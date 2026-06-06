@@ -76,6 +76,15 @@ Result<RendererCompiledShaders> Renderer::CompileRendererPipelineShaders() {
     }
     shaders.postPS = std::move(postPsResult).Value();
 
+    auto fullSceneCompositeV3PsResult =
+        ShaderCompiler::CompileFromFile("assets/shaders/FullSceneCompositeV3.hlsl", "PSMain", "ps_5_1");
+    if (fullSceneCompositeV3PsResult.IsOk()) {
+        shaders.fullSceneCompositeV3PS = std::move(fullSceneCompositeV3PsResult).Value();
+    } else {
+        spdlog::warn("Failed to compile FullSceneCompositeV3 pixel shader: {}",
+                     fullSceneCompositeV3PsResult.Error());
+    }
+
     auto candidateBeautyDisplayPsResult =
         ShaderCompiler::CompileFromFile("assets/shaders/CandidateBeautyDisplay.hlsl", "PSMain", "ps_5_1");
     if (candidateBeautyDisplayPsResult.IsOk()) {

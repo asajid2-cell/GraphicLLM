@@ -17,7 +17,9 @@ REQUIRED_OUTPUTS = {
     "reflection_confidence",
     "scene_local_environment",
     "hdr_scene_color",
+    "candidate_hdr_scene_color",
     "ldr_cinematic_output",
+    "candidate_ldr_cinematic_output",
 }
 
 REQUIRED_DOMAINS = {
@@ -456,6 +458,9 @@ def analyze_report(
     composite_domain = domain_by_id.get("composite")
     composite_ready = v3.get("composite_v3_ready") is True
     if composite_ready:
+        composite_producer = composite_domain.get("producer") if isinstance(composite_domain, dict) else None
+        composite_is_real = composite_producer == "FullSceneCompositeV3"
+        composite_pass = find_frame_pass(report, "FullSceneCompositeV3")
         for dependency in [
             "material_attributes_ready",
             "lighting_split_resources_ready",
@@ -467,18 +472,35 @@ def analyze_report(
         if not isinstance(composite_domain, dict):
             failures.append("composite_v3_ready=true but composite domain is missing")
         else:
-            if composite_domain.get("producer") != "FullSceneCompositeV3Adapter":
-                failures.append("composite domain must currently be produced by FullSceneCompositeV3Adapter")
-            if composite_domain.get("output_resource") != "hdr_scene_color":
-                failures.append("composite domain must output hdr_scene_color")
-            if composite_domain.get("debug_view") != "hdr_scene_color":
-                failures.append("composite domain must expose hdr_scene_color debug view")
+            if composite_producer not in {"FullSceneCompositeV3", "FullSceneCompositeV3Adapter"}:
+                failures.append("composite domain must be produced by FullSceneCompositeV3 or FullSceneCompositeV3Adapter")
+            expected_output = "candidate_hdr_scene_color" if composite_is_real else "hdr_scene_color"
+            if composite_domain.get("output_resource") != expected_output:
+                failures.append(f"composite domain must output {expected_output}")
+            if composite_domain.get("debug_view") != expected_output:
+                failures.append(f"composite domain must expose {expected_output} debug view")
             if composite_domain.get("default_beauty_affects") is not False:
                 failures.append("composite domain must not affect default beauty yet")
             if composite_domain.get("ready_channel_count", 0) < 4:
                 failures.append("composite domain ready without all required channels")
             if composite_domain.get("missing_required_channel_count", 1) != 0:
                 failures.append("composite domain ready with missing required channels")
+        if composite_is_real:
+            composite_resource = find_frame_resource(report, "candidate_hdr_scene_color")
+            if not isinstance(composite_resource, dict) or composite_resource.get("valid") is not True:
+                failures.append("FullSceneCompositeV3 ready without valid candidate_hdr_scene_color resource")
+            elif composite_resource.get("size_matches_contract") is not True:
+                failures.append("candidate_hdr_scene_color size does not match render contract")
+            if not isinstance(composite_pass, dict):
+                failures.append("composite domain produced by FullSceneCompositeV3 but pass is missing")
+            else:
+                if composite_pass.get("executed") is not True:
+                    failures.append("FullSceneCompositeV3 pass did not execute")
+                for resource in ["direct_lighting", "indirect_lighting", "shadow_visibility", "hdr_color"]:
+                    if resource not in composite_pass.get("reads", []):
+                        failures.append(f"FullSceneCompositeV3 pass does not read {resource}")
+                if "candidate_hdr_scene_color" not in composite_pass.get("writes", []):
+                    failures.append("FullSceneCompositeV3 pass does not write candidate_hdr_scene_color")
         for key in [
             "hdr_scene_color_ready",
             "composite_inputs_ready",
@@ -491,15 +513,19 @@ def analyze_report(
     post_domain = domain_by_id.get("cinematic_post")
     post_ready = v3.get("cinematic_post_v3_ready") is True
     if post_ready:
+        post_producer = post_domain.get("producer") if isinstance(post_domain, dict) else None
+        post_is_real = post_producer == "CinematicPostV3"
+        post_pass = find_frame_pass(report, "CinematicPostV3")
         if v3.get("composite_v3_ready") is not True:
             failures.append("cinematic_post_v3_ready=true before composite_v3_ready")
         if not isinstance(post_domain, dict):
             failures.append("cinematic_post_v3_ready=true but cinematic_post domain is missing")
         else:
-            if post_domain.get("producer") != "CinematicPostV3Adapter":
-                failures.append("cinematic_post domain must currently be produced by CinematicPostV3Adapter")
-            if post_domain.get("output_resource") != "ldr_cinematic_output":
-                failures.append("cinematic_post domain must output ldr_cinematic_output")
+            if post_producer not in {"CinematicPostV3", "CinematicPostV3Adapter"}:
+                failures.append("cinematic_post domain must be produced by CinematicPostV3 or CinematicPostV3Adapter")
+            expected_output = "candidate_ldr_cinematic_output" if post_is_real else "ldr_cinematic_output"
+            if post_domain.get("output_resource") != expected_output:
+                failures.append(f"cinematic_post domain must output {expected_output}")
             if post_domain.get("debug_view") != "exposure_meter":
                 failures.append("cinematic_post domain must expose exposure_meter debug view")
             if post_domain.get("default_beauty_affects") is not False:
@@ -508,6 +534,16 @@ def analyze_report(
                 failures.append("cinematic_post domain ready without all required channels")
             if post_domain.get("missing_required_channel_count", 1) != 0:
                 failures.append("cinematic_post domain ready with missing required channels")
+        if post_is_real:
+            if not isinstance(post_pass, dict):
+                failures.append("cinematic_post domain produced by CinematicPostV3 but pass is missing")
+            else:
+                if post_pass.get("executed") is not True:
+                    failures.append("CinematicPostV3 pass did not execute")
+                if "candidate_hdr_scene_color" not in post_pass.get("reads", []):
+                    failures.append("CinematicPostV3 pass does not read candidate_hdr_scene_color")
+                if "candidate_ldr_cinematic_output" not in post_pass.get("writes", []):
+                    failures.append("CinematicPostV3 pass does not write candidate_ldr_cinematic_output")
         for key in [
             "ldr_cinematic_output_ready",
             "exposure_meter_ready",
@@ -523,13 +559,15 @@ def analyze_report(
     candidate_ready = v3.get("candidate_beauty_ready") is True
     candidate_displayed = v3.get("candidate_beauty_displayed") is True
     if candidate_requested:
-        candidate_pass = find_frame_pass(report, "FullSceneCandidateBeautyV3")
+        candidate_producer = v3.get("candidate_beauty_producer")
+        candidate_pass_name = "CinematicPostV3" if candidate_producer == "CinematicPostV3" else "FullSceneCandidateBeautyV3"
+        candidate_pass = find_frame_pass(report, candidate_pass_name)
         candidate_resource = find_frame_resource(report, "candidate_ldr_cinematic_output")
         if not isinstance(candidate_domain, dict):
             failures.append("candidate_beauty_requested=true but candidate_beauty domain is missing")
         else:
-            if candidate_domain.get("producer") != "FullSceneCandidateBeautyV3":
-                failures.append("candidate beauty must be produced by FullSceneCandidateBeautyV3")
+            if candidate_domain.get("producer") not in {"CinematicPostV3", "FullSceneCandidateBeautyV3"}:
+                failures.append("candidate beauty must be produced by CinematicPostV3 or FullSceneCandidateBeautyV3")
             if candidate_domain.get("output_resource") != "candidate_ldr_cinematic_output":
                 failures.append("candidate beauty must output candidate_ldr_cinematic_output")
             if candidate_domain.get("debug_view") != "candidate_beauty_v3":
@@ -541,14 +579,15 @@ def analyze_report(
         elif candidate_resource.get("size_matches_contract") is not True:
             failures.append("candidate_ldr_cinematic_output size does not match render contract")
         if not isinstance(candidate_pass, dict):
-            failures.append("candidate beauty requested but FullSceneCandidateBeautyV3 pass is missing")
+            failures.append(f"candidate beauty requested but {candidate_pass_name} pass is missing")
         else:
             if candidate_pass.get("executed") is not True:
-                failures.append("FullSceneCandidateBeautyV3 pass did not execute")
-            if "hdr_color" not in candidate_pass.get("reads", []):
-                failures.append("FullSceneCandidateBeautyV3 pass does not read hdr_color")
+                failures.append(f"{candidate_pass_name} pass did not execute")
+            expected_input = "candidate_hdr_scene_color" if candidate_pass_name == "CinematicPostV3" else "hdr_color"
+            if expected_input not in candidate_pass.get("reads", []):
+                failures.append(f"{candidate_pass_name} pass does not read {expected_input}")
             if "candidate_ldr_cinematic_output" not in candidate_pass.get("writes", []):
-                failures.append("FullSceneCandidateBeautyV3 pass does not write candidate_ldr_cinematic_output")
+                failures.append(f"{candidate_pass_name} pass does not write candidate_ldr_cinematic_output")
         if candidate_ready:
             for dependency in [
                 "composite_v3_ready",
@@ -556,7 +595,7 @@ def analyze_report(
             ]:
                 if v3.get(dependency) is not True:
                     failures.append(f"candidate_beauty_ready=true before {dependency}")
-            if v3.get("candidate_beauty_producer") != "FullSceneCandidateBeautyV3":
+            if v3.get("candidate_beauty_producer") not in {"CinematicPostV3", "FullSceneCandidateBeautyV3"}:
                 failures.append("candidate_beauty_ready=true with wrong producer")
             if v3.get("candidate_beauty_output") != "candidate_ldr_cinematic_output":
                 failures.append("candidate_beauty_ready=true with wrong output")

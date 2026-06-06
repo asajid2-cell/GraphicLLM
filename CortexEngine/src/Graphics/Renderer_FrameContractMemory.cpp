@@ -104,6 +104,7 @@ Renderer::VRAMBreakdown Renderer::GetEstimatedVRAMBreakdown() const {
     addResource(breakdown.renderTargetBytes, m_shadowResources.resources.map.Get());
     addResource(breakdown.renderTargetBytes, m_mainTargets.hdr.resources.color.Get());
     addResource(breakdown.renderTargetBytes, m_mainTargets.normalRoughness.resources.texture.Get());
+    addResource(breakdown.renderTargetBytes, m_mainTargets.compositeV3.resources.hdrSceneColor.Get());
     addResource(breakdown.renderTargetBytes, m_mainTargets.candidateBeautyV3.resources.ldrOutput.Get());
     addResource(breakdown.renderTargetBytes, m_temporalScreenState.velocityBuffer.Get());
 

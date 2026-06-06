@@ -75,9 +75,12 @@ Current bridge status:
   command-line flags.
 - `FullSceneCandidateBeautyV3Display` can now blit the candidate output to the
   swapchain for review while normal `beauty` rows remain unchanged.
-- The display path is still a review bridge, not a promotion. It reuses the
-  existing post-process composite until `FullSceneCompositeV3` and
-  `CinematicPostV3` are replaced with real V3 producers.
+- The candidate review row now has first real producer ownership:
+  `FullSceneCompositeV3` writes `candidate_hdr_scene_color` from V3 direct,
+  indirect, and shadow-visibility resources; `CinematicPostV3` consumes that
+  target and writes `candidate_ldr_cinematic_output`.
+- Normal/default rows still use adapter evidence until the candidate path is
+  stress-tested and explicitly promoted.
 
 Initial bridge:
 
@@ -90,6 +93,9 @@ Initial bridge:
 - the first real producer is `FullSceneCandidateBeautyV3`, which may reuse the
   current post shader initially but must render through a named candidate pass
   into `candidate_ldr_cinematic_output`.
+- the first real composite/post producer chain is
+  `FullSceneCompositeV3 -> CinematicPostV3`; adapter rows remain valid only as
+  fallback/default evidence.
 - `default_beauty_affects` must remain `false`.
 
 ## Phase 0 - Stabilize Before Beauty

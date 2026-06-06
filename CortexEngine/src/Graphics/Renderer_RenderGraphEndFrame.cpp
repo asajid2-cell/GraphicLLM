@@ -20,6 +20,122 @@ namespace {
 constexpr D3D12_RESOURCE_STATES kRenderGraphShaderResourceState =
     D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
 
+struct FullSceneCompositeV3Context {
+    RGResourceHandle directLighting;
+    RGResourceHandle indirectLighting;
+    RGResourceHandle shadowVisibility;
+    RGResourceHandle legacyHdr;
+    RGResourceHandle output;
+    ID3D12Device* device = nullptr;
+    DescriptorHeapManager* descriptorManager = nullptr;
+    ID3D12GraphicsCommandList* commandList = nullptr;
+    DX12RootSignature* rootSignature = nullptr;
+    DX12Pipeline* pipeline = nullptr;
+    D3D12_GPU_VIRTUAL_ADDRESS frameConstants = 0;
+    DescriptorHandle directLightingSRV;
+    DescriptorHandle indirectLightingSRV;
+    DescriptorHandle shadowVisibilitySRV;
+    DescriptorHandle legacyHdrSRV;
+    D3D12_CPU_DESCRIPTOR_HANDLE outputRTV{};
+    uint32_t width = 0;
+    uint32_t height = 0;
+    bool* ran = nullptr;
+    bool* failed = nullptr;
+    const char** stage = nullptr;
+};
+
+void FailFullSceneCompositeV3(const FullSceneCompositeV3Context& context, const char* stage) {
+    if (context.failed) {
+        *context.failed = true;
+    }
+    if (context.stage && !*context.stage) {
+        *context.stage = stage ? stage : "full_scene_composite_v3_unknown";
+    }
+}
+
+[[nodiscard]] bool AddFullSceneCompositeV3Pass(RenderGraph& graph,
+                                               const FullSceneCompositeV3Context& context) {
+    if (!context.directLighting.IsValid() ||
+        !context.indirectLighting.IsValid() ||
+        !context.shadowVisibility.IsValid() ||
+        !context.legacyHdr.IsValid() ||
+        !context.output.IsValid() ||
+        !context.device ||
+        !context.descriptorManager ||
+        !context.commandList ||
+        !context.rootSignature ||
+        !context.pipeline ||
+        !context.pipeline->GetPipelineState() ||
+        context.frameConstants == 0 ||
+        !context.directLightingSRV.IsValid() ||
+        !context.indirectLightingSRV.IsValid() ||
+        !context.shadowVisibilitySRV.IsValid() ||
+        !context.legacyHdrSRV.IsValid() ||
+        context.outputRTV.ptr == 0 ||
+        context.width == 0 ||
+        context.height == 0) {
+        FailFullSceneCompositeV3(context, "full_scene_composite_v3_contract");
+        return false;
+    }
+
+    graph.AddPass(
+        "FullSceneCompositeV3",
+        [context](RGPassBuilder& builder) {
+            builder.SetType(RGPassType::Graphics);
+            builder.Read(context.directLighting, RGResourceUsage::ShaderResource);
+            builder.Read(context.indirectLighting, RGResourceUsage::ShaderResource);
+            builder.Read(context.shadowVisibility, RGResourceUsage::ShaderResource);
+            builder.Read(context.legacyHdr, RGResourceUsage::ShaderResource);
+            builder.Write(context.output, RGResourceUsage::RenderTarget);
+        },
+        [context](ID3D12GraphicsCommandList*, const RenderGraph&) {
+            auto tableResult = context.descriptorManager->AllocateTransientCBV_SRV_UAVRange(4);
+            if (tableResult.IsErr()) {
+                FailFullSceneCompositeV3(context, "full_scene_composite_v3_descriptor");
+                return;
+            }
+
+            const DescriptorHandle base = tableResult.Value();
+            const DescriptorHandle table[4] = {
+                context.descriptorManager->GetCBV_SRV_UAVHandle(base.index + 0u),
+                context.descriptorManager->GetCBV_SRV_UAVHandle(base.index + 1u),
+                context.descriptorManager->GetCBV_SRV_UAVHandle(base.index + 2u),
+                context.descriptorManager->GetCBV_SRV_UAVHandle(base.index + 3u),
+            };
+            for (const DescriptorHandle& handle : table) {
+                if (!handle.IsValid()) {
+                    FailFullSceneCompositeV3(context, "full_scene_composite_v3_descriptor_slot");
+                    return;
+                }
+            }
+
+            context.device->CopyDescriptorsSimple(1, table[0].cpu, context.directLightingSRV.cpu, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+            context.device->CopyDescriptorsSimple(1, table[1].cpu, context.indirectLightingSRV.cpu, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+            context.device->CopyDescriptorsSimple(1, table[2].cpu, context.shadowVisibilitySRV.cpu, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+            context.device->CopyDescriptorsSimple(1, table[3].cpu, context.legacyHdrSRV.cpu, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+
+            context.commandList->OMSetRenderTargets(1, &context.outputRTV, FALSE, nullptr);
+            FullscreenPass::SetViewportAndScissor(context.commandList, context.width, context.height);
+            if (!FullscreenPass::BindGraphicsState({
+                    context.commandList,
+                    context.descriptorManager,
+                    context.rootSignature,
+                    context.frameConstants,
+                })) {
+                FailFullSceneCompositeV3(context, "full_scene_composite_v3_bind");
+                return;
+            }
+            context.commandList->SetPipelineState(context.pipeline->GetPipelineState());
+            context.commandList->SetGraphicsRootDescriptorTable(3, table[0].gpu);
+            FullscreenPass::DrawTriangle(context.commandList);
+            if (context.ran) {
+                *context.ran = true;
+            }
+        });
+
+    return true;
+}
+
 struct CandidateBeautyDisplayContext {
     RGResourceHandle candidate;
     RGResourceHandle backBuffer;
@@ -139,6 +255,19 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
          std::getenv("CORTEX_DISPLAY_FULL_SCENE_CANDIDATE_BEAUTY_V3") != nullptr) &&
         m_pipelineState.candidateBeautyDisplay &&
         m_mainTargets.candidateBeautyV3.descriptors.ldrOutputSRV.IsValid();
+    const bool wantsCompositeV3ThisFrame =
+        wantsCandidateBeautyThisFrame &&
+        m_pipelineState.fullSceneCompositeV3 &&
+        m_mainTargets.compositeV3.resources.hdrSceneColor &&
+        m_mainTargets.compositeV3.descriptors.hdrSceneColorRTV.IsValid() &&
+        m_mainTargets.compositeV3.descriptors.hdrSceneColorSRV.IsValid() &&
+        m_mainTargets.lightingV3.resources.directLighting &&
+        m_mainTargets.lightingV3.resources.indirectLighting &&
+        m_mainTargets.lightingV3.resources.shadowVisibility &&
+        m_mainTargets.lightingV3.descriptors.directLightingSRV.IsValid() &&
+        m_mainTargets.lightingV3.descriptors.indirectLightingSRV.IsValid() &&
+        m_mainTargets.lightingV3.descriptors.shadowVisibilitySRV.IsValid() &&
+        m_mainTargets.hdr.descriptors.srv.IsValid();
     const bool useFusedBloomTransients =
         wantsFusedBloomThisFrame &&
         std::getenv("CORTEX_DISABLE_BLOOM_TRANSIENTS") == nullptr;
@@ -149,6 +278,7 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
 
     result.attempted = true;
     result.attemptedBloom = wantsFusedBloomThisFrame;
+    result.attemptedCompositeV3 = wantsCompositeV3ThisFrame;
     result.attemptedCandidateBeauty = wantsCandidateBeautyThisFrame;
     result.attemptedCandidateBeautyDisplay = wantsCandidateBeautyDisplayThisFrame;
     Debug::GPUProfiler::Get().BeginScope(m_commandResources.graphicsList.Get(), "RenderGraphEndFrame", "RenderGraph");
@@ -178,6 +308,10 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
     RGResourceHandle rtReflHistHandle{};
     RGResourceHandle localReflRadianceHandle{};
     RGResourceHandle backBufferHandle{};
+    RGResourceHandle v3DirectLightingHandle{};
+    RGResourceHandle v3IndirectLightingHandle{};
+    RGResourceHandle v3ShadowVisibilityHandle{};
+    RGResourceHandle candidateHdrSceneColorHandle{};
     RGResourceHandle candidateBeautyHandle{};
     std::array<RGResourceHandle, kBloomLevels> bloomA{};
     std::array<RGResourceHandle, kBloomLevels> bloomB{};
@@ -349,6 +483,24 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
             m_services.window->GetCurrentBackBuffer(),
             D3D12_RESOURCE_STATE_PRESENT,
             "BackBuffer");
+        if (wantsCompositeV3ThisFrame) {
+            v3DirectLightingHandle = m_services.renderGraph->ImportResource(
+                m_mainTargets.lightingV3.resources.directLighting.Get(),
+                m_mainTargets.lightingV3.resources.state,
+                "V3DirectLighting_ForComposite");
+            v3IndirectLightingHandle = m_services.renderGraph->ImportResource(
+                m_mainTargets.lightingV3.resources.indirectLighting.Get(),
+                m_mainTargets.lightingV3.resources.state,
+                "V3IndirectLighting_ForComposite");
+            v3ShadowVisibilityHandle = m_services.renderGraph->ImportResource(
+                m_mainTargets.lightingV3.resources.shadowVisibility.Get(),
+                m_mainTargets.lightingV3.resources.state,
+                "V3ShadowVisibility_ForComposite");
+            candidateHdrSceneColorHandle = m_services.renderGraph->ImportResource(
+                m_mainTargets.compositeV3.resources.hdrSceneColor.Get(),
+                m_mainTargets.compositeV3.resources.state,
+                "CandidateHDRSceneColor");
+        }
         if (wantsCandidateBeautyThisFrame) {
             candidateBeautyHandle = m_services.renderGraph->ImportResource(
                 m_mainTargets.candidateBeautyV3.resources.ldrOutput.Get(),
@@ -503,11 +655,46 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
         executeContext.status.stage = &postProcessGraphStageError;
         executeContext.ranPostProcess = &result.ranPostProcess;
 
+        if (wantsCompositeV3ThisFrame && candidateHdrSceneColorHandle.IsValid()) {
+            FullSceneCompositeV3Context compositeContext{};
+            compositeContext.directLighting = v3DirectLightingHandle;
+            compositeContext.indirectLighting = v3IndirectLightingHandle;
+            compositeContext.shadowVisibility = v3ShadowVisibilityHandle;
+            compositeContext.legacyHdr = hdrHandle;
+            compositeContext.output = candidateHdrSceneColorHandle;
+            compositeContext.device = m_services.device ? m_services.device->GetDevice() : nullptr;
+            compositeContext.descriptorManager = m_services.descriptorManager.get();
+            compositeContext.commandList = m_commandResources.graphicsList.Get();
+            compositeContext.rootSignature = m_pipelineState.rootSignature.get();
+            compositeContext.pipeline = m_pipelineState.fullSceneCompositeV3.get();
+            compositeContext.frameConstants = m_constantBuffers.currentFrameGPU;
+            compositeContext.directLightingSRV = m_mainTargets.lightingV3.descriptors.directLightingSRV;
+            compositeContext.indirectLightingSRV = m_mainTargets.lightingV3.descriptors.indirectLightingSRV;
+            compositeContext.shadowVisibilitySRV = m_mainTargets.lightingV3.descriptors.shadowVisibilitySRV;
+            compositeContext.legacyHdrSRV = m_mainTargets.hdr.descriptors.srv;
+            compositeContext.outputRTV = m_mainTargets.compositeV3.descriptors.hdrSceneColorRTV.cpu;
+            compositeContext.width = GetInternalRenderWidth();
+            compositeContext.height = GetInternalRenderHeight();
+            compositeContext.ran = &result.ranCompositeV3;
+            compositeContext.failed = &bloomStageFailed;
+            compositeContext.stage = &postProcessGraphStageError;
+            if (!AddFullSceneCompositeV3Pass(*m_services.renderGraph, compositeContext)) {
+                bloomStageFailed = true;
+            }
+        }
+
         if (candidateBeautyHandle.IsValid()) {
             PostProcessGraphPass::ResourceHandles candidateBeautyResources = postProcessResources;
+            if (candidateHdrSceneColorHandle.IsValid()) {
+                candidateBeautyResources.hdr = candidateHdrSceneColorHandle;
+            }
             candidateBeautyResources.backBuffer = candidateBeautyHandle;
 
             PostProcessGraphPass::ExecuteContext candidateExecuteContext = executeContext;
+            if (candidateHdrSceneColorHandle.IsValid()) {
+                candidateExecuteContext.descriptorUpdate.hdr =
+                    m_mainTargets.compositeV3.resources.hdrSceneColor.Get();
+            }
             candidateExecuteContext.draw.targetRtv = m_mainTargets.candidateBeautyV3.descriptors.ldrOutputRTV.cpu;
             candidateExecuteContext.draw.width = GetInternalRenderWidth();
             candidateExecuteContext.draw.height = GetInternalRenderHeight();
@@ -516,7 +703,7 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
             candidateExecuteContext.ranPostProcess = &result.ranCandidateBeauty;
 
             PostProcessGraphPass::GraphContext candidateBeautyContext{};
-            candidateBeautyContext.passName = "FullSceneCandidateBeautyV3";
+            candidateBeautyContext.passName = candidateHdrSceneColorHandle.IsValid() ? "CinematicPostV3" : "FullSceneCandidateBeautyV3";
             candidateBeautyContext.resources = candidateBeautyResources;
             candidateBeautyContext.execute = candidateExecuteContext;
             candidateBeautyContext.status.failed = &bloomStageFailed;
@@ -661,6 +848,10 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
             m_mainTargets.candidateBeautyV3.resources.state =
                 m_services.renderGraph->GetResourceState(candidateBeautyHandle);
         }
+        if (candidateHdrSceneColorHandle.IsValid()) {
+            m_mainTargets.compositeV3.resources.state =
+                m_services.renderGraph->GetResourceState(candidateHdrSceneColorHandle);
+        }
         if (hzbHandle.IsValid() && (m_debugViewState.mode == 32u)) m_hzbResources.resources.resourceState = m_services.renderGraph->GetResourceState(hzbHandle);
         if (wantsFusedBloomThisFrame && !useFusedBloomTransients) {
             for (uint32_t level = 0; level < m_bloomResources.resources.activeLevels; ++level) {
@@ -689,12 +880,25 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
                         false,
                         nullptr,
                         true);
+        if (wantsCompositeV3ThisFrame) {
+            RecordFramePass("FullSceneCompositeV3",
+                            true,
+                            result.ranCompositeV3,
+                            result.ranCompositeV3 ? 1u : 0u,
+                            {"direct_lighting", "indirect_lighting", "shadow_visibility", "hdr_color"},
+                            {"candidate_hdr_scene_color"},
+                            false,
+                            nullptr,
+                            true);
+        }
         if (wantsCandidateBeautyThisFrame) {
-            RecordFramePass("FullSceneCandidateBeautyV3",
+            const bool usedCandidateHdr = wantsCompositeV3ThisFrame && result.ranCompositeV3;
+            RecordFramePass(usedCandidateHdr ? "CinematicPostV3" : "FullSceneCandidateBeautyV3",
                             true,
                             result.ranCandidateBeauty,
                             result.ranCandidateBeauty ? 1u : 0u,
-                            {"hdr_color", "ssao", "ssr_color", "bloom", "taa_history", "depth",
+                            {usedCandidateHdr ? "candidate_hdr_scene_color" : "hdr_color",
+                             "ssao", "ssr_color", "bloom", "taa_history", "depth",
                              inputs.frameNormalRoughnessResource,
                              "vb_gbuffer_emissive_metallic", "vb_gbuffer_material_ext1",
                              "vb_gbuffer_material_ext2", "velocity", "rt_reflection", "hzb"},
@@ -721,7 +925,9 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
                         {"depth", "hdr_color", "ssao", "ssr_color", "bloom", "taa_history",
                          "velocity", "rt_reflection", "vb_gbuffer_material_ext1",
                          "vb_gbuffer_material_ext2", "hzb"},
-                        {"hzb", "back_buffer", "candidate_ldr_cinematic_output"});
+                        wantsCompositeV3ThisFrame
+                            ? std::initializer_list<const char*>{"hzb", "back_buffer", "candidate_hdr_scene_color", "candidate_ldr_cinematic_output"}
+                            : std::initializer_list<const char*>{"hzb", "back_buffer", "candidate_ldr_cinematic_output"});
     } else {
         RecordFramePass("RenderGraphEndFrame", true, true, result.ranPostProcess ? 1u : 0u,
                         {"depth", "hdr_color", "ssao", "ssr_color", "bloom", "taa_history",

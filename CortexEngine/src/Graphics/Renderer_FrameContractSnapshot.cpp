@@ -70,6 +70,7 @@ void ApplyBudgetPlanToContract(FrameContract::BudgetInfo& info, const RendererBu
 bool IsCinematicPostPass(const FrameContract::PassRecord& pass) {
     return pass.name == "PostProcess" ||
            pass.name == "Bloom" ||
+           pass.name == "CinematicPostV3" ||
            pass.name == "RenderGraphEndFrame";
 }
 
@@ -83,7 +84,7 @@ void FinalizeCinematicPostBudget(FrameContract& contract) {
 
     bool hasDetailedPostPass = false;
     for (const auto& pass : contract.passes) {
-        if (pass.name == "PostProcess" || pass.name == "Bloom") {
+        if (pass.name == "PostProcess" || pass.name == "Bloom" || pass.name == "CinematicPostV3") {
             hasDetailedPostPass = true;
             break;
         }
@@ -396,6 +397,10 @@ void Renderer::UpdateFrameContractSnapshot(Scene::ECS_Registry* registry,
     addResource("depth", m_depthResources.resources.buffer.Get(), contract.renderWidth, contract.renderHeight);
     addResource("hdr_color", m_mainTargets.hdr.resources.color.Get(), contract.renderWidth, contract.renderHeight);
     addResource("gbuffer_normal_roughness", m_mainTargets.normalRoughness.resources.texture.Get(), contract.renderWidth, contract.renderHeight);
+    addResource("candidate_hdr_scene_color",
+                m_mainTargets.compositeV3.resources.hdrSceneColor.Get(),
+                contract.renderWidth,
+                contract.renderHeight);
     addResource("candidate_ldr_cinematic_output",
                 m_mainTargets.candidateBeautyV3.resources.ldrOutput.Get(),
                 contract.renderWidth,

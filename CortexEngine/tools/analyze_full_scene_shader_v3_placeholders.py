@@ -15,6 +15,9 @@ REQUIRED_OUTPUTS = {
     "shadow_visibility",
     "reflection_radiance",
     "reflection_confidence",
+    "reflection_source_id",
+    "reflection_rejected_source_mask",
+    "reflection_temporal_delta",
     "scene_local_environment",
     "hdr_scene_color",
     "candidate_hdr_scene_color",
@@ -54,6 +57,9 @@ LIGHTING_SIGNAL_THRESHOLDS = {
     "v3_shadow_visibility": {"min_mean_luma": 0.02, "max_mean_luma": 0.98, "min_nonblack_ratio": 0.05},
     "v3_shadow_loss": {"min_mean_luma": 0.005, "min_nonblack_ratio": 0.01},
     "v3_indirect_lighting": {"min_mean_luma": 0.01, "min_nonblack_ratio": 0.05},
+    "reflection_radiance": {"min_mean_luma": 0.001, "min_nonblack_ratio": 0.001},
+    "reflection_confidence": {"min_mean_luma": 0.001, "min_nonblack_ratio": 0.001},
+    "reflection_source_id": {"min_mean_luma": 0.001, "min_nonblack_ratio": 0.001},
     "candidate_hdr_scene_color": {"min_mean_luma": 0.01, "min_nonblack_ratio": 0.05},
 }
 
@@ -422,6 +428,7 @@ def analyze_report(
     reflection_domain = domain_by_id.get("reflection")
     reflection_ready = v3.get("reflection_v3_ready") is True
     if reflection_ready:
+        reflection_pass = find_frame_pass(report, "FullSceneReflectionV3")
         if v3.get("scene_local_environment_ready") is not True:
             failures.append("reflection_v3_ready=true before scene_local_environment_ready")
         if not isinstance(reflection_domain, dict):
@@ -435,7 +442,7 @@ def analyze_report(
                 failures.append("reflection domain must expose reflection_confidence debug view")
             if reflection_domain.get("default_beauty_affects") is not False:
                 failures.append("reflection domain must not affect default beauty yet")
-            if reflection_domain.get("ready_channel_count", 0) < 4:
+            if reflection_domain.get("ready_channel_count", 0) < 5:
                 failures.append("reflection domain ready without all required channels")
             if reflection_domain.get("missing_required_channel_count", 1) != 0:
                 failures.append("reflection domain ready with missing required channels")
@@ -455,6 +462,27 @@ def analyze_report(
         ]:
             if v3.get(key) is not True:
                 failures.append(f"reflection_v3_ready=true but {key} is not true")
+        if not isinstance(reflection_pass, dict):
+            failures.append("reflection domain produced by FullSceneReflectionV3 but pass is missing")
+        else:
+            if reflection_pass.get("executed") is not True:
+                failures.append("FullSceneReflectionV3 pass did not execute")
+            if "local_reflection_radiance" not in reflection_pass.get("reads", []):
+                failures.append("FullSceneReflectionV3 pass does not read local_reflection_radiance")
+            for resource in [
+                "reflection_radiance",
+                "reflection_confidence",
+                "reflection_source_id",
+                "reflection_rejected_source_mask",
+                "reflection_temporal_delta",
+            ]:
+                if resource not in reflection_pass.get("writes", []):
+                    failures.append(f"FullSceneReflectionV3 pass does not write {resource}")
+                reflection_resource = find_frame_resource(report, resource)
+                if not isinstance(reflection_resource, dict) or reflection_resource.get("valid") is not True:
+                    failures.append(f"FullSceneReflectionV3 ready without valid {resource} resource")
+                elif reflection_resource.get("size_matches_contract") is not True:
+                    failures.append(f"{resource} size does not match render contract")
 
     composite_domain = domain_by_id.get("composite")
     composite_ready = v3.get("composite_v3_ready") is True
@@ -502,7 +530,7 @@ def analyze_report(
                     "indirect_lighting",
                     "shadow_visibility",
                     "hdr_color",
-                    "local_reflection_radiance",
+                    "reflection_radiance",
                 ]:
                     if resource not in composite_pass.get("reads", []):
                         failures.append(f"FullSceneCompositeV3 pass does not read {resource}")

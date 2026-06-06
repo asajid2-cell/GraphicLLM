@@ -144,6 +144,50 @@ struct FullSceneCompositeV3TargetDescriptors {
     }
 };
 
+struct FullSceneReflectionV3TargetResources {
+    ComPtr<ID3D12Resource> radiance;
+    ComPtr<ID3D12Resource> confidence;
+    ComPtr<ID3D12Resource> sourceId;
+    ComPtr<ID3D12Resource> rejectedSourceMask;
+    ComPtr<ID3D12Resource> temporalDelta;
+    D3D12_RESOURCE_STATES state = D3D12_RESOURCE_STATE_COMMON;
+
+    void Reset() {
+        radiance.Reset();
+        confidence.Reset();
+        sourceId.Reset();
+        rejectedSourceMask.Reset();
+        temporalDelta.Reset();
+        state = D3D12_RESOURCE_STATE_COMMON;
+    }
+};
+
+struct FullSceneReflectionV3TargetDescriptors {
+    DescriptorHandle radianceRTV;
+    DescriptorHandle radianceSRV;
+    DescriptorHandle confidenceRTV;
+    DescriptorHandle confidenceSRV;
+    DescriptorHandle sourceIdRTV;
+    DescriptorHandle sourceIdSRV;
+    DescriptorHandle rejectedSourceMaskRTV;
+    DescriptorHandle rejectedSourceMaskSRV;
+    DescriptorHandle temporalDeltaRTV;
+    DescriptorHandle temporalDeltaSRV;
+
+    void Reset() {
+        radianceRTV = {};
+        radianceSRV = {};
+        confidenceRTV = {};
+        confidenceSRV = {};
+        sourceIdRTV = {};
+        sourceIdSRV = {};
+        rejectedSourceMaskRTV = {};
+        rejectedSourceMaskSRV = {};
+        temporalDeltaRTV = {};
+        temporalDeltaSRV = {};
+    }
+};
+
 struct HDRRenderTargetState {
     HDRRenderTargetResources resources;
     HDRRenderTargetDescriptors descriptors;
@@ -492,6 +536,127 @@ struct FullSceneCompositeV3TargetState {
     }
 };
 
+struct FullSceneReflectionV3TargetState {
+    FullSceneReflectionV3TargetResources resources;
+    FullSceneReflectionV3TargetDescriptors descriptors;
+
+    [[nodiscard]] Result<void> CreateTargets(ID3D12Device* device,
+                                             DescriptorHeapManager* descriptorManager,
+                                             UINT width,
+                                             UINT height) {
+        if (!device || !descriptorManager || width == 0 || height == 0) {
+            return Result<void>::Err("Renderer not initialized for FullSceneReflectionV3 target creation");
+        }
+
+        resources.Reset();
+
+        auto createTarget = [&](const char* label,
+                                ComPtr<ID3D12Resource>& target,
+                                DescriptorHandle& rtv,
+                                DescriptorHandle& srv) -> Result<void> {
+            D3D12_RESOURCE_DESC desc = {};
+            desc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+            desc.Width = width;
+            desc.Height = height;
+            desc.DepthOrArraySize = 1;
+            desc.MipLevels = 1;
+            desc.Format = DXGI_FORMAT_R16G16B16A16_FLOAT;
+            desc.SampleDesc.Count = 1;
+            desc.Flags = D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
+
+            D3D12_CLEAR_VALUE clearValue = {};
+            clearValue.Format = desc.Format;
+            clearValue.Color[0] = 0.0f;
+            clearValue.Color[1] = 0.0f;
+            clearValue.Color[2] = 0.0f;
+            clearValue.Color[3] = 1.0f;
+
+            const auto heapProps = MainTargetDefaultHeapProperties();
+            const HRESULT hr = device->CreateCommittedResource(
+                &heapProps,
+                D3D12_HEAP_FLAG_NONE,
+                &desc,
+                D3D12_RESOURCE_STATE_RENDER_TARGET,
+                &clearValue,
+                IID_PPV_ARGS(&target));
+            if (FAILED(hr)) {
+                resources.Reset();
+                return Result<void>::Err(std::string("Failed to create FullSceneReflectionV3 target: ") + label);
+            }
+
+            if (!rtv.IsValid()) {
+                auto rtvResult = descriptorManager->AllocateRTV();
+                if (rtvResult.IsErr()) {
+                    return Result<void>::Err(std::string("Failed to allocate RTV for FullSceneReflectionV3 target: ") +
+                                             label + ": " + rtvResult.Error());
+                }
+                rtv = rtvResult.Value();
+            }
+
+            D3D12_RENDER_TARGET_VIEW_DESC rtvDesc = {};
+            rtvDesc.Format = desc.Format;
+            rtvDesc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
+            device->CreateRenderTargetView(target.Get(), &rtvDesc, rtv.cpu);
+
+            if (!srv.IsValid()) {
+                auto srvResult = descriptorManager->AllocateStagingCBV_SRV_UAV();
+                if (srvResult.IsErr()) {
+                    return Result<void>::Err(std::string("Failed to allocate SRV for FullSceneReflectionV3 target: ") +
+                                             label + ": " + srvResult.Error());
+                }
+                srv = srvResult.Value();
+            }
+
+            D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
+            srvDesc.Format = desc.Format;
+            srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+            srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+            srvDesc.Texture2D.MipLevels = 1;
+            device->CreateShaderResourceView(target.Get(), &srvDesc, srv.cpu);
+
+            return Result<void>::Ok();
+        };
+
+        auto radiance = createTarget("reflection_radiance",
+                                     resources.radiance,
+                                     descriptors.radianceRTV,
+                                     descriptors.radianceSRV);
+        if (radiance.IsErr()) return radiance;
+
+        auto confidence = createTarget("reflection_confidence",
+                                       resources.confidence,
+                                       descriptors.confidenceRTV,
+                                       descriptors.confidenceSRV);
+        if (confidence.IsErr()) return confidence;
+
+        auto sourceId = createTarget("reflection_source_id",
+                                     resources.sourceId,
+                                     descriptors.sourceIdRTV,
+                                     descriptors.sourceIdSRV);
+        if (sourceId.IsErr()) return sourceId;
+
+        auto rejected = createTarget("reflection_rejected_source_mask",
+                                     resources.rejectedSourceMask,
+                                     descriptors.rejectedSourceMaskRTV,
+                                     descriptors.rejectedSourceMaskSRV);
+        if (rejected.IsErr()) return rejected;
+
+        auto temporal = createTarget("reflection_temporal_delta",
+                                     resources.temporalDelta,
+                                     descriptors.temporalDeltaRTV,
+                                     descriptors.temporalDeltaSRV);
+        if (temporal.IsErr()) return temporal;
+
+        resources.state = D3D12_RESOURCE_STATE_RENDER_TARGET;
+        return Result<void>::Ok();
+    }
+
+    void Reset() {
+        resources.Reset();
+        descriptors.Reset();
+    }
+};
+
 struct FullSceneLightingV3TargetState {
     FullSceneLightingV3TargetResources resources;
     FullSceneLightingV3TargetDescriptors descriptors;
@@ -617,6 +782,7 @@ struct MainRenderTargetState {
     HDRRenderTargetState hdr;
     GBufferNormalRoughnessTargetState normalRoughness;
     FullSceneLightingV3TargetState lightingV3;
+    FullSceneReflectionV3TargetState reflectionV3;
     FullSceneCompositeV3TargetState compositeV3;
     FullSceneCandidateBeautyV3TargetState candidateBeautyV3;
 
@@ -632,6 +798,10 @@ struct MainRenderTargetState {
         lightingV3.Reset();
     }
 
+    void ResetReflectionV3() {
+        reflectionV3.Reset();
+    }
+
     void ResetCompositeV3() {
         compositeV3.Reset();
     }
@@ -644,6 +814,7 @@ struct MainRenderTargetState {
         ResetHDR();
         ResetGBufferNormalRoughness();
         ResetLightingV3();
+        ResetReflectionV3();
         ResetCompositeV3();
         ResetCandidateBeautyV3();
     }

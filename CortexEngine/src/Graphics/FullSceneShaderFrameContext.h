@@ -1236,6 +1236,9 @@ struct FullSceneShaderPipelineV3FrameContext {
         "shadow_visibility",
         "reflection_radiance",
         "reflection_confidence",
+        "reflection_source_id",
+        "reflection_rejected_source_mask",
+        "reflection_temporal_delta",
         "scene_local_environment",
         "hdr_scene_color",
         "candidate_hdr_scene_color",
@@ -1578,15 +1581,30 @@ inline FullSceneShaderPipelineV3FrameContext BuildFullSceneShaderPipelineV3Frame
         externalIblVisibilityAuthorized &&
         enclosedMissFallbackSafe &&
         readyReflectionSources > 0;
+    const bool reflectionResolverV3WritesOutputs =
+        FullSceneShaderHasResource(contract, "reflection_radiance") &&
+        FullSceneShaderHasResource(contract, "reflection_confidence") &&
+        FullSceneShaderHasResource(contract, "reflection_source_id") &&
+        FullSceneShaderHasResource(contract, "reflection_rejected_source_mask") &&
+        FullSceneShaderHasResource(contract, "reflection_temporal_delta") &&
+        FullSceneShaderPassReadsResource(contract, "FullSceneReflectionV3", "local_reflection_radiance") &&
+        FullSceneShaderPassWritesResource(contract, "FullSceneReflectionV3", "reflection_radiance") &&
+        FullSceneShaderPassWritesResource(contract, "FullSceneReflectionV3", "reflection_confidence") &&
+        FullSceneShaderPassWritesResource(contract, "FullSceneReflectionV3", "reflection_source_id") &&
+        FullSceneShaderPassWritesResource(contract, "FullSceneReflectionV3", "reflection_rejected_source_mask") &&
+        FullSceneShaderPassWritesResource(contract, "FullSceneReflectionV3", "reflection_temporal_delta");
     context.reflectionRadianceReady =
         context.sceneLocalEnvironmentReady &&
-        sourceContractReady;
+        sourceContractReady &&
+        reflectionResolverV3WritesOutputs;
     context.reflectionSourceIdReady =
         reflectionOwnerKnown &&
-        reflectionOwnerReportAvailable;
+        reflectionOwnerReportAvailable &&
+        reflectionResolverV3WritesOutputs;
     context.reflectionConfidenceReady =
         context.reflectionRadianceReady &&
-        reflectionPoliciesAvailable;
+        reflectionPoliciesAvailable &&
+        reflectionResolverV3WritesOutputs;
     const bool primaryReflectionSourceSceneLocal =
         localProbeSourceReady ||
         (!localProbeSourceReady && !rtSourceReady && !ssrSourceReady && iblSourceReady);
@@ -1602,13 +1620,15 @@ inline FullSceneShaderPipelineV3FrameContext BuildFullSceneShaderPipelineV3Frame
          contract.materials.materialTemporalStableGlossy > 0 &&
          FullSceneShaderHasResource(contract, "taa_history"));
     context.reflectionTemporalDeltaReady =
-        sceneLocalReflectionTemporalBoundReady ||
-        historyReflectionTemporalBoundReady;
+        reflectionResolverV3WritesOutputs &&
+        (sceneLocalReflectionTemporalBoundReady ||
+         historyReflectionTemporalBoundReady);
     uint32_t readyReflectionChannels = 0;
     readyReflectionChannels += context.reflectionRadianceReady ? 1u : 0u;
     readyReflectionChannels += context.reflectionConfidenceReady ? 1u : 0u;
     readyReflectionChannels += context.reflectionSourceIdReady ? 1u : 0u;
     readyReflectionChannels += context.reflectionTemporalDeltaReady ? 1u : 0u;
+    readyReflectionChannels += reflectionResolverV3WritesOutputs ? 1u : 0u;
     context.reflectionV3ChannelCount = readyReflectionChannels;
     context.reflectionV3SourceCount = readyReflectionSources;
     context.reflectionV3SourceContract =
@@ -1617,7 +1637,7 @@ inline FullSceneShaderPipelineV3FrameContext BuildFullSceneShaderPipelineV3Frame
         ssrSourceReady ? "screen_space_reflection" :
         iblSourceReady ? "scene_local_environment" :
         "unknown";
-    context.reflectionV3Ready = readyReflectionChannels == 4u;
+    context.reflectionV3Ready = readyReflectionChannels == 5u;
 
     FullSceneShaderPipelineV3DomainEvidence reflectionDomain =
         MakeFullSceneShaderPipelineV3DomainEvidence(
@@ -1626,7 +1646,7 @@ inline FullSceneShaderPipelineV3FrameContext BuildFullSceneShaderPipelineV3Frame
             "reflection_radiance",
             "reflection_confidence",
             context.reflectionV3Ready
-                ? "FullSceneReflectionV3 is backed by source radiance, source-id, confidence, and temporal-delta ownership contracts"
+                ? "FullSceneReflectionV3 writes concrete radiance, confidence, source-id, rejected-source, and temporal-delta resources"
                 : "FullSceneReflectionV3 is missing one or more reflection ownership channels");
     reflectionDomain.enabled =
         contract.sceneVisual.active &&
@@ -1642,6 +1662,10 @@ inline FullSceneShaderPipelineV3FrameContext BuildFullSceneShaderPipelineV3Frame
         "scene_visual_reflection_owner",
         "material_reflection_policy",
         "local_reflection_radiance",
+        "reflection_confidence",
+        "reflection_source_id",
+        "reflection_rejected_source_mask",
+        "reflection_temporal_delta",
         "rt_reflection_signal_history",
     };
     reflectionDomain.debugViews = {
@@ -1655,6 +1679,7 @@ inline FullSceneShaderPipelineV3FrameContext BuildFullSceneShaderPipelineV3Frame
         context.reflectionRadianceReady ? "reflection_radiance_owned" : "reflection_radiance_missing",
         context.reflectionConfidenceReady ? "reflection_confidence_owned" : "reflection_confidence_missing",
         context.reflectionSourceIdReady ? "reflection_source_id_owned" : "reflection_source_id_missing",
+        reflectionResolverV3WritesOutputs ? "reflection_rejected_source_mask_owned" : "reflection_rejected_source_mask_missing",
         context.reflectionTemporalDeltaReady
             ? (sceneLocalReflectionTemporalBoundReady
                    ? "reflection_temporal_delta_scene_local_bound"
@@ -1663,7 +1688,7 @@ inline FullSceneShaderPipelineV3FrameContext BuildFullSceneShaderPipelineV3Frame
         std::string("primary_source=") + context.reflectionV3SourceContract,
     };
     reflectionDomain.backingResourceCount = readyReflectionChannels;
-    reflectionDomain.requiredChannelCount = 4u;
+    reflectionDomain.requiredChannelCount = 5u;
     reflectionDomain.readyChannelCount = readyReflectionChannels;
     reflectionDomain.missingRequiredChannelCount =
         reflectionDomain.requiredChannelCount - reflectionDomain.readyChannelCount;
@@ -1679,7 +1704,7 @@ inline FullSceneShaderPipelineV3FrameContext BuildFullSceneShaderPipelineV3Frame
         FullSceneShaderPassReadsResource(contract, "FullSceneCompositeV3", "indirect_lighting") &&
         FullSceneShaderPassReadsResource(contract, "FullSceneCompositeV3", "shadow_visibility") &&
         FullSceneShaderPassReadsResource(contract, "FullSceneCompositeV3", "hdr_color") &&
-        FullSceneShaderPassReadsResource(contract, "FullSceneCompositeV3", "local_reflection_radiance");
+        FullSceneShaderPassReadsResource(contract, "FullSceneCompositeV3", "reflection_radiance");
     const bool realCompositeV3ProducerReady = candidateHdrSceneColorReady && compositeReadsV3Inputs;
     context.hdrSceneColorReady = candidateHdrSceneColorReady || legacyHdrSceneColorReady;
     context.compositeInputsReady =
@@ -1717,7 +1742,7 @@ inline FullSceneShaderPipelineV3FrameContext BuildFullSceneShaderPipelineV3Frame
             realCompositeV3ProducerReady ? "candidate_hdr_scene_color" : "hdr_scene_color",
             context.compositeV3Ready
                 ? (realCompositeV3ProducerReady
-                       ? "FullSceneCompositeV3 writes candidate HDR scene color from V3 lighting and local reflection radiance resources"
+                       ? "FullSceneCompositeV3 writes candidate HDR scene color from V3 lighting and ReflectionResolverV3 radiance resources"
                        : "FullSceneCompositeV3 adapter maps current HDR output to named HDR scene color and owns energy/overbright policy evidence")
                 : "FullSceneCompositeV3 is missing HDR output, input, energy, or overbright ownership evidence");
     compositeDomain.enabled = contract.sceneVisual.active;
@@ -1729,7 +1754,7 @@ inline FullSceneShaderPipelineV3FrameContext BuildFullSceneShaderPipelineV3Frame
     compositeDomain.backingResources = {
         realCompositeV3ProducerReady ? "candidate_hdr_scene_color" : "hdr_color",
         "hdr_color",
-        "local_reflection_radiance",
+        "reflection_radiance",
         "material_attributes",
         "lighting_split",
         "reflection_radiance",

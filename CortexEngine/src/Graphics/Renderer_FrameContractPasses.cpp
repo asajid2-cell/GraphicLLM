@@ -76,6 +76,11 @@ void Renderer::RecordFramePass(const char* name,
         if (resource == "shadow_visibility") return resourceBytes(m_mainTargets.lightingV3.resources.shadowVisibility.Get());
         if (resource == "shadow_loss") return resourceBytes(m_mainTargets.lightingV3.resources.shadowLoss.Get());
         if (resource == "indirect_lighting") return resourceBytes(m_mainTargets.lightingV3.resources.indirectLighting.Get());
+        if (resource == "reflection_radiance") return resourceBytes(m_mainTargets.reflectionV3.resources.radiance.Get());
+        if (resource == "reflection_confidence") return resourceBytes(m_mainTargets.reflectionV3.resources.confidence.Get());
+        if (resource == "reflection_source_id") return resourceBytes(m_mainTargets.reflectionV3.resources.sourceId.Get());
+        if (resource == "reflection_rejected_source_mask") return resourceBytes(m_mainTargets.reflectionV3.resources.rejectedSourceMask.Get());
+        if (resource == "reflection_temporal_delta") return resourceBytes(m_mainTargets.reflectionV3.resources.temporalDelta.Get());
         if (resource == "ssao") return resourceBytes(m_ssaoResources.resources.texture.Get());
         if (resource == "ssr_color") return resourceBytes(m_ssrResources.resources.color.Get());
         if (resource == "velocity") return resourceBytes(m_temporalScreenState.velocityBuffer.Get());
@@ -109,6 +114,9 @@ void Renderer::RecordFramePass(const char* name,
             if (write == "depth" || write == "hdr_color" ||
                 write == "candidate_hdr_scene_color" ||
                 write == "candidate_ldr_cinematic_output" ||
+                write == "reflection_radiance" || write == "reflection_confidence" ||
+                write == "reflection_source_id" || write == "reflection_rejected_source_mask" ||
+                write == "reflection_temporal_delta" ||
                 write == "direct_lighting" || write == "direct_lighting_unshadowed" ||
                 write == "shadow_visibility" || write == "shadow_loss" || write == "indirect_lighting" ||
                 write == "gbuffer_normal_roughness" || write == "velocity" ||
@@ -149,9 +157,11 @@ void Renderer::RecordFramePass(const char* name,
         record.name == "Bloom" ||
         record.name == "PostProcess" ||
         record.name == "FullSceneCompositeV3" ||
+        record.name == "FullSceneReflectionV3" ||
         record.name == "CinematicPostV3" ||
         record.name == "FullSceneCandidateBeautyV3" ||
         record.name == "FullSceneCandidateBeautyV3Display" ||
+        record.name == "FullSceneReflectionV3DebugView" ||
         record.name == "FullSceneCompositeV3DebugView" ||
         record.name == "RenderVoxel" ||
         record.name == "RenderGraphEndFrame";

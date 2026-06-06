@@ -22,6 +22,11 @@ V3_LIGHTING_VIEWS = [
 
 CANDIDATE_COMPOSITE_VIEWS = [
     "candidate_hdr_scene_color",
+    "reflection_radiance",
+    "reflection_confidence",
+    "reflection_source_id",
+    "reflection_rejected_source_mask",
+    "reflection_temporal_delta",
 ]
 
 LEGACY_PAIRS = {

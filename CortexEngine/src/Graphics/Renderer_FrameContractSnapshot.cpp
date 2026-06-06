@@ -410,6 +410,11 @@ void Renderer::UpdateFrameContractSnapshot(Scene::ECS_Registry* registry,
     addResource("shadow_visibility", m_mainTargets.lightingV3.resources.shadowVisibility.Get(), contract.renderWidth, contract.renderHeight);
     addResource("shadow_loss", m_mainTargets.lightingV3.resources.shadowLoss.Get(), contract.renderWidth, contract.renderHeight);
     addResource("indirect_lighting", m_mainTargets.lightingV3.resources.indirectLighting.Get(), contract.renderWidth, contract.renderHeight);
+    addResource("reflection_radiance", m_mainTargets.reflectionV3.resources.radiance.Get(), contract.renderWidth, contract.renderHeight);
+    addResource("reflection_confidence", m_mainTargets.reflectionV3.resources.confidence.Get(), contract.renderWidth, contract.renderHeight);
+    addResource("reflection_source_id", m_mainTargets.reflectionV3.resources.sourceId.Get(), contract.renderWidth, contract.renderHeight);
+    addResource("reflection_rejected_source_mask", m_mainTargets.reflectionV3.resources.rejectedSourceMask.Get(), contract.renderWidth, contract.renderHeight);
+    addResource("reflection_temporal_delta", m_mainTargets.reflectionV3.resources.temporalDelta.Get(), contract.renderWidth, contract.renderHeight);
     if (m_services.visibilityBuffer) {
         addResource("visibility_buffer", m_services.visibilityBuffer->GetVisibilityBuffer(), contract.renderWidth, contract.renderHeight);
         addResource("vb_gbuffer_albedo", m_services.visibilityBuffer->GetAlbedoBuffer(), contract.renderWidth, contract.renderHeight);

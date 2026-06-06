@@ -5644,3 +5644,67 @@ Remaining limitation:
 - Next SSR work should improve SSR confidence/radiance coverage or add a
   source-specific diagnostic packet before allowing SSR to win more often in
   auto policy.
+
+### Full Scene Shader Renderer Refactor Direction - 2026-06-06
+
+Current target:
+
+- Build `FullSceneCandidateBeautyV3` as the opt-in high-end renderer path.
+- Keep default beauty unchanged until candidate evidence is good enough and the
+  user explicitly accepts promotion.
+- Treat high-end visual quality as a system refactor, not a screenshot polish
+  exercise.
+
+Renderer domains to own:
+
+- Material payload V3:
+  stable PBR payload for base color, normal, roughness, metallic, specular,
+  emissive, opacity, AO, height/parallax, clearcoat, sheen, anisotropy, and
+  material class.
+- Lighting V3:
+  direct light, shadow visibility, indirect light, emissive light, volumetric
+  contribution, and exposure-pre-tonemap energy as separate resources.
+- Reflection V3:
+  local radiance, SSR, RT/ray query, planar/hero probes, and scene-local
+  environment fused by source ID, confidence, rejection mask, and temporal debt.
+- Scene-local environment V3:
+  visible background is separate from lighting/reflection background, so closed
+  rooms do not inherit inappropriate IBL imagery.
+- Composite V3:
+  candidate HDR image built from V3 terms rather than an adapter over legacy
+  `hdr_color`.
+- Cinematic post V3:
+  controlled exposure, bloom, tone map, color grade, glare, DOF, and history
+  diagnostics with locked-exposure stability packets.
+
+Execution order:
+
+1. SSR source-quality pass.
+   - Capture raw `ssr_color`, SSR confidence, normal/roughness/depth inputs,
+     rejection reasons, and resolver output.
+   - Fix the blank forced-SSR stress packet before allowing SSR to dominate
+     auto policy.
+2. Material payload pass.
+   - Normalize material channels and add range/debug gates so surfaces stop
+     reading as flat, plastic, mirror-like, or chalky by accident.
+3. Shadow and lighting stability pass.
+   - Lock exposure and reject moving shadows/light on static floor and wall
+     pixels under mouse jitter and camera sweep.
+4. Scene-local environment pass.
+   - Keep IBL lighting/reflection useful while preventing visible/reflection
+     content leaks in enclosed scenes.
+5. Candidate composite pass.
+   - Replace adapter ownership with a true V3 candidate composite and
+     split-screen/default comparison packet.
+6. Cross-family art packet.
+   - Validate gallery, kitchen, office, gym, classroom, concert, red room,
+     stadium, bathroom, bedroom, workshop, store, and street with static,
+     mouse-jitter, camera-sweep, close-surface, and reflective-object rows.
+
+Non-negotiable gates:
+
+- every feature must have named resources, producer pass, debug view,
+  frame-report fields, analyzer checks, and packet evidence.
+- no fix can rely only on IBL blur, disabled reflections, hidden backgrounds,
+  or changing the tested scene.
+- do not claim completion from a single attractive screenshot.

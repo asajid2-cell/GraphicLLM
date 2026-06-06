@@ -6348,3 +6348,85 @@ Do not drift:
   scene/camera changes.
 - Do not promote default beauty before candidate resources, debug views,
   frame-report fields, packet metrics, contact sheets, and user review pass.
+
+### ReflectionHistoryV3 Reprojection Validity - 2026-06-06
+
+Implemented:
+
+- `FullSceneReflectionHistoryV3` now reads geometry/motion inputs:
+  `depth`, normal/roughness, and `velocity`.
+- The render-graph pass contract fails if those inputs are missing.
+- Descriptor table expanded from `4` SRVs to `7` SRVs:
+  reflection radiance, source ID, temporal delta, previous history, depth,
+  normal/roughness, and velocity.
+- `FullSceneReflectionHistoryV3.hlsl` now samples previous history at
+  `uv + velocity + g_TAAParams.xy`.
+- Reprojection validity uses the same acceptance family as the temporal
+  rejection mask:
+  - bounds acceptance.
+  - depth agreement.
+  - normal agreement.
+  - motion-speed taper.
+- `reflection_history_v3_validity` now packs:
+  - R: current reflection active.
+  - G: source class.
+  - B: reusable reprojected previous history.
+  - A: rejection/debt strength.
+- `FullSceneShaderFrameContext.h` and
+  `tools/analyze_full_scene_shader_v3_placeholders.py` now require
+  `FullSceneReflectionHistoryV3` to read `depth`, `velocity`, and a
+  normal/roughness resource.
+- `assets/final_art/full_scene_shader_pipeline_v3_contract.json` now records
+  `required_history_inputs` for the reflection domain.
+- `tools/validate_full_scene_shader_pipeline_v3_plan.py` validates those
+  history inputs.
+- Documentation updated in:
+  - `docs/FULL_SCENE_SHADER_PIPELINE_V3.md`.
+  - `docs/FULL_SCENE_SHADER_AAA_REFACTOR_PLAN.md`.
+
+Validation:
+
+```powershell
+python -m py_compile tools\analyze_full_scene_shader_v3_placeholders.py tools\analyze_full_scene_shader_v3_lighting_motion.py tools\validate_full_scene_shader_pipeline_v3_plan.py tools\check_full_scene_shader_pipeline_v2_frame_report.py
+python tools\validate_full_scene_shader_pipeline_v3_plan.py
+cmd.exe /d /c "call ""C:\Program Files\Microsoft Visual Studio\18\Community\Common7\Tools\VsDevCmd.bat"" -arch=x64 -host_arch=x64 >nul && set ""CORTEX_SKIP_ASSET_SYNC=1"" && ""C:\Program Files\Ninja\ninja.exe"" -C build CortexEngine -j 8"
+Copy-Item -LiteralPath assets\shaders\FullSceneReflectionHistoryV3.hlsl -Destination build\bin\assets\shaders\FullSceneReflectionHistoryV3.hlsl -Force
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_full_scene_shader_pipeline_v3_packet.ps1 -NoBuild -SkipSceneAnalyzers -NoStressScene -FamilyFilter gallery -SmokeFrames 24 -CaptureFrame 12 -CaptureSequenceCount 1 -StabilityMotionMode static -OutputRoot build\captures\v3_reflection_history_reprojection_static_smoke1_20260606
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_full_scene_shader_pipeline_v3_packet.ps1 -NoBuild -SkipSceneAnalyzers -NoStressScene -FamilyFilter gallery -SmokeFrames 36 -CaptureFrame 18 -CaptureSequenceCount 2 -StabilityMotionMode mouse_jitter -OutputRoot build\captures\v3_reflection_history_reprojection_motion_smoke1_20260606
+```
+
+Results:
+
+- Static packet passed:
+  `build/captures/v3_reflection_history_reprojection_static_smoke1_20260606`.
+- Mouse-jitter packet passed:
+  `build/captures/v3_reflection_history_reprojection_motion_smoke1_20260606`.
+- V3 promotion decision status remains `review_packet_passed`;
+  `default_beauty_promotable=false`.
+- Frame-report proof from the history-validity row:
+  - `reflection_history_v3_ready=true`.
+  - `reflection_history_v3_prev_ready=true`.
+  - `reflection_history_v3_validity_ready=true`.
+  - `reflection_v3_channel_count=10`.
+  - `FullSceneReflectionHistoryV3.executed=true`.
+  - `FullSceneReflectionHistoryV3.reads=reflection_radiance,
+    reflection_source_id, reflection_temporal_delta,
+    reflection_history_v3_prev, depth, vb_gbuffer_normal_roughness,
+    velocity`.
+  - `FullSceneReflectionHistoryV3.writes=reflection_history_v3_curr,
+    reflection_history_v3_validity`.
+- Mouse-jitter history metrics:
+  - `reflection_history_v3_curr.mean_abs_luma_delta=0.0048307`,
+    active `0.0309180`.
+  - `reflection_history_v3_prev.mean_abs_luma_delta=0.0048307`,
+    active `0.0309180`.
+  - `reflection_history_v3_validity.mean_abs_luma_delta=0.0046699`,
+    active `0.0435406`.
+
+Current limitation:
+
+- This pass produces advisory validity only.
+- Reflection source admission is still conservative; do not use this slice to
+  make SSR or RT win more often yet.
+- Next aligned work is source-switch/disocclusion counters, then using
+  history validity to bound SSR/RT/local-probe source fusion.

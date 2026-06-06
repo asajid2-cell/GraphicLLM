@@ -973,8 +973,13 @@ Interpretation:
   plus current history, previous history, and history validity.
 - `FullSceneReflectionHistoryV3Copy` copies current history into previous
   history after the history pass so the next frame has a stable read target.
-- This seed pass samples previous-frame history only as an availability signal.
-  It does not yet use velocity/depth/normal reprojection for source admission.
+- Follow-up reprojection validity now makes `FullSceneReflectionHistoryV3`
+  read `depth`, a normal/roughness resource, and `velocity`.
+- The pass samples previous history at `uv + velocity + taa_jitter_delta` and
+  writes `reflection_history_v3_validity` as active source, source class,
+  reusable reprojected history, and rejection/debt strength.
+- The validity resource is still advisory. It does not yet loosen ReflectionV3
+  auto source selection until motion packets prove the confidence contract.
 
 Concrete resolver producer update, 2026-06-06:
 

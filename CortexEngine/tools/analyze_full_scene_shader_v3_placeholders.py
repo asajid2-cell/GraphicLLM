@@ -514,9 +514,20 @@ def analyze_report(
                     "reflection_source_id",
                     "reflection_temporal_delta",
                     "reflection_history_v3_prev",
+                    "depth",
+                    "velocity",
                 ]:
                     if resource not in history_pass.get("reads", []):
                         failures.append(f"FullSceneReflectionHistoryV3 pass does not read {resource}")
+                if not any(
+                    resource in history_pass.get("reads", [])
+                    for resource in [
+                        "gbuffer_normal_roughness",
+                        "vb_gbuffer_normal_roughness",
+                        "normal_roughness",
+                    ]
+                ):
+                    failures.append("FullSceneReflectionHistoryV3 pass does not read a normal/roughness resource")
                 for resource in [
                     "reflection_history_v3_curr",
                     "reflection_history_v3_validity",

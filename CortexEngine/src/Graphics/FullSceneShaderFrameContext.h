@@ -1651,6 +1651,11 @@ inline FullSceneShaderPipelineV3FrameContext BuildFullSceneShaderPipelineV3Frame
         FullSceneShaderPassReadsResource(contract, "FullSceneReflectionHistoryV3", "reflection_source_id") &&
         FullSceneShaderPassReadsResource(contract, "FullSceneReflectionHistoryV3", "reflection_temporal_delta") &&
         FullSceneShaderPassReadsResource(contract, "FullSceneReflectionHistoryV3", "reflection_history_v3_prev") &&
+        FullSceneShaderPassReadsResource(contract, "FullSceneReflectionHistoryV3", "depth") &&
+        (FullSceneShaderPassReadsResource(contract, "FullSceneReflectionHistoryV3", "gbuffer_normal_roughness") ||
+         FullSceneShaderPassReadsResource(contract, "FullSceneReflectionHistoryV3", "vb_gbuffer_normal_roughness") ||
+         FullSceneShaderPassReadsResource(contract, "FullSceneReflectionHistoryV3", "normal_roughness")) &&
+        FullSceneShaderPassReadsResource(contract, "FullSceneReflectionHistoryV3", "velocity") &&
         FullSceneShaderPassWritesResource(contract, "FullSceneReflectionHistoryV3", "reflection_history_v3_curr") &&
         FullSceneShaderPassWritesResource(contract, "FullSceneReflectionHistoryV3", "reflection_history_v3_validity") &&
         FullSceneShaderPassReadsResource(contract, "FullSceneReflectionHistoryV3Copy", "reflection_history_v3_curr") &&

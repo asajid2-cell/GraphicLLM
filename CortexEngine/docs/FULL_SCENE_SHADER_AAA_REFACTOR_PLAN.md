@@ -67,6 +67,18 @@ candidate beauty: FullSceneCandidateBeautyV3
 The engine should be able to show both, capture both, and compare both. The
 candidate path can fail without breaking public default rendering.
 
+Current bridge status:
+
+- `FullSceneCandidateBeautyV3` now renders an opt-in LDR candidate output into
+  `candidate_ldr_cinematic_output`.
+- The debug menu / settings overlay can request the candidate path without
+  command-line flags.
+- `FullSceneCandidateBeautyV3Display` can now blit the candidate output to the
+  swapchain for review while normal `beauty` rows remain unchanged.
+- The display path is still a review bridge, not a promotion. It reuses the
+  existing post-process composite until `FullSceneCompositeV3` and
+  `CinematicPostV3` are replaced with real V3 producers.
+
 Initial bridge:
 
 - `candidate_beauty_v3` is an opt-in packet view.

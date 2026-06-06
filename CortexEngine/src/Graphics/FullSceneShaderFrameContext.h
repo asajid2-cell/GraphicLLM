@@ -1178,6 +1178,7 @@ struct FullSceneShaderPipelineV3FrameContext {
     bool defaultBeautyAffects = false;
     bool candidateBeautyRequested = false;
     bool candidateBeautyReady = false;
+    bool candidateBeautyDisplayed = false;
     std::string candidateBeautyProducer = "none";
     std::string candidateBeautyOutput = "none";
     bool runtimePlaceholdersReady = true;
@@ -1293,6 +1294,11 @@ inline FullSceneShaderPipelineV3FrameContext BuildFullSceneShaderPipelineV3Frame
             contract,
             "FullSceneCandidateBeautyV3",
             "candidate_ldr_cinematic_output");
+    context.candidateBeautyDisplayed =
+        FullSceneShaderPassWritesResource(
+            contract,
+            "FullSceneCandidateBeautyV3Display",
+            "back_buffer");
 
     const std::vector<std::string> materialBackingResources = {
         "vb_gbuffer_albedo",

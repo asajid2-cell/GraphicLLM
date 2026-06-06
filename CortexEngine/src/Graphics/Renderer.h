@@ -649,9 +649,11 @@ private:
         bool attempted = false;
         bool attemptedBloom = false;
         bool attemptedCandidateBeauty = false;
+        bool attemptedCandidateBeautyDisplay = false;
         bool ranBloom = false;
         bool ranPostProcess = false;
         bool ranCandidateBeauty = false;
+        bool ranCandidateBeautyDisplay = false;
         bool ranHZB = false;
         bool fallbackUsed = false;
         std::string fallbackReason;

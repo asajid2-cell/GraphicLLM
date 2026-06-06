@@ -147,6 +147,7 @@ void Renderer::RecordFramePass(const char* name,
         record.name == "Bloom" ||
         record.name == "PostProcess" ||
         record.name == "FullSceneCandidateBeautyV3" ||
+        record.name == "FullSceneCandidateBeautyV3Display" ||
         record.name == "RenderVoxel" ||
         record.name == "RenderGraphEndFrame";
     record.renderGraph = renderGraphOwned || (record.name == "RenderGraphEndFrame");

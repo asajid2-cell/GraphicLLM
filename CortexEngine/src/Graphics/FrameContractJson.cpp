@@ -368,6 +368,7 @@ json FullSceneShaderPipelineV3ToJson(const FrameContract& contract) {
         {"default_beauty_affects", context.defaultBeautyAffects},
         {"candidate_beauty_requested", context.candidateBeautyRequested},
         {"candidate_beauty_ready", context.candidateBeautyReady},
+        {"candidate_beauty_displayed", context.candidateBeautyDisplayed},
         {"candidate_beauty_producer", context.candidateBeautyProducer},
         {"candidate_beauty_output", context.candidateBeautyOutput},
         {"runtime_placeholders_ready", context.runtimePlaceholdersReady},

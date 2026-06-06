@@ -55,7 +55,7 @@ Result<void> Renderer::CreateScreenSpacePipelineStates(const RendererCompiledSha
         PipelineDesc reflectionResolverV3Desc = postDesc;
         reflectionResolverV3Desc.pixelShader = *shaders.fullSceneReflectionResolverV3PS;
         reflectionResolverV3Desc.rtvFormat = DXGI_FORMAT_R16G16B16A16_FLOAT;
-        reflectionResolverV3Desc.numRenderTargets = 5;
+        reflectionResolverV3Desc.numRenderTargets = 7;
 
         auto reflectionResolverPipelineResult = m_pipelineState.fullSceneReflectionResolverV3->Initialize(
             m_services.device->GetDevice(),
@@ -67,6 +67,27 @@ Result<void> Renderer::CreateScreenSpacePipelineStates(const RendererCompiledSha
             m_pipelineState.fullSceneReflectionResolverV3.reset();
         } else {
             spdlog::info("FullSceneReflectionResolverV3 pipeline created successfully.");
+        }
+    }
+
+    if (shaders.fullSceneReflectionHistoryV3PS) {
+        m_pipelineState.fullSceneReflectionHistoryV3 = std::make_unique<DX12Pipeline>();
+
+        PipelineDesc reflectionHistoryV3Desc = postDesc;
+        reflectionHistoryV3Desc.pixelShader = *shaders.fullSceneReflectionHistoryV3PS;
+        reflectionHistoryV3Desc.rtvFormat = DXGI_FORMAT_R16G16B16A16_FLOAT;
+        reflectionHistoryV3Desc.numRenderTargets = 2;
+
+        auto reflectionHistoryPipelineResult = m_pipelineState.fullSceneReflectionHistoryV3->Initialize(
+            m_services.device->GetDevice(),
+            m_pipelineState.rootSignature->GetRootSignature(),
+            reflectionHistoryV3Desc);
+        if (reflectionHistoryPipelineResult.IsErr()) {
+            spdlog::warn("Failed to create FullSceneReflectionHistoryV3 pipeline: {}",
+                         reflectionHistoryPipelineResult.Error());
+            m_pipelineState.fullSceneReflectionHistoryV3.reset();
+        } else {
+            spdlog::info("FullSceneReflectionHistoryV3 pipeline created successfully.");
         }
     }
 

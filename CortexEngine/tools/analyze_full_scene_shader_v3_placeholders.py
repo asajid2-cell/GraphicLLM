@@ -20,6 +20,8 @@ REQUIRED_OUTPUTS = {
     "reflection_temporal_delta",
     "reflection_ssr_source_signal",
     "reflection_rt_source_signal",
+    "reflection_history_v3_curr",
+    "reflection_history_v3_validity",
     "scene_local_environment",
     "hdr_scene_color",
     "candidate_hdr_scene_color",
@@ -467,6 +469,8 @@ def analyze_report(
             "reflection_temporal_delta_ready",
             "reflection_ssr_source_signal_ready",
             "reflection_rt_source_signal_ready",
+            "reflection_history_v3_ready",
+            "reflection_history_v3_validity_ready",
         ]:
             if v3.get(key) is not True:
                 failures.append(f"reflection_v3_ready=true but {key} is not true")
@@ -497,6 +501,30 @@ def analyze_report(
                     failures.append(f"FullSceneReflectionV3 ready without valid {resource} resource")
                 elif reflection_resource.get("size_matches_contract") is not True:
                     failures.append(f"{resource} size does not match render contract")
+            history_pass = find_frame_pass(report, "FullSceneReflectionHistoryV3")
+            if not isinstance(history_pass, dict):
+                failures.append("reflection domain ready but FullSceneReflectionHistoryV3 pass is missing")
+            else:
+                if history_pass.get("executed") is not True:
+                    failures.append("FullSceneReflectionHistoryV3 pass did not execute")
+                for resource in [
+                    "reflection_radiance",
+                    "reflection_source_id",
+                    "reflection_temporal_delta",
+                ]:
+                    if resource not in history_pass.get("reads", []):
+                        failures.append(f"FullSceneReflectionHistoryV3 pass does not read {resource}")
+                for resource in [
+                    "reflection_history_v3_curr",
+                    "reflection_history_v3_validity",
+                ]:
+                    if resource not in history_pass.get("writes", []):
+                        failures.append(f"FullSceneReflectionHistoryV3 pass does not write {resource}")
+                    history_resource = find_frame_resource(report, resource)
+                    if not isinstance(history_resource, dict) or history_resource.get("valid") is not True:
+                        failures.append(f"FullSceneReflectionHistoryV3 ready without valid {resource} resource")
+                    elif history_resource.get("size_matches_contract") is not True:
+                        failures.append(f"{resource} size does not match render contract")
 
     composite_domain = domain_by_id.get("composite")
     composite_ready = v3.get("composite_v3_ready") is True

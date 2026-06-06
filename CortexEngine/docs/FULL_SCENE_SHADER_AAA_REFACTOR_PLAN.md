@@ -416,6 +416,25 @@ Admission gates:
 - Smooth/metallic stress packet must reduce source-ID active delta and final
   reflection radiance delta without blanking raw SSR/RT source signals.
 
+Seed implementation status, 2026-06-06:
+
+- `FullSceneReflectionHistoryV3` now exists as a separate pass after
+  `FullSceneReflectionV3`.
+- The pass writes:
+  - `reflection_history_v3_curr`.
+  - `reflection_history_v3_validity`.
+- The seed pass is intentionally current-frame only. It does not yet perform
+  previous-history reprojection or source-ID hysteresis.
+- The existing ReflectionV3 PSO target count was corrected from `5` to `7`.
+- Debug modes `75` and `76` expose the history resources.
+- Static and mouse-jitter gallery packets passed with
+  `reflection_v3_channel_count=9`.
+- Remaining required architecture:
+  - add `reflection_history_v3_prev` ping-pong ownership.
+  - sample velocity/depth/normal/roughness for reprojected validity.
+  - record source-switch counts and disocclusion invalidation.
+  - use source-ID hysteresis to control SSR/RT/local-probe admission.
+
 ## 2026-06-06 Refactor Plan Before Goal Feature Completion
 
 The target is not merely "better shaders." The target is a full candidate

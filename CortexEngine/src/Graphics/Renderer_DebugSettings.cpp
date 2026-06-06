@@ -8,7 +8,7 @@
 namespace Cortex::Graphics {
 
 namespace {
-constexpr uint32_t kMaxDebugViewMode = 66u;
+constexpr uint32_t kMaxDebugViewMode = 67u;
 }
 
 int Renderer::GetDebugViewMode() const {
@@ -75,6 +75,7 @@ void Renderer::CycleDebugViewMode() {
     // 64 = V3 shadow visibility split buffer
     // 65 = V3 shadow loss split buffer
     // 66 = V3 indirect lighting split buffer
+    // 67 = candidate HDR scene color from FullSceneCompositeV3
     m_debugViewState.mode = (m_debugViewState.mode + 1) % (kMaxDebugViewMode + 1u);
     const char* label = nullptr;
     switch (m_debugViewState.mode) {
@@ -145,6 +146,7 @@ void Renderer::CycleDebugViewMode() {
         case 64: label = "VB_V3ShadowVisibility"; break;
         case 65: label = "VB_V3ShadowLoss"; break;
         case 66: label = "VB_V3IndirectLighting"; break;
+        case 67: label = "FullSceneCompositeV3CandidateHDR"; break;
         default: label = "Unknown"; break;
     }
     spdlog::info("Debug view mode: {}", label);

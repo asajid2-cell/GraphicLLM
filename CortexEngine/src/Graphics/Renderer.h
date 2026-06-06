@@ -649,11 +649,13 @@ private:
         bool attempted = false;
         bool attemptedBloom = false;
         bool attemptedCompositeV3 = false;
+        bool attemptedCompositeV3DebugView = false;
         bool attemptedCandidateBeauty = false;
         bool attemptedCandidateBeautyDisplay = false;
         bool ranBloom = false;
         bool ranPostProcess = false;
         bool ranCompositeV3 = false;
+        bool ranCompositeV3DebugView = false;
         bool ranCandidateBeauty = false;
         bool ranCandidateBeautyDisplay = false;
         bool ranHZB = false;

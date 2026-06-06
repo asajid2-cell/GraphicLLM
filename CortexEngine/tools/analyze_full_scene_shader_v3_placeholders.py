@@ -54,6 +54,7 @@ LIGHTING_SIGNAL_THRESHOLDS = {
     "v3_shadow_visibility": {"min_mean_luma": 0.02, "max_mean_luma": 0.98, "min_nonblack_ratio": 0.05},
     "v3_shadow_loss": {"min_mean_luma": 0.005, "min_nonblack_ratio": 0.01},
     "v3_indirect_lighting": {"min_mean_luma": 0.01, "min_nonblack_ratio": 0.05},
+    "candidate_hdr_scene_color": {"min_mean_luma": 0.01, "min_nonblack_ratio": 0.05},
 }
 
 SIGNAL_THRESHOLD_EPSILON = 1e-4

@@ -20,6 +20,10 @@ V3_LIGHTING_VIEWS = [
     "v3_indirect_lighting",
 ]
 
+CANDIDATE_COMPOSITE_VIEWS = [
+    "candidate_hdr_scene_color",
+]
+
 LEGACY_PAIRS = {
     "v3_direct_lighting": "direct_light",
     "v3_direct_lighting_unshadowed": "direct_light_unshadowed",
@@ -95,7 +99,7 @@ def build_view_rows(
         if not isinstance(result, dict):
             continue
         view = str(result.get("view", ""))
-        if view not in set(V3_LIGHTING_VIEWS) | set(LEGACY_PAIRS.values()) | {"beauty"}:
+        if view not in set(V3_LIGHTING_VIEWS) | set(CANDIDATE_COMPOSITE_VIEWS) | set(LEGACY_PAIRS.values()) | {"beauty"}:
             continue
 
         sequence = [Path(path) for path in result.get("capture_sequence", []) if path]
@@ -180,6 +184,28 @@ def build_family_rows(rows: list[dict[str, Any]], ratio_warning: float) -> tuple
                     "beauty_mean_abs_luma_delta": beauty_delta,
                     "v3_over_beauty_ratio": v3_delta / max(beauty_delta, 1e-6),
                     "v3_active_delta_ratio": v3_row["summary"]["mean_active_delta_ratio"],
+                }
+            )
+
+        for candidate_view in CANDIDATE_COMPOSITE_VIEWS:
+            candidate_row = views.get(candidate_view)
+            if not candidate_row:
+                family_status = "missing_candidate_composite_view"
+                view_rows.append({"view": candidate_view, "status": "missing_candidate_composite_view"})
+                continue
+
+            candidate_delta = candidate_row["summary"]["mean_abs_luma_delta"]
+            view_rows.append(
+                {
+                    "view": candidate_view,
+                    "legacy_view": "",
+                    "status": "ok",
+                    "v3_mean_abs_luma_delta": candidate_delta,
+                    "legacy_mean_abs_luma_delta": 0.0,
+                    "v3_over_legacy_ratio": 0.0,
+                    "beauty_mean_abs_luma_delta": beauty_delta,
+                    "v3_over_beauty_ratio": candidate_delta / max(beauty_delta, 1e-6),
+                    "v3_active_delta_ratio": candidate_row["summary"]["mean_active_delta_ratio"],
                 }
             )
 

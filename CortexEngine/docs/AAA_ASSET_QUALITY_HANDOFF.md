@@ -5166,3 +5166,79 @@ Remaining limitation:
 - Next slice should add raw debug views and motion-stability packets for
   `candidate_hdr_scene_color`, then start moving reflection/environment inputs
   from adapter evidence into concrete producer resources.
+
+### Candidate HDR Debug View and Motion Gate - 2026-06-06
+
+Implemented:
+
+- Added debug mode `67`: `FullSceneCompositeV3CandidateHDR`.
+- Added packet view `candidate_hdr_scene_color`.
+- The view enables candidate V3, runs `FullSceneCompositeV3`, and displays the
+  raw `candidate_hdr_scene_color` target through `FullSceneCompositeV3DebugView`.
+- The V3 packet default view list now includes `candidate_hdr_scene_color`.
+- The V3 metrics gate now requires `candidate_hdr_scene_color` to be present and
+  nonblank.
+- The V3 motion analyzer now includes `candidate_hdr_scene_color` as a candidate
+  composite row. It is compared against beauty motion, not against a legacy
+  lighting split row.
+- The strict V2 checker now accepts debug mode range `67`.
+
+Validation:
+
+```powershell
+python -m py_compile tools\analyze_full_scene_shader_v3_lighting_motion.py tools\analyze_full_scene_shader_v3_placeholders.py tools\check_full_scene_shader_pipeline_v2_frame_report.py
+python tools\validate_full_scene_shader_pipeline_v3_plan.py
+git diff --check -- src\Graphics\Renderer.h src\Graphics\Renderer_DebugSettings.cpp src\Graphics\Renderer_RenderGraphEndFrame.cpp src\Graphics\Renderer_FrameContractPasses.cpp src\Graphics\FullSceneShaderFrameContext.h tools\run_scene_local_cinematic_renderer_v1_packets.ps1 tools\run_full_scene_shader_pipeline_v3_packet.ps1 tools\analyze_full_scene_shader_v3_placeholders.py tools\analyze_full_scene_shader_v3_lighting_motion.py tools\check_full_scene_shader_pipeline_v2_frame_report.py tools\validate_full_scene_shader_pipeline_v3_plan.py docs\FULL_SCENE_SHADER_AAA_REFACTOR_PLAN.md docs\AAA_ASSET_QUALITY_HANDOFF.md
+cmd.exe /d /c "call ""C:\Program Files\Microsoft Visual Studio\18\Community\Common7\Tools\VsDevCmd.bat"" -arch=x64 -host_arch=x64 >nul && set ""CORTEX_SKIP_ASSET_SYNC=1"" && ""C:\Program Files\Microsoft Visual Studio\18\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\Ninja\ninja.exe"" -C build CortexEngine -j 8"
+$env:CORTEX_ENABLE_FULL_SCENE_CANDIDATE_BEAUTY_V3='1'; powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_full_scene_shader_pipeline_v3_packet.ps1 -NoBuild -SkipSceneAnalyzers -NoStressScene -FamilyFilter gallery -SmokeFrames 24 -CaptureFrame 12 -CaptureSequenceCount 1 -StabilityMotionMode static -OutputRoot build\captures\v3_candidate_hdr_debug_static_smoke2_20260606
+$env:CORTEX_ENABLE_FULL_SCENE_CANDIDATE_BEAUTY_V3='1'; powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_full_scene_shader_pipeline_v3_packet.ps1 -NoBuild -SkipSceneAnalyzers -NoStressScene -FamilyFilter gallery -SmokeFrames 36 -CaptureFrame 18 -CaptureSequenceCount 2 -StabilityMotionMode mouse_jitter -OutputRoot build\captures\v3_candidate_hdr_debug_motion_smoke1_20260606
+python tools\analyze_full_scene_shader_v3_lighting_motion.py --manifest build\captures\v3_candidate_hdr_debug_motion_smoke1_20260606\manifest.json --output-json build\captures\v3_candidate_hdr_debug_motion_smoke1_20260606\v3_lighting_motion.json --output-md build\captures\v3_candidate_hdr_debug_motion_smoke1_20260606\v3_lighting_motion.md --min-sequence-count 2
+```
+
+Results:
+
+- Python compile passed.
+- V3 plan validator passed.
+- focused `git diff --check` passed, with only existing CRLF warnings.
+- native build completed; first command timed out while Ninja continued in the
+  background, then a follow-up Ninja run reported `ninja: no work to do`.
+- static packet passed:
+  - artifact root:
+    `build/captures/v3_candidate_hdr_debug_static_smoke2_20260606`.
+  - reports: `18`.
+  - promotion status: `review_packet_passed`.
+- mouse-jitter motion packet passed:
+  - artifact root:
+    `build/captures/v3_candidate_hdr_debug_motion_smoke1_20260606`.
+  - reports: `18`.
+  - V3 lighting motion measured `12` view sequences.
+  - promotion status: `review_packet_passed`.
+
+Direct evidence:
+
+- `candidate_hdr_scene_color` metrics from the motion packet:
+  - debug view: `67`.
+  - mean luma: `0.440450`.
+  - max luma: `1.000000`.
+  - nonblack ratio: `0.961260`.
+  - hot-pixel ratio: `0.154786`.
+- `candidate_hdr_scene_color` motion row:
+  - status: `ok`.
+  - mean abs luma delta: `0.008965`.
+  - beauty mean abs luma delta: `0.006547`.
+  - candidate/beauty ratio: `1.369420`.
+  - active delta ratio: `0.061689`.
+- `gallery/candidate_hdr_scene_color/frame_report_shutdown.json`:
+  - `FullSceneCompositeV3` executed and wrote `candidate_hdr_scene_color`.
+  - `CinematicPostV3` executed and read `candidate_hdr_scene_color`.
+  - `FullSceneCompositeV3DebugView` executed, read
+    `candidate_hdr_scene_color`, and wrote `back_buffer`.
+
+Remaining limitation:
+
+- This proves visibility and short mouse-jitter stability for the raw candidate
+  HDR target, not final AAA quality.
+- Next producer gap is still reflection/environment/media ownership inside
+  `FullSceneCompositeV3`. The current composite uses V3 lighting plus a bounded
+  HDR fallback; it does not yet consume concrete V3 reflection/environment
+  radiance resources as first-class inputs.

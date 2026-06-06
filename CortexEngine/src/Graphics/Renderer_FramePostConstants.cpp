@@ -31,13 +31,15 @@ float ReflectionV3SourceOverrideFromEnv() {
         s_override = 0.0f;
     } else if (std::strcmp(value, "local") == 0 || std::strcmp(value, "scene_local") == 0) {
         s_override = 1.0f;
+    } else if (std::strcmp(value, "ssr") == 0 || std::strcmp(value, "screen_space") == 0) {
+        s_override = 2.0f;
     } else if (std::strcmp(value, "environment") == 0 || std::strcmp(value, "env") == 0) {
         s_override = 4.0f;
     } else if (std::strcmp(value, "none") == 0 || std::strcmp(value, "off") == 0) {
         s_override = 255.0f;
     } else {
         const int numeric = std::atoi(value);
-        if (numeric == 1 || numeric == 4 || numeric == 255) {
+        if (numeric == 1 || numeric == 2 || numeric == 4 || numeric == 255) {
             s_override = static_cast<float>(numeric);
         } else {
             spdlog::warn("Renderer: ignoring unsupported CORTEX_V3_REFLECTION_SOURCE_OVERRIDE='{}'", value);

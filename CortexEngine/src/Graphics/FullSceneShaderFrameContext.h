@@ -1284,6 +1284,9 @@ inline std::string FullSceneShaderReflectionV3ForcedSourceContract() {
     if (normalized == "local" || normalized == "scene_local" || normalized == "1") {
         return "forced_scene_local_radiance";
     }
+    if (normalized == "ssr" || normalized == "screen_space" || normalized == "2") {
+        return "forced_screen_space_reflection";
+    }
     if (normalized == "environment" || normalized == "env" || normalized == "4") {
         return "forced_scene_local_environment";
     }
@@ -1614,6 +1617,7 @@ inline FullSceneShaderPipelineV3FrameContext BuildFullSceneShaderPipelineV3Frame
         FullSceneShaderHasResource(contract, "reflection_rejected_source_mask") &&
         FullSceneShaderHasResource(contract, "reflection_temporal_delta") &&
         FullSceneShaderPassReadsResource(contract, "FullSceneReflectionV3", "local_reflection_radiance") &&
+        FullSceneShaderPassReadsResource(contract, "FullSceneReflectionV3", "ssr_color") &&
         FullSceneShaderPassWritesResource(contract, "FullSceneReflectionV3", "reflection_radiance") &&
         FullSceneShaderPassWritesResource(contract, "FullSceneReflectionV3", "reflection_confidence") &&
         FullSceneShaderPassWritesResource(contract, "FullSceneReflectionV3", "reflection_source_id") &&
@@ -1674,7 +1678,7 @@ inline FullSceneShaderPipelineV3FrameContext BuildFullSceneShaderPipelineV3Frame
             "reflection_radiance",
             "reflection_confidence",
             context.reflectionV3Ready
-                ? "FullSceneReflectionV3 writes concrete radiance, confidence, source-id, rejected-source, and temporal-delta resources"
+                ? "FullSceneReflectionV3 writes concrete radiance, confidence, source-id, rejected-source, and temporal-delta resources from scene-local and SSR inputs"
                 : "FullSceneReflectionV3 is missing one or more reflection ownership channels");
     reflectionDomain.enabled =
         contract.sceneVisual.active &&

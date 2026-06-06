@@ -49,6 +49,7 @@ struct FullSceneCompositeV3Context {
 
 struct FullSceneReflectionResolverV3Context {
     RGResourceHandle localReflectionRadiance;
+    RGResourceHandle ssr;
     RGResourceHandle radiance;
     RGResourceHandle confidence;
     RGResourceHandle sourceId;
@@ -216,6 +217,9 @@ void FailFullSceneReflectionResolverV3(const FullSceneReflectionResolverV3Contex
         [context](RGPassBuilder& builder) {
             builder.SetType(RGPassType::Graphics);
             builder.Read(context.localReflectionRadiance, RGResourceUsage::ShaderResource);
+            if (context.ssr.IsValid()) {
+                builder.Read(context.ssr, RGResourceUsage::ShaderResource);
+            }
             builder.Write(context.radiance, RGResourceUsage::RenderTarget);
             builder.Write(context.confidence, RGResourceUsage::RenderTarget);
             builder.Write(context.sourceId, RGResourceUsage::RenderTarget);
@@ -223,13 +227,18 @@ void FailFullSceneReflectionResolverV3(const FullSceneReflectionResolverV3Contex
             builder.Write(context.temporalDelta, RGResourceUsage::RenderTarget);
         },
         [context](ID3D12GraphicsCommandList*, const RenderGraph& graph) {
-            auto srvResult = context.descriptorManager->AllocateTransientCBV_SRV_UAV();
+            auto srvResult = context.descriptorManager->AllocateTransientCBV_SRV_UAVRange(2);
             if (srvResult.IsErr()) {
                 FailFullSceneReflectionResolverV3(context, "full_scene_reflection_resolver_v3_descriptor");
                 return;
             }
 
             const DescriptorHandle inputSRV = srvResult.Value();
+            const DescriptorHandle ssrSRV = context.descriptorManager->GetCBV_SRV_UAVHandle(inputSRV.index + 1u);
+            if (!ssrSRV.IsValid()) {
+                FailFullSceneReflectionResolverV3(context, "full_scene_reflection_resolver_v3_ssr_descriptor");
+                return;
+            }
             ID3D12Resource* localRadiance = graph.GetResource(context.localReflectionRadiance);
             if (!DescriptorTable::WriteTexture2DSRV(
                     context.device,
@@ -237,6 +246,17 @@ void FailFullSceneReflectionResolverV3(const FullSceneReflectionResolverV3Contex
                     localRadiance,
                     DXGI_FORMAT_R16G16B16A16_FLOAT)) {
                 FailFullSceneReflectionResolverV3(context, "full_scene_reflection_resolver_v3_input_srv");
+                return;
+            }
+            ID3D12Resource* ssr = context.ssr.IsValid()
+                ? graph.GetResource(context.ssr)
+                : nullptr;
+            if (!DescriptorTable::WriteTexture2DSRV(
+                    context.device,
+                    ssrSRV,
+                    ssr,
+                    DXGI_FORMAT_R16G16B16A16_FLOAT)) {
+                FailFullSceneReflectionResolverV3(context, "full_scene_reflection_resolver_v3_ssr_srv");
                 return;
             }
 
@@ -757,6 +777,7 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
         if (wantsReflectionResolverV3ThisFrame && localReflRadianceHandle.IsValid()) {
             FullSceneReflectionResolverV3Context reflectionContext{};
             reflectionContext.localReflectionRadiance = localReflRadianceHandle;
+            reflectionContext.ssr = ssrHandle;
             reflectionContext.radiance = reflectionRadianceHandle;
             reflectionContext.confidence = reflectionConfidenceHandle;
             reflectionContext.sourceId = reflectionSourceIdHandle;
@@ -1191,7 +1212,7 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
                             true,
                             ranReflectionResolverV3,
                             ranReflectionResolverV3 ? 1u : 0u,
-                            {"local_reflection_radiance"},
+                            {"local_reflection_radiance", "ssr_color"},
                             {"reflection_radiance", "reflection_confidence", "reflection_source_id",
                              "reflection_rejected_source_mask", "reflection_temporal_delta"},
                             false,

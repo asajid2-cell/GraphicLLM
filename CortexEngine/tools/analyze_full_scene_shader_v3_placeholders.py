@@ -453,6 +453,7 @@ def analyze_report(
                 "screen_space_reflection",
                 "scene_local_environment",
                 "forced_scene_local_radiance",
+                "forced_screen_space_reflection",
                 "forced_scene_local_environment",
             }:
                 failures.append(f"reflection domain ready with invalid source contract: {source_contract}")
@@ -471,6 +472,8 @@ def analyze_report(
                 failures.append("FullSceneReflectionV3 pass did not execute")
             if "local_reflection_radiance" not in reflection_pass.get("reads", []):
                 failures.append("FullSceneReflectionV3 pass does not read local_reflection_radiance")
+            if "ssr_color" not in reflection_pass.get("reads", []):
+                failures.append("FullSceneReflectionV3 pass does not read ssr_color")
             for resource in [
                 "reflection_radiance",
                 "reflection_confidence",

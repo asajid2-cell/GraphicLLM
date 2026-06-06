@@ -5554,3 +5554,93 @@ Remaining limitation:
 - SSR and RT/ray-query reflection are still not real inputs to the resolver.
   They remain visible as not-admitted dynamic source debt in the rejection
   channel until the next source-fusion slice.
+
+### ReflectionResolverV3 SSR Input Wiring - 2026-06-06
+
+Implemented:
+
+- `FullSceneReflectionV3` now receives `ssr_color` as a second resolver input.
+- The render graph passes `SSRColor` into the resolver when the resource exists.
+- The resolver shader samples `g_SSRReflection : t1`.
+- Auto source policy now supports SSR:
+  - SSR can win only when its confidence is high enough above scene-local
+    radiance.
+  - local radiance remains the stable fallback.
+  - environment remains the final scene-local fallback.
+- `CORTEX_V3_REFLECTION_SOURCE_OVERRIDE` now accepts `ssr` or numeric `2`.
+- Frame reports now expose `forced_screen_space_reflection`.
+- V3 readiness now requires `FullSceneReflectionV3` to read both
+  `local_reflection_radiance` and `ssr_color`.
+- The analyzer now fails if `FullSceneReflectionV3` stops reading `ssr_color`.
+
+Validation:
+
+```powershell
+python -m py_compile tools\analyze_full_scene_shader_v3_placeholders.py tools\analyze_full_scene_shader_v3_lighting_motion.py tools\validate_full_scene_shader_pipeline_v3_plan.py
+python tools\validate_full_scene_shader_pipeline_v3_plan.py
+git diff --check -- CortexEngine/assets/shaders/FullSceneReflectionResolverV3.hlsl CortexEngine/src/Graphics/Renderer_RenderGraphEndFrame.cpp CortexEngine/src/Graphics/Renderer_FramePostConstants.cpp CortexEngine/src/Graphics/ShaderTypes.h CortexEngine/src/Graphics/FullSceneShaderFrameContext.h CortexEngine/tools/analyze_full_scene_shader_v3_placeholders.py
+& 'C:\Program Files\Ninja\ninja.exe' -C build -t recompact
+cmd.exe /d /c "call ""C:\Program Files\Microsoft Visual Studio\18\Community\Common7\Tools\VsDevCmd.bat"" -arch=x64 -host_arch=x64 >nul && set ""CORTEX_SKIP_ASSET_SYNC=1"" && ""C:\Program Files\Ninja\ninja.exe"" -C build CortexEngine -j 8"
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_full_scene_shader_pipeline_v3_packet.ps1 -NoBuild -SkipSceneAnalyzers -NoStressScene -FamilyFilter gallery -SmokeFrames 24 -CaptureFrame 12 -CaptureSequenceCount 1 -StabilityMotionMode static -OutputRoot build\captures\v3_reflection_ssr_input_auto_static_smoke1_20260606
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_full_scene_shader_pipeline_v3_packet.ps1 -NoBuild -SkipSceneAnalyzers -NoStressScene -FamilyFilter gallery -SmokeFrames 36 -CaptureFrame 18 -CaptureSequenceCount 2 -StabilityMotionMode mouse_jitter -OutputRoot build\captures\v3_reflection_ssr_input_auto_motion_smoke1_20260606
+```
+
+Results:
+
+- Python compile passed.
+- V3 plan validator passed with `Required outputs: 14`.
+- focused `git diff --check` passed, with only existing CRLF warnings.
+- native build passed and linked `build/bin/CortexEngine.exe`.
+- auto static packet passed:
+  `build/captures/v3_reflection_ssr_input_auto_static_smoke1_20260606`.
+  - reports: `23`.
+  - promotion status: `review_packet_passed`.
+- auto mouse-jitter packet passed:
+  `build/captures/v3_reflection_ssr_input_auto_motion_smoke1_20260606`.
+  - reports: `23`.
+  - V3 lighting/reflection motion measured `17` view sequences.
+  - promotion status: `review_packet_passed`.
+
+Direct frame-report proof:
+
+- `SSR.executed=true`.
+- `SSR.reads=hdr_color`, `depth`, and `vb_gbuffer_normal_roughness`.
+- `SSR.writes=ssr_color`.
+- `FullSceneReflectionV3.executed=true`.
+- `FullSceneReflectionV3.reads=local_reflection_radiance` and `ssr_color`.
+- `FullSceneReflectionV3.writes=reflection_radiance`,
+  `reflection_confidence`, `reflection_source_id`,
+  `reflection_rejected_source_mask`, and `reflection_temporal_delta`.
+- `FullSceneCompositeV3.reads=reflection_radiance`.
+
+Auto mouse-jitter reflection evidence:
+
+- `reflection_radiance`: mean abs luma delta `0.0024278814`, active delta
+  ratio `0.0138726128`.
+- `reflection_confidence`: mean abs luma delta `0.0007756502`, active delta
+  ratio `0.0068261719`.
+- `reflection_source_id`: mean abs luma delta `0.0006937146`, active delta
+  ratio `0.0058745660`.
+- `reflection_rejected_source_mask`: mean abs luma delta `0.0001864565`,
+  active delta ratio `0.0017708333`.
+- `reflection_temporal_delta`: mean abs luma delta `0.0`, active delta
+  ratio `0.0`.
+
+Forced-SSR diagnostic:
+
+- Attempted:
+  `build/captures/v3_reflection_source_policy_ssr_stress_static_smoke1_20260606`.
+- The report proved `SSR.executed=true`, `SSR.writes=ssr_color`, and
+  `FullSceneReflectionV3.reads=ssr_color`.
+- The packet failed signal gates because forced SSR produced blank
+  `reflection_radiance` and `reflection_confidence` in that stress capture.
+- Treat this as real SSR source-quality debt, not a failure of the V3 resolver
+  wiring.
+
+Remaining limitation:
+
+- SSR is now a real resolver input, but it is not yet artistically/admission
+  reliable enough to force as the selected source in the current stress row.
+- Next SSR work should improve SSR confidence/radiance coverage or add a
+  source-specific diagnostic packet before allowing SSR to win more often in
+  auto policy.

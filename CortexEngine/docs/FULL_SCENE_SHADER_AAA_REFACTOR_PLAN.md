@@ -872,9 +872,25 @@ Current status, 2026-06-06:
     and
     `build/captures/v3_reflection_source_policy_auto_motion_smoke1_20260606`
     passed.
-- Remaining source-arbitration work is to add actual SSR and RT/ray-query
-  inputs to the resolver and choose them by roughness, confidence, distance,
-  surface orientation, scene mode, and history availability.
+- SSR input admission has started:
+  - `FullSceneReflectionV3` reads `ssr_color` in addition to
+    `local_reflection_radiance`.
+  - `FullSceneReflectionResolverV3` samples `g_SSRReflection : t1`.
+  - `CORTEX_V3_REFLECTION_SOURCE_OVERRIDE` can now force `ssr`,
+    `screen_space`, or numeric `2`.
+  - frame reports expose `forced_screen_space_reflection`.
+  - auto policy admits SSR only when its confidence beats scene-local radiance
+    by a large margin, so unstable screen-space data does not replace stable
+    local/environment fallback by default.
+  - auto static and mouse-jitter packets pass:
+    `build/captures/v3_reflection_ssr_input_auto_static_smoke1_20260606` and
+    `build/captures/v3_reflection_ssr_input_auto_motion_smoke1_20260606`.
+  - forced SSR stress packet proved the render-graph wiring but failed signal
+    gates because SSR produced blank radiance/confidence in that stress view.
+- Remaining source-arbitration work is to make SSR source quality reliable,
+  then add RT/ray-query inputs and choose among all reflection sources by
+  roughness, confidence, distance, surface orientation, scene mode, and history
+  availability.
 
 Milestone 4: scene-local environment resources.
 

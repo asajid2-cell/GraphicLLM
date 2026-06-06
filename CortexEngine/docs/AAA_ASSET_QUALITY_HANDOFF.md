@@ -362,6 +362,21 @@ Rejected experiment:
   slice is a real ReflectionV3 history/stability resource with explicit
   source-ID hysteresis, reprojection/validity, and candidate rejection metrics.
 
+Next planned architecture:
+
+- `docs/FULL_SCENE_SHADER_AAA_REFACTOR_PLAN.md` now defines
+  `ReflectionHistoryV3`.
+- The intended contract adds:
+  - `reflection_history_v3_curr`.
+  - `reflection_history_v3_prev`.
+  - `reflection_history_v3_validity`.
+- The pass should read velocity, depth, normal/roughness, previous reflection
+  history, SSR, RT, and local probe radiance.
+- The policy should use reprojection, surface validity, source-ID hysteresis,
+  and disocclusion rejection before allowing SSR/RT to beat the local probe.
+- Success must be measured by source-ID active delta and reflection radiance
+  delta under mouse-jitter and smooth/metallic stress packets.
+
 ### Local Reflection Into Composite V3 - 2026-06-06
 
 Implemented:

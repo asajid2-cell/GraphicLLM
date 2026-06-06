@@ -307,6 +307,115 @@ Follow-up source diagnostic status, 2026-06-06:
   source-quality stabilization is implemented and proven across smooth/metallic
   stress scenes.
 
+Rejected source-stability shortcut, 2026-06-06:
+
+- A screen-space derivative stability gate was tested inside
+  `FullSceneReflectionResolverV3.hlsl`.
+- It reduced `reflection_radiance` motion delta in one gallery mouse-jitter
+  packet, but worsened `reflection_confidence` and `reflection_source_id`
+  motion deltas.
+- Decision: do not solve reflection stability with single-frame derivative
+  heuristics. They make the source ownership contract less stable and are too
+  easy to tune scene-by-scene.
+
+Required next architecture: `ReflectionHistoryV3`
+
+The next reflection-quality slice must be a real history/stability system, not
+a final-composite boost and not another local heuristic.
+
+Resource contract:
+
+```text
+FullSceneReflectionV3
+  reads:
+    local_reflection_radiance
+    ssr_color
+    rt_reflection
+    reflection_history_v3_prev       optional on first frame
+    velocity
+    depth
+    normal_roughness
+  writes:
+    reflection_radiance
+    reflection_confidence
+    reflection_source_id
+    reflection_rejected_source_mask
+    reflection_temporal_delta
+    reflection_ssr_source_signal
+    reflection_rt_source_signal
+    reflection_history_v3_curr
+    reflection_history_v3_validity
+
+EndFrame
+  swaps:
+    reflection_history_v3_curr -> reflection_history_v3_prev
+```
+
+History payload:
+
+```text
+reflection_history_v3_curr RGBA16F
+  rgb = resolved reflection radiance
+  a   = resolved confidence
+
+reflection_history_v3_validity RGBA8 or RG16F
+  r = reprojected history valid
+  g = source id stable enough to keep
+  b = source changed/rejected this frame
+  a = disocclusion or camera-cut invalid
+```
+
+Per-pixel policy pseudocode:
+
+```text
+currentSources = evaluate(localProbe, ssr, rt, environment)
+prev = sample(historyPrev, uv + velocity + jitterDelta)
+
+historySurfaceOk =
+  depthClose(currentDepth, historyDepth) &&
+  normalClose(currentNormal, historyNormal) &&
+  !cameraCut &&
+  taaHistoryValid
+
+candidate = pickBestCurrentSource(currentSources)
+
+sourceStable =
+  historySurfaceOk &&
+  prev.confidence > minHistoryConfidence &&
+  sourceCompatible(prev.sourceId, candidate.sourceId, currentRoughness)
+
+if sourceStable:
+  candidate.score += hysteresisBonus(prev.sourceId, currentRoughness)
+  candidate.radiance = clampNeighborhood(candidate.radiance, prev.radiance)
+
+if candidate.source is SSR or RT:
+  require candidate.score >= localProbe.score + sourceSwitchMargin
+  require sourceStable or candidate.confidence >= firstFrameHighConfidence
+
+resolved = candidate
+historyCurr = pack(resolved.radiance, resolved.confidence, resolved.sourceId)
+validity = pack(historySurfaceOk, sourceStable, sourceChanged, invalidReason)
+```
+
+Why this is better:
+
+- Source changes become explicit measured events instead of hidden shimmer.
+- SSR/RT can become strong when temporally stable, but cannot win just because
+  one noisy frame is bright.
+- Smooth/metallic surfaces get real hysteresis where shimmer is most visible.
+- The same packet harness can rank source stability before we promote the
+  result into the candidate beauty path.
+
+Admission gates:
+
+- `reflection_history_v3_curr` and `reflection_history_v3_validity` exist as
+  concrete frame resources.
+- Frame report exposes `reflection_history_v3_ready`,
+  `reflection_history_v3_validity_ready`, and source-switch counts.
+- Mouse-jitter packet must not increase `reflection_source_id` motion delta.
+- Smooth/metallic stress packet must reduce source-ID active delta and final
+  reflection radiance delta without blanking raw SSR/RT source signals.
+
 ## 2026-06-06 Refactor Plan Before Goal Feature Completion
 
 The target is not merely "better shaders." The target is a full candidate

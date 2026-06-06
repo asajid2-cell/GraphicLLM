@@ -497,7 +497,13 @@ def analyze_report(
             else:
                 if composite_pass.get("executed") is not True:
                     failures.append("FullSceneCompositeV3 pass did not execute")
-                for resource in ["direct_lighting", "indirect_lighting", "shadow_visibility", "hdr_color"]:
+                for resource in [
+                    "direct_lighting",
+                    "indirect_lighting",
+                    "shadow_visibility",
+                    "hdr_color",
+                    "local_reflection_radiance",
+                ]:
                     if resource not in composite_pass.get("reads", []):
                         failures.append(f"FullSceneCompositeV3 pass does not read {resource}")
                 if "candidate_hdr_scene_color" not in composite_pass.get("writes", []):

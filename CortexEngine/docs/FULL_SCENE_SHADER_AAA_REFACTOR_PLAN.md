@@ -845,6 +845,22 @@ Milestone 3: reflection resolver ownership.
 - add roughness-aware filtering and confidence clamping.
 - validate on metallic stress with mouse jitter.
 
+Current status, 2026-06-06:
+
+- `FullSceneReflectionV3` is now a concrete render-graph producer, not only a
+  report adapter.
+- It writes `reflection_radiance`, `reflection_confidence`,
+  `reflection_source_id`, `reflection_rejected_source_mask`, and
+  `reflection_temporal_delta`.
+- `FullSceneCompositeV3` consumes `reflection_radiance`.
+- Gallery static and mouse-jitter packets pass:
+  - `build/captures/v3_reflection_resolver_static_smoke2_20260606`.
+  - `build/captures/v3_reflection_resolver_motion_smoke1_20260606`.
+- The next reflection work is deeper source arbitration and filtering:
+  local probe vs SSR vs RT/ray query vs scene-local environment, with
+  roughness-aware source choice and temporal-history admission. Do not redo the
+  basic resource/pass/report wiring unless packet evidence regresses.
+
 Milestone 4: scene-local environment resources.
 
 - create real irradiance/specular/background resources.

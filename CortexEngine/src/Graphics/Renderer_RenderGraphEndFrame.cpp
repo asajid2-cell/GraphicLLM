@@ -10,6 +10,7 @@
 #include "Passes/RenderPassScope.h"
 #include "RenderGraph.h"
 
+#include <array>
 #include <cstdlib>
 #include <glm/geometric.hpp>
 #include <span>
@@ -46,12 +47,42 @@ struct FullSceneCompositeV3Context {
     const char** stage = nullptr;
 };
 
+struct FullSceneReflectionResolverV3Context {
+    RGResourceHandle localReflectionRadiance;
+    RGResourceHandle radiance;
+    RGResourceHandle confidence;
+    RGResourceHandle sourceId;
+    RGResourceHandle rejectedSourceMask;
+    RGResourceHandle temporalDelta;
+    ID3D12Device* device = nullptr;
+    DescriptorHeapManager* descriptorManager = nullptr;
+    ID3D12GraphicsCommandList* commandList = nullptr;
+    DX12RootSignature* rootSignature = nullptr;
+    DX12Pipeline* pipeline = nullptr;
+    D3D12_GPU_VIRTUAL_ADDRESS frameConstants = 0;
+    std::array<D3D12_CPU_DESCRIPTOR_HANDLE, 5> outputRTVs{};
+    uint32_t width = 0;
+    uint32_t height = 0;
+    bool* ran = nullptr;
+    bool* failed = nullptr;
+    const char** stage = nullptr;
+};
+
 void FailFullSceneCompositeV3(const FullSceneCompositeV3Context& context, const char* stage) {
     if (context.failed) {
         *context.failed = true;
     }
     if (context.stage && !*context.stage) {
         *context.stage = stage ? stage : "full_scene_composite_v3_unknown";
+    }
+}
+
+void FailFullSceneReflectionResolverV3(const FullSceneReflectionResolverV3Context& context, const char* stage) {
+    if (context.failed) {
+        *context.failed = true;
+    }
+    if (context.stage && !*context.stage) {
+        *context.stage = stage ? stage : "full_scene_reflection_resolver_v3_unknown";
     }
 }
 
@@ -144,6 +175,88 @@ void FailFullSceneCompositeV3(const FullSceneCompositeV3Context& context, const 
             }
             context.commandList->SetPipelineState(context.pipeline->GetPipelineState());
             context.commandList->SetGraphicsRootDescriptorTable(3, table[0].gpu);
+            FullscreenPass::DrawTriangle(context.commandList);
+            if (context.ran) {
+                *context.ran = true;
+            }
+        });
+
+    return true;
+}
+
+[[nodiscard]] bool AddFullSceneReflectionResolverV3Pass(RenderGraph& graph,
+                                                        const FullSceneReflectionResolverV3Context& context) {
+    if (!context.localReflectionRadiance.IsValid() ||
+        !context.radiance.IsValid() ||
+        !context.confidence.IsValid() ||
+        !context.sourceId.IsValid() ||
+        !context.rejectedSourceMask.IsValid() ||
+        !context.temporalDelta.IsValid() ||
+        !context.device ||
+        !context.descriptorManager ||
+        !context.commandList ||
+        !context.rootSignature ||
+        !context.pipeline ||
+        !context.pipeline->GetPipelineState() ||
+        context.frameConstants == 0 ||
+        context.width == 0 ||
+        context.height == 0) {
+        FailFullSceneReflectionResolverV3(context, "full_scene_reflection_resolver_v3_contract");
+        return false;
+    }
+    for (const auto rtv : context.outputRTVs) {
+        if (rtv.ptr == 0) {
+            FailFullSceneReflectionResolverV3(context, "full_scene_reflection_resolver_v3_rtv");
+            return false;
+        }
+    }
+
+    graph.AddPass(
+        "FullSceneReflectionV3",
+        [context](RGPassBuilder& builder) {
+            builder.SetType(RGPassType::Graphics);
+            builder.Read(context.localReflectionRadiance, RGResourceUsage::ShaderResource);
+            builder.Write(context.radiance, RGResourceUsage::RenderTarget);
+            builder.Write(context.confidence, RGResourceUsage::RenderTarget);
+            builder.Write(context.sourceId, RGResourceUsage::RenderTarget);
+            builder.Write(context.rejectedSourceMask, RGResourceUsage::RenderTarget);
+            builder.Write(context.temporalDelta, RGResourceUsage::RenderTarget);
+        },
+        [context](ID3D12GraphicsCommandList*, const RenderGraph& graph) {
+            auto srvResult = context.descriptorManager->AllocateTransientCBV_SRV_UAV();
+            if (srvResult.IsErr()) {
+                FailFullSceneReflectionResolverV3(context, "full_scene_reflection_resolver_v3_descriptor");
+                return;
+            }
+
+            const DescriptorHandle inputSRV = srvResult.Value();
+            ID3D12Resource* localRadiance = graph.GetResource(context.localReflectionRadiance);
+            if (!DescriptorTable::WriteTexture2DSRV(
+                    context.device,
+                    inputSRV,
+                    localRadiance,
+                    DXGI_FORMAT_R16G16B16A16_FLOAT)) {
+                FailFullSceneReflectionResolverV3(context, "full_scene_reflection_resolver_v3_input_srv");
+                return;
+            }
+
+            context.commandList->OMSetRenderTargets(
+                static_cast<UINT>(context.outputRTVs.size()),
+                context.outputRTVs.data(),
+                FALSE,
+                nullptr);
+            FullscreenPass::SetViewportAndScissor(context.commandList, context.width, context.height);
+            if (!FullscreenPass::BindGraphicsState({
+                    context.commandList,
+                    context.descriptorManager,
+                    context.rootSignature,
+                    context.frameConstants,
+                })) {
+                FailFullSceneReflectionResolverV3(context, "full_scene_reflection_resolver_v3_bind");
+                return;
+            }
+            context.commandList->SetPipelineState(context.pipeline->GetPipelineState());
+            context.commandList->SetGraphicsRootDescriptorTable(3, inputSRV.gpu);
             FullscreenPass::DrawTriangle(context.commandList);
             if (context.ran) {
                 *context.ran = true;
@@ -294,6 +407,29 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
         m_debugViewState.mode == 67u &&
         m_pipelineState.candidateBeautyDisplay &&
         m_mainTargets.compositeV3.descriptors.hdrSceneColorSRV.IsValid();
+    const bool wantsReflectionResolverV3ThisFrame =
+        wantsRgPostThisFrame &&
+        m_pipelineState.fullSceneReflectionResolverV3 &&
+        m_mainTargets.reflectionV3.resources.radiance &&
+        m_mainTargets.reflectionV3.resources.confidence &&
+        m_mainTargets.reflectionV3.resources.sourceId &&
+        m_mainTargets.reflectionV3.resources.rejectedSourceMask &&
+        m_mainTargets.reflectionV3.resources.temporalDelta &&
+        m_mainTargets.reflectionV3.descriptors.radianceRTV.IsValid() &&
+        m_mainTargets.reflectionV3.descriptors.radianceSRV.IsValid() &&
+        m_mainTargets.reflectionV3.descriptors.confidenceRTV.IsValid() &&
+        m_mainTargets.reflectionV3.descriptors.confidenceSRV.IsValid() &&
+        m_mainTargets.reflectionV3.descriptors.sourceIdRTV.IsValid() &&
+        m_mainTargets.reflectionV3.descriptors.sourceIdSRV.IsValid() &&
+        m_mainTargets.reflectionV3.descriptors.rejectedSourceMaskRTV.IsValid() &&
+        m_mainTargets.reflectionV3.descriptors.rejectedSourceMaskSRV.IsValid() &&
+        m_mainTargets.reflectionV3.descriptors.temporalDeltaRTV.IsValid() &&
+        m_mainTargets.reflectionV3.descriptors.temporalDeltaSRV.IsValid();
+    const bool wantsReflectionResolverV3DebugViewThisFrame =
+        wantsReflectionResolverV3ThisFrame &&
+        m_debugViewState.mode >= 68u &&
+        m_debugViewState.mode <= 72u &&
+        m_pipelineState.candidateBeautyDisplay;
     const bool useFusedBloomTransients =
         wantsFusedBloomThisFrame &&
         std::getenv("CORTEX_DISABLE_BLOOM_TRANSIENTS") == nullptr;
@@ -338,6 +474,11 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
     RGResourceHandle v3DirectLightingHandle{};
     RGResourceHandle v3IndirectLightingHandle{};
     RGResourceHandle v3ShadowVisibilityHandle{};
+    RGResourceHandle reflectionRadianceHandle{};
+    RGResourceHandle reflectionConfidenceHandle{};
+    RGResourceHandle reflectionSourceIdHandle{};
+    RGResourceHandle reflectionRejectedSourceMaskHandle{};
+    RGResourceHandle reflectionTemporalDeltaHandle{};
     RGResourceHandle candidateHdrSceneColorHandle{};
     RGResourceHandle candidateBeautyHandle{};
     std::array<RGResourceHandle, kBloomLevels> bloomA{};
@@ -345,6 +486,9 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
     std::array<ComPtr<ID3D12Resource>, kBloomLevels> savedBloomA{};
     std::array<ComPtr<ID3D12Resource>, kBloomLevels> savedBloomB{};
     bool bloomStageFailed = false;
+    bool ranReflectionResolverV3 = false;
+    bool ranReflectionResolverV3DebugView = false;
+    bool scheduledReflectionResolverV3 = false;
     const char* bloomGraphStageError = nullptr;
     const char* postProcessGraphStageError = nullptr;
     VisibilityBufferRenderer::ResourceStateSnapshot vbPostInitialStates{};
@@ -528,6 +672,28 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
                 m_mainTargets.compositeV3.resources.state,
                 "CandidateHDRSceneColor");
         }
+        if (wantsReflectionResolverV3ThisFrame) {
+            reflectionRadianceHandle = m_services.renderGraph->ImportResource(
+                m_mainTargets.reflectionV3.resources.radiance.Get(),
+                m_mainTargets.reflectionV3.resources.state,
+                "ReflectionV3Radiance");
+            reflectionConfidenceHandle = m_services.renderGraph->ImportResource(
+                m_mainTargets.reflectionV3.resources.confidence.Get(),
+                m_mainTargets.reflectionV3.resources.state,
+                "ReflectionV3Confidence");
+            reflectionSourceIdHandle = m_services.renderGraph->ImportResource(
+                m_mainTargets.reflectionV3.resources.sourceId.Get(),
+                m_mainTargets.reflectionV3.resources.state,
+                "ReflectionV3SourceId");
+            reflectionRejectedSourceMaskHandle = m_services.renderGraph->ImportResource(
+                m_mainTargets.reflectionV3.resources.rejectedSourceMask.Get(),
+                m_mainTargets.reflectionV3.resources.state,
+                "ReflectionV3RejectedSourceMask");
+            reflectionTemporalDeltaHandle = m_services.renderGraph->ImportResource(
+                m_mainTargets.reflectionV3.resources.temporalDelta.Get(),
+                m_mainTargets.reflectionV3.resources.state,
+                "ReflectionV3TemporalDelta");
+        }
         if (wantsCandidateBeautyThisFrame) {
             candidateBeautyHandle = m_services.renderGraph->ImportResource(
                 m_mainTargets.candidateBeautyV3.resources.ldrOutput.Get(),
@@ -586,6 +752,39 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
             localRadianceContext.status.stage = &postProcessGraphStageError;
             localReflRadianceHandle =
                 LocalReflectionRadiancePass::AddToGraph(*m_services.renderGraph, localRadianceContext);
+        }
+
+        if (wantsReflectionResolverV3ThisFrame && localReflRadianceHandle.IsValid()) {
+            FullSceneReflectionResolverV3Context reflectionContext{};
+            reflectionContext.localReflectionRadiance = localReflRadianceHandle;
+            reflectionContext.radiance = reflectionRadianceHandle;
+            reflectionContext.confidence = reflectionConfidenceHandle;
+            reflectionContext.sourceId = reflectionSourceIdHandle;
+            reflectionContext.rejectedSourceMask = reflectionRejectedSourceMaskHandle;
+            reflectionContext.temporalDelta = reflectionTemporalDeltaHandle;
+            reflectionContext.device = m_services.device ? m_services.device->GetDevice() : nullptr;
+            reflectionContext.descriptorManager = m_services.descriptorManager.get();
+            reflectionContext.commandList = m_commandResources.graphicsList.Get();
+            reflectionContext.rootSignature = m_pipelineState.rootSignature.get();
+            reflectionContext.pipeline = m_pipelineState.fullSceneReflectionResolverV3.get();
+            reflectionContext.frameConstants = m_constantBuffers.currentFrameGPU;
+            reflectionContext.outputRTVs = {
+                m_mainTargets.reflectionV3.descriptors.radianceRTV.cpu,
+                m_mainTargets.reflectionV3.descriptors.confidenceRTV.cpu,
+                m_mainTargets.reflectionV3.descriptors.sourceIdRTV.cpu,
+                m_mainTargets.reflectionV3.descriptors.rejectedSourceMaskRTV.cpu,
+                m_mainTargets.reflectionV3.descriptors.temporalDeltaRTV.cpu,
+            };
+            reflectionContext.width = GetInternalRenderWidth();
+            reflectionContext.height = GetInternalRenderHeight();
+            reflectionContext.ran = &ranReflectionResolverV3;
+            reflectionContext.failed = &bloomStageFailed;
+            reflectionContext.stage = &postProcessGraphStageError;
+            if (!AddFullSceneReflectionResolverV3Pass(*m_services.renderGraph, reflectionContext)) {
+                bloomStageFailed = true;
+            } else {
+                scheduledReflectionResolverV3 = true;
+            }
         }
 
         const PostProcessGraphPass::ResourceHandles postProcessResources{
@@ -688,7 +887,9 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
             compositeContext.indirectLighting = v3IndirectLightingHandle;
             compositeContext.shadowVisibility = v3ShadowVisibilityHandle;
             compositeContext.legacyHdr = hdrHandle;
-            compositeContext.localReflectionRadiance = localReflRadianceHandle;
+            compositeContext.localReflectionRadiance = scheduledReflectionResolverV3 && reflectionRadianceHandle.IsValid()
+                ? reflectionRadianceHandle
+                : localReflRadianceHandle;
             compositeContext.output = candidateHdrSceneColorHandle;
             compositeContext.device = m_services.device ? m_services.device->GetDevice() : nullptr;
             compositeContext.descriptorManager = m_services.descriptorManager.get();
@@ -799,6 +1000,64 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
                 bloomStageFailed = true;
             }
         }
+
+        if (wantsReflectionResolverV3DebugViewThisFrame && scheduledReflectionResolverV3) {
+            RGResourceHandle debugSource{};
+            DescriptorHandle debugSRV{};
+            const char* debugPassName = "FullSceneReflectionV3DebugView";
+            switch (m_debugViewState.mode) {
+            case 68u:
+                debugSource = reflectionRadianceHandle;
+                debugSRV = m_mainTargets.reflectionV3.descriptors.radianceSRV;
+                debugPassName = "FullSceneReflectionV3RadianceDebugView";
+                break;
+            case 69u:
+                debugSource = reflectionConfidenceHandle;
+                debugSRV = m_mainTargets.reflectionV3.descriptors.confidenceSRV;
+                debugPassName = "FullSceneReflectionV3ConfidenceDebugView";
+                break;
+            case 70u:
+                debugSource = reflectionSourceIdHandle;
+                debugSRV = m_mainTargets.reflectionV3.descriptors.sourceIdSRV;
+                debugPassName = "FullSceneReflectionV3SourceIdDebugView";
+                break;
+            case 71u:
+                debugSource = reflectionRejectedSourceMaskHandle;
+                debugSRV = m_mainTargets.reflectionV3.descriptors.rejectedSourceMaskSRV;
+                debugPassName = "FullSceneReflectionV3RejectedSourceMaskDebugView";
+                break;
+            case 72u:
+                debugSource = reflectionTemporalDeltaHandle;
+                debugSRV = m_mainTargets.reflectionV3.descriptors.temporalDeltaSRV;
+                debugPassName = "FullSceneReflectionV3TemporalDeltaDebugView";
+                break;
+            default:
+                break;
+            }
+
+            if (debugSource.IsValid() && debugSRV.IsValid()) {
+                CandidateBeautyDisplayContext reflectionDebugContext{};
+                reflectionDebugContext.passName = debugPassName;
+                reflectionDebugContext.candidate = debugSource;
+                reflectionDebugContext.backBuffer = backBufferHandle;
+                reflectionDebugContext.device = m_services.device ? m_services.device->GetDevice() : nullptr;
+                reflectionDebugContext.descriptorManager = m_services.descriptorManager.get();
+                reflectionDebugContext.commandList = m_commandResources.graphicsList.Get();
+                reflectionDebugContext.rootSignature = m_pipelineState.rootSignature.get();
+                reflectionDebugContext.pipeline = m_pipelineState.candidateBeautyDisplay.get();
+                reflectionDebugContext.frameConstants = m_constantBuffers.currentFrameGPU;
+                reflectionDebugContext.candidateSRV = debugSRV;
+                reflectionDebugContext.backBufferRTV = m_services.window->GetCurrentRTV();
+                reflectionDebugContext.width = m_services.window->GetWidth();
+                reflectionDebugContext.height = m_services.window->GetHeight();
+                reflectionDebugContext.ran = &ranReflectionResolverV3DebugView;
+                reflectionDebugContext.failed = &bloomStageFailed;
+                reflectionDebugContext.stage = &postProcessGraphStageError;
+                if (!AddCandidateBeautyDisplayPass(*m_services.renderGraph, reflectionDebugContext)) {
+                    bloomStageFailed = true;
+                }
+            }
+        }
     }
 
     const auto execResult = m_services.renderGraph->Execute(m_commandResources.graphicsList.Get());
@@ -904,6 +1163,10 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
             m_mainTargets.compositeV3.resources.state =
                 m_services.renderGraph->GetResourceState(candidateHdrSceneColorHandle);
         }
+        if (reflectionRadianceHandle.IsValid()) {
+            m_mainTargets.reflectionV3.resources.state =
+                m_services.renderGraph->GetResourceState(reflectionRadianceHandle);
+        }
         if (hzbHandle.IsValid() && (m_debugViewState.mode == 32u)) m_hzbResources.resources.resourceState = m_services.renderGraph->GetResourceState(hzbHandle);
         if (wantsFusedBloomThisFrame && !useFusedBloomTransients) {
             for (uint32_t level = 0; level < m_bloomResources.resources.activeLevels; ++level) {
@@ -923,6 +1186,18 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
                             nullptr,
                             true);
         }
+        if (wantsReflectionResolverV3ThisFrame) {
+            RecordFramePass("FullSceneReflectionV3",
+                            true,
+                            ranReflectionResolverV3,
+                            ranReflectionResolverV3 ? 1u : 0u,
+                            {"local_reflection_radiance"},
+                            {"reflection_radiance", "reflection_confidence", "reflection_source_id",
+                             "reflection_rejected_source_mask", "reflection_temporal_delta"},
+                            false,
+                            nullptr,
+                            true);
+        }
         RecordFramePass("PostProcess", true, result.ranPostProcess, result.ranPostProcess ? 1u : 0u,
                         {"hdr_color", "ssao", "ssr_color", "bloom", "taa_history", "depth",
                          inputs.frameNormalRoughnessResource,
@@ -933,7 +1208,18 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
                         nullptr,
                         true);
         if (wantsCompositeV3ThisFrame) {
-            if (localReflRadianceHandle.IsValid()) {
+            if (ranReflectionResolverV3 && reflectionRadianceHandle.IsValid()) {
+                RecordFramePass("FullSceneCompositeV3",
+                                true,
+                                result.ranCompositeV3,
+                                result.ranCompositeV3 ? 1u : 0u,
+                                {"direct_lighting", "indirect_lighting", "shadow_visibility", "hdr_color",
+                                 "reflection_radiance"},
+                                {"candidate_hdr_scene_color"},
+                                false,
+                                nullptr,
+                                true);
+            } else if (localReflRadianceHandle.IsValid()) {
                 RecordFramePass("FullSceneCompositeV3",
                                 true,
                                 result.ranCompositeV3,
@@ -989,6 +1275,24 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
                             result.ranCompositeV3DebugView,
                             result.ranCompositeV3DebugView ? 1u : 0u,
                             {"candidate_hdr_scene_color"},
+                            {"back_buffer"},
+                            false,
+                            nullptr,
+                            true);
+        }
+        if (wantsReflectionResolverV3DebugViewThisFrame) {
+            const char* readResource =
+                m_debugViewState.mode == 68u ? "reflection_radiance" :
+                m_debugViewState.mode == 69u ? "reflection_confidence" :
+                m_debugViewState.mode == 70u ? "reflection_source_id" :
+                m_debugViewState.mode == 71u ? "reflection_rejected_source_mask" :
+                m_debugViewState.mode == 72u ? "reflection_temporal_delta" :
+                "reflection_radiance";
+            RecordFramePass("FullSceneReflectionV3DebugView",
+                            true,
+                            ranReflectionResolverV3DebugView,
+                            ranReflectionResolverV3DebugView ? 1u : 0u,
+                            {readResource},
                             {"back_buffer"},
                             false,
                             nullptr,

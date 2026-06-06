@@ -5368,3 +5368,89 @@ Remaining limitation:
   `FullSceneCompositeV3`. The current composite uses V3 lighting plus a bounded
   HDR fallback; it does not yet consume concrete V3 reflection/environment
   radiance resources as first-class inputs.
+
+### Concrete ReflectionResolverV3 Producer - 2026-06-06
+
+Implemented:
+
+- Added `assets/shaders/FullSceneReflectionResolverV3.hlsl`.
+- Added persistent ReflectionV3 targets and descriptors:
+  `reflection_radiance`, `reflection_confidence`, `reflection_source_id`,
+  `reflection_rejected_source_mask`, and `reflection_temporal_delta`.
+- Added render-graph pass `FullSceneReflectionV3`.
+  - reads `local_reflection_radiance`.
+  - writes all five concrete ReflectionV3 resources.
+- `FullSceneCompositeV3` now consumes `reflection_radiance` from the resolver
+  when available.
+- Added ReflectionV3 debug modes:
+  - `68`: reflection radiance.
+  - `69`: reflection confidence.
+  - `70`: reflection source ID.
+  - `71`: rejected source mask.
+  - `72`: temporal delta.
+- Updated packet runners, V3 analyzers, the static contract, and runtime
+  required-output reporting so all five ReflectionV3 outputs are required and
+  visible.
+
+Validation:
+
+```powershell
+python -m py_compile tools\analyze_full_scene_shader_v3_placeholders.py tools\analyze_full_scene_shader_v3_lighting_motion.py tools\validate_full_scene_shader_pipeline_v3_plan.py tools\check_full_scene_shader_pipeline_v2_frame_report.py
+python tools\validate_full_scene_shader_pipeline_v3_plan.py
+git diff --check -- CortexEngine/src/Graphics/FullSceneShaderFrameContext.h CortexEngine/src/Graphics/Renderer_RenderGraphEndFrame.cpp CortexEngine/src/Graphics/Renderer_FrameContractSnapshot.cpp CortexEngine/src/Graphics/RendererMainTargetState.h CortexEngine/assets/final_art/full_scene_shader_pipeline_v3_contract.json CortexEngine/tools/analyze_full_scene_shader_v3_placeholders.py
+& 'C:\Program Files\Ninja\ninja.exe' -C build -t recompact
+cmd.exe /d /c "call ""C:\Program Files\Microsoft Visual Studio\18\Community\Common7\Tools\VsDevCmd.bat"" -arch=x64 -host_arch=x64 >nul && set ""CORTEX_SKIP_ASSET_SYNC=1"" && ""C:\Program Files\Ninja\ninja.exe"" -C build CortexEngine -j 8"
+$env:CORTEX_ENABLE_FULL_SCENE_CANDIDATE_BEAUTY_V3='1'; powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_full_scene_shader_pipeline_v3_packet.ps1 -NoBuild -SkipSceneAnalyzers -NoStressScene -FamilyFilter gallery -SmokeFrames 24 -CaptureFrame 12 -CaptureSequenceCount 1 -StabilityMotionMode static -OutputRoot build\captures\v3_reflection_resolver_static_smoke2_20260606
+$env:CORTEX_ENABLE_FULL_SCENE_CANDIDATE_BEAUTY_V3='1'; powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_full_scene_shader_pipeline_v3_packet.ps1 -NoBuild -SkipSceneAnalyzers -NoStressScene -FamilyFilter gallery -SmokeFrames 36 -CaptureFrame 18 -CaptureSequenceCount 2 -StabilityMotionMode mouse_jitter -OutputRoot build\captures\v3_reflection_resolver_motion_smoke1_20260606
+```
+
+Results:
+
+- Python compile passed.
+- V3 plan validator passed with `Required outputs: 14`.
+- focused `git diff --check` passed, with only existing CRLF warnings.
+- native build passed and linked `build/bin/CortexEngine.exe`.
+- static packet passed:
+  `build/captures/v3_reflection_resolver_static_smoke2_20260606`.
+  - reports: `23`.
+  - promotion status: `review_packet_passed`.
+- mouse-jitter packet passed:
+  `build/captures/v3_reflection_resolver_motion_smoke1_20260606`.
+  - reports: `23`.
+  - V3 lighting/reflection motion measured `17` view sequences.
+  - promotion status: `review_packet_passed`.
+
+Direct frame-report proof:
+
+- required outputs: `14`.
+- `reflection_v3_ready=true`.
+- `reflection_v3_channel_count=5`.
+- `reflection_v3_source_contract=local_probe`.
+- `FullSceneReflectionV3` executed, read `local_reflection_radiance`, and wrote
+  `reflection_radiance`, `reflection_confidence`, `reflection_source_id`,
+  `reflection_rejected_source_mask`, and `reflection_temporal_delta`.
+- `FullSceneCompositeV3` executed, read `direct_lighting`,
+  `indirect_lighting`, `shadow_visibility`, `hdr_color`, and
+  `reflection_radiance`, then wrote `candidate_hdr_scene_color`.
+
+Mouse-jitter reflection evidence:
+
+- `reflection_radiance`: mean abs luma delta `0.0024393373`, active delta
+  ratio `0.0140386285`.
+- `reflection_confidence`: mean abs luma delta `0.0003614430`, active delta
+  ratio `0.0051226128`.
+- `reflection_source_id`: mean abs luma delta `0.0004442693`, active delta
+  ratio `0.0057389323`.
+- `reflection_rejected_source_mask`: mean abs luma delta `0.0001864565`,
+  active delta ratio `0.0017708333`.
+- `reflection_temporal_delta`: mean abs luma delta `0.0001864565`, active
+  delta ratio `0.0017708333`.
+
+Remaining limitation:
+
+- The resolver is now a concrete resource producer, but it still wraps the
+  current local reflection radiance source. Source arbitration across local
+  probe, SSR, RT/ray query, and scene-local environment remains the next
+  ReflectionV3 quality step.
+- This is still candidate-path infrastructure. Default beauty remains
+  unchanged.

@@ -49,6 +49,27 @@ Result<void> Renderer::CreateScreenSpacePipelineStates(const RendererCompiledSha
         }
     }
 
+    if (shaders.fullSceneReflectionResolverV3PS) {
+        m_pipelineState.fullSceneReflectionResolverV3 = std::make_unique<DX12Pipeline>();
+
+        PipelineDesc reflectionResolverV3Desc = postDesc;
+        reflectionResolverV3Desc.pixelShader = *shaders.fullSceneReflectionResolverV3PS;
+        reflectionResolverV3Desc.rtvFormat = DXGI_FORMAT_R16G16B16A16_FLOAT;
+        reflectionResolverV3Desc.numRenderTargets = 5;
+
+        auto reflectionResolverPipelineResult = m_pipelineState.fullSceneReflectionResolverV3->Initialize(
+            m_services.device->GetDevice(),
+            m_pipelineState.rootSignature->GetRootSignature(),
+            reflectionResolverV3Desc);
+        if (reflectionResolverPipelineResult.IsErr()) {
+            spdlog::warn("Failed to create FullSceneReflectionResolverV3 pipeline: {}",
+                         reflectionResolverPipelineResult.Error());
+            m_pipelineState.fullSceneReflectionResolverV3.reset();
+        } else {
+            spdlog::info("FullSceneReflectionResolverV3 pipeline created successfully.");
+        }
+    }
+
     if (shaders.candidateBeautyDisplayPS) {
         m_pipelineState.candidateBeautyDisplay = std::make_unique<DX12Pipeline>();
 

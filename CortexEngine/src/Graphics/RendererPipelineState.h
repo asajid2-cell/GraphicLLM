@@ -27,6 +27,7 @@ struct RendererPipelineReadiness {
 
     bool postProcess = false;
     bool fullSceneCompositeV3 = false;
+    bool fullSceneReflectionResolverV3 = false;
     bool candidateBeautyDisplay = false;
     bool taa = false;
     bool ssr = false;
@@ -73,6 +74,7 @@ struct RendererPipelineState {
 
     std::unique_ptr<DX12Pipeline> postProcess;
     std::unique_ptr<DX12Pipeline> fullSceneCompositeV3;
+    std::unique_ptr<DX12Pipeline> fullSceneReflectionResolverV3;
     std::unique_ptr<DX12Pipeline> candidateBeautyDisplay;
     std::unique_ptr<DX12Pipeline> taa;
     std::unique_ptr<DX12Pipeline> ssr;
@@ -115,6 +117,7 @@ struct RendererPipelineState {
         readiness.shadowAlphaDoubleSided = shadowAlphaDoubleSided != nullptr;
         readiness.postProcess = postProcess != nullptr;
         readiness.fullSceneCompositeV3 = fullSceneCompositeV3 != nullptr;
+        readiness.fullSceneReflectionResolverV3 = fullSceneReflectionResolverV3 != nullptr;
         readiness.candidateBeautyDisplay = candidateBeautyDisplay != nullptr;
         readiness.taa = taa != nullptr;
         readiness.ssr = ssr != nullptr;
@@ -154,6 +157,7 @@ struct RendererPipelineState {
         shadowAlphaDoubleSided.reset();
         postProcess.reset();
         fullSceneCompositeV3.reset();
+        fullSceneReflectionResolverV3.reset();
         candidateBeautyDisplay.reset();
         taa.reset();
         ssr.reset();

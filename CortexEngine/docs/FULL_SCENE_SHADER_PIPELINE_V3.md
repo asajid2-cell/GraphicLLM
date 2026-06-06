@@ -70,6 +70,7 @@ Geometry / Visibility
        -> reflection_radiance
        -> reflection_confidence
        -> reflection_source_id
+       -> reflection_rejected_source_mask
        -> reflection_temporal_delta
   -> SceneLocalEnvironmentV3
        -> scene_local_environment
@@ -285,6 +286,7 @@ indirect_light,
 reflection_radiance,
 reflection_confidence,
 reflection_source_id,
+reflection_rejected_source_mask,
 reflection_temporal_delta,
 environment_mode,
 ambient_lighting,
@@ -393,8 +395,8 @@ Each stage owns exactly one contract boundary:
    - Inputs: material roughness/metallic/normal, scene-local environment,
      local probes, optional SSR/ray query, and history.
    - Outputs: `reflection_radiance`, `reflection_source_id`,
-     `reflection_confidence`, `reflection_temporal_delta`, and
-     `rejected_reflection_source`.
+     `reflection_confidence`, `reflection_rejected_source_mask`, and
+     `reflection_temporal_delta`.
    - The resolver must explicitly choose between local probe, SSR, ray query,
      and scene-local fallback per pixel.
    - Glossy/metal surfaces must stop jittering through source switches that are
@@ -829,8 +831,8 @@ Current evidence-domain implementation:
   `local_probe`, `ray_query_reflection`, `screen_space_reflection`, and
   `scene_local_environment`.
 - current readiness channels are:
-  `reflection_radiance`, `reflection_confidence`, `reflection_source_id`, and
-  `reflection_temporal_delta`.
+  `reflection_radiance`, `reflection_confidence`, `reflection_source_id`,
+  `reflection_rejected_source_mask`, and `reflection_temporal_delta`.
 - current temporal-delta ownership is source-aware:
   - scene-local probe/environment reflection sources can own a deterministic
     `reflection_temporal_delta_scene_local_bound` channel without RT history.
@@ -842,7 +844,7 @@ Current evidence-domain implementation:
   `material_reflection_policy`, `local_reflection_radiance`, and
   `rt_reflection_signal_history`.
 - the placeholder packet analyzer now allows and validates the `reflection`
-  domain when these four channels are owned and `SceneLocalEnvironmentV3` is
+  domain when these five channels are owned and `SceneLocalEnvironmentV3` is
   already ready.
 - first runtime smoke:
   `build/captures/v3_reflection_contract_smoke1_20260605`.
@@ -860,13 +862,73 @@ Current evidence-domain implementation:
 
 Important limitation:
 
-- This slice does not add the final reflection resolver shader or change
-  default beauty. It promotes the reflection problem from hidden renderer state
-  into named V3 evidence that later resolver/composite work can consume.
 - The source-aware temporal-delta rule is deliberately a contract fix, not a
   scene workaround: enclosed scenes with stable local reflection probes should
   not be blocked on RT reflection history, while dynamic reflection paths still
   require history/TAA evidence.
+
+Concrete resolver producer update, 2026-06-06:
+
+- added `assets/shaders/FullSceneReflectionResolverV3.hlsl`.
+- added concrete ReflectionV3 render targets:
+  `reflection_radiance`, `reflection_confidence`, `reflection_source_id`,
+  `reflection_rejected_source_mask`, and `reflection_temporal_delta`.
+- `FullSceneReflectionV3` now runs as a render-graph pass after
+  `LocalReflectionRadiance`.
+- the pass reads `local_reflection_radiance` and writes all five concrete
+  ReflectionV3 resources.
+- `FullSceneCompositeV3` now reads `reflection_radiance` from the resolver
+  when it is scheduled, falling back to `local_reflection_radiance` only when
+  the resolver is unavailable.
+- added debug views:
+  - mode `68`: `reflection_radiance`.
+  - mode `69`: `reflection_confidence`.
+  - mode `70`: `reflection_source_id`.
+  - mode `71`: `reflection_rejected_source_mask`.
+  - mode `72`: `reflection_temporal_delta`.
+- the runtime required-output list now matches the machine contract and
+  includes all five ReflectionV3 outputs.
+- static packet:
+  `build/captures/v3_reflection_resolver_static_smoke2_20260606`.
+  - reports: `23`.
+  - promotion status: `review_packet_passed`.
+- mouse-jitter packet:
+  `build/captures/v3_reflection_resolver_motion_smoke1_20260606`.
+  - reports: `23`.
+  - V3 motion analyzer measured `17` view sequences.
+  - promotion status: `review_packet_passed`.
+- direct frame-report proof from the mouse-jitter packet:
+  - required outputs: `14`.
+  - `reflection_v3_ready=true`.
+  - `reflection_v3_channel_count=5`.
+  - `reflection_v3_source_contract=local_probe`.
+  - `FullSceneReflectionV3.executed=true`.
+  - `FullSceneReflectionV3.reads=local_reflection_radiance`.
+  - `FullSceneReflectionV3.writes=reflection_radiance`,
+    `reflection_confidence`, `reflection_source_id`,
+    `reflection_rejected_source_mask`, and `reflection_temporal_delta`.
+  - `FullSceneCompositeV3.reads=direct_lighting`, `indirect_lighting`,
+    `shadow_visibility`, `hdr_color`, and `reflection_radiance`.
+  - `FullSceneCompositeV3.writes=candidate_hdr_scene_color`.
+- reflection mouse-jitter rows:
+  - `reflection_radiance`: mean abs luma delta `0.0024393373`,
+    active delta ratio `0.0140386285`.
+  - `reflection_confidence`: mean abs luma delta `0.0003614430`,
+    active delta ratio `0.0051226128`.
+  - `reflection_source_id`: mean abs luma delta `0.0004442693`,
+    active delta ratio `0.0057389323`.
+  - `reflection_rejected_source_mask`: mean abs luma delta `0.0001864565`,
+    active delta ratio `0.0017708333`.
+  - `reflection_temporal_delta`: mean abs luma delta `0.0001864565`,
+    active delta ratio `0.0017708333`.
+
+Remaining limitation:
+
+- This is a concrete resolver resource/pass slice, but it still derives from
+  the current local reflection radiance source. SSR/RT/environment source
+  competition, roughness-aware source selection, and real temporal history
+  admission remain future ReflectionV3 work.
+- Default beauty remains unchanged and not promoted.
 
 ### L007 - Scene Local Environment V3
 

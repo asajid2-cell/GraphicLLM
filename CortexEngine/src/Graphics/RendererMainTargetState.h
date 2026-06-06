@@ -154,7 +154,9 @@ struct FullSceneReflectionV3TargetResources {
     ComPtr<ID3D12Resource> rtSourceSignal;
     ComPtr<ID3D12Resource> historyCurr;
     ComPtr<ID3D12Resource> historyPrev;
+    ComPtr<ID3D12Resource> historyPrevSourceId;
     ComPtr<ID3D12Resource> historyValidity;
+    ComPtr<ID3D12Resource> historyRejection;
     D3D12_RESOURCE_STATES state = D3D12_RESOURCE_STATE_COMMON;
     D3D12_RESOURCE_STATES radianceState = D3D12_RESOURCE_STATE_COMMON;
     D3D12_RESOURCE_STATES confidenceState = D3D12_RESOURCE_STATE_COMMON;
@@ -165,7 +167,9 @@ struct FullSceneReflectionV3TargetResources {
     D3D12_RESOURCE_STATES rtSourceSignalState = D3D12_RESOURCE_STATE_COMMON;
     D3D12_RESOURCE_STATES historyCurrState = D3D12_RESOURCE_STATE_COMMON;
     D3D12_RESOURCE_STATES historyPrevState = D3D12_RESOURCE_STATE_COMMON;
+    D3D12_RESOURCE_STATES historyPrevSourceIdState = D3D12_RESOURCE_STATE_COMMON;
     D3D12_RESOURCE_STATES historyValidityState = D3D12_RESOURCE_STATE_COMMON;
+    D3D12_RESOURCE_STATES historyRejectionState = D3D12_RESOURCE_STATE_COMMON;
 
     void Reset() {
         radiance.Reset();
@@ -177,7 +181,9 @@ struct FullSceneReflectionV3TargetResources {
         rtSourceSignal.Reset();
         historyCurr.Reset();
         historyPrev.Reset();
+        historyPrevSourceId.Reset();
         historyValidity.Reset();
+        historyRejection.Reset();
         state = D3D12_RESOURCE_STATE_COMMON;
         radianceState = D3D12_RESOURCE_STATE_COMMON;
         confidenceState = D3D12_RESOURCE_STATE_COMMON;
@@ -188,7 +194,9 @@ struct FullSceneReflectionV3TargetResources {
         rtSourceSignalState = D3D12_RESOURCE_STATE_COMMON;
         historyCurrState = D3D12_RESOURCE_STATE_COMMON;
         historyPrevState = D3D12_RESOURCE_STATE_COMMON;
+        historyPrevSourceIdState = D3D12_RESOURCE_STATE_COMMON;
         historyValidityState = D3D12_RESOURCE_STATE_COMMON;
+        historyRejectionState = D3D12_RESOURCE_STATE_COMMON;
     }
 };
 
@@ -211,8 +219,12 @@ struct FullSceneReflectionV3TargetDescriptors {
     DescriptorHandle historyCurrSRV;
     DescriptorHandle historyPrevRTV;
     DescriptorHandle historyPrevSRV;
+    DescriptorHandle historyPrevSourceIdRTV;
+    DescriptorHandle historyPrevSourceIdSRV;
     DescriptorHandle historyValidityRTV;
     DescriptorHandle historyValiditySRV;
+    DescriptorHandle historyRejectionRTV;
+    DescriptorHandle historyRejectionSRV;
 
     void Reset() {
         radianceRTV = {};
@@ -233,8 +245,12 @@ struct FullSceneReflectionV3TargetDescriptors {
         historyCurrSRV = {};
         historyPrevRTV = {};
         historyPrevSRV = {};
+        historyPrevSourceIdRTV = {};
+        historyPrevSourceIdSRV = {};
         historyValidityRTV = {};
         historyValiditySRV = {};
+        historyRejectionRTV = {};
+        historyRejectionSRV = {};
     }
 };
 
@@ -721,11 +737,23 @@ struct FullSceneReflectionV3TargetState {
                                         descriptors.historyPrevSRV);
         if (historyPrev.IsErr()) return historyPrev;
 
+        auto historyPrevSourceId = createTarget("reflection_history_v3_prev_source_id",
+                                                resources.historyPrevSourceId,
+                                                descriptors.historyPrevSourceIdRTV,
+                                                descriptors.historyPrevSourceIdSRV);
+        if (historyPrevSourceId.IsErr()) return historyPrevSourceId;
+
         auto historyValidity = createTarget("reflection_history_v3_validity",
                                             resources.historyValidity,
                                             descriptors.historyValidityRTV,
                                             descriptors.historyValiditySRV);
         if (historyValidity.IsErr()) return historyValidity;
+
+        auto historyRejection = createTarget("reflection_history_v3_rejection",
+                                             resources.historyRejection,
+                                             descriptors.historyRejectionRTV,
+                                             descriptors.historyRejectionSRV);
+        if (historyRejection.IsErr()) return historyRejection;
 
         resources.state = D3D12_RESOURCE_STATE_RENDER_TARGET;
         resources.radianceState = D3D12_RESOURCE_STATE_RENDER_TARGET;
@@ -737,7 +765,9 @@ struct FullSceneReflectionV3TargetState {
         resources.rtSourceSignalState = D3D12_RESOURCE_STATE_RENDER_TARGET;
         resources.historyCurrState = D3D12_RESOURCE_STATE_RENDER_TARGET;
         resources.historyPrevState = D3D12_RESOURCE_STATE_RENDER_TARGET;
+        resources.historyPrevSourceIdState = D3D12_RESOURCE_STATE_RENDER_TARGET;
         resources.historyValidityState = D3D12_RESOURCE_STATE_RENDER_TARGET;
+        resources.historyRejectionState = D3D12_RESOURCE_STATE_RENDER_TARGET;
         return Result<void>::Ok();
     }
 

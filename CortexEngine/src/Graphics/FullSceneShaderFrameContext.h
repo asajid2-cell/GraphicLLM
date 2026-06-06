@@ -1199,7 +1199,9 @@ struct FullSceneShaderPipelineV3FrameContext {
     bool reflectionRTSourceSignalReady = false;
     bool reflectionHistoryV3Ready = false;
     bool reflectionHistoryV3PrevReady = false;
+    bool reflectionHistoryV3PrevSourceIdReady = false;
     bool reflectionHistoryV3ValidityReady = false;
+    bool reflectionHistoryV3RejectionReady = false;
     bool compositeV3Ready = false;
     bool hdrSceneColorReady = false;
     bool compositeInputsReady = false;
@@ -1249,7 +1251,9 @@ struct FullSceneShaderPipelineV3FrameContext {
         "reflection_rt_source_signal",
         "reflection_history_v3_curr",
         "reflection_history_v3_prev",
+        "reflection_history_v3_prev_source_id",
         "reflection_history_v3_validity",
+        "reflection_history_v3_rejection",
         "scene_local_environment",
         "hdr_scene_color",
         "candidate_hdr_scene_color",
@@ -1646,11 +1650,14 @@ inline FullSceneShaderPipelineV3FrameContext BuildFullSceneShaderPipelineV3Frame
         reflectionResolverV3WritesOutputs &&
         FullSceneShaderHasResource(contract, "reflection_history_v3_curr") &&
         FullSceneShaderHasResource(contract, "reflection_history_v3_prev") &&
+        FullSceneShaderHasResource(contract, "reflection_history_v3_prev_source_id") &&
         FullSceneShaderHasResource(contract, "reflection_history_v3_validity") &&
+        FullSceneShaderHasResource(contract, "reflection_history_v3_rejection") &&
         FullSceneShaderPassReadsResource(contract, "FullSceneReflectionHistoryV3", "reflection_radiance") &&
         FullSceneShaderPassReadsResource(contract, "FullSceneReflectionHistoryV3", "reflection_source_id") &&
         FullSceneShaderPassReadsResource(contract, "FullSceneReflectionHistoryV3", "reflection_temporal_delta") &&
         FullSceneShaderPassReadsResource(contract, "FullSceneReflectionHistoryV3", "reflection_history_v3_prev") &&
+        FullSceneShaderPassReadsResource(contract, "FullSceneReflectionHistoryV3", "reflection_history_v3_prev_source_id") &&
         FullSceneShaderPassReadsResource(contract, "FullSceneReflectionHistoryV3", "depth") &&
         (FullSceneShaderPassReadsResource(contract, "FullSceneReflectionHistoryV3", "gbuffer_normal_roughness") ||
          FullSceneShaderPassReadsResource(contract, "FullSceneReflectionHistoryV3", "vb_gbuffer_normal_roughness") ||
@@ -1658,8 +1665,11 @@ inline FullSceneShaderPipelineV3FrameContext BuildFullSceneShaderPipelineV3Frame
         FullSceneShaderPassReadsResource(contract, "FullSceneReflectionHistoryV3", "velocity") &&
         FullSceneShaderPassWritesResource(contract, "FullSceneReflectionHistoryV3", "reflection_history_v3_curr") &&
         FullSceneShaderPassWritesResource(contract, "FullSceneReflectionHistoryV3", "reflection_history_v3_validity") &&
+        FullSceneShaderPassWritesResource(contract, "FullSceneReflectionHistoryV3", "reflection_history_v3_rejection") &&
         FullSceneShaderPassReadsResource(contract, "FullSceneReflectionHistoryV3Copy", "reflection_history_v3_curr") &&
-        FullSceneShaderPassWritesResource(contract, "FullSceneReflectionHistoryV3Copy", "reflection_history_v3_prev");
+        FullSceneShaderPassReadsResource(contract, "FullSceneReflectionHistoryV3Copy", "reflection_source_id") &&
+        FullSceneShaderPassWritesResource(contract, "FullSceneReflectionHistoryV3Copy", "reflection_history_v3_prev") &&
+        FullSceneShaderPassWritesResource(contract, "FullSceneReflectionHistoryV3Copy", "reflection_history_v3_prev_source_id");
     context.reflectionRadianceReady =
         context.sceneLocalEnvironmentReady &&
         sourceContractReady &&
@@ -1702,9 +1712,15 @@ inline FullSceneShaderPipelineV3FrameContext BuildFullSceneShaderPipelineV3Frame
     context.reflectionHistoryV3PrevReady =
         reflectionHistoryV3WritesOutputs &&
         FullSceneShaderHasResource(contract, "reflection_history_v3_prev");
+    context.reflectionHistoryV3PrevSourceIdReady =
+        reflectionHistoryV3WritesOutputs &&
+        FullSceneShaderHasResource(contract, "reflection_history_v3_prev_source_id");
     context.reflectionHistoryV3ValidityReady =
         reflectionHistoryV3WritesOutputs &&
         FullSceneShaderHasResource(contract, "reflection_history_v3_validity");
+    context.reflectionHistoryV3RejectionReady =
+        reflectionHistoryV3WritesOutputs &&
+        FullSceneShaderHasResource(contract, "reflection_history_v3_rejection");
     uint32_t readyReflectionChannels = 0;
     readyReflectionChannels += context.reflectionRadianceReady ? 1u : 0u;
     readyReflectionChannels += context.reflectionConfidenceReady ? 1u : 0u;
@@ -1715,7 +1731,9 @@ inline FullSceneShaderPipelineV3FrameContext BuildFullSceneShaderPipelineV3Frame
     readyReflectionChannels += context.reflectionRTSourceSignalReady ? 1u : 0u;
     readyReflectionChannels += context.reflectionHistoryV3Ready ? 1u : 0u;
     readyReflectionChannels += context.reflectionHistoryV3PrevReady ? 1u : 0u;
+    readyReflectionChannels += context.reflectionHistoryV3PrevSourceIdReady ? 1u : 0u;
     readyReflectionChannels += context.reflectionHistoryV3ValidityReady ? 1u : 0u;
+    readyReflectionChannels += context.reflectionHistoryV3RejectionReady ? 1u : 0u;
     context.reflectionV3ChannelCount = readyReflectionChannels;
     context.reflectionV3SourceCount = readyReflectionSources;
     const std::string forcedReflectionSourceContract = FullSceneShaderReflectionV3ForcedSourceContract();
@@ -1726,7 +1744,7 @@ inline FullSceneShaderPipelineV3FrameContext BuildFullSceneShaderPipelineV3Frame
         ssrSourceReady ? "screen_space_reflection" :
         iblSourceReady ? "scene_local_environment" :
         "unknown";
-    context.reflectionV3Ready = readyReflectionChannels == 10u;
+    context.reflectionV3Ready = readyReflectionChannels == 12u;
 
     FullSceneShaderPipelineV3DomainEvidence reflectionDomain =
         MakeFullSceneShaderPipelineV3DomainEvidence(
@@ -1735,7 +1753,7 @@ inline FullSceneShaderPipelineV3FrameContext BuildFullSceneShaderPipelineV3Frame
             "reflection_radiance",
             "reflection_confidence",
             context.reflectionV3Ready
-                ? "FullSceneReflectionV3 and FullSceneReflectionHistoryV3 write concrete radiance, confidence, source-id, rejected-source, temporal-delta, source-signal, and current/previous history resources"
+                ? "FullSceneReflectionV3 and FullSceneReflectionHistoryV3 write concrete radiance, confidence, source-id, rejected-source, temporal-delta, source-signal, current/previous history, and rejection diagnostic resources"
                 : "FullSceneReflectionV3 is missing one or more reflection ownership channels");
     reflectionDomain.enabled =
         contract.sceneVisual.active &&
@@ -1760,7 +1778,9 @@ inline FullSceneShaderPipelineV3FrameContext BuildFullSceneShaderPipelineV3Frame
             "reflection_rt_source_signal",
             "reflection_history_v3_curr",
             "reflection_history_v3_prev",
+            "reflection_history_v3_prev_source_id",
             "reflection_history_v3_validity",
+            "reflection_history_v3_rejection",
             "rt_reflection_signal_history",
     };
     reflectionDomain.debugViews = {
@@ -1774,6 +1794,7 @@ inline FullSceneShaderPipelineV3FrameContext BuildFullSceneShaderPipelineV3Frame
         "reflection_history_v3_curr",
         "reflection_history_v3_prev",
         "reflection_history_v3_validity",
+        "reflection_history_v3_rejection",
     };
     reflectionDomain.channels = {
         context.reflectionRadianceReady ? "reflection_radiance_owned" : "reflection_radiance_missing",
@@ -1797,13 +1818,19 @@ inline FullSceneShaderPipelineV3FrameContext BuildFullSceneShaderPipelineV3Frame
         context.reflectionHistoryV3PrevReady
             ? "reflection_history_v3_prev_owned"
             : "reflection_history_v3_prev_missing",
+        context.reflectionHistoryV3PrevSourceIdReady
+            ? "reflection_history_v3_prev_source_id_owned"
+            : "reflection_history_v3_prev_source_id_missing",
         context.reflectionHistoryV3ValidityReady
             ? "reflection_history_v3_validity_owned"
             : "reflection_history_v3_validity_missing",
+        context.reflectionHistoryV3RejectionReady
+            ? "reflection_history_v3_rejection_owned"
+            : "reflection_history_v3_rejection_missing",
         std::string("primary_source=") + context.reflectionV3SourceContract,
     };
     reflectionDomain.backingResourceCount = readyReflectionChannels;
-    reflectionDomain.requiredChannelCount = 10u;
+    reflectionDomain.requiredChannelCount = 12u;
     reflectionDomain.readyChannelCount = readyReflectionChannels;
     reflectionDomain.missingRequiredChannelCount =
         reflectionDomain.requiredChannelCount - reflectionDomain.readyChannelCount;

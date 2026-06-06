@@ -76,7 +76,7 @@ Result<void> Renderer::CreateScreenSpacePipelineStates(const RendererCompiledSha
         PipelineDesc reflectionHistoryV3Desc = postDesc;
         reflectionHistoryV3Desc.pixelShader = *shaders.fullSceneReflectionHistoryV3PS;
         reflectionHistoryV3Desc.rtvFormat = DXGI_FORMAT_R16G16B16A16_FLOAT;
-        reflectionHistoryV3Desc.numRenderTargets = 2;
+        reflectionHistoryV3Desc.numRenderTargets = 3;
 
         auto reflectionHistoryPipelineResult = m_pipelineState.fullSceneReflectionHistoryV3->Initialize(
             m_services.device->GetDevice(),

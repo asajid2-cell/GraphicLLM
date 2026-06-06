@@ -32,6 +32,7 @@ CANDIDATE_COMPOSITE_VIEWS = [
     "reflection_history_v3_curr",
     "reflection_history_v3_prev",
     "reflection_history_v3_validity",
+    "reflection_history_v3_rejection",
 ]
 
 LEGACY_PAIRS = {

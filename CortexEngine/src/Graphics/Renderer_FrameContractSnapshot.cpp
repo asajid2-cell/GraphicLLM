@@ -419,7 +419,9 @@ void Renderer::UpdateFrameContractSnapshot(Scene::ECS_Registry* registry,
     addResource("reflection_rt_source_signal", m_mainTargets.reflectionV3.resources.rtSourceSignal.Get(), contract.renderWidth, contract.renderHeight);
     addResource("reflection_history_v3_curr", m_mainTargets.reflectionV3.resources.historyCurr.Get(), contract.renderWidth, contract.renderHeight);
     addResource("reflection_history_v3_prev", m_mainTargets.reflectionV3.resources.historyPrev.Get(), contract.renderWidth, contract.renderHeight);
+    addResource("reflection_history_v3_prev_source_id", m_mainTargets.reflectionV3.resources.historyPrevSourceId.Get(), contract.renderWidth, contract.renderHeight);
     addResource("reflection_history_v3_validity", m_mainTargets.reflectionV3.resources.historyValidity.Get(), contract.renderWidth, contract.renderHeight);
+    addResource("reflection_history_v3_rejection", m_mainTargets.reflectionV3.resources.historyRejection.Get(), contract.renderWidth, contract.renderHeight);
     if (m_services.visibilityBuffer) {
         addResource("visibility_buffer", m_services.visibilityBuffer->GetVisibilityBuffer(), contract.renderWidth, contract.renderHeight);
         addResource("vb_gbuffer_albedo", m_services.visibilityBuffer->GetAlbedoBuffer(), contract.renderWidth, contract.renderHeight);

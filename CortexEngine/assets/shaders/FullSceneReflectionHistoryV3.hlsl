@@ -41,9 +41,10 @@ Texture2D<float4> g_ReflectionRadiance : register(t0);
 Texture2D<float4> g_ReflectionSourceId : register(t1);
 Texture2D<float4> g_ReflectionTemporalDelta : register(t2);
 Texture2D<float4> g_ReflectionHistoryPrev : register(t3);
-Texture2D<float> g_Depth : register(t4);
-Texture2D<float4> g_NormalRoughness : register(t5);
-Texture2D<float2> g_Velocity : register(t6);
+Texture2D<float4> g_ReflectionHistoryPrevSourceId : register(t4);
+Texture2D<float> g_Depth : register(t5);
+Texture2D<float4> g_NormalRoughness : register(t6);
+Texture2D<float2> g_Velocity : register(t7);
 SamplerState g_LinearClamp : register(s0);
 
 struct VSOutput {
@@ -54,6 +55,7 @@ struct VSOutput {
 struct PSOutput {
     float4 historyCurr : SV_Target0;
     float4 historyValidity : SV_Target1;
+    float4 historyRejection : SV_Target2;
 };
 
 static float Luma(float3 color) {
@@ -82,6 +84,7 @@ PSOutput PSMain(VSOutput input) {
     float4 sourceId = g_ReflectionSourceId.Sample(g_LinearClamp, input.texCoord);
     float4 temporalDelta = g_ReflectionTemporalDelta.Sample(g_LinearClamp, input.texCoord);
     float4 historyPrev = g_ReflectionHistoryPrev.Sample(g_LinearClamp, historyUv);
+    float4 historyPrevSourceId = g_ReflectionHistoryPrevSourceId.Sample(g_LinearClamp, historyUv);
 
     float centerDepth = g_Depth.Load(int3(p, 0));
     float historyDepth = g_Depth.Load(int3(hp, 0));
@@ -93,6 +96,8 @@ PSOutput PSMain(VSOutput input) {
     float normalAcceptance = saturate((dot(centerNormal, historyNormal) - 0.78f) / 0.22f);
     float motionAcceptance = saturate(1.0f - max(speedPixels - 4.0f, 0.0f) / 56.0f);
     float boundsAcceptance = inBounds ? 1.0f : 0.0f;
+    float disocclusionRejection = 1.0f - saturate(depthAcceptance * normalAcceptance * boundsAcceptance);
+    float highMotionRejection = 1.0f - motionAcceptance;
     float reprojectionAcceptance =
         saturate(depthAcceptance * normalAcceptance * motionAcceptance * boundsAcceptance);
 
@@ -105,6 +110,11 @@ PSOutput PSMain(VSOutput input) {
     float forcedUnavailable = saturate(temporalDelta.g);
     float historyReusable = previousHistoryAvailable * reprojectionAcceptance;
     float reprojectionRejected = 1.0f - reprojectionAcceptance;
+    float previousSourceClass = saturate(historyPrevSourceId.r);
+    float previousSourceAvailable = step(0.001f, historyPrevSourceId.a + previousSourceClass);
+    float sourceSwitch = previousSourceAvailable * previousHistoryAvailable *
+        step(0.08f, abs(sourceClass - previousSourceClass));
+    float outOfBoundsRejection = 1.0f - boundsAcceptance;
 
     PSOutput output;
     output.historyCurr = float4(max(radiance.rgb, 0.0f.xxx), confidence);
@@ -118,5 +128,14 @@ PSOutput PSMain(VSOutput input) {
         sourceClass,
         historyReusable,
         max(max(forcedUnavailable, historyRequiredButMissing), reprojectionRejected));
+    // x = source switch between current source ID and reprojected previous source ID.
+    // y = depth/normal/bounds disocclusion rejection.
+    // z = high-motion rejection.
+    // w = out-of-bounds or forced/history debt.
+    output.historyRejection = float4(
+        sourceSwitch,
+        disocclusionRejection,
+        highMotionRejection,
+        max(outOfBoundsRejection, max(forcedUnavailable, historyRequiredButMissing)));
     return output;
 }

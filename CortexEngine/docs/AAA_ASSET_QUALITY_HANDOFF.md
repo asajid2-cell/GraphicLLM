@@ -6430,3 +6430,85 @@ Current limitation:
   make SSR or RT win more often yet.
 - Next aligned work is source-switch/disocclusion counters, then using
   history validity to bound SSR/RT/local-probe source fusion.
+
+### ReflectionHistoryV3 Source Carryover and Rejection Diagnostics - 2026-06-06
+
+Implemented:
+
+- `FullSceneReflectionHistoryV3` now carries previous-frame
+  `reflection_source_id` through `reflection_history_v3_prev_source_id`.
+- The history shader now writes a third MRT:
+  `reflection_history_v3_rejection`.
+- `reflection_history_v3_rejection` packs:
+  - R: source switch.
+  - G: disocclusion/depth/normal/bounds rejection.
+  - B: high-motion rejection.
+  - A: out-of-bounds, forced-unavailable, or missing-history debt.
+- Debug view `78` is `FullSceneReflectionHistoryV3Rejection`.
+- Frame-report contract now requires:
+  - `reflection_history_v3_prev_source_id_ready`.
+  - `reflection_history_v3_rejection_ready`.
+  - `reflection_v3_channel_count=12`.
+- Packet default views now include `reflection_history_v3_rejection`.
+- The analyzer now fails if:
+  - history does not read `reflection_history_v3_prev_source_id`.
+  - history does not write `reflection_history_v3_rejection`.
+  - history copy does not read `reflection_source_id`.
+  - history copy does not write `reflection_history_v3_prev_source_id`.
+
+Validation:
+
+```powershell
+python -m py_compile tools\analyze_full_scene_shader_v3_placeholders.py tools\analyze_full_scene_shader_v3_lighting_motion.py tools\validate_full_scene_shader_pipeline_v3_plan.py tools\check_full_scene_shader_pipeline_v2_frame_report.py
+python tools\validate_full_scene_shader_pipeline_v3_plan.py
+git -C z:\328\CMPUT328-A2\codexworks\301\graphics diff --check -- <explicit V3 reflection-history files>
+cmd.exe /d /c "call ""C:\Program Files\Microsoft Visual Studio\18\Community\Common7\Tools\VsDevCmd.bat"" -arch=x64 -host_arch=x64 >nul && set ""CORTEX_SKIP_ASSET_SYNC=1"" && ""C:\Program Files\Ninja\ninja.exe"" -C build CortexEngine -j 8"
+Copy-Item -LiteralPath assets\shaders\FullSceneReflectionHistoryV3.hlsl -Destination build\bin\assets\shaders\FullSceneReflectionHistoryV3.hlsl -Force
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_full_scene_shader_pipeline_v3_packet.ps1 -NoBuild -SkipSceneAnalyzers -NoStressScene -FamilyFilter gallery -SmokeFrames 24 -CaptureFrame 12 -CaptureSequenceCount 1 -StabilityMotionMode static -OutputRoot build\captures\v3_reflection_history_rejection_static_smoke1_20260606
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_full_scene_shader_pipeline_v3_packet.ps1 -NoBuild -SkipSceneAnalyzers -NoStressScene -FamilyFilter gallery -SmokeFrames 36 -CaptureFrame 18 -CaptureSequenceCount 2 -StabilityMotionMode mouse_jitter -OutputRoot build\captures\v3_reflection_history_rejection_motion_smoke1_20260606
+```
+
+Results:
+
+- Static packet passed:
+  `build/captures/v3_reflection_history_rejection_static_smoke1_20260606`.
+- Mouse-jitter packet passed:
+  `build/captures/v3_reflection_history_rejection_motion_smoke1_20260606`.
+- Motion packet frame-report proof from
+  `gallery/reflection_history_v3_rejection/frame_report_shutdown.json`:
+  - `reflection_v3_ready=true`.
+  - `reflection_v3_channel_count=12`.
+  - `reflection_history_v3_prev_source_id_ready=true`.
+  - `reflection_history_v3_rejection_ready=true`.
+  - `default_beauty_affects=false`.
+  - status remains `planned_not_promoted`.
+- `FullSceneReflectionHistoryV3.executed=true`.
+- `FullSceneReflectionHistoryV3.reads` include:
+  `reflection_radiance`, `reflection_source_id`,
+  `reflection_temporal_delta`, `reflection_history_v3_prev`,
+  `reflection_history_v3_prev_source_id`, `depth`,
+  `vb_gbuffer_normal_roughness`, and `velocity`.
+- `FullSceneReflectionHistoryV3.writes` include:
+  `reflection_history_v3_curr`, `reflection_history_v3_validity`, and
+  `reflection_history_v3_rejection`.
+- `FullSceneReflectionHistoryV3Copy.reads` include:
+  `reflection_history_v3_curr` and `reflection_source_id`.
+- `FullSceneReflectionHistoryV3Copy.writes` include:
+  `reflection_history_v3_prev` and
+  `reflection_history_v3_prev_source_id`.
+- `reflection_history_v3_prev_source_id` and
+  `reflection_history_v3_rejection` are valid render-resolution resources.
+- Mouse-jitter motion metrics:
+  - `reflection_history_v3_curr.delta=0.00483072`, active `0.03091797`.
+  - `reflection_history_v3_validity.delta=0.00466985`, active
+    `0.04354058`.
+  - `reflection_history_v3_rejection.delta=0.02864249`, active
+    `0.10860352`.
+
+Current limitation:
+
+- This is still diagnostic/advisory. It does not yet change reflection source
+  selection or default beauty.
+- Next aligned pass is source-fusion admission: use validity plus rejection
+  lanes to bound when SSR/RT/local-probe sources may win on smooth/metallic
+  surfaces.

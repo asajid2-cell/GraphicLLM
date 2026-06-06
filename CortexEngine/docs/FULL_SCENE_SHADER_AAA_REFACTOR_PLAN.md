@@ -4,6 +4,204 @@ Status: planning ledger.
 
 Default beauty stays unchanged until a separate promotion gate passes.
 
+## 2026-06-06 Refactor Plan Before Goal Feature Completion
+
+The target is not merely "better shaders." The target is a full candidate
+beauty renderer that can approach Unreal-style final pixels because each visual
+term is physically named, debug-visible, motion-tested, and composited through a
+controlled HDR/post stack.
+
+The current V3 path is in the right shape but is still incomplete:
+
+- `FullSceneCompositeV3` exists and writes `candidate_hdr_scene_color`.
+- `CinematicPostV3` exists and writes `candidate_ldr_cinematic_output`.
+- The raw candidate HDR debug view exists as mode `67`.
+- The composite currently uses V3 direct, indirect, and shadow visibility plus
+  a bounded legacy HDR fallback.
+- Reflection, scene-local environment, material payload richness, emissive GI,
+  atmosphere/media, bloom, exposure, and color grading are not yet first-class
+  producer inputs to the candidate beauty path.
+
+The next goal feature must therefore be a staged full-scene shader feature, not
+a local screenshot polish pass.
+
+### Refactor North Star
+
+Candidate beauty should render from this resource contract:
+
+```text
+MaterialResolveV3
+  -> material_base_color
+  -> material_normal_world
+  -> material_roughness
+  -> material_metallic
+  -> material_ao
+  -> material_emissive
+  -> material_missing_channel_mask
+
+LightingV3
+  -> direct_lighting
+  -> indirect_lighting
+  -> shadow_visibility
+  -> shadow_loss
+
+SceneLocalEnvironmentV3
+  -> environment_irradiance
+  -> environment_specular_prefilter
+  -> visible_background
+  -> reflection_background
+  -> atmosphere_terms
+
+ReflectionResolverV3
+  -> reflection_radiance
+  -> reflection_confidence
+  -> reflection_source_id
+  -> reflection_rejected_source_mask
+  -> reflection_temporal_delta
+
+GIAndMediaV3
+  -> emissive_indirect
+  -> diffuse_probe_lighting
+  -> ambient_occlusion
+  -> atmosphere_inscatter
+  -> atmosphere_transmittance
+
+FullSceneCompositeV3
+  -> candidate_hdr_scene_color
+  -> overbright_mask
+  -> underlit_mask
+  -> lighting_energy_budget
+  -> composition_debug
+
+CinematicPostV3
+  -> candidate_exposure_meter
+  -> candidate_bloom_extract
+  -> candidate_bloom_resolved
+  -> candidate_tonemapped_output
+  -> candidate_color_grade_delta
+  -> candidate_ldr_cinematic_output
+```
+
+Default beauty may continue using the legacy path while this is built. The
+candidate path must not silently call back into old helpers that reconstruct
+lighting, reflection, or post terms differently from the named V3 resources.
+
+### Implementation Slices
+
+Slice 1: Reflection/environment enters the real composite.
+
+- Feed the existing `local_reflection_radiance` graph resource into
+  `FullSceneCompositeV3`.
+- Add the SRV binding, HLSL input, frame-report read, analyzer requirement, and
+  packet proof.
+- Keep the blend conservative. The goal of this slice is ownership and
+  inspectability, not a dramatic visual change.
+- Admission: `FullSceneCompositeV3` reads `local_reflection_radiance`,
+  `candidate_hdr_scene_color` remains nonblank, and mouse-jitter packets still
+  pass.
+
+Slice 2: Reflection resolver becomes a real resource producer.
+
+- Split reflection source selection out of report-only evidence.
+- Produce `reflection_radiance`, `reflection_confidence`,
+  `reflection_source_id`, and `reflection_rejected_source_mask`.
+- Support source overrides: local probe, SSR, RT, environment, and auto.
+- Admission: glossy/metallic stress views show stable source IDs and bounded
+  reflection deltas under mouse jitter.
+
+Slice 3: Scene-local environment becomes real texture data.
+
+- Separate camera-visible background from reflection and lighting backgrounds.
+- Create local room/stage reflection backgrounds for enclosed scenes.
+- Keep exterior IBL lighting usable without showing unrelated panorama content.
+- Admission: enclosed kitchen/office/concert rows do not reflect or display
+  unrelated exterior IBL imagery unless explicitly authorized.
+
+Slice 4: Material payload becomes candidate-owned.
+
+- Promote material channels from partial adapter evidence to stable V3
+  resources used by reflection and composite.
+- Add missing-channel masks and material fallback policy debug views.
+- Normalize roughness/metallic/emissive ranges for generated/imported assets.
+- Admission: material debug views are nonblank, stable under motion, and
+  identify fallback usage instead of hiding it.
+
+Slice 5: GI, emissive, and atmosphere/media.
+
+- Add emissive contribution for neon, red-room, and concert scenes.
+- Add diffuse probe/local irradiance contribution for enclosed scenes.
+- Add atmosphere/media buffers only after direct material and reflection
+  stability are proven.
+- Admission: emissive scenes visibly affect nearby surfaces without exposure
+  pumping, and non-emissive rooms do not become flat when visible IBL is hidden.
+
+Slice 6: Composite diagnostics and energy controls.
+
+- Move `FullSceneCompositeV3` from `direct + indirect + fallback` to a controlled
+  HDR composition of material, direct, indirect, reflection, emissive, media,
+  and confidence buffers.
+- Emit `overbright_mask`, `underlit_mask`, `lighting_energy_budget`, and
+  `composition_debug`.
+- Admission: candidate HDR has bounded hot pixels, explainable overbright
+  regions, and no silent legacy HDR rescue except in a named fallback view.
+
+Slice 7: Real CinematicPostV3.
+
+- Replace reuse of the current post shader with a candidate-owned filmic stack.
+- Add manual/locked-auto exposure, bloom extract/resolve, tone map, color grade,
+  optional sharpening, and bypass views.
+- Admission: exposure does not pump under mouse motion; bloom only comes from
+  bright/emissive sources; raw HDR and final LDR remain independently visible.
+
+Slice 8: Cross-family promotion ladder.
+
+- Run gallery, kitchen, office, gym, classroom, concert, red room, stadium,
+  bathroom, bedroom, workshop, store, and street.
+- Motion modes: static, mouse jitter, camera sweep, close-surface orbit, and
+  reflective-object orbit.
+- Artifacts: frame reports, debug metrics, contact sheets, candidate/default
+  comparisons, failure reports, and promotion decision.
+- Admission: candidate can be reviewed by the user, but default beauty still
+  remains unchanged until explicit acceptance.
+
+### Why This Is Better Than Previous Attempts
+
+Previous work often moved artifacts around: blur the IBL, change a scene, add a
+local fix, or polish one camera angle. This plan prevents that failure mode by
+requiring each visual effect to be an inspectable resource with an owner and a
+motion gate.
+
+The engine gets stronger even when a screenshot is not yet beautiful because
+every slice adds reusable renderer capability:
+
+- reflection problems become source/confidence problems, not guesswork.
+- IBL problems become environment ownership problems, not blur settings.
+- material problems become missing-channel and range-normalization problems.
+- lighting problems become direct/indirect/shadow resource problems.
+- post problems become exposure/bloom/tone-map resource problems.
+
+### Immediate Next Feature
+
+The next implementation should be Slice 1:
+
+`local_reflection_radiance -> FullSceneCompositeV3 -> candidate_hdr_scene_color`
+
+This is the smallest meaningful step toward real full-scene shaders because it
+connects an existing reflection producer to the candidate composite path without
+changing default beauty. It also gives us a concrete place to detect the
+remaining metallic/smooth jitter as reflection-resource instability rather than
+as a vague final-image defect.
+
+### Non-Negotiable Gates
+
+- Do not promote default beauty during these slices.
+- Do not hide artifacts by disabling IBL, blurring reflection sources, or
+  changing the scene under test.
+- Do not mark a V3 domain ready unless a pass/resource/debug view supports it.
+- Do not trust still screenshots without mouse-jitter and camera-sweep packets.
+- Do not let candidate beauty affect normal `beauty` rows.
+- Do not call this complete until the user accepts the candidate visuals.
+
 This plan replaces the current pattern of isolated renderer improvements with
 one full-scene shader architecture. The goal is not to hide artifacts with
 scene changes or one-off settings. The goal is a robust, opt-in candidate

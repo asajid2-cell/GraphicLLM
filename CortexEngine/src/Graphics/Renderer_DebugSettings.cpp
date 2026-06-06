@@ -8,7 +8,7 @@
 namespace Cortex::Graphics {
 
 namespace {
-constexpr uint32_t kMaxDebugViewMode = 72u;
+constexpr uint32_t kMaxDebugViewMode = 73u;
 }
 
 int Renderer::GetDebugViewMode() const {
@@ -152,6 +152,7 @@ void Renderer::CycleDebugViewMode() {
         case 70: label = "FullSceneReflectionV3SourceId"; break;
         case 71: label = "FullSceneReflectionV3RejectedSourceMask"; break;
         case 72: label = "FullSceneReflectionV3TemporalDelta"; break;
+        case 73: label = "FullSceneReflectionV3SSRSourceSignal"; break;
         default: label = "Unknown"; break;
     }
     spdlog::info("Debug view mode: {}", label);

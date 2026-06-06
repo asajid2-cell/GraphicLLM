@@ -4815,3 +4815,41 @@ Important limitation:
   separately from public default beauty.
 - next implementation should replace the adapter with a real
   `FullSceneCandidateBeautyV3` composite/post resource path.
+
+### Full Scene Shader Refactor Blueprint - 2026-06-05
+
+Planning checkpoint:
+
+- Expanded `docs/FULL_SCENE_SHADER_AAA_REFACTOR_PLAN.md` with the concrete
+  full-scene shader refactor blueprint.
+- The plan now treats AAA visual quality as a staged resource architecture, not
+  a single beauty-shader tweak.
+- The target frame is split into:
+  1. foundation resources: visibility, depth, velocity, material attributes,
+     masks, and scene profile constants.
+  2. lighting resources: shadows, direct light, indirect light, environment,
+     reflections, emissive, atmosphere, and confidence/validity buffers.
+  3. presentation resources: HDR composite, exposure, bloom, tonemap, color
+     grade, final LDR, and side-by-side candidate output.
+
+Immediate next implementation target:
+
+- Replace `FullSceneCandidateBeautyV3Adapter` with a real opt-in render graph
+  path:
+  - offscreen resource: `candidate_ldr_cinematic_output`.
+  - named pass: `FullSceneCandidateBeautyV3`.
+  - frame-report producer:
+    `candidate_beauty_producer=FullSceneCandidateBeautyV3`.
+  - default `beauty` rows still report `default_beauty_affects=false`.
+
+Refactor guardrails:
+
+- Do not promote a feature unless it has a named producer resource, debug view,
+  frame-report field, and packet gate.
+- Do not use blur, hidden IBL, disabled reflections, or post-processing to make
+  an upstream artifact disappear.
+- Candidate beauty must stay opt-in until cross-family evidence and user review
+  accept it.
+- The next code slice should first create the real candidate output resource,
+  then move material, reflection, environment, composite, and post domains from
+  adapters into real producers.

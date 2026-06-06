@@ -398,6 +398,246 @@ Admission:
 8. Implement cinematic post stack.
 9. Build cross-family packet ladder and promotion report.
 
+## Full Scene Shader Refactor Blueprint
+
+Date: 2026-06-05.
+
+This is the implementation blueprint for moving from the current V3 evidence
+stack to a real full-scene shader stack. The key shift is that "AAA visuals"
+must not mean one bigger beauty shader. It must mean a staged render pipeline
+where each visual term is produced once, named, inspected, measured, and then
+composited.
+
+### Architecture Shape
+
+The target frame should be split into three layers:
+
+1. Foundation layer:
+   geometry, visibility, depth, velocity, material attributes, masks, and
+   scene profile constants.
+2. Lighting layer:
+   shadows, direct light, indirect light, environment light, reflections,
+   emissive contribution, atmosphere, and confidence/validity buffers.
+3. Presentation layer:
+   HDR composite, exposure, bloom, tonemap, color grade, sharpening, UI-safe
+   final LDR output, and side-by-side candidate capture.
+
+Each layer owns resources. Later layers may read earlier resources, but they
+must not silently reconstruct hidden state. For example, the composite pass must
+read `direct_lighting`, `indirect_lighting`, `reflection_radiance`, and
+`emissive_lighting`; it should not call back into old deferred-lighting helper
+code that recomputes those terms differently.
+
+### Candidate Beauty Contract
+
+`FullSceneCandidateBeautyV3` is the safety rail for the refactor.
+
+It must be:
+
+- opt-in through a runtime flag or debug-menu switch.
+- captured by packet tooling as a separate view.
+- rendered into its own resource, not only aliased to the current back buffer.
+- compared against default beauty without changing default beauty.
+- blocked from default promotion until the user explicitly accepts it.
+
+Target resources:
+
+- `candidate_hdr_scene_color`
+- `candidate_ldr_cinematic_output`
+- `candidate_exposure_meter`
+- `candidate_bloom_resolved`
+- `candidate_color_grade_delta`
+- `candidate_debug_term_id`
+
+Admission for this step:
+
+- `candidate_beauty_v3` packet row reports
+  `candidate_beauty_producer=FullSceneCandidateBeautyV3`.
+- `candidate_ldr_cinematic_output` exists as a valid runtime resource.
+- a pass named `FullSceneCandidateBeautyV3` writes that resource.
+- normal `beauty` rows keep `default_beauty_affects=false`.
+
+### Pass And Resource Map
+
+The intended pass graph is:
+
+```text
+DepthPrepass / VisibilityBuffer
+  writes: depth, velocity, visibility_id
+
+MaterialResolveV3
+  reads: visibility_id, material tables, textures
+  writes: material_base_color, material_normal_world,
+          material_roughness, material_metallic, material_ao,
+          material_emissive, material_missing_channel_mask
+
+ShadowVisibilityV3
+  reads: depth, material_normal_world, light tables, shadow maps
+  writes: shadow_visibility, shadow_loss, shadow_filter_radius
+
+DirectLightingV3
+  reads: material_*, shadow_visibility, light tables
+  writes: direct_lighting, direct_lighting_unshadowed, light_importance
+
+SceneLocalEnvironmentV3
+  reads: scene profile, local probes, sky/IBL assets
+  writes: environment_irradiance, environment_specular_prefilter,
+          visible_background, reflection_background, atmosphere_terms
+
+IndirectLightingV3
+  reads: material_*, environment_irradiance, probes, AO, emissive
+  writes: indirect_lighting, diffuse_probe_lighting,
+          emissive_indirect, gi_confidence
+
+ReflectionResolverV3
+  reads: material_*, depth, velocity, local probes, SSR, RT reflections,
+         reflection_background
+  writes: reflection_radiance, reflection_confidence,
+          reflection_source_id, reflection_rejected_source_mask,
+          reflection_temporal_delta, reflection_roughness_lod
+
+AtmosphereMediaV3
+  reads: depth, light tables, scene profile, fog/media volumes
+  writes: atmosphere_inscatter, atmosphere_transmittance, volumetric_light
+
+FullSceneCompositeV3
+  reads: direct_lighting, indirect_lighting, reflection_radiance,
+         material_emissive, atmosphere_*, confidence/mask buffers
+  writes: candidate_hdr_scene_color, lighting_energy_budget,
+          overbright_mask, underlit_mask, composition_debug
+
+CinematicPostV3
+  reads: candidate_hdr_scene_color, exposure history, bloom chain,
+         color-grade settings
+  writes: candidate_ldr_cinematic_output, candidate_exposure_meter,
+          candidate_bloom_resolved, candidate_color_grade_delta
+```
+
+### Refactor Rules
+
+Use these rules while replacing adapters with real producers:
+
+- One producer owns one resource. If two passes write the same named resource,
+  the frame report must mark the resource ambiguous.
+- Every resource gets at least one debug view before it is used by candidate
+  beauty.
+- Every debug view gets packet metrics: nonblack ratio, luma range, hot-pixel
+  ratio, and frame-to-frame delta under motion.
+- The default beauty path may read legacy resources until promotion, but the
+  candidate beauty path must read V3 resources directly.
+- Post-processing cannot be used to hide upstream instability. Raw HDR,
+  pre-tonemap, post-tonemap, and final LDR views must stay available.
+- IBL has three independent roles: lighting source, reflection source, and
+  visible background. Enclosed scenes can enable the first two without showing
+  unrelated panorama pixels.
+- Reflection source choice must be visible per pixel through
+  `reflection_source_id` and `reflection_confidence`.
+- Any temporal feature must name its history owner. If history is missing,
+  the pass must degrade to a stable non-temporal path instead of flickering.
+
+### Debug Menu Requirements
+
+The debug menu should expose the refactor without forcing command-line flags:
+
+- candidate beauty enable.
+- default/candidate split-screen mode.
+- post-process bypass.
+- reflection source override: auto, local probe, SSR, RT, environment.
+- IBL visible background strength.
+- IBL reflection strength.
+- local probe reflection strength.
+- shadow mode: off, hard, filtered, contact only, full.
+- exposure mode: manual, locked auto, live auto.
+- debug-view selector for every V3 resource.
+
+The menu must display whether the current frame is default beauty, candidate
+beauty, or split-screen. This prevents accidental screenshots from being used
+as promotion evidence for the wrong path.
+
+### Packet Ladder
+
+Use a ladder instead of one giant final test:
+
+1. Single-pass smoke:
+   one scene, static camera, one new resource, one debug view.
+2. Motion smoke:
+   one scene, mouse jitter plus camera sweep.
+3. Reflective stress:
+   gallery or metallic stress scene, close-surface orbit.
+4. Enclosed-room stress:
+   kitchen or office with visible IBL disabled but IBL lighting/reflection
+   still available.
+5. Stage-light stress:
+   concert or red room with emissive and bloom pressure.
+6. Large-space stress:
+   stadium or gym with long camera distances and many repeated surfaces.
+7. Cross-family packet:
+   required families, required motion modes, candidate beauty enabled.
+8. Promotion packet:
+   before/after contact sheets, debug evidence, failure report, and explicit
+   default-promotion decision.
+
+No phase should skip directly to step 7. The current problem class is often
+only visible in one narrow condition, so the ladder must preserve targeted
+repro rows.
+
+### Implementation Milestones
+
+Milestone 1: real candidate output.
+
+- add an offscreen LDR target for `candidate_ldr_cinematic_output`.
+- add `FullSceneCandidateBeautyV3` as a named render graph pass.
+- reuse current post shader initially, but write to the candidate resource.
+- update frame reports and analyzers to require the real pass/resource.
+
+Milestone 2: material payload normalization.
+
+- create a stable material V3 resource layout.
+- route imported/generated asset material data into it.
+- expose missing channels and fallback ranges.
+- add material debug-view packet gates.
+
+Milestone 3: reflection resolver ownership.
+
+- split local probe, SSR, RT, and environment reflection sources.
+- add source ID, confidence, and rejected-source masks.
+- add roughness-aware filtering and confidence clamping.
+- validate on metallic stress with mouse jitter.
+
+Milestone 4: scene-local environment resources.
+
+- create real irradiance/specular/background resources.
+- give enclosed rooms local backgrounds and local probes.
+- keep visible IBL separate from reflection/lighting IBL.
+- validate old-office-IBL conditions without hiding the issue by blur.
+
+Milestone 5: composite and post.
+
+- build `FullSceneCompositeV3` over V3 lighting/reflection/environment terms.
+- build `CinematicPostV3` with locked exposure diagnostics.
+- add split-screen compare and contact-sheet output.
+
+Milestone 6: cross-family promotion.
+
+- run gallery, kitchen, office, gym, classroom, concert, red room, stadium,
+  bathroom, bedroom, workshop, store, and street.
+- require static, mouse jitter, camera sweep, close-surface orbit, and
+  reflective-object orbit rows.
+- keep default beauty unchanged until user review accepts candidate output.
+
+### Stop Conditions
+
+Stop a phase and diagnose if any of these happen:
+
+- a packet row has device removal or a missing frame report.
+- a resource is marked ready but has no producing pass.
+- a candidate output exists only as a report field and not as a texture.
+- a debug view is blank while its producer is marked ready.
+- a motion packet shows large luminance jumps on static floor/wall pixels.
+- enabling candidate beauty changes normal `beauty` output.
+- IBL blur, background hiding, or disabled reflections are the only reason a
+  visible artifact disappears.
+
 ## Goal Completion Boundary
 
 Do not claim completion when a screenshot looks better.

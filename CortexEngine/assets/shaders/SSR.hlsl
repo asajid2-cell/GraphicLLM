@@ -111,6 +111,21 @@ float3 ReconstructViewPosition(float2 uv, float depth)
     return view.xyz / max(view.w, 1e-4f);
 }
 
+bool ProjectViewPosition(float3 posVS, out float2 uv)
+{
+    float4 clip = mul(g_ProjectionMatrix, float4(posVS, 1.0f));
+    if (clip.w <= 1e-4f || !all(isfinite(clip)))
+    {
+        uv = 0.0f.xx;
+        return false;
+    }
+
+    float2 ndc = clip.xy / clip.w;
+    uv.x = ndc.x * 0.5f + 0.5f;
+    uv.y = 0.5f - ndc.y * 0.5f;
+    return uv.x >= 0.0f && uv.x <= 1.0f && uv.y >= 0.0f && uv.y <= 1.0f;
+}
+
 float4 SSRPS(VSOutput input) : SV_TARGET
 {
     float2 uv = input.uv;
@@ -151,7 +166,7 @@ float4 SSRPS(VSOutput input) : SV_TARGET
     float  originZ = viewPos.z;
 
     float maxDistance = max(g_SSRParams.x, 1.0f);
-    int   maxSteps    = 64;
+    int   maxSteps    = 96;
     float stepSize    = maxDistance / maxSteps;
 
     // View-space thickness tolerance. Use a smaller thickness on glossy
@@ -174,33 +189,29 @@ float4 SSRPS(VSOutput input) : SV_TARGET
     // Bias start away from the surface so the first few steps don't instantly
     // re-hit the same depth due to quantization/precision (most noticeable on
     // glossy curved surfaces).
-    float startOffset = stepSize * 4.0f;
-    startOffset += 0.02f * (1.0f - roughness);
+    float startOffset = max(stepSize * 1.5f, 0.035f);
+    startOffset += 0.01f * (1.0f - roughness);
     posVS += viewDir * startOffset;
     traveled += startOffset;
 
     // Require the ray to travel a minimum distance before accepting a hit.
     // This avoids near-origin self-hits that show up as a small nested copy
     // on glossy curved surfaces.
-    float minHitDistance = lerp(0.25f, 0.05f, roughness);
-    float minZSeparation = lerp(0.50f, 0.10f, roughness);
+    float minHitDistance = lerp(0.16f, 0.04f, roughness);
+    float minZSeparation = lerp(0.30f, 0.08f, roughness);
+
+    float previousDz = 0.0f;
+    bool previousComparable = false;
 
     [loop]
     for (int i = 0; i < maxSteps; ++i)
     {
+        float3 rayStartVS = posVS;
         posVS += viewDir * stepSize;
         traveled += stepSize;
 
-        float4 clip = mul(g_ProjectionMatrix, float4(posVS, 1.0f));
-        if (clip.w <= 1e-4f || !all(isfinite(clip)))
-            break;
-
-        float2 ndc = clip.xy / clip.w;
         float2 hitUV;
-        hitUV.x = ndc.x * 0.5f + 0.5f;
-        hitUV.y = 0.5f - ndc.y * 0.5f;
-
-        if (hitUV.x < 0.0f || hitUV.x > 1.0f || hitUV.y < 0.0f || hitUV.y > 1.0f)
+        if (!ProjectViewPosition(posVS, hitUV))
             break;
 
         float sceneDepth = g_Depth.SampleLevel(g_Sampler, hitUV, 0).r;
@@ -231,15 +242,54 @@ float4 SSRPS(VSOutput input) : SV_TARGET
         float3 hitN = normalize(hitNR.xyz * 2.0f - 1.0f);
         bool sameSurface = dot(hitN, N) > 0.995f;
 
-        if (traveled > minHitDistance &&
+        bool comparable =
+            traveled > minHitDistance &&
             zSep > minZSeparation &&
-            !sameSurface &&
-            dz > 0.0f && dz < thicknessVS)
+            !sameSurface;
+
+        bool directHit = comparable && dz > 0.0f && dz < thicknessVS;
+        bool crossedHit = comparable && previousComparable && previousDz <= 0.0f && dz > 0.0f;
+        if (crossedHit && !directHit)
+        {
+            float3 lo = rayStartVS;
+            float3 hi = posVS;
+            [unroll]
+            for (int refine = 0; refine < 5; ++refine)
+            {
+                float3 mid = 0.5f * (lo + hi);
+                float2 midUV;
+                if (!ProjectViewPosition(mid, midUV))
+                    break;
+
+                float midDepth = g_Depth.SampleLevel(g_Sampler, midUV, 0).r;
+                if (midDepth <= 0.0f || midDepth >= 1.0f - 1e-4f)
+                    break;
+
+                float3 midSceneVS = ReconstructViewPosition(midUV, midDepth);
+                float midDz = mid.z - midSceneVS.z;
+                if (midDz > 0.0f)
+                {
+                    hi = mid;
+                    dz = midDz;
+                    hitUV = midUV;
+                }
+                else
+                {
+                    lo = mid;
+                }
+            }
+            directHit = dz > -thicknessVS * 0.25f && dz < thicknessVS * 1.5f;
+        }
+
+        if (directHit)
         {
             hitColor = g_SceneColor.SampleLevel(g_Sampler, hitUV, 0).rgb;
             hit = true;
             break;
         }
+
+        previousComparable = comparable;
+        previousDz = dz;
     }
 
     if (!hit)
@@ -259,6 +309,8 @@ float4 SSRPS(VSOutput input) : SV_TARGET
         hitColor *= (kMaxHitIntensity / maxChannel);
     }
 
+    float edgeFade = smoothstep(0.0f, 0.06f, min(min(input.uv.x, 1.0f - input.uv.x), min(input.uv.y, 1.0f - input.uv.y)));
     float ssrStrength = saturate(g_SSRParams.z);
-    return float4(hitColor * ssrStrength, reflectionWeight * ssrStrength);
+    float sourceConfidence = sqrt(saturate(reflectionWeight)) * distanceFactor * edgeFade * ssrStrength;
+    return float4(hitColor * ssrStrength, sourceConfidence);
 }

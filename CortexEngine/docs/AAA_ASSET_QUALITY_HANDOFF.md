@@ -5798,3 +5798,89 @@ Remaining limitation:
   depth/normal intersection tolerance, roughness/material masks, HZB or depth
   hierarchy use, edge fade, and confidence calibration.
   Do not let SSR win more often in auto mode until source quality improves.
+
+### SSR Producer Refinement Pass - 2026-06-06
+
+Implemented:
+
+- Updated `assets/shaders/SSR.hlsl`.
+- Increased SSR march budget from `64` to `96` steps.
+- Reduced near-origin skip distance and minimum hit separation so valid
+  near-field glossy hits are not skipped as aggressively.
+- Added view-space projection helper and crossing refinement:
+  - if a ray step crosses from in front of to behind scene depth, refine the
+    interval with 5 binary-search steps.
+  - this catches hits that the previous fixed-step `dz < thickness` test could
+    step past.
+- Recalibrated SSR alpha as source confidence:
+  - previous alpha was mostly raw material reflection weight.
+  - new alpha uses `sqrt(reflectionWeight) * distanceFactor * edgeFade *
+    ssrStrength`.
+  - radiance remains multiplied by SSR strength.
+- Kept resolver auto policy strict. This pass improves the SSR producer signal;
+  it does not make SSR dominate auto reflection selection.
+
+Validation notes:
+
+- The broad asset-sync build path timed out once while generating assets.
+  The stale runtime copy was then updated explicitly:
+  `Copy-Item assets\shaders\SSR.hlsl build\bin\assets\shaders\SSR.hlsl -Force`.
+- Runtime packet validation compiled/exercised the updated shader through the
+  engine.
+- Static checks:
+  - `python -m py_compile tools\analyze_full_scene_shader_v3_placeholders.py tools\analyze_full_scene_shader_v3_lighting_motion.py tools\validate_full_scene_shader_pipeline_v3_plan.py`
+  - `python tools\validate_full_scene_shader_pipeline_v3_plan.py`
+  - V3 validator passed with `Required outputs: 15`.
+- Packets:
+  - forced SSR static:
+    `build/captures/v3_ssr_producer_refined_forced_static_smoke1_20260606`.
+  - auto static:
+    `build/captures/v3_ssr_producer_refined_auto_static_smoke1_20260606`.
+  - auto mouse-jitter:
+    `build/captures/v3_ssr_producer_refined_auto_motion_smoke1_20260606`.
+  - forced SSR diagnostic-only motion probe:
+    `build/captures/v3_ssr_producer_refined_forced_motion_probe1_20260606`.
+
+Before/after signal:
+
+- previous forced SSR static:
+  - `reflection_radiance.mean_luma=0.0196873`,
+    `nonblack_ratio=0.0820681`.
+  - `reflection_confidence.mean_luma=0.0033247`,
+    `nonblack_ratio=0.0337229`.
+  - `reflection_ssr_source_signal.mean_luma=0.0067306`,
+    `nonblack_ratio=0.0849750`.
+- refined forced SSR static:
+  - `reflection_radiance.mean_luma=0.1127585`,
+    `nonblack_ratio=0.3997233`.
+  - `reflection_confidence.mean_luma=0.0575320`,
+    `nonblack_ratio=0.3876128`.
+  - `reflection_ssr_source_signal.mean_luma=0.0697975`,
+    `nonblack_ratio=0.4163715`.
+- refined auto static:
+  - `reflection_ssr_source_signal.mean_luma=0.0656002`,
+    `nonblack_ratio=0.4163715`.
+  - source contract remains `local_probe`.
+
+Motion evidence:
+
+- refined auto mouse-jitter passed the standard V3 packet.
+- admitted auto reflection rows remained essentially unchanged:
+  - `reflection_radiance.delta=0.0024279`, active `0.0138726`.
+  - `reflection_confidence.delta=0.0007757`, active `0.0068262`.
+  - `reflection_temporal_delta.delta=0.0`, active `0.0`.
+- `reflection_ssr_source_signal` is more active after producer refinement:
+  - previous auto signal delta `0.0012916`, active `0.0157010`.
+  - refined auto signal delta `0.0058466`, active `0.0516949`.
+- forced SSR diagnostic-only motion probe:
+  - `reflection_radiance.delta=0.0110627`, active `0.0645812`.
+  - `reflection_confidence.delta=0.0051552`, active `0.0412988`.
+  - `reflection_ssr_source_signal.delta=0.0062148`, active `0.0525141`.
+
+Interpretation:
+
+- SSR producer coverage/confidence improved substantially.
+- Forced SSR is now useful for inspection, but it remains visibly more
+  motion-sensitive than the scene-local auto path.
+- Auto policy should remain local-probe-first until SSR gets temporal
+  stabilization/history-aware confidence or an RT/ray-query fallback blend.

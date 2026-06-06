@@ -1013,8 +1013,14 @@ Execution order:
        the auto admission threshold.
      - auto SSR remains strict and still falls back to scene-local radiance in
        the gallery packet.
-     - next work is improving the SSR producer's hit coverage/confidence, not
-       loosening auto source selection.
+     - SSR producer hit coverage/confidence improved with a refined raymarch:
+       96 steps, reduced near-origin skip, crossing refinement, edge fade, and
+       source-confidence alpha.
+     - forced SSR static coverage improved from about `8%` nonblack radiance to
+       about `40%`.
+     - forced SSR remains more motion-sensitive than the scene-local auto path,
+       so next work is temporal/confidence stabilization and RT/ray-query
+       fallback fusion, not loosening auto source selection.
 
 2. Material payload pass.
    - Replace ad hoc material interpretation with a V3 material resource and

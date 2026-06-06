@@ -1019,14 +1019,38 @@ Forced-SSR limitation:
   visually reliable reflection source until its source packet produces stable
   nonblank radiance/confidence.
 
+SSR producer refinement update, 2026-06-06:
+
+- `SSR.hlsl` now uses a refined view-space raymarch:
+  - `96` steps.
+  - smaller near-origin skip.
+  - reduced minimum hit/separation gates.
+  - crossing refinement with 5 binary-search steps.
+  - source-confidence alpha using reflection weight, distance fade, screen-edge
+    fade, and SSR strength.
+- forced SSR static packet now passes:
+  `build/captures/v3_ssr_producer_refined_forced_static_smoke1_20260606`.
+- auto static packet now passes with stronger source diagnostic signal:
+  `build/captures/v3_ssr_producer_refined_auto_static_smoke1_20260606`.
+- auto mouse-jitter packet passes:
+  `build/captures/v3_ssr_producer_refined_auto_motion_smoke1_20260606`.
+- producer improvement:
+  - forced SSR `reflection_radiance.nonblack_ratio` improved from `0.0820681`
+    to `0.3997233`.
+  - forced SSR `reflection_confidence.nonblack_ratio` improved from
+    `0.0337229` to `0.3876128`.
+  - auto `reflection_ssr_source_signal.nonblack_ratio` is now `0.4163715`.
+- auto source contract remains `local_probe`; this is intentional until SSR
+  motion/temporal confidence is stable enough to win source selection.
+
 Remaining limitation:
 
-- SSR is now a real resolver input, but it is not yet reliable enough to force
-  as the selected reflection source in the current stress row.
+- SSR is now a real resolver input with stronger producer signal, but it is
+  still more motion-sensitive than scene-local radiance.
 - RT/ray-query reflection is still not a resolver input.
-  Remaining source-fusion work should improve SSR coverage/admission first,
-  then add RT/ray-query ownership with the same source-ID, confidence,
-  rejection-mask, and temporal-history evidence.
+  Remaining source-fusion work should add SSR temporal confidence/history
+  stabilization, then add RT/ray-query ownership with the same source-ID,
+  confidence, rejection-mask, and temporal-history evidence.
 
 ### L007 - Scene Local Environment V3
 

@@ -417,6 +417,7 @@ void Renderer::UpdateFrameContractSnapshot(Scene::ECS_Registry* registry,
     addResource("reflection_temporal_delta", m_mainTargets.reflectionV3.resources.temporalDelta.Get(), contract.renderWidth, contract.renderHeight);
     addResource("reflection_ssr_source_signal", m_mainTargets.reflectionV3.resources.ssrSourceSignal.Get(), contract.renderWidth, contract.renderHeight);
     addResource("reflection_rt_source_signal", m_mainTargets.reflectionV3.resources.rtSourceSignal.Get(), contract.renderWidth, contract.renderHeight);
+    addResource("reflection_source_suppression", m_mainTargets.reflectionV3.resources.sourceSuppression.Get(), contract.renderWidth, contract.renderHeight);
     addResource("reflection_history_v3_curr", m_mainTargets.reflectionV3.resources.historyCurr.Get(), contract.renderWidth, contract.renderHeight);
     addResource("reflection_history_v3_prev", m_mainTargets.reflectionV3.resources.historyPrev.Get(), contract.renderWidth, contract.renderHeight);
     addResource("reflection_history_v3_prev_source_id", m_mainTargets.reflectionV3.resources.historyPrevSourceId.Get(), contract.renderWidth, contract.renderHeight);

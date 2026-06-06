@@ -20,6 +20,7 @@ REQUIRED_OUTPUTS = {
     "reflection_temporal_delta",
     "reflection_ssr_source_signal",
     "reflection_rt_source_signal",
+    "reflection_source_suppression",
     "reflection_history_v3_curr",
     "reflection_history_v3_prev",
     "reflection_history_v3_prev_source_id",
@@ -472,6 +473,7 @@ def analyze_report(
             "reflection_temporal_delta_ready",
             "reflection_ssr_source_signal_ready",
             "reflection_rt_source_signal_ready",
+            "reflection_source_suppression_ready",
             "reflection_history_v3_ready",
             "reflection_history_v3_prev_ready",
             "reflection_history_v3_prev_source_id_ready",
@@ -517,6 +519,7 @@ def analyze_report(
                 "reflection_temporal_delta",
                 "reflection_ssr_source_signal",
                 "reflection_rt_source_signal",
+                "reflection_source_suppression",
             ]:
                 if resource not in reflection_pass.get("writes", []):
                     failures.append(f"FullSceneReflectionV3 pass does not write {resource}")
@@ -785,6 +788,7 @@ def analyze_report(
         "reflection_temporal_delta_ready": v3.get("reflection_temporal_delta_ready"),
         "reflection_ssr_source_signal_ready": v3.get("reflection_ssr_source_signal_ready"),
         "reflection_rt_source_signal_ready": v3.get("reflection_rt_source_signal_ready"),
+        "reflection_source_suppression_ready": v3.get("reflection_source_suppression_ready"),
         "reflection_history_v3_ready": v3.get("reflection_history_v3_ready"),
         "reflection_history_v3_prev_ready": v3.get("reflection_history_v3_prev_ready"),
         "reflection_history_v3_prev_source_id_ready": v3.get("reflection_history_v3_prev_source_id_ready"),

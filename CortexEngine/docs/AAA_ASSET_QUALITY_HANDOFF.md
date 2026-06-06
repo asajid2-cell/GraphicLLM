@@ -6680,3 +6680,81 @@ Current limitation:
 - Next aligned pass: add closeup stress packets for glossy metal/glass/rough
   dielectric surfaces and split material suppression from history suppression
   into its own debug channel or resource before candidate beauty promotion.
+
+### ReflectionV3 Source Suppression Diagnostics - 2026-06-06
+
+Implemented:
+
+- `FullSceneReflectionV3` now writes `reflection_source_suppression` as an
+  eighth resolver output.
+- Debug mode `79` exposes `FullSceneReflectionV3SourceSuppression`.
+- Channel contract:
+  - `R`: history/source-switch suppression.
+  - `G`: material/roughness suppression.
+  - `B`: roughness.
+  - `A`: metallic.
+- The frame contract, resource snapshot, pass write list, memory accounting,
+  V3 runtime context, JSON report, V3 contract JSON, analyzers, and packet
+  runners now require and capture the resource.
+- Reflection V3 readiness now requires `13` channels.
+
+Validation:
+
+```powershell
+python -m py_compile tools\analyze_full_scene_shader_v3_placeholders.py tools\analyze_full_scene_shader_v3_lighting_motion.py tools\validate_full_scene_shader_pipeline_v3_plan.py tools\check_full_scene_shader_pipeline_v2_frame_report.py
+python -m json.tool assets\final_art\full_scene_shader_pipeline_v3_contract.json
+python tools\validate_full_scene_shader_pipeline_v3_plan.py
+git -C z:\328\CMPUT328-A2\codexworks\301\graphics diff --check -- CortexEngine/assets/final_art/full_scene_shader_pipeline_v3_contract.json CortexEngine/assets/shaders/FullSceneReflectionResolverV3.hlsl CortexEngine/docs/FULL_SCENE_SHADER_AAA_REFACTOR_PLAN.md CortexEngine/docs/FULL_SCENE_SHADER_PIPELINE_V3.md CortexEngine/src/Graphics/FrameContractJson.cpp CortexEngine/src/Graphics/FullSceneShaderFrameContext.h CortexEngine/src/Graphics/RendererMainTargetState.h CortexEngine/src/Graphics/Renderer_DebugSettings.cpp CortexEngine/src/Graphics/Renderer_FrameContractMemory.cpp CortexEngine/src/Graphics/Renderer_FrameContractPasses.cpp CortexEngine/src/Graphics/Renderer_FrameContractSnapshot.cpp CortexEngine/src/Graphics/Renderer_RenderGraphEndFrame.cpp CortexEngine/src/Graphics/Renderer_ScreenComputePipelineSetup.cpp CortexEngine/tools/analyze_full_scene_shader_v3_lighting_motion.py CortexEngine/tools/analyze_full_scene_shader_v3_placeholders.py CortexEngine/tools/check_full_scene_shader_pipeline_v2_frame_report.py CortexEngine/tools/run_full_scene_shader_pipeline_v3_packet.ps1 CortexEngine/tools/run_scene_local_cinematic_renderer_v1_packets.ps1 CortexEngine/tools/validate_full_scene_shader_pipeline_v3_plan.py
+cmd.exe /d /c "call ""C:\Program Files\Microsoft Visual Studio\18\Community\Common7\Tools\VsDevCmd.bat"" -arch=x64 -host_arch=x64 >nul && set ""CORTEX_SKIP_ASSET_SYNC=1"" && ""C:\Program Files\Ninja\ninja.exe"" -C build CortexEngine -j 8"
+Copy-Item -LiteralPath assets\shaders\FullSceneReflectionResolverV3.hlsl -Destination build\bin\assets\shaders\FullSceneReflectionResolverV3.hlsl -Force
+Copy-Item -LiteralPath assets\shaders\FullSceneReflectionHistoryV3.hlsl -Destination build\bin\assets\shaders\FullSceneReflectionHistoryV3.hlsl -Force
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_full_scene_shader_pipeline_v3_packet.ps1 -NoBuild -SkipSceneAnalyzers -NoStressScene -FamilyFilter gallery -SmokeFrames 24 -CaptureFrame 12 -CaptureSequenceCount 1 -StabilityMotionMode static -OutputRoot build\captures\v3_reflection_source_suppression_static_smoke1_20260606
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_full_scene_shader_pipeline_v3_packet.ps1 -NoBuild -SkipSceneAnalyzers -NoStressScene -FamilyFilter gallery -SmokeFrames 30 -CaptureFrame 15 -CaptureSequenceCount 2 -StabilityMotionMode mouse_jitter -OutputRoot build\captures\v3_reflection_source_suppression_motion_smoke1_20260606
+```
+
+Results:
+
+- Static packet passed:
+  `build/captures/v3_reflection_source_suppression_static_smoke1_20260606`.
+- Mouse-jitter packet passed:
+  `build/captures/v3_reflection_source_suppression_motion_smoke1_20260606`.
+- Motion packet promotion result:
+  `review_packet_passed`, `default beauty promotable=false`.
+- Motion packet frame-report proof from
+  `gallery/reflection_source_suppression/frame_report_shutdown.json`:
+  - `reflection_v3_ready=true`.
+  - `reflection_v3_channel_count=13`.
+  - `reflection_source_suppression_ready=true`.
+  - `default_beauty_affects=false`.
+  - status remains `planned_not_promoted`.
+- `reflection_source_suppression` resource:
+  - `valid=true`.
+  - `size_matches_contract=true`.
+  - `width=1088`.
+  - `height=612`.
+- `FullSceneReflectionV3.reads`:
+  `local_reflection_radiance`, `ssr_color`, `rt_reflection`,
+  `reflection_history_v3_prev_source_id`,
+  `reflection_history_v3_validity`, `reflection_history_v3_rejection`,
+  `vb_gbuffer_normal_roughness`, and `vb_gbuffer_emissive_metallic`.
+- `FullSceneReflectionV3.writes`:
+  `reflection_radiance`, `reflection_confidence`,
+  `reflection_source_id`, `reflection_rejected_source_mask`,
+  `reflection_temporal_delta`, `reflection_ssr_source_signal`,
+  `reflection_rt_source_signal`, and `reflection_source_suppression`.
+- Mouse-jitter metrics:
+  - `reflection_radiance.delta=0.01129032`, active `0.06415907`.
+  - `reflection_source_id.delta=0.00977111`, active `0.05311198`.
+  - `reflection_rejected_source_mask.delta=0.00299466`, active
+    `0.04688477`.
+  - `reflection_source_suppression.delta=0.07844539`, active
+    `0.17913628`.
+
+Current limitation:
+
+- This is a diagnostic split, not a beauty promotion or final BRDF model.
+- It proves why SSR/RT sources are suppressed, but it does not yet tune the
+  suppression policy for glass, water, clearcoat, anisotropy, or transmission.
+- Next aligned pass: run closeup stress packets for glossy metal, glass, rough
+  dielectric, and water; then use `reflection_source_suppression` to tune
+  material-class-specific reflection policy before candidate beauty promotion.

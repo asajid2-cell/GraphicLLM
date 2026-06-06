@@ -137,7 +137,9 @@
         "rt_reflection",
         "reflection_history_v3_prev_source_id",
         "reflection_history_v3_validity",
-        "reflection_history_v3_rejection"
+        "reflection_history_v3_rejection",
+        "normal_roughness",
+        "vb_gbuffer_emissive_metallic"
       ],
       "required_history_inputs": [
         "reflection_radiance",

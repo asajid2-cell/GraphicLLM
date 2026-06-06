@@ -131,6 +131,14 @@
         "local_probe",
         "scene_local_environment"
       ],
+      "required_resolver_inputs": [
+        "local_reflection_radiance",
+        "ssr_color",
+        "rt_reflection",
+        "reflection_history_v3_prev_source_id",
+        "reflection_history_v3_validity",
+        "reflection_history_v3_rejection"
+      ],
       "required_history_inputs": [
         "reflection_radiance",
         "reflection_source_id",

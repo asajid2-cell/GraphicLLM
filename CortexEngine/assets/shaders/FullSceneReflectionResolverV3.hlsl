@@ -65,6 +65,9 @@ cbuffer FrameConstants : register(b1)
 Texture2D<float4> g_LocalReflectionRadiance : register(t0);
 Texture2D<float4> g_SSRReflection : register(t1);
 Texture2D<float4> g_RTReflection : register(t2);
+Texture2D<float4> g_HistoryPrevSourceId : register(t3);
+Texture2D<float4> g_HistoryValidity : register(t4);
+Texture2D<float4> g_HistoryRejection : register(t5);
 SamplerState g_LinearClamp : register(s0);
 
 struct VSOutput {
@@ -124,13 +127,35 @@ PSOutput PSMain(VSOutput input) {
     bool forceEnvironment = sourceOverride == 4u;
     bool forceNone = sourceOverride >= 255u;
 
-    bool chooseSSR = !forceNone && ((forceSSR && ssrRawActive > 0.0f) ||
-                     (!forceLocal && !forceSSR && !forceRT && !forceEnvironment &&
-                      ssrActive > 0.0f && ssrConfidence >= max(localConfidence + 0.18f, 0.72f)));
+    float4 historyPrevSourceId = g_HistoryPrevSourceId.Sample(g_LinearClamp, input.texCoord);
+    float4 historyValidity = g_HistoryValidity.Sample(g_LinearClamp, input.texCoord);
+    float4 historyRejection = g_HistoryRejection.Sample(g_LinearClamp, input.texCoord);
+    float previousSourceClass = saturate(max(historyPrevSourceId.r, historyValidity.g));
+    float previousSourceAvailable = step(0.001f, previousSourceClass);
+    float historyReusable = saturate(historyValidity.b);
+    float historyDebt = saturate(max(historyValidity.a,
+                                     max(historyRejection.g, max(historyRejection.b, historyRejection.a))));
+    float priorSwitchDebt = saturate(max(historyRejection.r, previousSourceAvailable * (1.0f - historyReusable)));
+    float ssrSourceSwitch = previousSourceAvailable * step(0.08f, abs(0.50f - previousSourceClass));
+    float rtSourceSwitch = previousSourceAvailable * step(0.08f, abs(0.75f - previousSourceClass));
+    float ssrHistoryPenalty =
+        ssrSourceSwitch * saturate(0.06f + 0.20f * (1.0f - historyReusable) + 0.16f * historyDebt + 0.14f * priorSwitchDebt);
+    float rtHistoryPenalty =
+        rtSourceSwitch * saturate(0.04f + 0.16f * (1.0f - historyReusable) + 0.12f * historyDebt + 0.10f * priorSwitchDebt);
+    float ssrAdmissionConfidence = saturate(ssrConfidence - ssrHistoryPenalty);
+    float rtAdmissionConfidence = saturate(rtConfidence - rtHistoryPenalty);
+    float ssrAutoThreshold = max(localConfidence + 0.18f, 0.72f);
+    float rtAutoThreshold = max(localConfidence + 0.16f, 0.62f);
+    bool autoPolicy = !forceLocal && !forceSSR && !forceRT && !forceEnvironment;
+    bool ssrBaselineEligible = autoPolicy && ssrActive > 0.0f && ssrConfidence >= ssrAutoThreshold;
+    bool rtBaselineEligible = autoPolicy && rtActive > 0.0f && rtConfidence >= rtAutoThreshold;
+    bool ssrHistoryEligible = autoPolicy && ssrActive > 0.0f && ssrAdmissionConfidence >= ssrAutoThreshold;
+    bool rtHistoryEligible = autoPolicy && rtActive > 0.0f && rtAdmissionConfidence >= rtAutoThreshold;
+
+    bool chooseSSR = !forceNone && ((forceSSR && ssrRawActive > 0.0f) || ssrHistoryEligible);
     bool chooseRT = !forceNone && !chooseSSR &&
                     ((forceRT && rtRawActive > 0.0f) ||
-                     (!forceLocal && !forceSSR && !forceRT && !forceEnvironment &&
-                      rtActive > 0.0f && rtConfidence >= max(localConfidence + 0.16f, 0.62f)));
+                     rtHistoryEligible);
     bool chooseLocal = !forceNone && !chooseSSR && !chooseRT &&
                        ((forceLocal && localActive > 0.0f) ||
                         (!forceLocal && !forceSSR && !forceRT && !forceEnvironment && localActive > 0.0f));
@@ -141,7 +166,9 @@ PSOutput PSMain(VSOutput input) {
 
     float sourceCode = chooseSSR ? 2.0f : (chooseRT ? 3.0f : (chooseLocal ? 1.0f : (chooseEnvironment ? 4.0f : 0.0f)));
     float3 radiance = chooseSSR ? ssrRadiance : (chooseRT ? rtRadiance : (chooseLocal ? localRadiance : (chooseEnvironment ? envRadiance : 0.0f.xxx)));
-    float confidence = chooseSSR ? (forceSSR ? ssrForcedConfidence : ssrConfidence) : (chooseRT ? max(rtConfidence, rtRawConfidence) : (chooseLocal ? localConfidence : (chooseEnvironment ? envConfidence : 0.0f)));
+    float confidence = chooseSSR ? (forceSSR ? ssrForcedConfidence : ssrAdmissionConfidence) :
+                       (chooseRT ? (forceRT ? max(rtConfidence, rtRawConfidence) : rtAdmissionConfidence) :
+                        (chooseLocal ? localConfidence : (chooseEnvironment ? envConfidence : 0.0f)));
     float active = step(0.001f, confidence + Luma(radiance));
 
     PSOutput output;
@@ -156,12 +183,17 @@ PSOutput PSMain(VSOutput input) {
     output.sourceId = float4(sourceCode * 0.25f, confidence, overrideSignal, 1.0f);
 
     // Rejection mask: R = scene-local radiance rejected/missing,
-    // G = SSR rejected/missing, B = RT/environment rejected or missing.
+    // G = SSR rejected/missing, B = RT/environment rejected or missing,
+    // A = auto SSR/RT suppressed by source-history hysteresis.
     float localRejected = chooseLocal ? 0.0f : (1.0f - localActive);
     float ssrRejected = chooseSSR ? 0.0f : (1.0f - ssrActive);
     float rtRejected = chooseRT ? 0.0f : (1.0f - rtActive);
     float environmentRejected = chooseEnvironment ? 0.0f : (1.0f - envActive);
-    output.rejectedSourceMask = float4(localRejected, ssrRejected, max(rtRejected, environmentRejected), 1.0f);
+    float historySuppressedSource =
+        (ssrBaselineEligible && !ssrHistoryEligible) || (rtBaselineEligible && !rtHistoryEligible)
+            ? 1.0f
+            : 0.0f;
+    output.rejectedSourceMask = float4(localRejected, ssrRejected, max(rtRejected, environmentRejected), historySuppressedSource);
 
     // Stable scene-local sources do not require history. Forced policies that
     // cannot be satisfied are visible in G so packets can prove the override
@@ -181,14 +213,14 @@ PSOutput PSMain(VSOutput input) {
     // B = admitted confidence after resolver shaping / forced raw admission,
     // A = forced-SSR rejected.
     output.ssrSourceSignal = float4(saturate(ssrLuma), ssrRawConfidence,
-                                    forceSSR ? ssrForcedConfidence : ssrConfidence,
+                                    forceSSR ? ssrForcedConfidence : ssrAdmissionConfidence,
                                     forceSSR && ssrRawActive <= 0.0f ? 1.0f : 0.0f);
 
     // RT source diagnostic: R = raw RT luma, G = raw RT alpha/weight,
     // B = admitted confidence after resolver shaping / forced raw admission,
     // A = forced-RT rejected.
     output.rtSourceSignal = float4(saturate(rtLuma), rtRawConfidence,
-                                   forceRT ? max(rtConfidence, rtRawConfidence) : rtConfidence,
+                                   forceRT ? max(rtConfidence, rtRawConfidence) : rtAdmissionConfidence,
                                    forceRT && rtRawActive <= 0.0f ? 1.0f : 0.0f);
     return output;
 }

@@ -492,6 +492,13 @@ def analyze_report(
             if "rt_reflection" not in reflection_pass.get("reads", []):
                 failures.append("FullSceneReflectionV3 pass does not read rt_reflection")
             for resource in [
+                "reflection_history_v3_prev_source_id",
+                "reflection_history_v3_validity",
+                "reflection_history_v3_rejection",
+            ]:
+                if resource not in reflection_pass.get("reads", []):
+                    failures.append(f"FullSceneReflectionV3 pass does not read {resource}")
+            for resource in [
                 "reflection_radiance",
                 "reflection_confidence",
                 "reflection_source_id",

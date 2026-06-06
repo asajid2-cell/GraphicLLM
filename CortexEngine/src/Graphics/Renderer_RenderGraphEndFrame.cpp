@@ -77,6 +77,9 @@ struct FullSceneReflectionHistoryV3Context {
     RGResourceHandle sourceId;
     RGResourceHandle temporalDelta;
     RGResourceHandle historyPrev;
+    RGResourceHandle depth;
+    RGResourceHandle normalRoughness;
+    RGResourceHandle velocity;
     RGResourceHandle historyCurr;
     RGResourceHandle historyValidity;
     ID3D12Device* device = nullptr;
@@ -361,6 +364,9 @@ void FailFullSceneReflectionHistoryV3Copy(const FullSceneReflectionHistoryV3Copy
         !context.sourceId.IsValid() ||
         !context.temporalDelta.IsValid() ||
         !context.historyPrev.IsValid() ||
+        !context.depth.IsValid() ||
+        !context.normalRoughness.IsValid() ||
+        !context.velocity.IsValid() ||
         !context.historyCurr.IsValid() ||
         !context.historyValidity.IsValid() ||
         !context.device ||
@@ -390,11 +396,14 @@ void FailFullSceneReflectionHistoryV3Copy(const FullSceneReflectionHistoryV3Copy
             builder.Read(context.sourceId, RGResourceUsage::ShaderResource);
             builder.Read(context.temporalDelta, RGResourceUsage::ShaderResource);
             builder.Read(context.historyPrev, RGResourceUsage::ShaderResource);
+            builder.Read(context.depth, RGResourceUsage::ShaderResource | RGResourceUsage::DepthStencilRead);
+            builder.Read(context.normalRoughness, RGResourceUsage::ShaderResource);
+            builder.Read(context.velocity, RGResourceUsage::ShaderResource);
             builder.Write(context.historyCurr, RGResourceUsage::RenderTarget);
             builder.Write(context.historyValidity, RGResourceUsage::RenderTarget);
         },
         [context](ID3D12GraphicsCommandList*, const RenderGraph& graph) {
-            auto srvResult = context.descriptorManager->AllocateTransientCBV_SRV_UAVRange(4);
+            auto srvResult = context.descriptorManager->AllocateTransientCBV_SRV_UAVRange(7);
             if (srvResult.IsErr()) {
                 FailFullSceneReflectionHistoryV3(context, "full_scene_reflection_history_v3_descriptor");
                 return;
@@ -406,7 +415,18 @@ void FailFullSceneReflectionHistoryV3Copy(const FullSceneReflectionHistoryV3Copy
                 context.descriptorManager->GetCBV_SRV_UAVHandle(baseSRV.index + 2u);
             const DescriptorHandle historyPrevSRV =
                 context.descriptorManager->GetCBV_SRV_UAVHandle(baseSRV.index + 3u);
-            if (!sourceIdSRV.IsValid() || !temporalDeltaSRV.IsValid() || !historyPrevSRV.IsValid()) {
+            const DescriptorHandle depthSRV =
+                context.descriptorManager->GetCBV_SRV_UAVHandle(baseSRV.index + 4u);
+            const DescriptorHandle normalRoughnessSRV =
+                context.descriptorManager->GetCBV_SRV_UAVHandle(baseSRV.index + 5u);
+            const DescriptorHandle velocitySRV =
+                context.descriptorManager->GetCBV_SRV_UAVHandle(baseSRV.index + 6u);
+            if (!sourceIdSRV.IsValid() ||
+                !temporalDeltaSRV.IsValid() ||
+                !historyPrevSRV.IsValid() ||
+                !depthSRV.IsValid() ||
+                !normalRoughnessSRV.IsValid() ||
+                !velocitySRV.IsValid()) {
                 FailFullSceneReflectionHistoryV3(context, "full_scene_reflection_history_v3_source_descriptors");
                 return;
             }
@@ -430,7 +450,22 @@ void FailFullSceneReflectionHistoryV3Copy(const FullSceneReflectionHistoryV3Copy
                     context.device,
                     historyPrevSRV,
                     graph.GetResource(context.historyPrev),
-                    DXGI_FORMAT_R16G16B16A16_FLOAT)) {
+                    DXGI_FORMAT_R16G16B16A16_FLOAT) ||
+                !DescriptorTable::WriteTexture2DSRV(
+                    context.device,
+                    depthSRV,
+                    graph.GetResource(context.depth),
+                    DXGI_FORMAT_R32_FLOAT) ||
+                !DescriptorTable::WriteTexture2DSRV(
+                    context.device,
+                    normalRoughnessSRV,
+                    graph.GetResource(context.normalRoughness),
+                    DXGI_FORMAT_R16G16B16A16_FLOAT) ||
+                !DescriptorTable::WriteTexture2DSRV(
+                    context.device,
+                    velocitySRV,
+                    graph.GetResource(context.velocity),
+                    DXGI_FORMAT_R16G16_FLOAT)) {
                 FailFullSceneReflectionHistoryV3(context, "full_scene_reflection_history_v3_input_srv");
                 return;
             }
@@ -1071,6 +1106,9 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
             historyContext.sourceId = reflectionSourceIdHandle;
             historyContext.temporalDelta = reflectionTemporalDeltaHandle;
             historyContext.historyPrev = reflectionHistoryPrevHandle;
+            historyContext.depth = depthPpHandle;
+            historyContext.normalRoughness = normalHandle;
+            historyContext.velocity = velocityHandle;
             historyContext.historyCurr = reflectionHistoryCurrHandle;
             historyContext.historyValidity = reflectionHistoryValidityHandle;
             historyContext.device = m_services.device ? m_services.device->GetDevice() : nullptr;
@@ -1584,7 +1622,8 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
                             ranReflectionHistoryV3,
                             ranReflectionHistoryV3 ? 1u : 0u,
                             {"reflection_radiance", "reflection_source_id", "reflection_temporal_delta",
-                             "reflection_history_v3_prev"},
+                             "reflection_history_v3_prev", "depth", inputs.frameNormalRoughnessResource,
+                             "velocity"},
                             {"reflection_history_v3_curr", "reflection_history_v3_validity"},
                             false,
                             nullptr,

@@ -427,14 +427,13 @@ Seed implementation status, 2026-06-06:
   - `reflection_history_v3_validity`.
 - `FullSceneReflectionHistoryV3Copy` writes `reflection_history_v3_prev` from
   current history after the history pass.
-- The seed pass now owns previous-history storage but does not yet perform
-  velocity/depth/normal reprojection or source-ID hysteresis.
+- The seed pass owns previous-history storage. Reprojection validity is handled
+  by the follow-up history-validity pass; source-ID hysteresis is still pending.
 - The existing ReflectionV3 PSO target count was corrected from `5` to `7`.
 - Debug modes `75`, `76`, and `77` expose the history resources.
 - Static and mouse-jitter gallery packets passed with
   `reflection_v3_channel_count=9` before previous-history ownership.
 - Remaining required architecture:
-  - sample velocity/depth/normal/roughness for reprojected validity.
   - record source-switch counts and disocclusion invalidation.
   - use source-ID hysteresis to control SSR/RT/local-probe admission.
 
@@ -448,8 +447,14 @@ Previous-history ownership status, 2026-06-06:
 - Reflection V3 readiness now requires `10` channels.
 - Static and mouse-jitter gallery packets passed with
   `reflection_v3_channel_count=10`.
+- Reprojection validity status, 2026-06-06:
+  - `FullSceneReflectionHistoryV3` now reads `depth`, normal/roughness, and
+    `velocity`.
+  - previous history is sampled at `uv + velocity + taa_jitter_delta`.
+  - `reflection_history_v3_validity` now reports active source, source class,
+    reusable reprojected history, and rejection/debt strength.
+  - readiness and analyzer gates require the geometry/motion inputs.
 - Remaining required architecture:
-  - add velocity/depth/normal/roughness reprojection validity.
   - add source-switch and disocclusion counters.
   - only then allow history to affect SSR/RT/local-probe source admission.
 

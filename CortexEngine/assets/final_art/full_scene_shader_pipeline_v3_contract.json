@@ -129,6 +129,15 @@
         "local_probe",
         "scene_local_environment"
       ],
+      "required_history_inputs": [
+        "reflection_radiance",
+        "reflection_source_id",
+        "reflection_temporal_delta",
+        "reflection_history_v3_prev",
+        "depth",
+        "normal_roughness",
+        "velocity"
+      ],
       "required_outputs": [
         "reflection_radiance",
         "reflection_confidence",

@@ -188,6 +188,24 @@ def main() -> int:
     ]:
         require(gate in validation_gates, errors, f"V3 validation missing gate: {gate}")
 
+    reflection_contract = domains.get("reflection", {})
+    reflection_history_inputs = set(reflection_contract.get("required_history_inputs", []))
+    for resource in [
+        "reflection_radiance",
+        "reflection_source_id",
+        "reflection_temporal_delta",
+        "reflection_history_v3_prev",
+        "depth",
+        "normal_roughness",
+        "velocity",
+    ]:
+        require(
+            resource in reflection_history_inputs,
+            errors,
+            f"V3 reflection contract missing history input: {resource}",
+        )
+        require(resource in runtime_surface, errors, f"V3 runtime placeholder missing history input: {resource}")
+
     for token in [
         "FullSceneShaderPipelineV3ToJson",
         "BuildFullSceneShaderPipelineV3FrameContext",

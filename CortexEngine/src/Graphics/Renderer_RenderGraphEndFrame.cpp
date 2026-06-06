@@ -3,6 +3,7 @@
 #include "Debug/GPUProfiler.h"
 #include "Passes/BloomGraphPass.h"
 #include "Passes/BloomPass.h"
+#include "Passes/FullscreenPass.h"
 #include "Passes/LocalReflectionRadiancePass.h"
 #include "Passes/PostProcessGraphPass.h"
 #include "Passes/RenderPassScope.h"
@@ -18,6 +19,95 @@ namespace {
 
 constexpr D3D12_RESOURCE_STATES kRenderGraphShaderResourceState =
     D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
+
+struct CandidateBeautyDisplayContext {
+    RGResourceHandle candidate;
+    RGResourceHandle backBuffer;
+    ID3D12Device* device = nullptr;
+    DescriptorHeapManager* descriptorManager = nullptr;
+    ID3D12GraphicsCommandList* commandList = nullptr;
+    DX12RootSignature* rootSignature = nullptr;
+    DX12Pipeline* pipeline = nullptr;
+    D3D12_GPU_VIRTUAL_ADDRESS frameConstants = 0;
+    DescriptorHandle candidateSRV;
+    D3D12_CPU_DESCRIPTOR_HANDLE backBufferRTV{};
+    uint32_t width = 0;
+    uint32_t height = 0;
+    bool* ran = nullptr;
+    bool* failed = nullptr;
+    const char** stage = nullptr;
+};
+
+void FailCandidateBeautyDisplay(const CandidateBeautyDisplayContext& context, const char* stage) {
+    if (context.failed) {
+        *context.failed = true;
+    }
+    if (context.stage && !*context.stage) {
+        *context.stage = stage ? stage : "candidate_beauty_display_unknown";
+    }
+}
+
+[[nodiscard]] bool AddCandidateBeautyDisplayPass(RenderGraph& graph,
+                                                 const CandidateBeautyDisplayContext& context) {
+    if (!context.candidate.IsValid() ||
+        !context.backBuffer.IsValid() ||
+        !context.device ||
+        !context.descriptorManager ||
+        !context.commandList ||
+        !context.rootSignature ||
+        !context.pipeline ||
+        !context.pipeline->GetPipelineState() ||
+        context.frameConstants == 0 ||
+        !context.candidateSRV.IsValid() ||
+        context.backBufferRTV.ptr == 0 ||
+        context.width == 0 ||
+        context.height == 0) {
+        FailCandidateBeautyDisplay(context, "candidate_beauty_display_contract");
+        return false;
+    }
+
+    graph.AddPass(
+        "FullSceneCandidateBeautyV3Display",
+        [context](RGPassBuilder& builder) {
+            builder.SetType(RGPassType::Graphics);
+            builder.Read(context.candidate, RGResourceUsage::ShaderResource);
+            builder.Write(context.backBuffer, RGResourceUsage::RenderTarget);
+        },
+        [context](ID3D12GraphicsCommandList*, const RenderGraph&) {
+            auto transientResult = context.descriptorManager->AllocateTransientCBV_SRV_UAV();
+            if (transientResult.IsErr()) {
+                FailCandidateBeautyDisplay(context, "candidate_beauty_display_descriptor");
+                return;
+            }
+
+            const DescriptorHandle transientSRV = transientResult.Value();
+            context.device->CopyDescriptorsSimple(
+                1,
+                transientSRV.cpu,
+                context.candidateSRV.cpu,
+                D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+
+            context.commandList->OMSetRenderTargets(1, &context.backBufferRTV, FALSE, nullptr);
+            FullscreenPass::SetViewportAndScissor(context.commandList, context.width, context.height);
+            if (!FullscreenPass::BindGraphicsState({
+                    context.commandList,
+                    context.descriptorManager,
+                    context.rootSignature,
+                    context.frameConstants,
+                })) {
+                FailCandidateBeautyDisplay(context, "candidate_beauty_display_bind");
+                return;
+            }
+            context.commandList->SetPipelineState(context.pipeline->GetPipelineState());
+            context.commandList->SetGraphicsRootDescriptorTable(3, transientSRV.gpu);
+            FullscreenPass::DrawTriangle(context.commandList);
+            if (context.ran) {
+                *context.ran = true;
+            }
+        });
+
+    return true;
+}
 
 } // namespace
 
@@ -43,6 +133,12 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
          std::getenv("CORTEX_ENABLE_FULL_SCENE_CANDIDATE_BEAUTY_V3") != nullptr) &&
         m_mainTargets.candidateBeautyV3.resources.ldrOutput &&
         m_mainTargets.candidateBeautyV3.descriptors.ldrOutputRTV.IsValid();
+    const bool wantsCandidateBeautyDisplayThisFrame =
+        wantsCandidateBeautyThisFrame &&
+        (m_postProcessState.fullSceneCandidateBeautyV3Enabled ||
+         std::getenv("CORTEX_DISPLAY_FULL_SCENE_CANDIDATE_BEAUTY_V3") != nullptr) &&
+        m_pipelineState.candidateBeautyDisplay &&
+        m_mainTargets.candidateBeautyV3.descriptors.ldrOutputSRV.IsValid();
     const bool useFusedBloomTransients =
         wantsFusedBloomThisFrame &&
         std::getenv("CORTEX_DISABLE_BLOOM_TRANSIENTS") == nullptr;
@@ -54,6 +150,7 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
     result.attempted = true;
     result.attemptedBloom = wantsFusedBloomThisFrame;
     result.attemptedCandidateBeauty = wantsCandidateBeautyThisFrame;
+    result.attemptedCandidateBeautyDisplay = wantsCandidateBeautyDisplayThisFrame;
     Debug::GPUProfiler::Get().BeginScope(m_commandResources.graphicsList.Get(), "RenderGraphEndFrame", "RenderGraph");
     m_services.renderGraph->BeginFrame();
 
@@ -412,6 +509,8 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
 
             PostProcessGraphPass::ExecuteContext candidateExecuteContext = executeContext;
             candidateExecuteContext.draw.targetRtv = m_mainTargets.candidateBeautyV3.descriptors.ldrOutputRTV.cpu;
+            candidateExecuteContext.draw.width = GetInternalRenderWidth();
+            candidateExecuteContext.draw.height = GetInternalRenderHeight();
             candidateExecuteContext.backBufferUsedAsRenderTarget = nullptr;
             candidateExecuteContext.runRtReflectionDebugClear = false;
             candidateExecuteContext.ranPostProcess = &result.ranCandidateBeauty;
@@ -438,6 +537,28 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
             PostProcessGraphPass::AddToGraph(*m_services.renderGraph, postProcessContext);
         if (!postProcessResult.IsValid()) {
             bloomStageFailed = true;
+        }
+
+        if (wantsCandidateBeautyDisplayThisFrame && candidateBeautyHandle.IsValid()) {
+            CandidateBeautyDisplayContext displayContext{};
+            displayContext.candidate = candidateBeautyHandle;
+            displayContext.backBuffer = backBufferHandle;
+            displayContext.device = m_services.device ? m_services.device->GetDevice() : nullptr;
+            displayContext.descriptorManager = m_services.descriptorManager.get();
+            displayContext.commandList = m_commandResources.graphicsList.Get();
+            displayContext.rootSignature = m_pipelineState.rootSignature.get();
+            displayContext.pipeline = m_pipelineState.candidateBeautyDisplay.get();
+            displayContext.frameConstants = m_constantBuffers.currentFrameGPU;
+            displayContext.candidateSRV = m_mainTargets.candidateBeautyV3.descriptors.ldrOutputSRV;
+            displayContext.backBufferRTV = m_services.window->GetCurrentRTV();
+            displayContext.width = m_services.window->GetWidth();
+            displayContext.height = m_services.window->GetHeight();
+            displayContext.ran = &result.ranCandidateBeautyDisplay;
+            displayContext.failed = &bloomStageFailed;
+            displayContext.stage = &postProcessGraphStageError;
+            if (!AddCandidateBeautyDisplayPass(*m_services.renderGraph, displayContext)) {
+                bloomStageFailed = true;
+            }
         }
     }
 
@@ -578,6 +699,17 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
                              "vb_gbuffer_emissive_metallic", "vb_gbuffer_material_ext1",
                              "vb_gbuffer_material_ext2", "velocity", "rt_reflection", "hzb"},
                             {"candidate_ldr_cinematic_output"},
+                            false,
+                            nullptr,
+                            true);
+        }
+        if (wantsCandidateBeautyDisplayThisFrame) {
+            RecordFramePass("FullSceneCandidateBeautyV3Display",
+                            true,
+                            result.ranCandidateBeautyDisplay,
+                            result.ranCandidateBeautyDisplay ? 1u : 0u,
+                            {"candidate_ldr_cinematic_output"},
+                            {"back_buffer"},
                             false,
                             nullptr,
                             true);

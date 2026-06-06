@@ -29,6 +29,26 @@ Result<void> Renderer::CreateScreenSpacePipelineStates(const RendererCompiledSha
         return Result<void>::Err("Failed to create post-process pipeline: " + postPipelineResult.Error());
     }
 
+    if (shaders.candidateBeautyDisplayPS) {
+        m_pipelineState.candidateBeautyDisplay = std::make_unique<DX12Pipeline>();
+
+        PipelineDesc candidateDisplayDesc = postDesc;
+        candidateDisplayDesc.pixelShader = *shaders.candidateBeautyDisplayPS;
+        candidateDisplayDesc.rtvFormat = DXGI_FORMAT_R8G8B8A8_UNORM;
+
+        auto candidateDisplayPipelineResult = m_pipelineState.candidateBeautyDisplay->Initialize(
+            m_services.device->GetDevice(),
+            m_pipelineState.rootSignature->GetRootSignature(),
+            candidateDisplayDesc);
+        if (candidateDisplayPipelineResult.IsErr()) {
+            spdlog::warn("Failed to create FullSceneCandidateBeautyV3 display pipeline: {}",
+                         candidateDisplayPipelineResult.Error());
+            m_pipelineState.candidateBeautyDisplay.reset();
+        } else {
+            spdlog::info("FullSceneCandidateBeautyV3 display pipeline created successfully.");
+        }
+    }
+
     if (shaders.voxelPS) {
         m_pipelineState.voxel = std::make_unique<DX12Pipeline>();
 

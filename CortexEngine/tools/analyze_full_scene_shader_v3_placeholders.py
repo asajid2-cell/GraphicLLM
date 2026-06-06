@@ -521,6 +521,7 @@ def analyze_report(
     candidate_domain = domain_by_id.get("candidate_beauty")
     candidate_requested = v3.get("candidate_beauty_requested") is True
     candidate_ready = v3.get("candidate_beauty_ready") is True
+    candidate_displayed = v3.get("candidate_beauty_displayed") is True
     if candidate_requested:
         candidate_pass = find_frame_pass(report, "FullSceneCandidateBeautyV3")
         candidate_resource = find_frame_resource(report, "candidate_ldr_cinematic_output")
@@ -559,6 +560,19 @@ def analyze_report(
                 failures.append("candidate_beauty_ready=true with wrong producer")
             if v3.get("candidate_beauty_output") != "candidate_ldr_cinematic_output":
                 failures.append("candidate_beauty_ready=true with wrong output")
+    if candidate_displayed:
+        display_pass = find_frame_pass(report, "FullSceneCandidateBeautyV3Display")
+        if not isinstance(display_pass, dict):
+            failures.append("candidate_beauty_displayed=true but FullSceneCandidateBeautyV3Display pass is missing")
+        else:
+            if display_pass.get("executed") is not True:
+                failures.append("FullSceneCandidateBeautyV3Display pass did not execute")
+            if "candidate_ldr_cinematic_output" not in display_pass.get("reads", []):
+                failures.append("FullSceneCandidateBeautyV3Display pass does not read candidate_ldr_cinematic_output")
+            if "back_buffer" not in display_pass.get("writes", []):
+                failures.append("FullSceneCandidateBeautyV3Display pass does not write back_buffer")
+        if not candidate_ready:
+            failures.append("candidate_beauty_displayed=true before candidate_beauty_ready")
 
     return {
         "report": str(path),
@@ -569,6 +583,7 @@ def analyze_report(
         "default_beauty_affects": v3.get("default_beauty_affects"),
         "candidate_beauty_requested": v3.get("candidate_beauty_requested"),
         "candidate_beauty_ready": v3.get("candidate_beauty_ready"),
+        "candidate_beauty_displayed": v3.get("candidate_beauty_displayed"),
         "candidate_beauty_producer": v3.get("candidate_beauty_producer"),
         "candidate_beauty_output": v3.get("candidate_beauty_output"),
         "runtime_placeholders_ready": v3.get("runtime_placeholders_ready"),

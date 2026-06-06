@@ -76,6 +76,15 @@ Result<RendererCompiledShaders> Renderer::CompileRendererPipelineShaders() {
     }
     shaders.postPS = std::move(postPsResult).Value();
 
+    auto candidateBeautyDisplayPsResult =
+        ShaderCompiler::CompileFromFile("assets/shaders/CandidateBeautyDisplay.hlsl", "PSMain", "ps_5_1");
+    if (candidateBeautyDisplayPsResult.IsOk()) {
+        shaders.candidateBeautyDisplayPS = std::move(candidateBeautyDisplayPsResult).Value();
+    } else {
+        spdlog::warn("Failed to compile candidate beauty display pixel shader: {}",
+                     candidateBeautyDisplayPsResult.Error());
+    }
+
     auto voxelPsResult =
         ShaderCompiler::CompileFromFile("assets/shaders/VoxelRaymarch.hlsl", "PSMain", "ps_5_1");
     if (voxelPsResult.IsOk()) {

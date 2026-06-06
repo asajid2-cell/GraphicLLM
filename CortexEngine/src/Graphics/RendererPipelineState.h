@@ -26,6 +26,7 @@ struct RendererPipelineReadiness {
     bool shadowAlphaDoubleSided = false;
 
     bool postProcess = false;
+    bool candidateBeautyDisplay = false;
     bool taa = false;
     bool ssr = false;
     bool ssao = false;
@@ -70,6 +71,7 @@ struct RendererPipelineState {
     std::unique_ptr<DX12Pipeline> shadowAlphaDoubleSided;
 
     std::unique_ptr<DX12Pipeline> postProcess;
+    std::unique_ptr<DX12Pipeline> candidateBeautyDisplay;
     std::unique_ptr<DX12Pipeline> taa;
     std::unique_ptr<DX12Pipeline> ssr;
     std::unique_ptr<DX12Pipeline> ssao;
@@ -110,6 +112,7 @@ struct RendererPipelineState {
         readiness.shadowAlpha = shadowAlpha != nullptr;
         readiness.shadowAlphaDoubleSided = shadowAlphaDoubleSided != nullptr;
         readiness.postProcess = postProcess != nullptr;
+        readiness.candidateBeautyDisplay = candidateBeautyDisplay != nullptr;
         readiness.taa = taa != nullptr;
         readiness.ssr = ssr != nullptr;
         readiness.ssao = ssao != nullptr;
@@ -147,6 +150,7 @@ struct RendererPipelineState {
         shadowAlpha.reset();
         shadowAlphaDoubleSided.reset();
         postProcess.reset();
+        candidateBeautyDisplay.reset();
         taa.reset();
         ssr.reset();
         ssao.reset();

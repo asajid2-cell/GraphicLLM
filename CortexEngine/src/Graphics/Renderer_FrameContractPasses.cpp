@@ -69,6 +69,7 @@ void Renderer::RecordFramePass(const char* name,
         if (resource == "depth") return resourceBytes(m_depthResources.resources.buffer.Get());
         if (resource == "hdr_color") return resourceBytes(m_mainTargets.hdr.resources.color.Get());
         if (resource == "gbuffer_normal_roughness") return resourceBytes(m_mainTargets.normalRoughness.resources.texture.Get());
+        if (resource == "candidate_ldr_cinematic_output") return resourceBytes(m_mainTargets.candidateBeautyV3.resources.ldrOutput.Get());
         if (resource == "direct_lighting") return resourceBytes(m_mainTargets.lightingV3.resources.directLighting.Get());
         if (resource == "direct_lighting_unshadowed") return resourceBytes(m_mainTargets.lightingV3.resources.directLightingUnshadowed.Get());
         if (resource == "shadow_visibility") return resourceBytes(m_mainTargets.lightingV3.resources.shadowVisibility.Get());
@@ -105,6 +106,7 @@ void Renderer::RecordFramePass(const char* name,
                 return std::string("reduced_resolution");
             }
             if (write == "depth" || write == "hdr_color" ||
+                write == "candidate_ldr_cinematic_output" ||
                 write == "direct_lighting" || write == "direct_lighting_unshadowed" ||
                 write == "shadow_visibility" || write == "shadow_loss" || write == "indirect_lighting" ||
                 write == "gbuffer_normal_roughness" || write == "velocity" ||
@@ -144,6 +146,7 @@ void Renderer::RecordFramePass(const char* name,
         record.name == "SSAO" ||
         record.name == "Bloom" ||
         record.name == "PostProcess" ||
+        record.name == "FullSceneCandidateBeautyV3" ||
         record.name == "RenderVoxel" ||
         record.name == "RenderGraphEndFrame";
     record.renderGraph = renderGraphOwned || (record.name == "RenderGraphEndFrame");

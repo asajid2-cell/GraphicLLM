@@ -107,7 +107,7 @@ RGResourceHandle AddToGraph(RenderGraph& graph, const GraphContext& context) {
     }
 
     graph.AddPass(
-        "PostProcess",
+        context.passName ? context.passName : "PostProcess",
         [context](RGPassBuilder& builder) {
             Declare(builder, context.resources);
         },

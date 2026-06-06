@@ -396,6 +396,10 @@ void Renderer::UpdateFrameContractSnapshot(Scene::ECS_Registry* registry,
     addResource("depth", m_depthResources.resources.buffer.Get(), contract.renderWidth, contract.renderHeight);
     addResource("hdr_color", m_mainTargets.hdr.resources.color.Get(), contract.renderWidth, contract.renderHeight);
     addResource("gbuffer_normal_roughness", m_mainTargets.normalRoughness.resources.texture.Get(), contract.renderWidth, contract.renderHeight);
+    addResource("candidate_ldr_cinematic_output",
+                m_mainTargets.candidateBeautyV3.resources.ldrOutput.Get(),
+                contract.renderWidth,
+                contract.renderHeight);
     addResource("direct_lighting", m_mainTargets.lightingV3.resources.directLighting.Get(), contract.renderWidth, contract.renderHeight);
     addResource("direct_lighting_unshadowed", m_mainTargets.lightingV3.resources.directLightingUnshadowed.Get(), contract.renderWidth, contract.renderHeight);
     addResource("shadow_visibility", m_mainTargets.lightingV3.resources.shadowVisibility.Get(), contract.renderWidth, contract.renderHeight);

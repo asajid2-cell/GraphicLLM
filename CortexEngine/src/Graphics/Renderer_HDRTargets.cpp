@@ -57,6 +57,15 @@ Result<void> Renderer::CreateHDRTarget() {
         spdlog::warn("{}", lightingV3Result.Error());
     }
 
+    auto candidateBeautyResult = m_mainTargets.candidateBeautyV3.CreateTarget(
+        m_services.device->GetDevice(),
+        m_services.descriptorManager.get(),
+        width,
+        height);
+    if (candidateBeautyResult.IsErr()) {
+        spdlog::warn("{}", candidateBeautyResult.Error());
+    }
+
     InvalidateTAAHistory("resource_recreated");
     auto historyResult = m_temporalScreenState.CreateHistoryColor(
         m_services.device->GetDevice(),

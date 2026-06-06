@@ -646,8 +646,10 @@ private:
     struct EndFrameGraphResult {
         bool attempted = false;
         bool attemptedBloom = false;
+        bool attemptedCandidateBeauty = false;
         bool ranBloom = false;
         bool ranPostProcess = false;
+        bool ranCandidateBeauty = false;
         bool ranHZB = false;
         bool fallbackUsed = false;
         std::string fallbackReason;

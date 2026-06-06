@@ -4853,3 +4853,91 @@ Refactor guardrails:
 - The next code slice should first create the real candidate output resource,
   then move material, reflection, environment, composite, and post domains from
   adapters into real producers.
+
+### FullSceneCandidateBeautyV3 Real Resource Path - 2026-06-06
+
+Implemented:
+
+- `FullSceneCandidateBeautyV3` is now a real opt-in render graph pass.
+- New renderer-owned target:
+  `candidate_ldr_cinematic_output`.
+- New target state:
+  `FullSceneCandidateBeautyV3TargetState` in
+  `src/Graphics/RendererMainTargetState.h`.
+- The target is created with HDR-sized render targets and is tracked in:
+  - frame-contract resources.
+  - render-target memory accounting.
+  - pass write memory/resolution classification.
+- `PostProcessGraphPass` now accepts a custom pass name so the same post draw
+  can render to either:
+  - `PostProcess -> back_buffer`.
+  - `FullSceneCandidateBeautyV3 -> candidate_ldr_cinematic_output`.
+- The candidate pass only schedules when
+  `CORTEX_ENABLE_FULL_SCENE_CANDIDATE_BEAUTY_V3` is set.
+- Default `beauty` rows still do not schedule the candidate pass.
+- V3 readiness now requires:
+  - valid `candidate_ldr_cinematic_output` resource.
+  - executed `FullSceneCandidateBeautyV3` pass.
+  - pass reads `hdr_color`.
+  - pass writes `candidate_ldr_cinematic_output`.
+  - composite/post V3 evidence remains ready.
+- `tools/analyze_full_scene_shader_v3_placeholders.py` now rejects candidate
+  reports that lack the real pass/resource path.
+
+Validation:
+
+```powershell
+python -m py_compile tools\analyze_full_scene_shader_v3_placeholders.py tools\build_full_scene_shader_v3_promotion_decision.py
+python tools\validate_full_scene_shader_pipeline_v3_plan.py
+git diff --check -- src\Graphics\RendererMainTargetState.h src\Graphics\Renderer_HDRTargets.cpp src\Graphics\Renderer_Shutdown.cpp src\Graphics\Renderer_FrameContractMemory.cpp src\Graphics\Renderer_FrameContractPasses.cpp src\Graphics\Renderer_FrameContractSnapshot.cpp src\Graphics\Passes\PostProcessGraphPass.h src\Graphics\Passes\PostProcessGraphPass.cpp src\Graphics\Renderer.h src\Graphics\Renderer_RenderGraphEndFrame.cpp src\Graphics\FullSceneShaderFrameContext.h tools\analyze_full_scene_shader_v3_placeholders.py docs\FULL_SCENE_SHADER_AAA_REFACTOR_PLAN.md
+cmd.exe /d /c "call ""C:\Program Files\Microsoft Visual Studio\18\Community\Common7\Tools\VsDevCmd.bat"" -arch=x64 -host_arch=x64 >nul && set ""CORTEX_SKIP_ASSET_SYNC=1"" && ""C:\Program Files\Microsoft Visual Studio\18\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\Ninja\ninja.exe"" -C build CortexEngine -j 8"
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_full_scene_shader_pipeline_v3_packet.ps1 -NoBuild -SkipSceneAnalyzers -NoStressScene -FamilyFilter gallery -SmokeFrames 24 -CaptureFrame 12 -CaptureSequenceCount 1 -StabilityMotionMode static -OutputRoot build\captures\v3_candidate_beauty_resource_smoke1_20260606
+```
+
+Results:
+
+- Python compile passed.
+- V3 plan validator passed.
+- focused `git diff --check` passed, with only existing CRLF warnings.
+- native build passed and linked `build/bin/CortexEngine.exe`.
+- packet passed:
+  - artifact root:
+    `build/captures/v3_candidate_beauty_resource_smoke1_20260606`.
+  - reports: `17`.
+  - promotion status: `review_packet_passed`.
+  - candidate requested reports: `1`.
+  - candidate ready reports: `1`.
+- Direct frame-report proof:
+  - `gallery/beauty`:
+    `candidate_beauty_requested=false`,
+    `candidate_beauty_ready=false`,
+    `candidate_beauty_producer=none`,
+    no `FullSceneCandidateBeautyV3` pass,
+    `PostProcess` writes only `back_buffer`,
+    `default_beauty_affects=false`.
+  - `gallery/candidate_beauty_v3`:
+    `candidate_beauty_requested=true`,
+    `candidate_beauty_ready=true`,
+    `candidate_beauty_producer=FullSceneCandidateBeautyV3`,
+    `candidate_beauty_output=candidate_ldr_cinematic_output`,
+    valid resource size `1088x612`,
+    `FullSceneCandidateBeautyV3` executed,
+    pass reads `hdr_color`,
+    pass writes `candidate_ldr_cinematic_output`,
+    `PostProcess` still writes only `back_buffer`,
+    `default_beauty_affects=false`.
+
+Important limitation:
+
+- The real candidate path currently reuses the existing post-process shader.
+- This proves separate resource ownership and packet gating, not final
+  Unreal-style composite quality.
+
+Next safe pass:
+
+1. Add a debug-menu toggle and optional split-screen/display path for
+   candidate beauty so the user can compare it without command-line flags.
+2. Begin replacing the composite/post adapters with real
+   `FullSceneCompositeV3` and `CinematicPostV3` producers over V3 resources.
+3. Keep default beauty unchanged until cross-family evidence and user review
+   approve candidate promotion.

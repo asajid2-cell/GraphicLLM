@@ -70,6 +70,13 @@ def packet_row(packet_root: Path) -> dict[str, Any]:
     row["default_beauty_promotable"] = promotion.get("default_beauty_promotable")
     row["full_coverage_ready"] = promotion.get("full_coverage_ready")
     row["ready_domain_report_counts"] = promotion.get("ready_domain_report_counts", {})
+    row["candidate_beauty_requested_report_count"] = promotion.get(
+        "candidate_beauty_requested_report_count", 0
+    )
+    row["candidate_beauty_ready_report_count"] = promotion.get(
+        "candidate_beauty_ready_report_count", 0
+    )
+    row["candidate_beauty_predicates"] = promotion.get("candidate_beauty_predicates", {})
     row["failures"].extend(str(item) for item in promotion.get("failures", []))
     row["warnings"].extend(str(item) for item in promotion.get("warnings", []))
     if not row["review_packet_passed"]:
@@ -101,11 +108,27 @@ def build_matrix(
     )
     failures: list[str] = []
     warnings: list[str] = []
+    aggregate_candidate_blockers: dict[str, int] = {}
+    aggregate_requested_candidate_blockers: dict[str, int] = {}
     for row in rows:
         for failure in row.get("failures", []):
             failures.append(f"{row.get('packet_root')}: {failure}")
         for warning in row.get("warnings", []):
             warnings.append(f"{row.get('packet_root')}: {warning}")
+        predicates = row.get("candidate_beauty_predicates", {})
+        if isinstance(predicates, dict):
+            blockers = predicates.get("blocker_counts", {})
+            if isinstance(blockers, dict):
+                for key, value in blockers.items():
+                    aggregate_candidate_blockers[str(key)] = (
+                        aggregate_candidate_blockers.get(str(key), 0) + int(value or 0)
+                    )
+            requested_blockers = predicates.get("requested_blocker_counts", {})
+            if isinstance(requested_blockers, dict):
+                for key, value in requested_blockers.items():
+                    aggregate_requested_candidate_blockers[str(key)] = (
+                        aggregate_requested_candidate_blockers.get(str(key), 0) + int(value or 0)
+                    )
 
     missing_families = sorted(set(required_families) - set(observed_families))
     missing_motion_modes = sorted(set(required_motion_modes) - set(observed_motion_modes))
@@ -126,6 +149,10 @@ def build_matrix(
         "missing_motion_modes": missing_motion_modes,
         "full_matrix_ready": not failures,
         "default_beauty_promotable": False,
+        "candidate_beauty_blocker_counts": dict(sorted(aggregate_candidate_blockers.items())),
+        "candidate_beauty_requested_blocker_counts": dict(
+            sorted(aggregate_requested_candidate_blockers.items())
+        ),
         "packets": rows,
         "failures": failures,
         "warnings": warnings,
@@ -144,11 +171,19 @@ def write_markdown(path: Path, matrix: dict[str, Any]) -> None:
         f"- missing families: `{', '.join(matrix['missing_families'])}`",
         f"- observed motion modes: `{', '.join(matrix['observed_motion_modes'])}`",
         f"- missing motion modes: `{', '.join(matrix['missing_motion_modes'])}`",
+        f"- candidate blocker counts: `{json.dumps(matrix.get('candidate_beauty_blocker_counts', {}), sort_keys=True)}`",
+        f"- requested candidate blocker counts: `{json.dumps(matrix.get('candidate_beauty_requested_blocker_counts', {}), sort_keys=True)}`",
         "",
-        "| Packet | Motion | Families | Passed | Status |",
-        "|---|---|---|---|---|",
+        "| Packet | Motion | Families | Passed | Status | Candidate Ready | Candidate Blockers |",
+        "|---|---|---|---|---|---:|---|",
     ]
     for row in matrix["packets"]:
+        predicates = row.get("candidate_beauty_predicates", {})
+        if not isinstance(predicates, dict):
+            predicates = {}
+        blocker_counts = predicates.get("blocker_counts", {})
+        if not isinstance(blocker_counts, dict):
+            blocker_counts = {}
         lines.append(
             "| "
             + " | ".join(
@@ -158,6 +193,8 @@ def write_markdown(path: Path, matrix: dict[str, Any]) -> None:
                     f"`{', '.join(row.get('families', []))}`",
                     f"`{str(row.get('review_packet_passed')).lower()}`",
                     f"`{row.get('promotion_status', 'unknown')}`",
+                    f"`{row.get('candidate_beauty_ready_report_count', 0)}/{row.get('candidate_beauty_requested_report_count', 0)}`",
+                    f"`{json.dumps(blocker_counts, sort_keys=True)}`",
                 ]
             )
             + " |"

@@ -3,6 +3,82 @@
 This is the living handoff for the AAA asset-quality goal.
 Read this after compaction before continuing.
 
+## 2026-06-07 Promotion/Matrix Candidate Predicate Summary Checkpoint
+
+Latest pushed work before this section:
+
+- Commit `e929479` added candidate-beauty predicate debt to runtime frame
+  reports and `candidate_path_debt`.
+
+Implemented after that:
+
+- `tools\analyze_full_scene_shader_v3_placeholders.py` now carries the
+  individual candidate predicate booleans into `v3_signal.json` rows:
+  composite ready, cinematic post ready, candidate LDR output ready, candidate
+  HDR read ready, legacy bridge rejected, and default beauty unchanged.
+- `tools\build_full_scene_shader_v3_promotion_decision.py` now emits
+  `candidate_beauty_predicates`:
+  - report count
+  - requested report count
+  - ready report count
+  - predicate count
+  - min/max ready predicate count
+  - per-predicate ready report counts
+  - blocker counts
+  - requested-report blocker counts
+- `tools\build_full_scene_shader_v3_matrix_decision.py` now carries candidate
+  ready/requested counts and blocker summaries into each matrix packet row and
+  aggregates blocker counts across packets.
+- `tools\validate_full_scene_shader_pipeline_v3_plan.py` now includes the
+  matrix runner/analyzer in the checked runtime surface and requires the
+  candidate predicate summary tokens.
+
+Validation:
+
+```powershell
+python -m py_compile tools\analyze_full_scene_shader_v3_placeholders.py tools\build_full_scene_shader_v3_promotion_decision.py tools\build_full_scene_shader_v3_matrix_decision.py tools\validate_full_scene_shader_pipeline_v3_plan.py
+python tools\validate_full_scene_shader_pipeline_v3_plan.py
+python tools\analyze_full_scene_shader_v3_placeholders.py --input build\captures\v3_candidate_beauty_predicate_debt_smoke_20260607 --signal-output build\captures\v3_candidate_beauty_predicate_debt_smoke_20260607\v3_signal.json --stability-output build\captures\v3_candidate_beauty_predicate_debt_smoke_20260607\v3_stability.json --require-lighting-split-ready --require-lighting-split-draw-count 1 --require-lighting-signal-metrics
+python tools\build_full_scene_shader_v3_promotion_decision.py --packet-root build\captures\v3_candidate_beauty_predicate_debt_smoke_20260607 --output-json build\captures\v3_candidate_beauty_predicate_debt_smoke_20260607\promotion_decision.json --output-md build\captures\v3_candidate_beauty_predicate_debt_smoke_20260607\promotion_decision.md --allow-subset-review
+python tools\build_full_scene_shader_v3_matrix_decision.py --packet-root build\captures\v3_candidate_beauty_predicate_debt_smoke_20260607 --required-families stress_rt_showcase_reflection_closeup --required-motion-modes static --output-json build\captures\v3_candidate_beauty_predicate_debt_smoke_20260607\v3_matrix_single_packet_decision.json --output-md build\captures\v3_candidate_beauty_predicate_debt_smoke_20260607\v3_matrix_single_packet_decision.md
+```
+
+Evidence:
+
+- Regenerated `promotion_decision.json` reports:
+  - `candidate_beauty_requested_report_count=6`
+  - `candidate_beauty_ready_report_count=6`
+  - `predicate_count=6`
+  - `min_ready_predicate_count=1`
+  - `max_ready_predicate_count=6`
+  - per-predicate ready counts:
+    `composite_ready=6`, `cinematic_post_ready=6`,
+    `ldr_output_ready=6`, `reads_candidate_hdr=6`,
+    `legacy_bridge_rejected=54`, `default_beauty_unchanged=54`
+  - blocker counts for non-candidate views:
+    `candidate_beauty_not_requested=48`,
+    `composite_v3_not_ready=48`,
+    `cinematic_post_v3_not_ready=48`,
+    `candidate_ldr_output_missing=48`,
+    `candidate_hdr_input_missing=48`
+  - requested-report blocker counts `{}`.
+- Regenerated single-packet matrix reports:
+  - full matrix ready for the intentionally narrow
+    `stress_rt_showcase_reflection_closeup/static` requirement.
+  - packet row shows candidate ready `6/6`.
+  - matrix-level candidate blocker counts match the promotion summary.
+
+Current next work:
+
+1. Run a bounded cross-family candidate-beauty matrix using existing packet
+   controls, keeping known model-scene crash/device-removal debt separate from
+   report-evidence readiness.
+2. If cross-family packets show requested candidate blockers, use the new
+   predicate summary to target the failing layer rather than tuning visuals.
+3. Continue CompositeV3 legacy-rescue reduction and CinematicPostV3 polish only
+   after candidate predicates stay stable across more than the stress gallery
+   scene.
+
 ## 2026-06-07 Candidate Beauty Predicate Debt Checkpoint
 
 Latest pushed work before this section:

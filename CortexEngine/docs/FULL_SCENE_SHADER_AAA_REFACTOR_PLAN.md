@@ -166,7 +166,11 @@ Slice C:
   specular prefilter, atmosphere parameters, and ownership mask.
 - Packet proof: enclosed scenes do not show or sharply reflect unrelated IBL
   imagery unless explicitly authorized by profile.
-- This is now the next implementation slice.
+- Current state: the first policy-consumption gate is implemented.
+  `SceneLocalEnvironmentV3` readiness now requires parity with
+  `scene_profile_policy_contract` for environment policy, enclosure mode, and
+  reflection policy. Actual local resource selection still needs to consume
+  those fields.
 
 Slice D:
 
@@ -261,6 +265,38 @@ Next:
   `enclosure_mode`, and `reflection_policy` to choose local visible
   background, diffuse irradiance, specular prefilter, atmosphere, and
   ownership mask behavior.
+
+### 2026-06-07 SceneLocalEnvironmentV3 Policy Consumption Checkpoint
+
+Implemented:
+
+- Environment readiness now requires three SceneProfileV3 policy-consumption
+  channels, raising the ready-channel contract from `10` to `13`.
+- Frame reports expose environment/profile parity through:
+  `scene_local_environment_consumes_scene_profile_policy`,
+  `scene_local_environment_profile_contract_id`,
+  `scene_local_environment_profile_enclosure_mode`,
+  `scene_local_environment_profile_policy`, and
+  `scene_local_environment_profile_reflection_policy`.
+- The V3 placeholder and environment-payload analyzers fail on policy contract
+  mismatch.
+
+Evidence:
+
+- Full V3 stress packet:
+  `build\captures\v3_environment_profile_policy_consumption_stress_20260607`.
+- Packet passed V2 evidence, V3 placeholder checks, scene-profile analysis,
+  environment-payload analysis, material-payload analysis, CompositeV3
+  diagnostics, and review-packet promotion decision.
+- Environment payload analysis reported `54/54` profile-policy-consumed
+  reports and `0` failures. Texture payload readiness remained `0`, expected
+  for `rt_showcase_gallery` until a texture set is added.
+
+Next:
+
+- Move from evidence parity to real resource selection in
+  `SceneLocalEnvironmentV3`: local visible background, diffuse irradiance,
+  specular prefilter, atmosphere parameters, and ownership mask.
 
 ## 2026-06-07 Authoritative Execution Queue
 

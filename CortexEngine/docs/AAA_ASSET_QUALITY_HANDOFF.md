@@ -52,7 +52,8 @@ Current refactor queue:
 1. Contract reconciliation and promotion gate hardening.
 2. `MaterialPayloadV3` missing-channel ownership. Current aggregate path done.
 3. `SceneProfileV3` policy owner. Current policy-contract slice done.
-4. `SceneLocalEnvironmentV3` texture/resource ownership.
+4. `SceneLocalEnvironmentV3` texture/resource ownership. Current
+   profile-policy consumption gate done.
 5. `LightingShadowV3` high-contrast stress and source split.
 6. `ReflectionV3` provider expansion and resolver hardening.
 7. `TransparencyMediaV3`.
@@ -185,10 +186,65 @@ Current interpretation:
 
 - SceneProfileV3 now has a real machine-checkable policy contract for
   downstream domains to consume.
-- This is still evidence/control-plane work. It does not yet make environment,
-  lighting, reflection, composite, or post consume all policy fields.
+- Environment now consumes the SceneProfileV3 environment/enclosure/reflection
+  policy fields in readiness evidence. Lighting, reflection, composite, and
+  post still need explicit consumption.
 - The kitchen device hang remains a renderer stability issue for broad packet
   runs and should not be confused with SceneProfileV3 policy-contract failure.
+
+## 2026-06-07 SceneLocalEnvironmentV3 Profile Policy Consumption
+
+Implemented:
+
+- `SceneLocalEnvironmentV3` readiness now requires consuming the
+  `SceneProfileV3` policy contract.
+- Environment domain ready-channel count increased from `10` to `13`:
+  five source/provenance channels, five owned environment channels, and three
+  SceneProfileV3 policy-consumption channels.
+- Frame reports now emit:
+  - `scene_local_environment_consumes_scene_profile_policy`
+  - `scene_local_environment_profile_contract_id`
+  - `scene_local_environment_profile_enclosure_mode`
+  - `scene_local_environment_profile_policy`
+  - `scene_local_environment_profile_reflection_policy`
+- The environment contract requires profile policy contract,
+  profile enclosure mode, and profile reflection policy channels.
+- V3 placeholder and environment-payload analyzers now fail if environment
+  readiness is true while policy parity with `scene_profile_policy_contract`
+  is missing or mismatched.
+
+Validation:
+
+```powershell
+python -m py_compile tools\analyze_full_scene_shader_v3_environment_payload.py tools\analyze_full_scene_shader_v3_placeholders.py tools\validate_full_scene_shader_pipeline_v3_plan.py tools\analyze_full_scene_shader_v3_scene_profile.py
+python tools\validate_full_scene_shader_pipeline_v3_plan.py
+cmd.exe /d /c "call ""C:\Program Files\Microsoft Visual Studio\18\Community\Common7\Tools\VsDevCmd.bat"" -arch=x64 -host_arch=x64 >nul && set ""CORTEX_SKIP_ASSET_SYNC=1"" && ""C:\Program Files\Ninja\ninja.exe"" -C build CortexEngine -j 8"
+Copy-Item -LiteralPath assets\final_art\full_scene_shader_pipeline_v3_contract.json -Destination build\bin\assets\final_art\full_scene_shader_pipeline_v3_contract.json -Force
+$env:CORTEX_V3_REFLECTION_SOURCE_OVERRIDE='ssr'
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_full_scene_shader_pipeline_v3_packet.ps1 -NoBuild -SkipSceneAnalyzers -StressSceneOnly -StressSceneFilter rt_showcase:reflection_closeup -SmokeFrames 16 -CaptureFrame 8 -CaptureSequenceCount 1 -StabilityMotionMode static -OutputRoot build\captures\v3_environment_profile_policy_consumption_stress_20260607
+Remove-Item Env:\CORTEX_V3_REFLECTION_SOURCE_OVERRIDE -ErrorAction SilentlyContinue
+```
+
+Evidence:
+
+- Full V3 stress packet:
+  `build\captures\v3_environment_profile_policy_consumption_stress_20260607`.
+- Packet passed end to end: V2 evidence, V3 placeholder checks,
+  SceneProfileV3 analyzer, environment payload analyzer, material payload
+  analyzer, CompositeV3 diagnostics, and review-packet promotion decision.
+- Environment payload result:
+  - reports: `54`
+  - profile-policy-consumed reports: `54`
+  - failures: `0`
+  - payload-ready reports: `0`, expected because this stress gallery has no
+    texture set yet.
+
+Next:
+
+- Convert policy consumption from evidence only into actual
+  `SceneLocalEnvironmentV3` resource selection: local visible background,
+  diffuse irradiance, specular prefilter, atmosphere parameters, and ownership
+  mask.
 
 ## 2026-06-07 LightingV3 Shadow Motion Focus Harness
 

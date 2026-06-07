@@ -301,7 +301,10 @@
         "visible_background_source",
         "reflection_background_source",
         "ambient_source",
-        "atmosphere_source"
+        "atmosphere_source",
+        "scene_profile_policy_contract",
+        "scene_profile_enclosure_mode",
+        "scene_profile_reflection_policy"
       ],
       "payload_channels": [
         "scene_local_texture_set_id",

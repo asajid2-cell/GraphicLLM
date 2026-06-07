@@ -377,6 +377,9 @@ def analyze_report(
         "composite_missing_required_channels",
         "cinematic_post_missing_required_channels",
         "candidate_beauty_missing_required_channels",
+        "candidate_beauty_predicate_count",
+        "candidate_beauty_ready_predicate_count",
+        "candidate_beauty_blockers",
         "total_missing_required_channels",
         "not_ready_domain_count",
     ]:
@@ -879,6 +882,32 @@ def analyze_report(
     candidate_requested = v3.get("candidate_beauty_requested") is True
     candidate_ready = v3.get("candidate_beauty_ready") is True
     candidate_displayed = v3.get("candidate_beauty_displayed") is True
+    candidate_predicate_count = int(v3.get("candidate_beauty_predicate_count", 0) or 0)
+    candidate_ready_predicate_count = int(v3.get("candidate_beauty_ready_predicate_count", 0) or 0)
+    candidate_blockers = v3.get("candidate_beauty_blockers", [])
+    if not isinstance(candidate_blockers, list):
+        failures.append("candidate_beauty_blockers must be a list")
+        candidate_blockers = []
+    if candidate_predicate_count <= 0:
+        failures.append("candidate_beauty_predicate_count must be positive")
+    if candidate_ready_predicate_count < 0 or candidate_ready_predicate_count > candidate_predicate_count:
+        failures.append("candidate_beauty_ready_predicate_count is out of range")
+    if candidate_path_debt.get("candidate_beauty_predicate_count") != candidate_predicate_count:
+        failures.append("candidate_path_debt candidate_beauty_predicate_count does not match top-level field")
+    if candidate_path_debt.get("candidate_beauty_ready_predicate_count") != candidate_ready_predicate_count:
+        failures.append("candidate_path_debt candidate_beauty_ready_predicate_count does not match top-level field")
+    if candidate_path_debt.get("candidate_beauty_blockers") != candidate_blockers:
+        failures.append("candidate_path_debt candidate_beauty_blockers does not match top-level field")
+    for key in [
+        "candidate_beauty_composite_ready",
+        "candidate_beauty_cinematic_post_ready",
+        "candidate_beauty_ldr_output_ready",
+        "candidate_beauty_reads_candidate_hdr",
+        "candidate_beauty_legacy_bridge_rejected",
+        "candidate_beauty_default_beauty_unchanged",
+    ]:
+        if key not in v3:
+            failures.append(f"missing {key}")
     if candidate_requested:
         candidate_producer = v3.get("candidate_beauty_producer")
         candidate_pass_name = "CinematicPostV3"
@@ -924,6 +953,10 @@ def analyze_report(
                 failures.append("candidate_beauty_ready=true with wrong producer")
             if v3.get("candidate_beauty_output") != "candidate_ldr_cinematic_output":
                 failures.append("candidate_beauty_ready=true with wrong output")
+            if candidate_ready_predicate_count != candidate_predicate_count:
+                failures.append("candidate_beauty_ready=true with incomplete predicate count")
+            if candidate_blockers:
+                failures.append("candidate_beauty_ready=true with remaining blockers")
         legacy_bridge_pass = find_frame_pass(report, "FullSceneCandidateBeautyV3")
         if candidate_ready and isinstance(legacy_bridge_pass, dict) and legacy_bridge_pass.get("executed") is True:
             failures.append("candidate_beauty_ready=true while FullSceneCandidateBeautyV3 legacy bridge executed")
@@ -940,6 +973,10 @@ def analyze_report(
                 failures.append("FullSceneCandidateBeautyV3Display pass does not write back_buffer")
         if not candidate_ready:
             failures.append("candidate_beauty_displayed=true before candidate_beauty_ready")
+    if not candidate_ready and candidate_predicate_count > 0 and not candidate_blockers:
+        failures.append("candidate_beauty_ready=false without candidate_beauty_blockers")
+    if not candidate_requested and "candidate_beauty_not_requested" not in candidate_blockers:
+        failures.append("candidate_beauty_requested=false without candidate_beauty_not_requested blocker")
 
     return {
         "report": str(path),
@@ -954,6 +991,9 @@ def analyze_report(
         "candidate_beauty_displayed": v3.get("candidate_beauty_displayed"),
         "candidate_beauty_producer": v3.get("candidate_beauty_producer"),
         "candidate_beauty_output": v3.get("candidate_beauty_output"),
+        "candidate_beauty_predicate_count": candidate_predicate_count,
+        "candidate_beauty_ready_predicate_count": candidate_ready_predicate_count,
+        "candidate_beauty_blockers": candidate_blockers,
         "runtime_placeholders_ready": v3.get("runtime_placeholders_ready"),
         "contract_grounded": v3.get("contract_grounded"),
         "packet_gate_ready": v3.get("packet_gate_ready"),

@@ -3,6 +3,84 @@
 This is the living handoff for the AAA asset-quality goal.
 Read this after compaction before continuing.
 
+## 2026-06-07 Candidate Beauty Predicate Debt Checkpoint
+
+Latest pushed work before this section:
+
+- Commit `7df9521` closed the `local_reflection_radiance` RenderGraphV3
+  missing-producer debt.
+
+Implemented after that:
+
+- `FullSceneShaderPipelineV3FrameContext` now reports candidate-beauty
+  readiness as explicit predicates instead of an all-or-nothing missing-channel
+  count:
+  - `candidate_beauty_composite_ready`
+  - `candidate_beauty_cinematic_post_ready`
+  - `candidate_beauty_ldr_output_ready`
+  - `candidate_beauty_reads_candidate_hdr`
+  - `candidate_beauty_legacy_bridge_rejected`
+  - `candidate_beauty_default_beauty_unchanged`
+  - `candidate_beauty_predicate_count`
+  - `candidate_beauty_ready_predicate_count`
+  - `candidate_beauty_blockers`
+- `candidate_path_debt` now mirrors the predicate count, ready predicate count,
+  and blocker list so debt reports identify the actual failed candidate-beauty
+  predicate.
+- The candidate gate remains strict. Candidate beauty is still ready only when
+  requested, CompositeV3 is ready, CinematicPostV3 is ready, candidate LDR is
+  written from candidate HDR, the legacy HDR bridge is absent, and default
+  beauty remains unchanged.
+- `tools\analyze_full_scene_shader_v3_placeholders.py` now validates predicate
+  ranges, blocker consistency, top-level/debt agreement, and no remaining
+  blockers when `candidate_beauty_ready=true`.
+- `assets\final_art\full_scene_shader_pipeline_v3_contract.json` and
+  `tools\validate_full_scene_shader_pipeline_v3_plan.py` require these fields.
+
+Validation:
+
+```powershell
+python -m py_compile tools\analyze_full_scene_shader_v3_placeholders.py tools\validate_full_scene_shader_pipeline_v3_plan.py
+python -m json.tool assets\final_art\full_scene_shader_pipeline_v3_contract.json
+python tools\validate_full_scene_shader_pipeline_v3_plan.py
+cmd.exe /d /c "call ""C:\Program Files\Microsoft Visual Studio\18\Community\Common7\Tools\VsDevCmd.bat"" -arch=x64 -host_arch=x64 >nul && set ""CORTEX_SKIP_ASSET_SYNC=1"" && ""C:\Program Files\Ninja\ninja.exe"" -C build CortexEngine -j 8"
+Copy-Item -LiteralPath assets\final_art\full_scene_shader_pipeline_v3_contract.json -Destination build\bin\assets\final_art\full_scene_shader_pipeline_v3_contract.json -Force
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_full_scene_shader_pipeline_v3_packet.ps1 -NoBuild -SkipSceneAnalyzers -StressSceneOnly -StressSceneFilter rt_showcase:reflection_closeup -SmokeFrames 8 -CaptureFrame 4 -CaptureSequenceCount 1 -StabilityMotionMode static -OutputRoot build\captures\v3_candidate_beauty_predicate_debt_smoke_20260607
+```
+
+Evidence:
+
+- Packet:
+  `build\captures\v3_candidate_beauty_predicate_debt_smoke_20260607` passed
+  end to end.
+- In the ordinary `beauty` report:
+  - `candidate_beauty_requested=false`
+  - `candidate_beauty_ready_predicate_count=1`
+  - blockers:
+    `candidate_beauty_not_requested`, `composite_v3_not_ready`,
+    `cinematic_post_v3_not_ready`, `candidate_ldr_output_missing`,
+    `candidate_hdr_input_missing`
+  - `candidate_beauty_missing_required_channels=5`
+- In the `candidate_beauty_v3` report:
+  - `candidate_beauty_requested=true`
+  - `candidate_beauty_ready=true`
+  - `candidate_beauty_predicate_count=6`
+  - `candidate_beauty_ready_predicate_count=6`
+  - `candidate_beauty_blockers=[]`
+  - `candidate_beauty_missing_required_channels=0`
+  - `total_missing_required_channels=0`
+  - `render_graph_missing_producer_count=0`
+
+Current next work:
+
+1. Use the predicate debt fields in the promotion/matrix summaries so packet
+   failures identify the exact predicate and view scope.
+2. Run a bounded cross-family candidate-beauty matrix after choosing a small
+   family set and keeping model-scene crash debt separate from report evidence.
+3. Continue reducing CompositeV3 legacy rescue usage and improving
+   CinematicPostV3 only after cross-family candidate predicate evidence is
+   stable.
+
 ## 2026-06-07 Current AAA Full-Scene Shader Resume Point
 
 User direction:

@@ -2345,3 +2345,28 @@ Follow-up result:
   CompositeV3 diagnostics, and review-packet promotion decision.
 - Default beauty is still not promotable; the passing packet is stress-only,
   not the required cross-family and cross-motion promotion matrix.
+
+### Material Payload Contract Coverage - 2026-06-07
+
+Follow-up material hardening:
+
+- Standard V3 packets now capture `material_base_color` and
+  `material_normal` alongside roughness, metallic, surface class, and policy
+  views.
+- The V3 material payload analyzer now reports contract-required material
+  debug-view coverage against
+  `assets/final_art/full_scene_shader_pipeline_v3_contract.json`.
+- The first contract coverage packet
+  `build/captures/v3_material_payload_contract_views_stress_20260607`
+  passed V3 placeholder checks, V3 lighting motion, V3 material payload,
+  CompositeV3 diagnostics, and review-packet promotion decision.
+- Contract coverage is now explicit:
+  `material_base_color`, `material_roughness`, `material_metallic`,
+  `material_normal`, and `material_class` are covered; the remaining material
+  payload debt is `material_missing_channel_mask`.
+
+Next material payload slice:
+
+- Create a real missing-channel-mask resource/debug view or a stricter
+  equivalent frame-contract gate so missing texture/channel ownership is
+  visible before lighting, reflections, composite, or post consume materials.

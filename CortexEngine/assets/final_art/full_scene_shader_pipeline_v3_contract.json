@@ -87,6 +87,8 @@
         "material_missing_channel_mask"
       ],
       "packet_debug_views": [
+        "material_base_color",
+        "material_normal",
         "roughness",
         "metallic",
         "surface_class",

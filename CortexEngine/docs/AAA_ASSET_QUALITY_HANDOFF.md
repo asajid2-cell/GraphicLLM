@@ -7721,3 +7721,48 @@ Current next work:
 2. Next renderer layer should be material payload hardening or the
    scene-local environment split, unless a new user-visible smooth/metal
    regression appears.
+
+## 2026-06-07 Material Payload Contract Coverage Resume Point
+
+Implemented:
+
+- `tools/run_scene_local_cinematic_renderer_v1_packets.ps1` exposes
+  `material_base_color` and `material_normal` packet aliases.
+- `tools/run_full_scene_shader_pipeline_v3_packet.ps1` includes those aliases
+  in the default V3 packet view set.
+- `tools/analyze_full_scene_shader_v3_material_payload.py` requires those
+  views and reports contract-required material debug-view coverage.
+- `tools/analyze_full_scene_shader_v3_placeholders.py` classifies debug modes
+  `35` and `36` as material-payload scope, so material-only VB G-buffer debug
+  captures do not falsely require lighting split execution.
+- `assets/final_art/full_scene_shader_pipeline_v3_contract.json` lists
+  `material_base_color` and `material_normal` in material packet views.
+
+Validation evidence:
+
+- packet:
+  `build/captures/v3_material_payload_contract_views_stress_20260607`.
+- V3 placeholder analyzer passed after the material debug-scope fix.
+- V3 lighting motion passed with `24` view sequences.
+- material payload passed with:
+  - `sampled materials`: `2640`.
+  - `named materials`: `2640`.
+  - `advanced feature materials`: `1408`.
+  - `unresolved roughness fallback`: `0`.
+  - `unresolved transmission fallback`: `0`.
+  - `contract required debug views`: `6`.
+  - `contract debug view debt`: `1`.
+  - covered: `material_base_color`, `material_roughness`,
+    `material_metallic`, `material_normal`, `material_class`.
+  - debt: `material_missing_channel_mask`.
+- CompositeV3 diagnostics passed.
+- promotion decision: `review_packet_passed`.
+- default beauty remains not promotable because the packet is still a
+  stress-only subset and lacks the required families/motion modes.
+
+Current next work:
+
+1. Continue material hardening by creating a real missing-channel-mask
+   resource/debug view or a stricter equivalent frame-contract gate.
+2. After material payload debt is explicit and shrinking, move to
+   `SceneLocalEnvironmentV3` visible/background/reflection-environment split.

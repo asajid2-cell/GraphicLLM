@@ -15,6 +15,30 @@ User direction:
 
 Current planning checkpoint:
 
+- Added the expanded
+  `2026-06-07 Full Scene Shader Goal Feature Execution Architecture`
+  section near the top of
+  `docs\FULL_SCENE_SHADER_AAA_REFACTOR_PLAN.md`.
+- Treat that new execution architecture as the current runway before further
+  goal-feature implementation. It defines the data model refactor, render-graph
+  refactor, shader refactor, validation refactor, execution phases, near-term
+  work order, and explicit non-goals.
+- The main architectural move is to make `FullSceneShaderV3` a typed producer
+  stack:
+  `SceneProfileV3 -> VisibilityV3 -> MaterialPayloadV3 ->
+  SceneLocalEnvironmentV3 -> LightingShadowV3 -> ReflectionV3 ->
+  TransparencyMediaV3 -> CompositeV3 -> CinematicPostV3 -> PromotionV3`.
+- Each domain must prove:
+  `policy input -> producer/resource -> shader contribution -> debug view ->
+  frame report fields -> analyzer -> packet evidence`.
+- Near-term implementation should start upstream:
+  decoded material-color sampling and room/light influence for
+  `SceneLocalEnvironmentV3`, then report/capture separation, bounded
+  `ReflectionV3` family evidence, and continued `LightingShadowV3` close-surface
+  stress. `TransparencyMediaV3` and heavy `CinematicPostV3` stay deferred until
+  opaque HDR ownership is credible.
+- Explicit non-goal: do not count IBL blur, disabled reflections, reduced
+  sharpness, scene swaps, or post masking as fixes.
 - Added the short authoritative
   `2026-06-07 Goal Feature Refactor Plan - Full Scene Shader Renderer`
   section near the top of

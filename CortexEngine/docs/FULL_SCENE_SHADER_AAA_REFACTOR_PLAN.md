@@ -4,6 +4,250 @@ Status: planning ledger.
 
 Default beauty stays unchanged until a separate promotion gate passes.
 
+## 2026-06-07 Full Scene Shader Goal Feature Execution Architecture
+
+This is the current refactor plan to use before implementing the goal feature.
+The target is an opt-in `FullSceneShaderV3` candidate renderer that can become
+the default only after evidence and user review. The target is not a stronger
+post-process pass, a blurrier environment map, or a scene-specific workaround.
+
+### Final Shape
+
+The renderer should be split into stable domain producers that write typed
+resources and diagnostics:
+
+```text
+SceneProfileV3
+  -> VisibilityV3
+  -> MaterialPayloadV3
+  -> SceneLocalEnvironmentV3
+  -> LightingShadowV3
+  -> ReflectionV3
+  -> TransparencyMediaV3
+  -> CompositeV3
+  -> CinematicPostV3
+  -> PromotionV3
+```
+
+Every domain must have the same engineering contract:
+
+```text
+policy input
+  -> producer/resource
+  -> shader contribution
+  -> debug view
+  -> frame report fields
+  -> analyzer
+  -> packet evidence
+```
+
+If a domain lacks one of these links, it stays prototype debt even when the
+beauty screenshot looks good.
+
+### Data Model Refactor
+
+The current visual stack should move away from scattered booleans and implicit
+fallbacks. The candidate path needs explicit renderer data objects:
+
+- `SceneProfileV3Policy`: family, enclosure, environment permissions, light
+  rig, reflection priority, transparency/media needs, exposure/post look, and
+  promotion family id.
+- `VisibilityV3Buffers`: depth, velocity, normals, material id, object id,
+  surface id, disocclusion, motion confidence, and close-surface flags.
+- `MaterialPayloadV3Surface`: base color, normal, roughness, metallic,
+  specular, AO, emissive, opacity, transmission, clearcoat, sheen,
+  anisotropy, IOR, thickness, class id, missing mask, and invalid mask.
+- `SceneLocalEnvironmentV3Resources`: visible background, diffuse irradiance,
+  specular prefilter, reflection background, atmosphere parameters, ownership
+  mask, payload provenance, and fallback reason.
+- `LightingShadowV3Resources`: direct, unshadowed direct, indirect, shadow
+  visibility, shadow loss, source attribution, filter data, energy budget, and
+  light-motion diagnostics.
+- `ReflectionV3Resources`: SSR, RT/ray-query, local probe, hero/planar probe,
+  environment fallback, source id, confidence, rejected-source mask, history
+  validity, temporal delta, and source hysteresis.
+- `TransparencyMediaV3Resources`: glass, water, decals, particles,
+  volumetric inscatter, transmittance, ordering diagnostics, and composition
+  masks.
+- `CompositeV3Resources`: candidate HDR, contribution map, clamp debt,
+  legacy-rescue debt, overbright/underlit masks, and final pre-post audit.
+- `CinematicPostV3State`: exposure meter/state, bloom, glare, tonemap, color
+  grade, sharpen, vignette, optional DOF, and bypass outputs.
+
+### Render Graph Refactor
+
+The render graph should stop treating the candidate path as a set of loose
+debug passes. It should have a predictable frame structure:
+
+1. `BuildSceneProfileV3`.
+   Resolve scene family policy and immutable per-frame visual intent.
+
+2. `BuildVisibilityV3`.
+   Produce stable geometry buffers once, then feed every temporal or
+   screen-space effect from those buffers.
+
+3. `BuildMaterialPayloadV3`.
+   Normalize material payloads into typed PBR channels. Synthesize missing
+   channels only through explicit fallback policy and report that debt.
+
+4. `BuildSceneLocalEnvironmentV3`.
+   Bind or generate local visible background, irradiance, specular prefilter,
+   and reflection background. Enclosed scenes must not depend on visible or
+   sharp external IBL content unless the profile allows it.
+
+5. `BuildLightingShadowV3`.
+   Produce source-attributed lighting and shadow resources. Shadow instability
+   must report whether it came from sun, local lights, contact/RT,
+   screen-space paths, filter radius, environment, or exposure.
+
+6. `BuildReflectionV3`.
+   Produce all candidate providers separately, then resolve them with
+   confidence, history validity, material policy, and hysteresis. Smooth or
+   metallic jitter is fixed here.
+
+7. `BuildTransparencyMediaV3`.
+   Add water, glass, decals, fog, particles, and volumetrics after opaque
+   lighting/reflection ownership is inspectable.
+
+8. `BuildCompositeV3`.
+   Assemble candidate HDR from V3 terms. Legacy HDR rescue remains measured and
+   should trend toward zero before default promotion.
+
+9. `BuildCinematicPostV3`.
+   Apply exposure, bloom, glare, tonemap, grade, sharpen, vignette, and optional
+   DOF. Every strong post term has a bypass/debug view.
+
+10. `BuildPromotionV3Reports`.
+    Emit frame report fields and packet evidence for every enabled domain.
+
+### Shader Refactor
+
+Each V3 shader should avoid hidden cross-domain assumptions. The target
+organization is:
+
+- shared contracts in small HLSL headers for profile, material, visibility,
+  environment, lighting, reflection, transparency, composite, and post
+- one owning shader/pass per domain output, with helper functions allowed only
+  when they do not hide fallback decisions
+- debug modes that map directly to resource ownership, source id, confidence,
+  history, rejection, debt, and contribution
+- no visual fix is accepted unless the relevant debug mode and frame report
+  move in a coherent way
+
+The immediate shader risk areas are:
+
+- environment resources still use derived proxy assets rather than real
+  filtered local radiance
+- reflection source fusion still needs richer local probe or RT fallback proof
+- transparency/media should wait until opaque reflection and lighting are
+  stable enough to separate artifact sources
+- post should stay restrained until candidate HDR is real
+
+### Validation Refactor
+
+The packet system becomes the promotion harness, not a screenshot generator.
+Each domain gets three evidence levels:
+
+1. Focus packet.
+   A narrow repro scene or stress view that makes the domain defect obvious.
+
+2. Cross-family packet.
+   Gallery, kitchen, office, gym, classroom, concert, red room, stadium,
+   bathroom, bedroom, workshop, store, street, and exterior water/vegetation.
+
+3. Motion matrix.
+   Static, mouse jitter, camera sweep, close-surface orbit, reflective-object
+   orbit, high-contrast light sweep, and optional camera cut.
+
+Default promotion is blocked when:
+
+- candidate HDR normally relies on legacy rescue
+- enclosed scenes show or sharply reflect unauthorized external IBL content
+- floor, wall, shadow, smooth, or metallic flicker lacks source attribution
+- material payload channels are missing without downstream debt reporting
+- local environment resources are scalar approximations where resource-backed
+  radiance is required
+- post is hiding upstream instability
+- cross-family reports are missing because a capture crashed before diagnostics
+- human review rejects the beauty packet
+
+### Execution Phases
+
+Phase 0, lock the baseline.
+Keep current public beauty stable and keep all aggressive work behind candidate
+flags, debug views, and packet gates.
+
+Phase 1, unify contracts.
+Make C++ frame context, JSON contracts, HLSL bindings, debug aliases, analyzers,
+packet scripts, and promotion decisions speak the same V3 domain vocabulary.
+
+Phase 2, finish material ownership.
+Turn every material input into typed payload, explicit synthesis, or explicit
+missing debt. Lighting, reflections, transparency, composite, and post must
+consume and report this debt.
+
+Phase 3, make scene-local environment real.
+Move from payload aliases and generated flat proxies to decoded material-color
+sampling, room-shell influence, light-rig influence, filtered diffuse
+irradiance, filtered specular prefilter, and visible local background.
+
+Phase 4, finish shadow attribution and stability.
+Keep the old-office/floor/wall repro as a hard stress case, but diagnose it
+through `LightingShadowV3` source channels rather than hiding it through IBL or
+scene changes.
+
+Phase 5, finish reflection source fusion.
+Keep forced providers as diagnostics, but promote only the auto resolver.
+Strengthen SSR continuity, local probe fallback, RT/ray-query fallback, history
+validity, material suppression, and source hysteresis until smooth/metallic
+jitter has a named fix.
+
+Phase 6, add transparency and media.
+Introduce glass, water, decals, fog, particles, and volumetric terms only after
+opaque resources can prove whether artifacts come from lighting, reflection,
+environment, or ordering.
+
+Phase 7, own candidate HDR.
+Make `CompositeV3` the normal beauty source. Legacy rescue is allowed for
+diagnostics and emergency fallback, but promotion requires it to be near zero.
+
+Phase 8, add cinematic post.
+Add filmic exposure, bloom, glare, tone mapping, grade, sharpen, vignette, and
+optional DOF after candidate HDR is stable and inspectable.
+
+Phase 9, run promotion.
+Run the full cross-family and motion matrix, produce contact sheets and failure
+reports, and use human review as the final gate.
+
+### Near-Term Work Order
+
+The next implementation should start with the highest-leverage upstream terms:
+
+1. Upgrade `SceneLocalEnvironmentV3` proxy generation from filename inventory
+   to decoded material-color sampling plus room-shell/light-rig influence.
+2. Add frame-report and analyzer fields that prove local irradiance, local
+   specular, and visible background are generated from the same scene-local
+   contract.
+3. Add cross-family report/capture separation so a model-scene crash does not
+   erase diagnostics.
+4. Expand `ReflectionV3` provider evidence from gallery/office into a bounded
+   family matrix and add pixel-level SSR continuity if needed.
+5. Continue `LightingShadowV3` light-sweep and close-surface stress until
+   remaining flicker has a named source.
+6. Only after those pass, implement `TransparencyMediaV3` and
+   `CinematicPostV3`.
+
+### Non-Goals For This Refactor
+
+- Do not make IBL blur, disabled reflections, lowered sharpness, or scene swaps
+  count as fixes.
+- Do not promote a single scene or a single screenshot.
+- Do not build post-processing before candidate HDR ownership is real.
+- Do not wire new visual terms without debug views, frame reports, analyzers,
+  and packet evidence.
+- Do not mix scene-authoring quality work into this renderer stabilization and
+  AAA shader goal.
+
 ## 2026-06-07 Goal Feature Refactor Plan - Full Scene Shader Renderer
 
 This is the short authoritative plan for the requested goal feature. The

@@ -15,6 +15,33 @@ User direction:
 
 Current planning checkpoint:
 
+- Added the short authoritative
+  `2026-06-07 Goal Feature Refactor Plan - Full Scene Shader Renderer`
+  section near the top of
+  `docs\FULL_SCENE_SHADER_AAA_REFACTOR_PLAN.md`.
+- Treat that section as the current goal-feature plan. It defines the product
+  goal as an opt-in `FullSceneShaderV3` candidate renderer, not a single visual
+  preset or post-process pass.
+- The required renderer stack is:
+  `SceneProfileV3`, `VisibilityV3`, `MaterialPayloadV3`,
+  `SceneLocalEnvironmentV3`, `LightingShadowV3`, `ReflectionV3`,
+  `TransparencyMediaV3`, `CompositeV3`, `CinematicPostV3`, and `PromotionV3`.
+- Every visible term must prove the chain:
+  `SceneProfileV3 policy -> typed producer/resource -> shader contribution ->
+  debug view -> frame-report fields -> analyzer gate -> packet/promotion
+  evidence`.
+- Immediate implementation priority after planning:
+  1. harden `ReflectionV3` provider resolver because smooth/metallic jitter is
+     still a user-visible defect class
+  2. expand `SceneLocalEnvironmentV3` from payload aliases toward local
+     irradiance/specular/background proxy resources
+  3. separate cross-family frame-report diagnostics from visual capture success
+     so model-scene crashes do not block evidence
+  4. add `CompositeV3` legacy-rescue accounting
+  5. defer strong `CinematicPostV3` polish until upstream ownership is real
+- Completion remains blocked until candidate beauty passes matrix packets and
+  user review. One good screenshot or one fixed stress scene is not completion.
+
 - Added the authoritative
   `2026-06-07 Full Scene Shader Refactor Blueprint` section to
   `docs\FULL_SCENE_SHADER_AAA_REFACTOR_PLAN.md`.

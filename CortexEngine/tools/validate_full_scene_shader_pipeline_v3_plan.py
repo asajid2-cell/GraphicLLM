@@ -21,6 +21,7 @@ V3_MATERIAL_PAYLOAD_ANALYZER_PATH = ROOT / "tools" / "analyze_full_scene_shader_
 V3_SCENE_PROFILE_ANALYZER_PATH = ROOT / "tools" / "analyze_full_scene_shader_v3_scene_profile.py"
 V3_ENVIRONMENT_PAYLOAD_ANALYZER_PATH = ROOT / "tools" / "analyze_full_scene_shader_v3_environment_payload.py"
 V3_ENVIRONMENT_PROFILE_ANALYZER_PATH = ROOT / "tools" / "analyze_full_scene_shader_v3_environment_profiles.py"
+V3_ENVIRONMENT_PROXY_GENERATOR_PATH = ROOT / "tools" / "generate_scene_local_environment_proxies.py"
 V3_SHADOW_ATTRIBUTION_ANALYZER_PATH = ROOT / "tools" / "analyze_full_scene_shader_v3_shadow_attribution.py"
 V3_SHADOW_FOCUS_RUNNER_PATH = ROOT / "tools" / "run_lighting_v3_shadow_motion_focus_packet.ps1"
 V3_REFLECTION_SOURCE_RESOLVER_ANALYZER_PATH = ROOT / "tools" / "analyze_reflection_v3_source_resolver.py"
@@ -235,6 +236,7 @@ def main() -> int:
     scene_profile_source = V3_SCENE_PROFILE_ANALYZER_PATH.read_text(encoding="utf-8")
     environment_payload_source = V3_ENVIRONMENT_PAYLOAD_ANALYZER_PATH.read_text(encoding="utf-8")
     environment_profile_source = V3_ENVIRONMENT_PROFILE_ANALYZER_PATH.read_text(encoding="utf-8")
+    environment_proxy_generator_source = V3_ENVIRONMENT_PROXY_GENERATOR_PATH.read_text(encoding="utf-8")
     shadow_attribution_source = V3_SHADOW_ATTRIBUTION_ANALYZER_PATH.read_text(encoding="utf-8")
     shadow_focus_runner_source = V3_SHADOW_FOCUS_RUNNER_PATH.read_text(encoding="utf-8")
     reflection_source_resolver_source = V3_REFLECTION_SOURCE_RESOLVER_ANALYZER_PATH.read_text(encoding="utf-8")
@@ -256,6 +258,7 @@ def main() -> int:
             scene_profile_source,
             environment_payload_source,
             environment_profile_source,
+            environment_proxy_generator_source,
             shadow_attribution_source,
             shadow_focus_runner_source,
             reflection_source_resolver_source,
@@ -645,12 +648,15 @@ def main() -> int:
         '"scene_local_environment_proxy_binding_source"',
         "sceneLocalEnvironmentProxyFallbackReason",
         '"scene_local_environment_proxy_fallback_reason"',
+        "cached_explicit_scene_local_proxy_triple",
+        "cached_payload_derived_scene_local_proxy_triple",
         '"scene_local_proxy_resource_table_required"',
         '"scene_local_proxy_resource_table_bindable"',
         '"scene_local_proxy_bound_resource_count"',
         '"scene_local_proxy_binding_source"',
         '"scene_local_proxy_fallback_reason"',
         '"v3_environment_payload.json"',
+        "generate_scene_local_environment_proxies.py",
         "reflectionV3Ready",
         '"reflection_v3_ready"',
         "reflectionRadianceReady",

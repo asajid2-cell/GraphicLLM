@@ -92,6 +92,7 @@ struct SceneLocalPayloadTextureCandidates {
     std::string specularProxyPath;
     std::string visibleBackgroundProxyPath;
     bool present = false;
+    bool explicitProxyTriplePresent = false;
 };
 
 std::string ToLowerAscii(std::string value) {
@@ -152,6 +153,22 @@ int VisibleBackgroundTexturePriority(const std::filesystem::path& path) {
         return 2;
     }
     return 3;
+}
+
+std::filesystem::path FindSceneLocalProxyTexturePath(const std::string& setId,
+                                                     const char* filename) {
+    const std::vector<std::filesystem::path> candidatePaths = {
+        std::filesystem::path("assets/textures/scene_local_proxy") / setId / filename,
+        std::filesystem::path("../../assets/textures/scene_local_proxy") / setId / filename,
+    };
+    std::error_code ec;
+    for (const auto& candidate : candidatePaths) {
+        ec.clear();
+        if (std::filesystem::exists(candidate, ec) && std::filesystem::is_regular_file(candidate, ec)) {
+            return candidate;
+        }
+    }
+    return {};
 }
 
 SceneLocalPayloadTextureCandidates FindSceneLocalPayloadTextureCandidates(const std::string& family) {
@@ -226,6 +243,26 @@ SceneLocalPayloadTextureCandidates FindSceneLocalPayloadTextureCandidates(const 
     if (!normal.empty()) {
         result.normalPath = normal.front().generic_string();
         result.specularProxyPath = result.normalPath;
+    }
+
+    const std::filesystem::path explicitIrradiance =
+        FindSceneLocalProxyTexturePath(result.textureSetId, "scene_local_irradiance_proxy.dds");
+    const std::filesystem::path explicitSpecular =
+        FindSceneLocalProxyTexturePath(result.textureSetId, "scene_local_specular_proxy.dds");
+    const std::filesystem::path explicitVisible =
+        FindSceneLocalProxyTexturePath(result.textureSetId, "scene_local_visible_background_proxy.dds");
+    result.explicitProxyTriplePresent =
+        !explicitIrradiance.empty() &&
+        !explicitSpecular.empty() &&
+        !explicitVisible.empty();
+    if (!explicitIrradiance.empty()) {
+        result.irradianceProxyPath = explicitIrradiance.generic_string();
+    }
+    if (!explicitSpecular.empty()) {
+        result.specularProxyPath = explicitSpecular.generic_string();
+    }
+    if (!explicitVisible.empty()) {
+        result.visibleBackgroundProxyPath = explicitVisible.generic_string();
     }
     return result;
 }
@@ -590,8 +627,11 @@ Renderer::BuildSceneLocalEnvironmentV3PayloadBindingInfo(bool queueMissingUpload
         info.bindingSource = "null_payload_descriptors";
         info.fallbackReason = "payload_textures_not_resident";
     }
-    if (info.boundProxyResourceCount >= 3u) {
-        info.proxyBindingSource = "cached_scene_local_proxy_triple";
+    if (info.boundProxyResourceCount >= 3u && candidates.explicitProxyTriplePresent) {
+        info.proxyBindingSource = "cached_explicit_scene_local_proxy_triple";
+        info.proxyFallbackReason = "none";
+    } else if (info.boundProxyResourceCount >= 3u) {
+        info.proxyBindingSource = "cached_payload_derived_scene_local_proxy_triple";
         info.proxyFallbackReason = "none";
     } else if (info.boundProxyResourceCount > 0u) {
         info.proxyBindingSource = "partial_cached_scene_local_proxy";

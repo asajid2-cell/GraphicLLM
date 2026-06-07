@@ -337,9 +337,25 @@ SceneLocalEnvironmentV3 proxy-resource binding:
   with `4` payload-ready reports, `4` proxy-resource-bindable reports, and
   profile coverage for `gallery_neutral=1.0`, `enclosed_room=2.0`,
   `stage=3.0`, and `open_exterior=4.0`.
+- Explicit proxy asset generation now exists through
+  `tools\generate_scene_local_environment_proxies.py`. It generates small BC1
+  DDS files under `assets\textures\scene_local_proxy\<set_id>\` for local
+  irradiance, local specular, and visible-background proxy roles.
+- The renderer now prefers those explicit proxy assets and reports
+  `cached_explicit_scene_local_proxy_triple`; payload-derived fallback reports
+  `cached_payload_derived_scene_local_proxy_triple`.
+- The V3 placeholder and environment-payload analyzers now fail payload-ready
+  packets unless the explicit proxy source is used.
+- Fresh evidence
+  `build\captures\v3_scene_local_explicit_proxy_fresh_smoke_20260607` passed
+  with `54/54` explicit proxy bindings.
+- Cross-profile evidence
+  `build\captures\v3_scene_local_explicit_proxy_cross_profile_20260607` passed
+  with `4/4` explicit proxy bindings across gallery, office, concert, and
+  stadium profile modes.
 - This is still not final environment generation. The next environment step is
-  authored or generated irradiance/specular/background proxy resources instead
-  of reusing selected scene-local albedo/normal textures as proxy inputs.
+  to replace solid-color BC1 proxy placeholders with radiance proxies derived
+  from scene materials, room shell, lights, and camera policy.
 
 ## 2026-06-07 Master Refactor Before Goal Feature Completion
 

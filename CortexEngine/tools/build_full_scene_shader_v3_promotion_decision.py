@@ -70,6 +70,14 @@ def count_signal_flag(signal: dict[str, Any], field: str) -> int:
     return count
 
 
+def signal_rows_with_flag(signal: dict[str, Any], field: str) -> list[dict[str, Any]]:
+    return [
+        row
+        for row in signal.get("rows", [])
+        if isinstance(row, dict) and row.get(field) is True
+    ]
+
+
 def make_decision(
     *,
     packet_root: pathlib.Path,
@@ -166,6 +174,12 @@ def make_decision(
     candidate_beauty_ready_count = count_signal_flag(signal, "candidate_beauty_ready")
     if candidate_beauty_ready_count > candidate_beauty_requested_count:
         failures.append("candidate beauty ready count exceeds requested count")
+    for row in signal_rows_with_flag(signal, "candidate_beauty_ready"):
+        report = str(row.get("report", "unknown_report"))
+        if row.get("candidate_beauty_producer") != "CinematicPostV3":
+            failures.append(f"{report} candidate beauty ready without CinematicPostV3 producer")
+        if row.get("candidate_beauty_output") != "candidate_ldr_cinematic_output":
+            failures.append(f"{report} candidate beauty ready without candidate_ldr_cinematic_output")
 
     families = captured_families(manifest)
     missing_families = sorted(set(required_families) - set(families))

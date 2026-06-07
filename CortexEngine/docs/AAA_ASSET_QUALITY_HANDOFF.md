@@ -7151,3 +7151,77 @@ Current limitation:
   texture-backed `SceneLocalEnvironmentV3`.
 - Evidence is gallery static/mouse-jitter only. Cross-family and camera-sweep
   packets are still required before candidate/default promotion.
+
+### Candidate Beauty Strict Gate Scaffold - 2026-06-06
+
+Implemented:
+
+- `candidate_beauty` is now a required V3 contract domain in the plan
+  validator.
+- The machine-readable V3 contract now marks `hdr_color` and
+  `ldr_cinematic_output` as `rejected_ready_inputs` for candidate beauty.
+- Runtime candidate readiness now requires:
+  - `CinematicPostV3` writes `candidate_ldr_cinematic_output`.
+  - `CinematicPostV3` reads `candidate_hdr_scene_color`.
+  - no legacy `hdr_color` bridge participates in the ready path.
+- The candidate-beauty domain reports:
+  - `candidate_reads_candidate_hdr_scene_color`.
+  - `legacy_hdr_bridge_rejected` or `legacy_hdr_bridge_present`.
+  - `default_beauty_unchanged`.
+- The V3 placeholder analyzer and promotion decision builder now fail
+  candidate-ready evidence that is not produced by `CinematicPostV3`.
+
+Why:
+
+- This is the first implementation slice of the AAA candidate renderer plan.
+- It prevents the next goal feature from accidentally calling the old
+  `hdr_color` bridge a real candidate beauty path.
+- It keeps default beauty unchanged while giving later material, lighting,
+  environment, reflection, composite, and post work a stricter admission gate.
+
+Validation:
+
+```powershell
+python -m py_compile tools\analyze_full_scene_shader_v3_placeholders.py tools\validate_full_scene_shader_pipeline_v3_plan.py tools\build_full_scene_shader_v3_promotion_decision.py
+python -m json.tool assets\final_art\full_scene_shader_pipeline_v3_contract.json
+python tools\validate_full_scene_shader_pipeline_v3_plan.py
+cmd.exe /d /c "call ""C:\Program Files\Microsoft Visual Studio\18\Community\Common7\Tools\VsDevCmd.bat"" -arch=x64 -host_arch=x64 >nul && set ""CORTEX_SKIP_ASSET_SYNC=1"" && ""C:\Program Files\Ninja\ninja.exe"" -C build CortexEngine -j 8"
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_full_scene_shader_pipeline_v3_packet.ps1 -NoBuild -SkipSceneAnalyzers -NoStressScene -FamilyFilter gallery -SmokeFrames 12 -CaptureFrame 6 -CaptureSequenceCount 1 -StabilityMotionMode static -OutputRoot build\captures\v3_candidate_beauty_strict_gate_static_gallery_20260606
+```
+
+Evidence:
+
+- packet:
+  `build/captures/v3_candidate_beauty_strict_gate_static_gallery_20260606`.
+- `v3_signal.json`:
+  - failures `0`, warnings `0`, rows `32`.
+  - candidate requested reports `4`.
+  - candidate ready reports `4`.
+  - candidate producers: `CinematicPostV3`, `none`.
+  - candidate outputs: `candidate_ldr_cinematic_output`, `none`.
+- `v3_stability.json`:
+  - report count `32`.
+  - `default_beauty_affects_any=false`.
+  - composite ready reports `32`.
+  - cinematic post ready reports `32`.
+- `promotion_decision.json`:
+  - status `review_packet_passed`.
+  - `default_beauty_promotable=false`.
+  - failures `0`.
+  - warnings `3`, all expected subset warnings: missing non-gallery families,
+    missing mouse-jitter/camera-sweep, and sequence count below promotion
+    evidence.
+- `v3_composite_diagnostics.json`:
+  - failures `0`, warnings `0`.
+  - `mean_legacy_rescue=0.000000`.
+  - `mean_underlit=0.080436`.
+  - `mean_overbright=0.009254`.
+
+Current limitation:
+
+- This is a gate/scaffold slice, not visual-quality promotion.
+- It proves the gallery/static candidate path uses the real
+  `CinematicPostV3(candidate_hdr_scene_color -> candidate_ldr_cinematic_output)`
+  contract.
+- Cross-family and motion rows remain required before candidate/default
+  promotion.

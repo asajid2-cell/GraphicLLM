@@ -2062,29 +2062,28 @@ inline FullSceneShaderPipelineV3FrameContext BuildFullSceneShaderPipelineV3Frame
 
     const bool candidateLdrOutputReady =
         FullSceneShaderHasResource(contract, "candidate_ldr_cinematic_output") &&
-        (FullSceneShaderPassWritesResource(
-             contract,
-             "CinematicPostV3",
-             "candidate_ldr_cinematic_output") ||
-         FullSceneShaderPassWritesResource(
-             contract,
-             "FullSceneCandidateBeautyV3",
-             "candidate_ldr_cinematic_output"));
-    const bool candidateReadsHdr =
-        FullSceneShaderPassReadsResource(contract, "CinematicPostV3", "candidate_hdr_scene_color") ||
-        FullSceneShaderPassReadsResource(contract, "FullSceneCandidateBeautyV3", "hdr_color");
+        FullSceneShaderPassWritesResource(
+            contract,
+            "CinematicPostV3",
+            "candidate_ldr_cinematic_output");
+    const bool candidateReadsCandidateHdr =
+        FullSceneShaderPassReadsResource(contract, "CinematicPostV3", "candidate_hdr_scene_color");
+    const bool legacyCandidateBridgePresent =
+        FullSceneShaderPassWritesResource(
+            contract,
+            "FullSceneCandidateBeautyV3",
+            "candidate_ldr_cinematic_output") ||
+        FullSceneShaderPassReadsResource(contract, "FullSceneCandidateBeautyV3", "hdr_color") ||
+        FullSceneShaderPassReadsResource(contract, "CinematicPostV3", "hdr_color");
     context.candidateBeautyReady =
         context.candidateBeautyRequested &&
         context.compositeV3Ready &&
         context.cinematicPostV3Ready &&
         candidateLdrOutputReady &&
-        candidateReadsHdr;
+        candidateReadsCandidateHdr &&
+        !legacyCandidateBridgePresent;
     context.candidateBeautyProducer =
-        context.candidateBeautyReady
-            ? (cinematicPostV3OutputReady ? "CinematicPostV3" : "FullSceneCandidateBeautyV3")
-            : (context.candidateBeautyRequested
-                   ? (cinematicPostV3OutputReady ? "CinematicPostV3" : "FullSceneCandidateBeautyV3")
-                   : "none");
+        context.candidateBeautyRequested ? "CinematicPostV3" : "none";
     context.candidateBeautyOutput =
         context.candidateBeautyRequested ? "candidate_ldr_cinematic_output" : "none";
 
@@ -2095,11 +2094,11 @@ inline FullSceneShaderPipelineV3FrameContext BuildFullSceneShaderPipelineV3Frame
             context.candidateBeautyOutput,
             "candidate_beauty_v3",
             context.candidateBeautyReady
-                ? (cinematicPostV3OutputReady
-                       ? "CinematicPostV3 is opt-in and writes a real candidate LDR output without affecting default beauty"
-                       : "FullSceneCandidateBeautyV3 is opt-in and writes a real candidate LDR output without affecting default beauty")
+                ? "CinematicPostV3 is opt-in and writes candidate LDR from candidate HDR without affecting default beauty"
                 : context.candidateBeautyRequested
-                ? "Candidate beauty was requested but its output resource, pass, or upstream composite/post evidence is incomplete"
+                ? (legacyCandidateBridgePresent
+                       ? "Candidate beauty was requested but a legacy hdr_color bridge is present; this cannot be marked ready"
+                       : "Candidate beauty was requested but its output resource, pass, or upstream composite/post evidence is incomplete")
                 : "Candidate beauty is opt-in and was not requested this frame");
     candidateBeautyDomain.enabled = context.candidateBeautyRequested;
     candidateBeautyDomain.ready = context.candidateBeautyReady;
@@ -2114,6 +2113,7 @@ inline FullSceneShaderPipelineV3FrameContext BuildFullSceneShaderPipelineV3Frame
         "scene_local_environment",
         "reflection_radiance",
         "lighting_split",
+        "legacy_hdr_color_bridge_rejected",
     };
     candidateBeautyDomain.debugViews = {
         "candidate_beauty_v3",
@@ -2126,9 +2126,8 @@ inline FullSceneShaderPipelineV3FrameContext BuildFullSceneShaderPipelineV3Frame
         context.compositeV3Ready ? "composite_ready" : "composite_missing",
         context.cinematicPostV3Ready ? "cinematic_post_ready" : "cinematic_post_missing",
         candidateLdrOutputReady ? "candidate_ldr_output_owned" : "candidate_ldr_output_missing",
-        candidateReadsHdr
-            ? (cinematicPostV3OutputReady ? "candidate_reads_candidate_hdr_scene_color" : "candidate_reads_hdr_color")
-            : "candidate_hdr_input_missing",
+        candidateReadsCandidateHdr ? "candidate_reads_candidate_hdr_scene_color" : "candidate_hdr_input_missing",
+        legacyCandidateBridgePresent ? "legacy_hdr_bridge_present" : "legacy_hdr_bridge_rejected",
         "default_beauty_unchanged",
     };
     candidateBeautyDomain.backingResourceCount =
@@ -2136,8 +2135,9 @@ inline FullSceneShaderPipelineV3FrameContext BuildFullSceneShaderPipelineV3Frame
             (context.compositeV3Ready ? 1u : 0u) +
             (context.cinematicPostV3Ready ? 1u : 0u) +
             (candidateLdrOutputReady ? 1u : 0u) +
-            (candidateReadsHdr ? 1u : 0u));
-    candidateBeautyDomain.requiredChannelCount = 5u;
+            (candidateReadsCandidateHdr ? 1u : 0u) +
+            (!legacyCandidateBridgePresent ? 1u : 0u));
+    candidateBeautyDomain.requiredChannelCount = 6u;
     candidateBeautyDomain.readyChannelCount =
         context.candidateBeautyReady ? candidateBeautyDomain.requiredChannelCount : 0u;
     candidateBeautyDomain.missingRequiredChannelCount =

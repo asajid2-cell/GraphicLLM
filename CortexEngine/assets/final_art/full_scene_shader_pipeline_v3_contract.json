@@ -261,11 +261,13 @@
       "status": "opt_in_not_default",
       "required_inputs": [
         "candidate_hdr_scene_color",
-        "hdr_scene_color",
-        "ldr_cinematic_output",
         "scene_local_environment",
         "reflection_radiance",
         "lighting_split"
+      ],
+      "rejected_ready_inputs": [
+        "hdr_color",
+        "ldr_cinematic_output"
       ],
       "required_outputs": [
         "candidate_ldr_cinematic_output"
@@ -275,7 +277,7 @@
         "hdr_scene_color",
         "ldr_cinematic_output"
       ],
-      "promotion_rule": "candidate_beauty may be captured and ranked only when default_beauty_affects remains false"
+      "promotion_rule": "candidate_beauty may be captured and ranked only when default_beauty_affects remains false and the ready path is CinematicPostV3(candidate_hdr_scene_color -> candidate_ldr_cinematic_output); legacy hdr_color bridges are diagnostic debt, not ready candidates"
     },
     "validation": {
       "required_artifacts": [

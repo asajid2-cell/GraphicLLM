@@ -1,9 +1,9 @@
 #include "Renderer.h"
 
 #include "Debug/GPUProfiler.h"
+#include "FullSceneShaderV3GraphBuilder.h"
 #include "Passes/BloomGraphPass.h"
 #include "Passes/BloomPass.h"
-#include "Passes/FullSceneShaderV3Passes.h"
 #include "Passes/LocalReflectionRadiancePass.h"
 #include "Passes/PostProcessGraphPass.h"
 #include "Passes/RenderPassScope.h"
@@ -185,6 +185,7 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
     result.attemptedCandidateBeautyDisplay = wantsCandidateBeautyDisplayThisFrame;
     Debug::GPUProfiler::Get().BeginScope(m_commandResources.graphicsList.Get(), "RenderGraphEndFrame", "RenderGraph");
     m_services.renderGraph->BeginFrame();
+    FullSceneShaderV3GraphBuilder fullSceneShaderV3(*m_services.renderGraph);
 
     RGResourceHandle depthHandle{};
     RGResourceHandle hzbHandle{};
@@ -580,7 +581,7 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
             environmentContext.ran = &ranSceneLocalEnvironmentV3;
             environmentContext.failed = &bloomStageFailed;
             environmentContext.stage = &postProcessGraphStageError;
-            if (!AddSceneLocalEnvironmentV3Pass(*m_services.renderGraph, environmentContext)) {
+            if (!fullSceneShaderV3.SubmitSceneLocalEnvironment(environmentContext)) {
                 bloomStageFailed = true;
             }
         }
@@ -674,7 +675,7 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
             reflectionContext.ran = &ranReflectionResolverV3;
             reflectionContext.failed = &bloomStageFailed;
             reflectionContext.stage = &postProcessGraphStageError;
-            if (!AddFullSceneReflectionResolverV3Pass(*m_services.renderGraph, reflectionContext)) {
+            if (!fullSceneShaderV3.SubmitReflectionResolver(reflectionContext)) {
                 bloomStageFailed = true;
             } else {
                 scheduledReflectionResolverV3 = true;
@@ -710,7 +711,7 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
             historyContext.ran = &ranReflectionHistoryV3;
             historyContext.failed = &bloomStageFailed;
             historyContext.stage = &postProcessGraphStageError;
-            if (!AddFullSceneReflectionHistoryV3Pass(*m_services.renderGraph, historyContext)) {
+            if (!fullSceneShaderV3.SubmitReflectionHistory(historyContext)) {
                 bloomStageFailed = true;
             } else {
                 FullSceneReflectionHistoryV3CopyContext historyCopyContext{};
@@ -721,7 +722,7 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
                 historyCopyContext.ran = &ranReflectionHistoryV3Copy;
                 historyCopyContext.failed = &bloomStageFailed;
                 historyCopyContext.stage = &postProcessGraphStageError;
-                if (!AddFullSceneReflectionHistoryV3CopyPass(*m_services.renderGraph, historyCopyContext)) {
+                if (!fullSceneShaderV3.SubmitReflectionHistoryCopy(historyCopyContext)) {
                     bloomStageFailed = true;
                 }
             }
@@ -871,7 +872,7 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
             compositeContext.ran = &result.ranCompositeV3;
             compositeContext.failed = &bloomStageFailed;
             compositeContext.stage = &postProcessGraphStageError;
-            if (!AddFullSceneCompositeV3Pass(*m_services.renderGraph, compositeContext)) {
+            if (!fullSceneShaderV3.SubmitComposite(compositeContext)) {
                 bloomStageFailed = true;
             }
         }
@@ -937,7 +938,7 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
             displayContext.ran = &result.ranCandidateBeautyDisplay;
             displayContext.failed = &bloomStageFailed;
             displayContext.stage = &postProcessGraphStageError;
-            if (!AddCandidateBeautyDisplayPass(*m_services.renderGraph, displayContext)) {
+            if (!fullSceneShaderV3.SubmitDisplay(displayContext)) {
                 bloomStageFailed = true;
             }
         }
@@ -975,7 +976,7 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
             debugContext.ran = &result.ranCompositeV3DebugView;
             debugContext.failed = &bloomStageFailed;
             debugContext.stage = &postProcessGraphStageError;
-            if (!AddCandidateBeautyDisplayPass(*m_services.renderGraph, debugContext)) {
+            if (!fullSceneShaderV3.SubmitDisplay(debugContext)) {
                 bloomStageFailed = true;
             }
         }
@@ -1032,7 +1033,7 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
                 environmentDebugContext.ran = &ranSceneLocalEnvironmentV3DebugView;
                 environmentDebugContext.failed = &bloomStageFailed;
                 environmentDebugContext.stage = &postProcessGraphStageError;
-                if (!AddCandidateBeautyDisplayPass(*m_services.renderGraph, environmentDebugContext)) {
+                if (!fullSceneShaderV3.SubmitDisplay(environmentDebugContext)) {
                     bloomStageFailed = true;
                 }
             }
@@ -1125,7 +1126,7 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
                 reflectionDebugContext.ran = &ranReflectionResolverV3DebugView;
                 reflectionDebugContext.failed = &bloomStageFailed;
                 reflectionDebugContext.stage = &postProcessGraphStageError;
-                if (!AddCandidateBeautyDisplayPass(*m_services.renderGraph, reflectionDebugContext)) {
+                if (!fullSceneShaderV3.SubmitDisplay(reflectionDebugContext)) {
                     bloomStageFailed = true;
                 }
             }

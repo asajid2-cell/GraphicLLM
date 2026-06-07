@@ -128,6 +128,7 @@ set(CORTEX_SOURCES
     src/Graphics/RTScheduler.cpp
     src/Graphics/TemporalRejectionMask.cpp
     src/Graphics/TemporalManager.cpp
+    src/Graphics/FullSceneShaderV3GraphBuilder.cpp
     src/Graphics/RendererGeometryUtils.cpp
     src/Graphics/RendererSceneSnapshot.cpp
     src/Graphics/RendererSceneProfile.cpp
@@ -401,6 +402,7 @@ set(CORTEX_HEADERS
     src/Graphics/RTScheduler.h
     src/Graphics/TemporalRejectionMask.h
     src/Graphics/TemporalManager.h
+    src/Graphics/FullSceneShaderV3GraphBuilder.h
      src/Graphics/TextureAdmission.h
      src/Graphics/TextureSourcePlan.h
      src/Graphics/TextureUploadQueue.h

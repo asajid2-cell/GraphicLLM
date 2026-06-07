@@ -51,7 +51,7 @@ Current refactor queue:
 
 1. Contract reconciliation and promotion gate hardening.
 2. `MaterialPayloadV3` missing-channel ownership. Current aggregate path done.
-3. `SceneProfileV3` policy owner.
+3. `SceneProfileV3` policy owner. Current policy-contract slice done.
 4. `SceneLocalEnvironmentV3` texture/resource ownership.
 5. `LightingShadowV3` high-contrast stress and source split.
 6. `ReflectionV3` provider expansion and resolver hardening.
@@ -112,13 +112,14 @@ Evidence:
 Next concrete implementation slice:
 
 ```text
-SceneProfileV3 policy owner
-  -> declared profile object for scene family, enclosure, environment,
-     lighting, reflection, exposure, material expectations, post, and motion
-  -> frame-report profile evidence
-  -> profile-driven differences for neutral lab, gallery, kitchen, concert,
-     gym, red room, stadium, and exterior water
-  -> focused profile packet evidence
+SceneLocalEnvironmentV3 resource owner
+  -> consume SceneProfileV3 policy_contract fields
+  -> produce local visible background, diffuse irradiance, specular prefilter,
+     atmosphere parameters, and ownership mask
+  -> keep old-office IBL/sharp reflections as stress evidence, not an
+     avoidance target
+  -> prove enclosed families no longer rely on unauthorized visible/reflected
+     external IBL
 ```
 
 Goal status:
@@ -126,6 +127,68 @@ Goal status:
 - Do not mark complete. The plan is now clearer, but the full AAA candidate
   renderer and cross-family promotion proof are not done.
 - Keep default beauty unchanged until the candidate path passes promotion.
+
+## 2026-06-07 SceneProfileV3 Policy Contract Slice
+
+Implemented:
+
+- `SceneProfileV3` is now reported as the V3 scene-profile producer instead
+  of `SceneCinematicProfileV1Adapter`.
+- The old `scene_visual_contract` remains as the backing/adapter input.
+- The V3 frame report now emits:
+  - `scene_profile_policy_contract_ready`
+  - `scene_profile_policy_contract.owner`
+  - `scene_profile_policy_contract.contract_id`
+  - `family`, `enclosure_mode`, `environment_policy`, `lighting_policy`,
+    `reflection_policy`, `exposure_policy`, `material_policy`,
+    `temporal_policy`, `post_policy`, and `motion_stability_policy`
+- The scene-profile domain output is now `scene_profile_policy_contract`.
+- The V3 contract requires the policy-contract fields.
+- `tools\analyze_full_scene_shader_v3_scene_profile.py` now fails if the
+  policy contract is missing, not owned by `SceneProfileV3`, or inconsistent
+  with `scene_visual_contract`.
+
+Validation:
+
+```powershell
+python -m py_compile tools\analyze_full_scene_shader_v3_scene_profile.py tools\validate_full_scene_shader_pipeline_v3_plan.py
+python tools\validate_full_scene_shader_pipeline_v3_plan.py
+cmd.exe /d /c "call ""C:\Program Files\Microsoft Visual Studio\18\Community\Common7\Tools\VsDevCmd.bat"" -arch=x64 -host_arch=x64 >nul && set ""CORTEX_SKIP_ASSET_SYNC=1"" && ""C:\Program Files\Ninja\ninja.exe"" -C build CortexEngine -j 8"
+Copy-Item -LiteralPath assets\final_art\full_scene_shader_pipeline_v3_contract.json -Destination build\bin\assets\final_art\full_scene_shader_pipeline_v3_contract.json -Force
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_scene_profile_v3_focus_packet.ps1 -NoBuild -OutputRoot build\captures\scene_profile_v3_policy_contract_focus_20260607 -FamilyFilter gallery,kitchen,concert -ViewFilter beauty,reflection_owner,surface_policy,material_family,reflection_policy,temporal_policy,post_sensitivity -SmokeFrames 14 -CaptureFrame 7 -CaptureSequenceCount 1 -StabilityMotionMode static -MinFamilyCount 3
+python tools\analyze_full_scene_shader_v3_scene_profile.py --manifest build\captures\scene_profile_v3_policy_contract_focus_20260607\manifest.json --output-json build\captures\scene_profile_v3_policy_contract_focus_20260607\v3_scene_profile_manual.json --output-md build\captures\scene_profile_v3_policy_contract_focus_20260607\v3_scene_profile_manual.md --min-family-count 3
+```
+
+Evidence:
+
+- Plan validator passed.
+- Native target rebuilt successfully; the known trailing `vswhere.exe` warning
+  printed after link.
+- Focus packet output:
+  `build\captures\scene_profile_v3_policy_contract_focus_20260607`.
+- The packet runner returned nonzero because the known model-authored kitchen
+  path hit DX12 `DXGI_ERROR_DEVICE_HUNG` on some views.
+- Shutdown reports were still written and usable.
+- Manual SceneProfileV3 analyzer passed:
+  - reports: `21`
+  - families: `3`
+  - profiles: `3`
+  - policy contracts: `3`
+  - failures: `0`
+  - warnings: `0`
+- Families covered:
+  - `rt_showcase_gallery` -> `gallery_public_cinematic_v1:policy_v3`
+  - `home_kitchen_lantern` -> `kitchen_morning_warm_scene_local_v1:policy_v3`
+  - `neon_streamer_concert` -> `neon_concert_auditorium_scene_local_v1:policy_v3`
+
+Current interpretation:
+
+- SceneProfileV3 now has a real machine-checkable policy contract for
+  downstream domains to consume.
+- This is still evidence/control-plane work. It does not yet make environment,
+  lighting, reflection, composite, or post consume all policy fields.
+- The kitchen device hang remains a renderer stability issue for broad packet
+  runs and should not be confused with SceneProfileV3 policy-contract failure.
 
 ## 2026-06-07 LightingV3 Shadow Motion Focus Harness
 

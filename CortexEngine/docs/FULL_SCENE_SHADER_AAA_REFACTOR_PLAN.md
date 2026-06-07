@@ -154,6 +154,10 @@ Slice B:
   stadium, and exterior water.
 - Packet proof: changing family changes the profile output and downstream
   policies without editing shader code.
+- Current state: the first policy-owner contract slice is implemented.
+  `SceneProfileV3` now emits `scene_profile_policy_contract` in frame reports
+  and the old `scene_visual_contract` is recorded as a backing adapter input.
+  Downstream domains still need to consume the policy fields explicitly.
 
 Slice C:
 
@@ -162,6 +166,7 @@ Slice C:
   specular prefilter, atmosphere parameters, and ownership mask.
 - Packet proof: enclosed scenes do not show or sharply reflect unrelated IBL
   imagery unless explicitly authorized by profile.
+- This is now the next implementation slice.
 
 Slice D:
 
@@ -221,6 +226,41 @@ Do not call the goal feature complete until all are true:
   not an uninspected legacy HDR bridge.
 - Promotion evidence includes frame reports, debug metrics, contact sheets,
   failure reports, matrix decision, and human review.
+
+### 2026-06-07 SceneProfileV3 Policy Contract Checkpoint
+
+Implemented:
+
+- V3 scene-profile domain producer changed from
+  `SceneCinematicProfileV1Adapter` to `SceneProfileV3`.
+- Domain output changed from `scene_visual_contract` to
+  `scene_profile_policy_contract`.
+- `scene_visual_contract` remains the backing contract and adapter input.
+- Frame reports now expose a policy contract with owner, contract id, family,
+  enclosure, environment, lighting, reflection, exposure, material, temporal,
+  post, and motion-stability policies.
+- The scene-profile analyzer and static plan validator now require that
+  policy contract.
+
+Evidence:
+
+- Static plan validation passed.
+- Native build passed.
+- Focus packet root:
+  `build\captures\scene_profile_v3_policy_contract_focus_20260607`.
+- Manual analyzer passed with `21` reports, `3` families, `3` profiles,
+  `3` policy contracts, `0` failures, and `0` warnings.
+- The packet wrapper returned nonzero because the known model-authored kitchen
+  view path hit DX12 `DXGI_ERROR_DEVICE_HUNG` on some views; shutdown reports
+  were still valid and the profile analyzer passed.
+
+Next:
+
+- Make `SceneLocalEnvironmentV3` consume
+  `scene_profile_policy_contract.environment_policy`,
+  `enclosure_mode`, and `reflection_policy` to choose local visible
+  background, diffuse irradiance, specular prefilter, atmosphere, and
+  ownership mask behavior.
 
 ## 2026-06-07 Authoritative Execution Queue
 

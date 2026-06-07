@@ -56,9 +56,11 @@
       ]
     },
     "scene_profile": {
-      "producer": "SceneCinematicProfileV1Adapter",
-      "output_resource": "scene_visual_contract",
-      "output_contract": "frame_contract.scene_visual_contract",
+      "producer": "SceneProfileV3",
+      "adapter_input": "SceneCinematicProfileV1Adapter",
+      "output_resource": "scene_profile_policy_contract",
+      "output_contract": "frame_contract.full_scene_shader_pipeline_v3.scene_profile_policy_contract",
+      "backing_contract": "frame_contract.scene_visual_contract",
       "required_fields": [
         "profile_id",
         "family",
@@ -79,6 +81,20 @@
         "tone_mapper_preset",
         "visible_external_hdri_allowed",
         "invalid_external_hdri"
+      ],
+      "required_policy_contract_fields": [
+        "owner",
+        "contract_id",
+        "family",
+        "enclosure_mode",
+        "environment_policy",
+        "lighting_policy",
+        "reflection_policy",
+        "exposure_policy",
+        "material_policy",
+        "temporal_policy",
+        "post_policy",
+        "motion_stability_policy"
       ],
       "required_policy_channels": [
         "enclosure_mode",
@@ -108,7 +124,7 @@
         "temporal_policy",
         "post_sensitivity"
       ],
-      "promotion_rule": "SceneProfileV3 is ready only when scene_visual_contract owns the policy fields that drive environment, lighting, reflection, exposure, material, temporal, and post behavior; no parallel profile stack may be introduced."
+      "promotion_rule": "SceneProfileV3 is ready only when it emits a scene_profile_policy_contract owning the policy fields that drive environment, lighting, reflection, exposure, material, temporal, post, and motion stability behavior; scene_visual_contract is an adapter input, not the final V3 producer."
     },
     "material": {
       "producer": "FullSceneMaterialResolveV3",

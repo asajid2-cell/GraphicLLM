@@ -207,14 +207,24 @@ def main() -> int:
 
     scene_profile_contract = domains.get("scene_profile", {})
     require(
-        scene_profile_contract.get("producer") == "SceneCinematicProfileV1Adapter",
+        scene_profile_contract.get("producer") == "SceneProfileV3",
         errors,
-        "V3 scene_profile domain must adapt the existing SceneCinematicProfile contract",
+        "V3 scene_profile domain must be produced by SceneProfileV3",
     )
     require(
-        scene_profile_contract.get("output_resource") == "scene_visual_contract",
+        scene_profile_contract.get("adapter_input") == "SceneCinematicProfileV1Adapter",
         errors,
-        "V3 scene_profile contract must output scene_visual_contract",
+        "V3 scene_profile contract must preserve SceneCinematicProfileV1Adapter as adapter input",
+    )
+    require(
+        scene_profile_contract.get("output_resource") == "scene_profile_policy_contract",
+        errors,
+        "V3 scene_profile contract must output scene_profile_policy_contract",
+    )
+    require(
+        scene_profile_contract.get("backing_contract") == "frame_contract.scene_visual_contract",
+        errors,
+        "V3 scene_profile contract must keep scene_visual_contract as backing_contract",
     )
     for field in [
         "profile_id",
@@ -238,13 +248,38 @@ def main() -> int:
             errors,
             f"V3 scene_profile contract missing required field: {field}",
         )
+    for field in [
+        "owner",
+        "contract_id",
+        "family",
+        "enclosure_mode",
+        "environment_policy",
+        "lighting_policy",
+        "reflection_policy",
+        "exposure_policy",
+        "material_policy",
+        "temporal_policy",
+        "post_policy",
+        "motion_stability_policy",
+    ]:
+        require(
+            field in scene_profile_contract.get("required_policy_contract_fields", []),
+            errors,
+            f"V3 scene_profile contract missing required policy contract field: {field}",
+        )
     for token in [
         "sceneProfileReady",
         '"scene_profile_ready"',
         "sceneProfilePolicyCount",
         '"scene_profile_policy_count"',
+        "sceneProfilePolicyContractReady",
+        '"scene_profile_policy_contract_ready"',
+        "sceneProfilePolicyOwner",
+        '"scene_profile_policy_contract"',
+        "SceneProfileV3",
         "SceneCinematicProfileV1Adapter",
         "scene_visual_contract",
+        "scene_profile_policy_contract",
         "scene_profile",
     ]:
         require(token in runtime_surface, errors, f"V3 scene_profile runtime missing token: {token}")

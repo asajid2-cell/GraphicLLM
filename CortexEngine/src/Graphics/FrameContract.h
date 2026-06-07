@@ -233,6 +233,10 @@ struct FrameContract {
         uint32_t presetDefaultRoughness = 0;
         uint32_t presetDefaultTransmission = 0;
         uint32_t presetDefaultEmission = 0;
+        uint32_t presetClassAuthoredDefaultRoughness = 0;
+        uint32_t presetClassAuthoredDefaultTransmission = 0;
+        uint32_t unresolvedDefaultRoughnessFallback = 0;
+        uint32_t unresolvedDefaultTransmissionFallback = 0;
         uint32_t resolvedMetallic = 0;
         uint32_t resolvedConductor = 0;
         uint32_t resolvedTransmissive = 0;

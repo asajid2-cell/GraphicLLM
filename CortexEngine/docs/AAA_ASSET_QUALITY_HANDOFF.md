@@ -16,6 +16,8 @@ Plan location:
 
 - `docs/FULL_SCENE_SHADER_AAA_REFACTOR_PLAN.md`
 - New section:
+  `2026-06-07 Full Scene Shader Refactor Execution Blueprint`
+- New section:
   `2026-06-07 Full Scene Shader Master Refactor Plan`
 
 Current architectural decision:
@@ -65,6 +67,35 @@ Near-term work order:
    reflection, environment, transparency, emissive, and rescue terms.
 6. Start stronger cinematic post only after the resource spine and stability
    gates are in place.
+
+Execution blueprint added:
+
+- Treat `FullSceneCandidateBeautyV3` as a separate candidate renderer product
+  line, not a prettier default-path patch.
+- Target graph:
+  `SceneProfileV3 -> VisibilityV3 -> MaterialPayloadV3 ->
+  SceneLocalEnvironmentV3 -> LightingShadowV3 -> ReflectionV3 ->
+  TransparencyMediaV3 -> CompositeV3 -> CinematicPostV3`.
+- Every stage must have named resources, render-graph edges, frame-report
+  ownership, debug views, packet aliases, and analyzer gates before it can
+  influence candidate beauty.
+- Legacy `hdr_color`, old IBL paths, and fallback material defaults are allowed
+  only as named reference/rescue lanes, and their usage counts as promotion
+  debt.
+- Cross-family promotion requires focused subsystem packets first, then gallery,
+  kitchen, office, gym, classroom, concert, red room, stadium, bathroom,
+  bedroom, workshop, store, street, and exterior water/vegetation with static,
+  mouse-jitter, camera-sweep, close-surface orbit, reflective-object orbit, and
+  high-contrast light-sweep rows.
+
+Next concrete feature boundary:
+
+- `FullSceneCandidateBeautyV3` scaffolding and diagnostics.
+- Include contract freeze, `CompositeV3` contribution outputs, legacy rescue
+  usage output, debug views, packet/analyzer gates, and candidate-only review
+  capture.
+- Exclude default-beauty promotion, heavy cinematic post, and broad visual
+  tuning.
 
 Do not mark the goal complete from this plan. The next concrete checkpoint is
 a pushed `SceneLocalEnvironmentV3` infrastructure commit plus packet evidence.

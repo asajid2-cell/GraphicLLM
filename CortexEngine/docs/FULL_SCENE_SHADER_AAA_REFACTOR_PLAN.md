@@ -4,6 +4,224 @@ Status: planning ledger.
 
 Default beauty stays unchanged until a separate promotion gate passes.
 
+## 2026-06-07 Master Refactor Before Goal Feature Completion
+
+This is the current authoritative plan for moving CortexEngine from
+"debuggable renderer with some cinematic pieces" to a full-scene shader stack
+capable of AAA-style output. The goal feature is not one shader, one nicer IBL,
+or one polished screenshot. The goal feature is an opt-in candidate renderer
+where every visible contribution has a named producer, typed resource,
+debug view, frame-report field, analyzer, and promotion packet.
+
+### Product Shape
+
+Keep two render lines until promotion:
+
+```text
+stable public beauty
+  current default path, used as the fallback and regression baseline
+
+candidate beauty V3
+  opt-in full-scene shader path
+  consumes only V3-owned resources unless an emergency legacy rescue lane is
+  explicitly measured
+```
+
+Default beauty must not be changed while the refactor is incomplete. Candidate
+beauty can be aggressive, cinematic, and experimental because it is isolated
+behind packets, debug views, and promotion gates.
+
+### Final Render Architecture
+
+The target frame graph is:
+
+```text
+SceneProfileV3
+  -> family/enclosure/environment/lighting/reflection/material/post policies
+
+VisibilityV3
+  -> depth, velocity, object_id, material_id, surface_id,
+     stable normal, disocclusion, motion confidence
+
+MaterialPayloadV3
+  -> base_color, normal, roughness, metallic, specular, ao, emissive,
+     opacity, transmission, clearcoat, sheen, anisotropy, ior, thickness,
+     material_class, missing_channel_mask, invalid_range_mask
+
+SceneLocalEnvironmentV3
+  -> visible_background, diffuse_irradiance, specular_prefilter,
+     reflection_background, atmosphere, ownership_mask
+
+LightingShadowV3
+  -> direct_lighting, unshadowed_direct, indirect_lighting,
+     shadow_visibility, shadow_loss, shadow_source_attribution,
+     lighting_energy_budget
+
+ReflectionV3
+  -> local_probe_signal, planar_probe_signal, ssr_signal, rt_signal,
+     environment_signal, source_id, source_confidence, rejected_source_mask,
+     temporal_delta, history_validity, history_rejection
+
+TransparencyMediaV3
+  -> glass, water, transmission, decals, particles, volumetric_inscatter,
+     volumetric_transmittance, ordering_diagnostics
+
+CompositeV3
+  -> candidate_hdr_scene_color, contribution_map, energy_clamp_policy,
+     overbright_diagnostics, underlit_diagnostics, legacy_rescue_usage
+
+CinematicPostV3
+  -> exposure_meter, exposure_state, bloom_extract, bloom_resolve,
+     glare, tone_map, color_grade_delta, sharpen, vignette,
+     candidate_ldr_cinematic_output
+```
+
+Each arrow is a contract. If a pass consumes a legacy resource, a default
+texture, or a fallback value, the frame report must say so and the promotion
+packet must count it.
+
+### Dependency Order
+
+1. **Contract unification.**
+   Make the JSON contract, render graph, C++ frame context, HLSL resource
+   bindings, debug-view registry, packet aliases, analyzers, and promotion
+   decision use the same V3 names. Add negative tests where deleting one
+   required resource fails by name.
+
+2. **SceneProfileV3 as the policy brain.**
+   One declared profile must own scene family, enclosure, environment mode,
+   light rig, shadow policy, reflection priority, material expectations,
+   exposure policy, post look, and motion tolerance. Scattered scene-family
+   conditionals are allowed only as adapters while being retired.
+
+3. **MaterialPayloadV3 as a typed surface contract.**
+   Material quality cannot depend on anonymous defaults. Every channel must be
+   owned, synthesized with a visible reason, or marked missing. Downstream
+   lighting, reflections, transparency, composite, and post must report whether
+   they consumed missing-channel debt.
+
+4. **SceneLocalEnvironmentV3 as the room/stage/exterior owner.**
+   Enclosed scenes need local backgrounds and local radiance, not visible or
+   sharply reflected unrelated IBLs. The old-office IBL remains a stress case
+   with IBL on and enough sharpness to expose wrong reflection behavior.
+
+5. **LightingShadowV3 as a source-attributed lighting model.**
+   Directional, local, rect, emissive, ambient, screen-space, RT/contact, and
+   filter-radius terms must be separable. Floor/wall darkening under motion
+   must map to a named term or be proven absent under locked exposure.
+
+6. **ReflectionV3 as a source resolver, not one reflection texture.**
+   SSR, RT/ray query, planar/hero probes, local probes, and environment fallback
+   must produce separate signals. The resolver chooses using confidence,
+   material policy, disocclusion, history validity, and hysteresis.
+
+7. **TransparencyMediaV3.**
+   Water, glass, particles, decals, fog, and volumetric terms need a real
+   ordering model and diagnostics before post effects are tuned.
+
+8. **CompositeV3 as V3-only HDR assembly.**
+   Candidate HDR must be assembled from V3 material, lighting, environment,
+   reflection, transparency, emissive, atmosphere, and decal terms. Legacy HDR
+   rescue should trend toward zero and remain visible in every packet.
+
+9. **CinematicPostV3.**
+   Only after upstream ownership is real should we tune exposure, bloom, glare,
+   tone mapping, color grade, sharpening, vignette, and optional DOF. Post must
+   expose bypass views so it cannot hide upstream renderer defects.
+
+10. **Promotion matrix and human review.**
+    Required families: gallery, kitchen, office, gym, classroom, concert,
+    red room, stadium, bathroom, bedroom, workshop, store, street, exterior
+    water/vegetation. Required motion: static, mouse jitter, camera sweep,
+    close-surface orbit, reflective-object orbit, high-contrast light sweep.
+    Default beauty can be considered only after packet gates and user review
+    accept the candidate visuals across the matrix.
+
+### Implementation Slices
+
+Slice A, current checkpoint:
+
+- Keep the existing reflection-history stability work.
+- Keep material debug-view coverage and missing-channel-mask evidence.
+- Keep scene-local environment provenance and texture-payload reporting.
+- Commit this checkpoint before deeper shader surgery.
+
+Slice B:
+
+- Upgrade `SceneProfileV3` from adapted frame evidence to a renderer policy
+  object consumed by environment, lighting, reflection, material, and post.
+- Add profiles for neutral lab, gallery, kitchen, gym, concert, red room,
+  stadium, and exterior water.
+- Packet proof: changing family changes the profile output and downstream
+  policies without editing shader code.
+
+Slice C:
+
+- Expand `SceneLocalEnvironmentV3` from payload reporting to actual resource
+  production: local visible background, local diffuse irradiance, local
+  specular prefilter, atmosphere parameters, and ownership mask.
+- Packet proof: enclosed scenes do not show or sharply reflect unrelated IBL
+  imagery unless explicitly authorized by profile.
+
+Slice D:
+
+- Split high-contrast shadow/lighting sources and add the focused light-sweep
+  packet.
+- Packet proof: remaining shadow flicker or wall/floor pulsing is attributed
+  to a named source or rejected by a locked-exposure control.
+
+Slice E:
+
+- Finish ReflectionV3 provider fusion and history: local probe, planar/hero,
+  SSR, RT/ray query, environment fallback, source confidence, source ID,
+  rejection mask, hysteresis, and debug history.
+- Packet proof: smooth and metallic objects remain stable under mouse jitter,
+  camera orbit, and reflective-object orbit.
+
+Slice F:
+
+- Add TransparencyMediaV3 for water, glass, decals, particles, and volumetrics.
+- Packet proof: transparency artifacts are separable from opaque reflection,
+  environment, and composite artifacts.
+
+Slice G:
+
+- Make CompositeV3 the real candidate HDR owner and drive legacy rescue toward
+  zero.
+- Packet proof: contribution maps show where beauty comes from, and no single
+  fallback dominates the image.
+
+Slice H:
+
+- Build CinematicPostV3 on candidate HDR with bypass/debug views.
+- Packet proof: final LDR quality improves while raw HDR, bloom-off,
+  grade-off, and exposure-locked views remain stable.
+
+Slice I:
+
+- Run the promotion matrix, summarize failures, fix root domains, and repeat.
+- Default promotion remains blocked until matrix evidence and user review pass.
+
+### Acceptance Standard
+
+Do not call the goal feature complete until all are true:
+
+- Candidate beauty produces materially richer, more stable, more cinematic
+  images than current beauty in at least the required indoor, stage, stadium,
+  and exterior families.
+- Old-office IBL stress with IBL enabled no longer produces hidden reflection
+  instability.
+- Smooth/metallic closeups pass focused reflection-motion packets.
+- High-contrast floor/wall motion passes focused lighting-shadow packets.
+- Enclosed scenes have local environment ownership and no unauthorized visible
+  or reflected background leakage.
+- Material packets show owned/synthesized/missing channels and downstream debt
+  consumption.
+- Composite and post packets prove final beauty is coming from V3 resources,
+  not an uninspected legacy HDR bridge.
+- Promotion evidence includes frame reports, debug metrics, contact sheets,
+  failure reports, matrix decision, and human review.
+
 ## 2026-06-07 Authoritative Execution Queue
 
 This section supersedes older "next work" notes below when they conflict. The
@@ -3238,3 +3456,43 @@ Smoke proof:
   one passed packet, observed motion `static`, observed family
   `stress_rt_showcase_reflection_closeup`, missing required families
   `gallery,kitchen`, and missing required motion `mouse_jitter`.
+
+### SceneLocalEnvironmentV3 Texture Payload Contract - 2026-06-07
+
+Implemented:
+
+- The frame contract now reports scene-local texture payload state:
+  texture set id/path/presence, total texture count, albedo/normal counts,
+  payload readiness, and irradiance/specular/visible-background proxy
+  readiness.
+- Runtime derives the texture set id from the active scene family and scans
+  `assets/textures/scene_local/<family>`, including the repo-relative path
+  when launched from `build/bin`.
+- V3 frame reports now expose `scene_local_texture_payload_ready`,
+  `scene_local_texture_payload_count`, and `scene_local_texture_set_id`.
+- New analyzer:
+  `tools/analyze_full_scene_shader_v3_environment_payload.py`.
+- Standard V3 packets now emit `v3_environment_payload.json/md`, and promotion
+  review requires that artifact.
+
+Validated evidence:
+
+- Gym focus:
+  `build/captures/v3_environment_payload_gym_focus_20260607`.
+  The renderer device-hung before successful captures, but shutdown reports
+  were written and the environment-payload analyzer passed with:
+  `6/6` payload-ready reports, texture set `basketball_gym_day`, `10` DDS
+  textures, `5` albedo, `5` normal, and all three proxies ready.
+- Full stress:
+  `build/captures/v3_environment_payload_full_stress_20260607`.
+  Standard V3 packet passed end to end and emitted the required
+  environment-payload artifact. `rt_showcase_gallery` currently has no
+  texture set, so payload-ready count is `0` with no failures.
+
+Next refactor direction:
+
+- Add/import texture sets for the promotion families and then make
+  `SceneLocalEnvironmentV3.hlsl` consume payload readiness for richer local
+  irradiance/specular/background color selection.
+- Treat repeated model-authored scene `DXGI_ERROR_DEVICE_HUNG` failures as a
+  separate renderer stability blocker for broad cross-family capture packets.

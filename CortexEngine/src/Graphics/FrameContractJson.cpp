@@ -390,6 +390,9 @@ json FullSceneShaderPipelineV3ToJson(const FrameContract& contract) {
         {"scene_local_ambient_source", context.sceneLocalAmbientSource},
         {"scene_local_atmosphere_source", context.sceneLocalAtmosphereSource},
         {"scene_local_environment_source_count", context.sceneLocalEnvironmentSourceCount},
+        {"scene_local_texture_payload_ready", context.sceneLocalTexturePayloadReady},
+        {"scene_local_texture_payload_count", context.sceneLocalTexturePayloadCount},
+        {"scene_local_texture_set_id", context.sceneLocalTextureSetId},
         {"reflection_v3_ready", context.reflectionV3Ready},
         {"reflection_radiance_ready", context.reflectionRadianceReady},
         {"reflection_confidence_ready", context.reflectionConfidenceReady},
@@ -516,7 +519,17 @@ json FrameContractToJson(const FrameContract& contract) {
             {"local_reflection_probe_table_valid", contract.environment.localReflectionProbeTableValid},
             {"local_reflection_probe_radiance_enabled", contract.environment.localReflectionProbeRadianceEnabled},
             {"local_reflection_probe_diffuse_intensity", contract.environment.localReflectionProbeDiffuseIntensity},
-            {"local_reflection_probe_specular_intensity", contract.environment.localReflectionProbeSpecularIntensity}
+            {"local_reflection_probe_specular_intensity", contract.environment.localReflectionProbeSpecularIntensity},
+            {"scene_local_texture_set_id", contract.environment.sceneLocalTextureSetId},
+            {"scene_local_texture_set_path", contract.environment.sceneLocalTextureSetPath},
+            {"scene_local_texture_set_present", contract.environment.sceneLocalTextureSetPresent},
+            {"scene_local_texture_count", contract.environment.sceneLocalTextureCount},
+            {"scene_local_albedo_texture_count", contract.environment.sceneLocalAlbedoTextureCount},
+            {"scene_local_normal_texture_count", contract.environment.sceneLocalNormalTextureCount},
+            {"scene_local_payload_ready", contract.environment.sceneLocalPayloadReady},
+            {"scene_local_irradiance_proxy_ready", contract.environment.sceneLocalIrradianceProxyReady},
+            {"scene_local_specular_proxy_ready", contract.environment.sceneLocalSpecularProxyReady},
+            {"scene_local_visible_background_proxy_ready", contract.environment.sceneLocalVisibleBackgroundProxyReady}
         }},
         {"graphics_preset", {
             {"id", contract.graphicsPreset.id},

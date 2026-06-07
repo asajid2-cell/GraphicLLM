@@ -16,6 +16,7 @@ V3_PACKET_RUNNER_PATH = ROOT / "tools" / "run_full_scene_shader_pipeline_v3_pack
 V3_PROMOTION_DECISION_PATH = ROOT / "tools" / "build_full_scene_shader_v3_promotion_decision.py"
 V3_MATERIAL_PAYLOAD_ANALYZER_PATH = ROOT / "tools" / "analyze_full_scene_shader_v3_material_payload.py"
 V3_SCENE_PROFILE_ANALYZER_PATH = ROOT / "tools" / "analyze_full_scene_shader_v3_scene_profile.py"
+V3_ENVIRONMENT_PAYLOAD_ANALYZER_PATH = ROOT / "tools" / "analyze_full_scene_shader_v3_environment_payload.py"
 
 
 REQUIRED_PLAN_TOKENS = [
@@ -144,6 +145,11 @@ def main() -> int:
         errors,
         f"Missing V3 scene profile analyzer: {V3_SCENE_PROFILE_ANALYZER_PATH}",
     )
+    require(
+        V3_ENVIRONMENT_PAYLOAD_ANALYZER_PATH.exists(),
+        errors,
+        f"Missing V3 environment payload analyzer: {V3_ENVIRONMENT_PAYLOAD_ANALYZER_PATH}",
+    )
     if errors:
         for error in errors:
             print(f"ERROR: {error}")
@@ -158,6 +164,7 @@ def main() -> int:
     promotion_source = V3_PROMOTION_DECISION_PATH.read_text(encoding="utf-8")
     material_payload_source = V3_MATERIAL_PAYLOAD_ANALYZER_PATH.read_text(encoding="utf-8")
     scene_profile_source = V3_SCENE_PROFILE_ANALYZER_PATH.read_text(encoding="utf-8")
+    environment_payload_source = V3_ENVIRONMENT_PAYLOAD_ANALYZER_PATH.read_text(encoding="utf-8")
     runtime_surface = "\n".join(
         [
             frame_contract_source,
@@ -167,6 +174,7 @@ def main() -> int:
             promotion_source,
             material_payload_source,
             scene_profile_source,
+            environment_payload_source,
         ]
     )
 
@@ -292,6 +300,11 @@ def main() -> int:
 
     required_artifacts = set(domains.get("validation", {}).get("required_artifacts", []))
     require("v3_scene_profile.json" in required_artifacts, errors, "V3 validation missing v3_scene_profile.json artifact")
+    require(
+        "v3_environment_payload.json" in required_artifacts,
+        errors,
+        "V3 validation missing v3_environment_payload.json artifact",
+    )
 
     for domain_id in ["composite", "cinematic_post"]:
         require(
@@ -339,6 +352,20 @@ def main() -> int:
             channel in environment_policy_channels,
             errors,
             f"V3 environment contract missing policy channel: {channel}",
+        )
+    environment_payload_channels = set(environment_contract.get("payload_channels", []))
+    for channel in [
+        "scene_local_texture_set_id",
+        "scene_local_texture_count",
+        "scene_local_payload_ready",
+        "scene_local_irradiance_proxy_ready",
+        "scene_local_specular_proxy_ready",
+        "scene_local_visible_background_proxy_ready",
+    ]:
+        require(
+            channel in environment_payload_channels,
+            errors,
+            f"V3 environment contract missing payload channel: {channel}",
         )
 
     reflection_contract = domains.get("reflection", {})
@@ -418,6 +445,13 @@ def main() -> int:
         '"scene_local_atmosphere_source"',
         "sceneLocalEnvironmentSourceCount",
         '"scene_local_environment_source_count"',
+        "sceneLocalTexturePayloadReady",
+        '"scene_local_texture_payload_ready"',
+        "sceneLocalTexturePayloadCount",
+        '"scene_local_texture_payload_count"',
+        "sceneLocalTextureSetId",
+        '"scene_local_texture_set_id"',
+        '"v3_environment_payload.json"',
         "reflectionV3Ready",
         '"reflection_v3_ready"',
         "reflectionRadianceReady",

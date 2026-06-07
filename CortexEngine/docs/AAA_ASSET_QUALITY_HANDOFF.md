@@ -16,8 +16,20 @@ User direction:
 Authoritative plan:
 
 - `docs\FULL_SCENE_SHADER_AAA_REFACTOR_PLAN.md`
+- Use its `2026-06-07 Master Refactor Before Goal Feature Completion` section
+  as the current architecture and acceptance standard.
 - Use its `2026-06-07 Authoritative Execution Queue` section as the current
-  ordering when older "next work" notes conflict.
+  near-term ordering when older "next work" notes conflict.
+
+Current product boundary:
+
+- Stable public beauty remains the fallback/regression baseline.
+- Candidate beauty V3 is the opt-in Unreal-style/full-scene shader line.
+- Candidate beauty may use aggressive shader work, but every visible term must
+  have a named producer, typed resource, debug view, frame-report field,
+  analyzer, and packet before promotion.
+- Default beauty must not change until cross-family packet evidence and user
+  review accept the candidate path.
 
 Current candidate-only state:
 
@@ -8932,3 +8944,88 @@ Current next work:
 2. Continue texture-backed `SceneLocalEnvironmentV3` payload work.
 3. Keep default beauty unpromoted until matrix coverage is complete and visual
    review accepts the generated scene quality.
+
+### SceneLocalEnvironmentV3 Texture Payload Contract - 2026-06-07
+
+Implemented:
+
+- `FrameContract::EnvironmentInfo` now exposes scene-local texture payload
+  state:
+  - `scene_local_texture_set_id`
+  - `scene_local_texture_set_path`
+  - `scene_local_texture_set_present`
+  - `scene_local_texture_count`
+  - `scene_local_albedo_texture_count`
+  - `scene_local_normal_texture_count`
+  - `scene_local_payload_ready`
+  - `scene_local_irradiance_proxy_ready`
+  - `scene_local_specular_proxy_ready`
+  - `scene_local_visible_background_proxy_ready`
+- `Renderer_FrameContractSnapshot.cpp` derives the texture set id from the
+  active scene family and scans `assets/textures/scene_local/<family>`.
+  Runtime launched from `build/bin` also checks the repo-relative
+  `../../assets/textures/scene_local/<family>` path.
+- `FullSceneShaderPipelineV3FrameContext` now serializes:
+  - `scene_local_texture_payload_ready`
+  - `scene_local_texture_payload_count`
+  - `scene_local_texture_set_id`
+- Added `tools/analyze_full_scene_shader_v3_environment_payload.py`.
+  It gates texture-set counts, albedo/normal presence, proxy readiness, and
+  V3/environment contract consistency.
+- Standard V3 packets now emit `v3_environment_payload.json/md`.
+- `build_full_scene_shader_v3_promotion_decision.py` now requires the
+  environment-payload artifact and includes its failures in promotion review.
+- The V3 contract and plan validator now require the environment-payload
+  artifact and payload-channel declarations.
+
+Validation:
+
+```powershell
+python -m py_compile tools\analyze_full_scene_shader_v3_environment_payload.py tools\analyze_full_scene_shader_v3_placeholders.py tools\build_full_scene_shader_v3_promotion_decision.py tools\validate_full_scene_shader_pipeline_v3_plan.py tools\build_full_scene_shader_v3_matrix_decision.py
+$files=@('tools\run_full_scene_shader_pipeline_v3_packet.ps1','tools\run_full_scene_shader_pipeline_v3_matrix.ps1'); foreach($file in $files){$tokens=$null;$errors=$null;[System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path $file),[ref]$tokens,[ref]$errors)|Out-Null; if($errors.Count -gt 0){Write-Host $file; $errors|Format-List; exit 1}}
+python tools\validate_full_scene_shader_pipeline_v3_plan.py
+git -c submodule.recurse=false diff --check -- src\Graphics\FrameContract.h src\Graphics\Renderer_FrameContractSnapshot.cpp src\Graphics\FrameContractJson.cpp src\Graphics\FullSceneShaderFrameContext.h assets\final_art\full_scene_shader_pipeline_v3_contract.json tools\analyze_full_scene_shader_v3_environment_payload.py tools\analyze_full_scene_shader_v3_placeholders.py tools\build_full_scene_shader_v3_promotion_decision.py tools\run_full_scene_shader_pipeline_v3_packet.ps1 tools\validate_full_scene_shader_pipeline_v3_plan.py
+cmd.exe /d /c "call ""C:\Program Files\Microsoft Visual Studio\18\Community\Common7\Tools\VsDevCmd.bat"" -arch=x64 -host_arch=x64 >nul && set ""CORTEX_SKIP_ASSET_SYNC=1"" && ""C:\Program Files\Ninja\ninja.exe"" -C build CortexEngine -j 8"
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_scene_local_cinematic_renderer_v1_packets.ps1 -NoBuild -OutputRoot build\captures\v3_environment_payload_gym_focus_20260607 -FamilyFilter gym -ViewFilter beauty,scene_local_environment,ambient_lighting,visible_background,reflection_background,atmosphere -SmokeFrames 8 -CaptureFrame 4 -CaptureSequenceCount 1 -SkipOwnerAnalysis -SkipMaterialAnalysis -SkipStabilityAnalysis -SkipVisualQualityAnalysis
+python tools\analyze_full_scene_shader_v3_environment_payload.py --manifest build\captures\v3_environment_payload_gym_focus_20260607\manifest.json --output-json build\captures\v3_environment_payload_gym_focus_20260607\v3_environment_payload_manual.json --output-md build\captures\v3_environment_payload_gym_focus_20260607\v3_environment_payload_manual.md --min-payload-ready 1
+$env:CORTEX_V3_REFLECTION_SOURCE_OVERRIDE='ssr'
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_full_scene_shader_pipeline_v3_packet.ps1 -NoBuild -SkipSceneAnalyzers -StressSceneOnly -StressSceneFilter rt_showcase:reflection_closeup -SmokeFrames 16 -CaptureFrame 8 -CaptureSequenceCount 1 -StabilityMotionMode static -OutputRoot build\captures\v3_environment_payload_full_stress_20260607
+Remove-Item Env:\CORTEX_V3_REFLECTION_SOURCE_OVERRIDE -ErrorAction SilentlyContinue
+```
+
+Evidence:
+
+- Native target rebuilt successfully; the known trailing `vswhere.exe` warning
+  printed after success.
+- Gym focused packet:
+  `build\captures\v3_environment_payload_gym_focus_20260607`.
+  - The renderer returned `exit_code=1` for all six views due to DX12
+    `device_removed` / `DXGI_ERROR_DEVICE_HUNG` at frame 0 after HZB setup.
+  - Shutdown frame reports were still written.
+  - Manual environment-payload analysis passed with `0` failures:
+    `report_count=6`, `texture_set_present_report_count=6`,
+    `payload_ready_report_count=6`.
+  - Detected family `basketball_gym_day`, texture set `basketball_gym_day`,
+    `10` DDS textures, `5` albedo, `5` normal, and
+    irradiance/specular/visible proxies ready.
+- Full V3 stress packet:
+  `build\captures\v3_environment_payload_full_stress_20260607`.
+  - scene-local packet run passed.
+  - V2 evidence passed.
+  - V3 placeholder packet passed with `54` reports.
+  - scene profile, environment payload, material payload, CompositeV3
+    diagnostics, and promotion decision passed.
+  - environment payload result for `rt_showcase_gallery`:
+    `texture_set_present_report_count=0`, `payload_ready_report_count=0`,
+    `0` failures. This is expected because no `rt_showcase_gallery` texture
+    set exists yet.
+
+Current next work:
+
+1. Add/import scene-local texture sets for more scene families, starting with
+   `rt_showcase_gallery` or the model-authored families used by the promotion
+   matrix.
+2. Investigate the repeatable model-authored scene DX12 device hang; gym and
+   kitchen both write useful reports but fail capture runs.
+3. Feed payload readiness into actual `SceneLocalEnvironmentV3.hlsl`
+   color/radiance selection once enough families have texture payloads.

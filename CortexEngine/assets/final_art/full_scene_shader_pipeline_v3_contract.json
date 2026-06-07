@@ -287,6 +287,14 @@
         "ambient_source",
         "atmosphere_source"
       ],
+      "payload_channels": [
+        "scene_local_texture_set_id",
+        "scene_local_texture_count",
+        "scene_local_payload_ready",
+        "scene_local_irradiance_proxy_ready",
+        "scene_local_specular_proxy_ready",
+        "scene_local_visible_background_proxy_ready"
+      ],
       "required_debug_views": [
         "environment_mode",
         "ambient_lighting",
@@ -384,6 +392,7 @@
         "frame_report_shutdown.json",
         "debug_view_metrics.json",
         "v3_scene_profile.json",
+        "v3_environment_payload.json",
         "v3_material_payload.json",
         "v3_signal.json",
         "v3_stability.json",

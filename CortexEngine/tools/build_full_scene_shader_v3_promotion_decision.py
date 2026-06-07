@@ -95,6 +95,7 @@ def make_decision(
     stability_path = packet_root / "v3_stability.json"
     lighting_motion_path = packet_root / "v3_lighting_motion.json"
     scene_profile_path = packet_root / "v3_scene_profile.json"
+    environment_payload_path = packet_root / "v3_environment_payload.json"
     material_payload_path = packet_root / "v3_material_payload.json"
 
     failures: list[str] = []
@@ -105,6 +106,7 @@ def make_decision(
         "stability": str(stability_path),
         "lighting_motion": str(lighting_motion_path) if lighting_motion_path.exists() else None,
         "scene_profile": str(scene_profile_path) if scene_profile_path.exists() else None,
+        "environment_payload": str(environment_payload_path) if environment_payload_path.exists() else None,
         "material_payload": str(material_payload_path) if material_payload_path.exists() else None,
     }
 
@@ -131,6 +133,7 @@ def make_decision(
     stability = load_json(stability_path)
     lighting_motion = load_json(lighting_motion_path) if lighting_motion_path.exists() else None
     scene_profile = load_json(scene_profile_path) if scene_profile_path.exists() else None
+    environment_payload = load_json(environment_payload_path) if environment_payload_path.exists() else None
     material_payload = load_json(material_payload_path) if material_payload_path.exists() else None
 
     signal_failures = [str(item) for item in signal.get("failures", [])]
@@ -156,6 +159,10 @@ def make_decision(
     else:
         failures.extend(str(item) for item in scene_profile.get("failures", []))
         warnings.extend(str(item) for item in scene_profile.get("warnings", []))
+    if environment_payload is None:
+        failures.append("missing v3_environment_payload.json")
+    else:
+        failures.extend(str(item) for item in environment_payload.get("failures", []))
 
     report_count = int(stability.get("report_count", 0) or 0)
     full_pipeline_report_count = int(stability.get("full_pipeline_report_count", report_count) or 0)

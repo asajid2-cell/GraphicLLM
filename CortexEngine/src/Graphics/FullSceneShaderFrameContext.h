@@ -1234,6 +1234,9 @@ struct FullSceneShaderPipelineV3FrameContext {
     std::string sceneLocalAmbientSource = "unknown";
     std::string sceneLocalAtmosphereSource = "unknown";
     uint32_t sceneLocalEnvironmentSourceCount = 0;
+    bool sceneLocalTexturePayloadReady = false;
+    uint32_t sceneLocalTexturePayloadCount = 0;
+    std::string sceneLocalTextureSetId = "none";
     std::string sceneProfileProducer = "unknown";
     std::string sceneProfileOutput = "unknown";
     std::string reflectionV3SourceContract = "unknown";
@@ -1732,6 +1735,9 @@ inline FullSceneShaderPipelineV3FrameContext BuildFullSceneShaderPipelineV3Frame
         (FullSceneShaderKnownContractString(reflectionBackgroundSource) ? 1u : 0u) +
         (FullSceneShaderKnownContractString(ambientSource) ? 1u : 0u) +
         (FullSceneShaderKnownContractString(atmosphereSource) ? 1u : 0u);
+    context.sceneLocalTexturePayloadReady = contract.environment.sceneLocalPayloadReady;
+    context.sceneLocalTexturePayloadCount = contract.environment.sceneLocalTextureCount;
+    context.sceneLocalTextureSetId = contract.environment.sceneLocalTextureSetId;
 
     FullSceneShaderPipelineV3DomainEvidence environmentDomain =
         MakeFullSceneShaderPipelineV3DomainEvidence(
@@ -1752,6 +1758,7 @@ inline FullSceneShaderPipelineV3FrameContext BuildFullSceneShaderPipelineV3Frame
         "visible_background",
         "reflection_background",
         "atmosphere",
+        "scene_local_texture_payload",
     };
     environmentDomain.debugViews = {
         "environment_mode",
@@ -1759,6 +1766,7 @@ inline FullSceneShaderPipelineV3FrameContext BuildFullSceneShaderPipelineV3Frame
         "visible_background",
         "reflection_background",
         "atmosphere",
+        "scene_local_texture_payload",
     };
     environmentDomain.channels = {
         environmentMode,
@@ -1771,6 +1779,8 @@ inline FullSceneShaderPipelineV3FrameContext BuildFullSceneShaderPipelineV3Frame
         reflectionBackgroundSource,
         atmosphereReady ? "atmosphere_owned" : "atmosphere_missing",
         atmosphereSource,
+        contract.environment.sceneLocalPayloadReady ? "scene_local_texture_payload_ready"
+                                                    : "scene_local_texture_payload_not_ready",
     };
     environmentDomain.backingResourceCount = readyEnvironmentResources;
     environmentDomain.requiredChannelCount = 10u;

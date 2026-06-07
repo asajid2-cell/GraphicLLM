@@ -97,6 +97,7 @@ def make_decision(
     scene_profile_path = packet_root / "v3_scene_profile.json"
     environment_payload_path = packet_root / "v3_environment_payload.json"
     material_payload_path = packet_root / "v3_material_payload.json"
+    composite_diagnostics_path = packet_root / "v3_composite_diagnostics.json"
 
     failures: list[str] = []
     warnings: list[str] = []
@@ -108,6 +109,9 @@ def make_decision(
         "scene_profile": str(scene_profile_path) if scene_profile_path.exists() else None,
         "environment_payload": str(environment_payload_path) if environment_payload_path.exists() else None,
         "material_payload": str(material_payload_path) if material_payload_path.exists() else None,
+        "composite_diagnostics": (
+            str(composite_diagnostics_path) if composite_diagnostics_path.exists() else None
+        ),
     }
 
     if not manifest_path.exists():
@@ -135,6 +139,9 @@ def make_decision(
     scene_profile = load_json(scene_profile_path) if scene_profile_path.exists() else None
     environment_payload = load_json(environment_payload_path) if environment_payload_path.exists() else None
     material_payload = load_json(material_payload_path) if material_payload_path.exists() else None
+    composite_diagnostics = (
+        load_json(composite_diagnostics_path) if composite_diagnostics_path.exists() else None
+    )
 
     signal_failures = [str(item) for item in signal.get("failures", [])]
     stability_failures = [str(item) for item in stability.get("failures", [])]
@@ -163,6 +170,17 @@ def make_decision(
         failures.append("missing v3_environment_payload.json")
     else:
         failures.extend(str(item) for item in environment_payload.get("failures", []))
+    composite_summary: dict[str, Any] = {}
+    if composite_diagnostics is None:
+        failures.append("missing v3_composite_diagnostics.json")
+    else:
+        failures.extend(str(item) for item in composite_diagnostics.get("failures", []))
+        warnings.extend(str(item) for item in composite_diagnostics.get("warnings", []))
+        raw_summary = composite_diagnostics.get("summary", {})
+        if isinstance(raw_summary, dict):
+            composite_summary = raw_summary
+        if composite_diagnostics.get("ready") is not True:
+            failures.append("CompositeV3 diagnostics are not ready")
 
     report_count = int(stability.get("report_count", 0) or 0)
     full_pipeline_report_count = int(stability.get("full_pipeline_report_count", report_count) or 0)
@@ -266,6 +284,36 @@ def make_decision(
             else:
                 failures.append(message)
 
+    mean_explicit_legacy_rescue = float(
+        composite_summary.get("mean_explicit_legacy_rescue", 0.0) or 0.0
+    )
+    mean_legacy_rescue = float(composite_summary.get("mean_legacy_rescue", 0.0) or 0.0)
+    mean_clamp_mask = float(composite_summary.get("mean_clamp_mask", 0.0) or 0.0)
+    mean_clamp_ratio = float(composite_summary.get("mean_clamp_ratio", 0.0) or 0.0)
+    mean_direct_contribution = float(composite_summary.get("mean_direct_contribution", 0.0) or 0.0)
+    mean_reflection_contribution = float(composite_summary.get("mean_reflection_contribution", 0.0) or 0.0)
+    if mean_explicit_legacy_rescue > 0.05:
+        failures.append(
+            "CompositeV3 explicit legacy rescue debt exceeds promotion gate: "
+            f"{mean_explicit_legacy_rescue:.6f}"
+        )
+    if mean_legacy_rescue > 0.05:
+        failures.append(
+            "CompositeV3 overbright legacy rescue debt exceeds promotion gate: "
+            f"{mean_legacy_rescue:.6f}"
+        )
+    if mean_clamp_mask > 0.10 or mean_clamp_ratio > 0.10:
+        failures.append(
+            "CompositeV3 clamp debt exceeds promotion gate: "
+            f"mask={mean_clamp_mask:.6f} ratio={mean_clamp_ratio:.6f}"
+        )
+    if (
+        candidate_beauty_requested_count > 0
+        and mean_direct_contribution < 0.001
+        and mean_reflection_contribution < 0.001
+    ):
+        failures.append("CompositeV3 contribution map lacks owned direct/reflection contribution")
+
     review_packet_passed = not failures
     full_coverage_ready = (
         review_packet_passed
@@ -301,6 +349,14 @@ def make_decision(
         "ready_domain_report_counts": domain_counts,
         "candidate_beauty_requested_report_count": candidate_beauty_requested_count,
         "candidate_beauty_ready_report_count": candidate_beauty_ready_count,
+        "composite_v3_diagnostics": {
+            "mean_explicit_legacy_rescue": mean_explicit_legacy_rescue,
+            "mean_legacy_rescue": mean_legacy_rescue,
+            "mean_clamp_mask": mean_clamp_mask,
+            "mean_clamp_ratio": mean_clamp_ratio,
+            "mean_direct_contribution": mean_direct_contribution,
+            "mean_reflection_contribution": mean_reflection_contribution,
+        },
         "failures": failures,
         "warnings": warnings,
         "evidence": evidence,
@@ -332,6 +388,21 @@ def write_markdown(path: pathlib.Path, decision: dict[str, Any]) -> None:
     if isinstance(counts, dict):
         for domain in sorted(counts):
             lines.append(f"| {domain} | {counts[domain]} |")
+    composite = decision.get("composite_v3_diagnostics", {})
+    if isinstance(composite, dict):
+        lines.extend(
+            [
+                "",
+                "## CompositeV3 Diagnostics",
+                "",
+                f"- mean explicit legacy rescue: `{float(composite.get('mean_explicit_legacy_rescue', 0.0) or 0.0):.6f}`",
+                f"- mean legacy rescue: `{float(composite.get('mean_legacy_rescue', 0.0) or 0.0):.6f}`",
+                f"- mean clamp mask: `{float(composite.get('mean_clamp_mask', 0.0) or 0.0):.6f}`",
+                f"- mean clamp ratio: `{float(composite.get('mean_clamp_ratio', 0.0) or 0.0):.6f}`",
+                f"- mean direct contribution: `{float(composite.get('mean_direct_contribution', 0.0) or 0.0):.6f}`",
+                f"- mean reflection contribution: `{float(composite.get('mean_reflection_contribution', 0.0) or 0.0):.6f}`",
+            ]
+        )
     if decision.get("failures"):
         lines.extend(["", "## Failures", ""])
         lines.extend(f"- {failure}" for failure in decision["failures"])

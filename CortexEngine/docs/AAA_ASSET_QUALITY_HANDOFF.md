@@ -7465,3 +7465,78 @@ Current limitation:
   `CortexAssets` regeneration timed out on the large asset graph in this
   session. Treat the manual shader copy as part of this packet's reproduction
   until a normal configure/build refresh completes.
+
+### ReflectionV3 History Confidence/Reprojection Stability - 2026-06-07
+
+Implemented:
+
+- `FullSceneReflectionHistoryV3.hlsl` now uses pixel-exact `Load()` for
+  current-frame ReflectionV3 resources:
+  - `reflection_radiance`.
+  - `reflection_source_id`.
+  - `reflection_temporal_delta`.
+- The history pass now samples depth/normal at the reprojected UV instead of
+  comparing against a nearest-neighbor current-frame point sample.
+- Reprojection acceptance is less brittle:
+  - depth falloff changed from `160.0` to `96.0`.
+  - normal acceptance widened from `0.78/0.22` to `0.62/0.38`.
+- History activity and reusable-history availability are now confidence-driven
+  instead of radiance-luma-driven.
+- Source-switch detection is now continuous with `smoothstep(0.04, 0.16, ...)`
+  instead of a hard `step(0.08, ...)`.
+
+Why:
+
+- The previous pass treated the current frame as if it were previous-frame
+  geometry and used point-sampled depth/normal at the reprojected UV. Under
+  mouse jitter this made history validity and rejection masks move more than
+  beauty.
+- Confidence is a better history trust signal than radiance luma because bright
+  reflection content can move across a stable reflective surface.
+
+Validation:
+
+```powershell
+Copy-Item -LiteralPath assets\shaders\FullSceneReflectionHistoryV3.hlsl -Destination build\bin\assets\shaders\FullSceneReflectionHistoryV3.hlsl -Force
+$env:CORTEX_V3_REFLECTION_SOURCE_OVERRIDE='ssr'
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_full_scene_shader_pipeline_v3_packet.ps1 -NoBuild -SkipSceneAnalyzers -StressSceneOnly -StressSceneFilter rt_showcase:reflection_closeup -SmokeFrames 24 -CaptureFrame 12 -CaptureSequenceCount 2 -StabilityMotionMode mouse_jitter -OutputRoot build\captures\v3_reflection_history_confidence_validity_mouse_jitter_20260607
+```
+
+Evidence:
+
+- baseline packet:
+  `build/captures/v3_forced_ssr_reflection_continuous_masks_synced_mouse_jitter_20260606`.
+- after packet:
+  `build/captures/v3_reflection_history_confidence_validity_mouse_jitter_20260607`.
+- after packet status:
+  - V3 placeholder packet passed.
+  - material payload passed.
+  - CompositeV3 diagnostics passed.
+  - promotion decision `review_packet_passed`.
+- motion comparison:
+  - `reflection_history_v3_validity`: `0.053437 -> 0.052630`;
+    active delta `0.197129 -> 0.185659`.
+  - `reflection_history_v3_rejection`: `0.070312 -> 0.061797`;
+    active delta `0.343471 -> 0.278238`.
+  - `reflection_ssr_source_signal` remains stable: delta `0.021202`,
+    `0.797x` beauty.
+  - `reflection_source_suppression` remains stable: delta `0.014887`,
+    `0.560x` beauty.
+- after packet per-channel deltas:
+  - `reflection_history_v3_validity`: RGB
+    `[0.080439, 0.040978, 0.096091]`.
+  - `reflection_history_v3_rejection`: RGB
+    `[0.059277, 0.068931, 0.021108]`.
+
+Current limitation:
+
+- The history/rejection rows still warn:
+  `reflection_rejected_source_mask`, `reflection_temporal_delta`,
+  `reflection_history_v3_validity`, and
+  `reflection_history_v3_rejection`.
+- The remaining `reflection_rejected_source_mask` and
+  `reflection_temporal_delta` motion is upstream in the resolver's forced-SSR
+  availability/rejection channels, not fixed by the history pass alone.
+- Disk was full during this pass; older reproducible V3 capture folders under
+  `build/captures` were removed after verifying their paths were inside the
+  repo capture directory.

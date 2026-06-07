@@ -76,7 +76,7 @@ void Renderer::RenderScene(Scene::ECS_Registry* registry) {
             }
         }
 
-        EnsureMaterialTextures(renderable);
+        PrepareMaterialResources(renderable);
 
         const MaterialTextureFallbacks materialFallbacks{
             m_materialFallbacks.albedo.get(),
@@ -126,7 +126,6 @@ void Renderer::RenderScene(Scene::ECS_Registry* registry) {
         D3D12_GPU_VIRTUAL_ADDRESS objectCB = m_constantBuffers.object.AllocateAndWrite(objectData);
         D3D12_GPU_VIRTUAL_ADDRESS materialCB = m_constantBuffers.material.AllocateAndWrite(materialData);
 
-        // Descriptor tables are warmed via PrewarmMaterialDescriptors().
         if (!renderable.textures.gpuState || !renderable.textures.gpuState->descriptors[0].IsValid()) {
             continue;
         }

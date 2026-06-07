@@ -107,6 +107,21 @@ void Renderer::FillMaterialTextureIndices(const Scene::RenderableComponent& rend
     MaterialResolver::FillMaterialTextureIndices(renderable, materialData);
 }
 
+void Renderer::PrepareMaterialResources(Scene::RenderableComponent& renderable) {
+    ++m_frameDiagnostics.contract.contract.materials.resourcePrepareCalls;
+    EnsureMaterialTextures(renderable);
+    RefreshMaterialDescriptors(renderable);
+    const bool ready =
+        renderable.textures.gpuState &&
+        renderable.textures.gpuState->descriptorsReady &&
+        renderable.textures.gpuState->descriptors[0].IsValid();
+    if (ready) {
+        ++m_frameDiagnostics.contract.contract.materials.descriptorTablesReadyAfterPrepare;
+    } else {
+        ++m_frameDiagnostics.contract.contract.materials.descriptorTablesMissingAfterPrepare;
+    }
+}
+
 void Renderer::PrewarmMaterialDescriptors(Scene::ECS_Registry* registry) {
     if (!registry || !m_services.descriptorManager) {
         return;
@@ -120,10 +135,7 @@ void Renderer::PrewarmMaterialDescriptors(Scene::ECS_Registry* registry) {
             continue;
         }
 
-        EnsureMaterialTextures(renderable);
-        // Material descriptor tables are persistent per material and are
-        // rewritten only when their texture sources change.
-        RefreshMaterialDescriptors(renderable);
+        PrepareMaterialResources(renderable);
     }
 }
 
@@ -133,6 +145,8 @@ void Renderer::RefreshMaterialDescriptors(Scene::RenderableComponent& renderable
         tex.gpuState = std::make_shared<MaterialGPUState>();
     }
     auto& state = *tex.gpuState;
+    const bool hadAllocatedTable = state.descriptorsAllocated;
+    ++m_frameDiagnostics.contract.contract.materials.descriptorRefreshChecks;
 
     ID3D12Device* device = m_services.device ? m_services.device->GetDevice() : nullptr;
     if (!device || !m_services.descriptorManager) {
@@ -167,8 +181,15 @@ void Renderer::RefreshMaterialDescriptors(Scene::RenderableComponent& renderable
         fallbacks);
     if (refreshResult.IsErr()) {
         state.descriptorsReady = false;
+        ++m_frameDiagnostics.contract.contract.materials.descriptorRefreshFailures;
         spdlog::warn("{}", refreshResult.Error());
         return;
+    }
+    if (!hadAllocatedTable && state.descriptorsAllocated) {
+        ++m_frameDiagnostics.contract.contract.materials.descriptorTableAllocations;
+    }
+    if (refreshResult.Value()) {
+        ++m_frameDiagnostics.contract.contract.materials.descriptorTableWrites;
     }
 }
 

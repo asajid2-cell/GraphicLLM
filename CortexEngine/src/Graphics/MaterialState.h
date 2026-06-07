@@ -1,6 +1,7 @@
 #pragma once
 
 #include <array>
+#include <cstdint>
 #include <memory>
 #include "Graphics/RHI/DescriptorHeap.h"
 
@@ -15,6 +16,7 @@ struct MaterialGPUState {
     static constexpr uint32_t kSlotCount = 11;
     std::array<DescriptorHandle, kSlotCount> descriptors{};
     std::array<std::weak_ptr<DX12Texture>, kSlotCount> sourceTextures{};
+    std::array<uint64_t, kSlotCount> boundResourceSignatures{};
     bool descriptorsAllocated = false;
     bool descriptorsReady = false;
 };

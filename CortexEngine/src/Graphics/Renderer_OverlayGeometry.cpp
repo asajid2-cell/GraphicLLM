@@ -1,4 +1,4 @@
-﻿#include "Renderer.h"
+#include "Renderer.h"
 
 #include "Graphics/Passes/ForwardTargetBindingPass.h"
 #include "Graphics/Passes/FullscreenPass.h"
@@ -112,7 +112,7 @@ void Renderer::RenderOverlays(Scene::ECS_Registry* registry) {
         }
         auto& renderable = *renderablePtr;
 
-        EnsureMaterialTextures(renderable);
+        PrepareMaterialResources(renderable);
 
         const MaterialTextureFallbacks materialFallbacks{
             m_materialFallbacks.albedo.get(),

@@ -1,4 +1,4 @@
-﻿#include "Renderer.h"
+#include "Renderer.h"
 
 #include "Graphics/Passes/ForwardTargetBindingPass.h"
 #include "Graphics/Passes/FullscreenPass.h"
@@ -11,11 +11,15 @@
 #include "Scene/Components.h"
 
 #include <algorithm>
+#include <cstdlib>
 #include <vector>
 namespace Cortex::Graphics {
 
 void Renderer::RenderTransparent(Scene::ECS_Registry* registry) {
     if (!m_pipelineState.transparent) {
+        return;
+    }
+    if (std::getenv("CORTEX_DISABLE_TRANSPARENT_PASS")) {
         return;
     }
 
@@ -38,6 +42,7 @@ void Renderer::RenderTransparent(Scene::ECS_Registry* registry) {
     drawList.reserve(snapshot->transparentIndices.size());
 
     const glm::vec3 cameraPos = glm::vec3(m_constantBuffers.frameCPU.cameraPosition);
+    const glm::vec3 cameraForward = glm::normalize(m_cameraState.forwardWS);
     const FrustumPlanes frustum = ExtractFrustumPlanesCPU(m_constantBuffers.frameCPU.viewProjectionNoJitter);
 
     // Collect transparent entities and compute a simple distance-based depth
@@ -70,9 +75,13 @@ void Renderer::RenderTransparent(Scene::ECS_Registry* registry) {
             continue;
         }
 
-        glm::vec3 worldPos = glm::vec3(entry.worldMatrix[3]);
-        const glm::vec3 toCamera = worldPos - cameraPos;
-        float depth = glm::dot(toCamera, toCamera);
+        // Sort by view-space far extent rather than origin distance. Large
+        // glass walls/roofs can surround the camera; origin-distance sorting
+        // flips whole panels as the mouse rotates, which makes blended colors
+        // pop. The far extent gives a conservative back-to-front order that is
+        // stable for thin architectural panes.
+        const float centerDepth = glm::dot(centerWS - cameraPos, cameraForward);
+        float depth = centerDepth + radiusWS;
         drawList.push_back(TransparentDraw{entryIndex, depth});
     }
 
@@ -136,7 +145,7 @@ void Renderer::RenderTransparent(Scene::ECS_Registry* registry) {
         }
         auto& renderable = *renderablePtr;
 
-        EnsureMaterialTextures(renderable);
+        PrepareMaterialResources(renderable);
 
         const MaterialTextureFallbacks materialFallbacks{
             m_materialFallbacks.albedo.get(),
@@ -184,7 +193,6 @@ void Renderer::RenderTransparent(Scene::ECS_Registry* registry) {
         D3D12_GPU_VIRTUAL_ADDRESS materialCB =
             m_constantBuffers.material.AllocateAndWrite(materialData);
 
-        // Descriptor tables are warmed via PrewarmMaterialDescriptors().
         if (!renderable.textures.gpuState ||
             !renderable.textures.gpuState->descriptors[0].IsValid()) {
             continue;

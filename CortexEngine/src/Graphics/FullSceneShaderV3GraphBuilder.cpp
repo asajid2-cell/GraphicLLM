@@ -10,6 +10,35 @@ bool FullSceneShaderV3GraphBuilder::SubmitSceneLocalEnvironment(
     return FullSceneShaderV3Passes::AddSceneLocalEnvironmentV3Pass(m_graph, context);
 }
 
+bool FullSceneShaderV3GraphBuilder::SubmitSceneLocalEnvironment(
+    const SceneLocalEnvironmentCommon& common,
+    const SceneLocalEnvironmentSubmission& submission) {
+    FullSceneShaderV3Passes::SceneLocalEnvironmentV3Context context{};
+    context.sceneLocalEnvironment = submission.sceneLocalEnvironment;
+    context.ambientLighting = submission.ambientLighting;
+    context.visibleBackground = submission.visibleBackground;
+    context.reflectionBackground = submission.reflectionBackground;
+    context.atmosphere = submission.atmosphere;
+    context.device = common.device;
+    context.commandList = common.commandList;
+    context.rootSignature = common.rootSignature;
+    context.pipeline = common.pipeline;
+    context.descriptorManager = common.descriptorManager;
+    context.frameConstants = common.frameConstants;
+    context.payloadAlbedo = submission.payloadAlbedo;
+    context.payloadNormal = submission.payloadNormal;
+    context.irradianceProxy = submission.irradianceProxy;
+    context.specularProxy = submission.specularProxy;
+    context.visibleBackgroundProxy = submission.visibleBackgroundProxy;
+    context.outputRTVs = submission.outputRTVs;
+    context.width = common.width;
+    context.height = common.height;
+    context.ran = submission.ran;
+    context.failed = common.failed;
+    context.stage = common.stage;
+    return SubmitSceneLocalEnvironment(context);
+}
+
 bool FullSceneShaderV3GraphBuilder::SubmitReflectionResolver(
     const FullSceneShaderV3Passes::FullSceneReflectionResolverV3Context& context) {
     return FullSceneShaderV3Passes::AddFullSceneReflectionResolverV3Pass(m_graph, context);

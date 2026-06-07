@@ -258,6 +258,11 @@ foundation that makes later visual work faster:
    material debt, environment debt, lighting debt, reflection debt, composite
    debt, and post debt.
    This is now implemented as `candidate_path_debt` in the V3 runtime report.
+   The follow-up predicate-debt slice makes `candidate_beauty` actionable:
+   reports now expose the six candidate predicates, ready predicate count, and
+   blocker list so a failed candidate path points to request scope, CompositeV3,
+   CinematicPostV3, candidate LDR output, candidate-HDR input, or legacy-bridge
+   contamination instead of a binary missing-channel count.
    It summarizes missing required channels per candidate domain, render-graph
    missing producer resources, total missing required channels, not-ready domain
    count, and whether legacy rescue is still a live resource.

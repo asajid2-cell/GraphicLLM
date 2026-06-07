@@ -13,6 +13,9 @@
     "composite_missing_required_channels",
     "cinematic_post_missing_required_channels",
     "candidate_beauty_missing_required_channels",
+    "candidate_beauty_predicate_count",
+    "candidate_beauty_ready_predicate_count",
+    "candidate_beauty_blockers",
     "total_missing_required_channels",
     "not_ready_domain_count",
     "legacy_rescue_resource_ready"

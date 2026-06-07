@@ -1218,6 +1218,15 @@ struct FullSceneShaderPipelineV3FrameContext {
     bool candidateBeautyDisplayed = false;
     std::string candidateBeautyProducer = "none";
     std::string candidateBeautyOutput = "none";
+    bool candidateBeautyCompositeReady = false;
+    bool candidateBeautyCinematicPostReady = false;
+    bool candidateBeautyLdrOutputReady = false;
+    bool candidateBeautyReadsCandidateHdr = false;
+    bool candidateBeautyLegacyBridgeRejected = false;
+    bool candidateBeautyDefaultBeautyUnchanged = true;
+    uint32_t candidateBeautyPredicateCount = 0;
+    uint32_t candidateBeautyReadyPredicateCount = 0;
+    std::vector<std::string> candidateBeautyBlockers;
     bool runtimePlaceholdersReady = true;
     bool contractGrounded = true;
     bool packetGateReady = false;
@@ -2650,13 +2659,45 @@ inline FullSceneShaderPipelineV3FrameContext BuildFullSceneShaderPipelineV3Frame
             "candidate_ldr_cinematic_output") ||
         FullSceneShaderPassReadsResource(contract, "FullSceneCandidateBeautyV3", "hdr_color") ||
         FullSceneShaderPassReadsResource(contract, "CinematicPostV3", "hdr_color");
+    context.candidateBeautyCompositeReady = context.compositeV3Ready;
+    context.candidateBeautyCinematicPostReady = context.cinematicPostV3Ready;
+    context.candidateBeautyLdrOutputReady = candidateLdrOutputReady;
+    context.candidateBeautyReadsCandidateHdr = candidateReadsCandidateHdr;
+    context.candidateBeautyLegacyBridgeRejected = !legacyCandidateBridgePresent;
+    context.candidateBeautyDefaultBeautyUnchanged = !context.defaultBeautyAffects;
+    context.candidateBeautyPredicateCount = 6u;
+    context.candidateBeautyReadyPredicateCount =
+        static_cast<uint32_t>((context.candidateBeautyRequested ? 1u : 0u) +
+                              (context.candidateBeautyCompositeReady ? 1u : 0u) +
+                              (context.candidateBeautyCinematicPostReady ? 1u : 0u) +
+                              (context.candidateBeautyLdrOutputReady ? 1u : 0u) +
+                              (context.candidateBeautyReadsCandidateHdr ? 1u : 0u) +
+                              (context.candidateBeautyLegacyBridgeRejected ? 1u : 0u));
+    if (!context.candidateBeautyRequested) {
+        FullSceneShaderPushUnique(context.candidateBeautyBlockers, "candidate_beauty_not_requested");
+    }
+    if (!context.candidateBeautyCompositeReady) {
+        FullSceneShaderPushUnique(context.candidateBeautyBlockers, "composite_v3_not_ready");
+    }
+    if (!context.candidateBeautyCinematicPostReady) {
+        FullSceneShaderPushUnique(context.candidateBeautyBlockers, "cinematic_post_v3_not_ready");
+    }
+    if (!context.candidateBeautyLdrOutputReady) {
+        FullSceneShaderPushUnique(context.candidateBeautyBlockers, "candidate_ldr_output_missing");
+    }
+    if (!context.candidateBeautyReadsCandidateHdr) {
+        FullSceneShaderPushUnique(context.candidateBeautyBlockers, "candidate_hdr_input_missing");
+    }
+    if (!context.candidateBeautyLegacyBridgeRejected) {
+        FullSceneShaderPushUnique(context.candidateBeautyBlockers, "legacy_hdr_bridge_present");
+    }
+    if (!context.candidateBeautyDefaultBeautyUnchanged) {
+        FullSceneShaderPushUnique(context.candidateBeautyBlockers, "default_beauty_affected");
+    }
     context.candidateBeautyReady =
         context.candidateBeautyRequested &&
-        context.compositeV3Ready &&
-        context.cinematicPostV3Ready &&
-        candidateLdrOutputReady &&
-        candidateReadsCandidateHdr &&
-        !legacyCandidateBridgePresent;
+        context.candidateBeautyReadyPredicateCount == context.candidateBeautyPredicateCount &&
+        context.candidateBeautyDefaultBeautyUnchanged;
     context.candidateBeautyProducer =
         context.candidateBeautyRequested ? "CinematicPostV3" : "none";
     context.candidateBeautyOutput =
@@ -2706,15 +2747,9 @@ inline FullSceneShaderPipelineV3FrameContext BuildFullSceneShaderPipelineV3Frame
         "default_beauty_unchanged",
     };
     candidateBeautyDomain.backingResourceCount =
-        static_cast<uint32_t>(
-            (context.compositeV3Ready ? 1u : 0u) +
-            (context.cinematicPostV3Ready ? 1u : 0u) +
-            (candidateLdrOutputReady ? 1u : 0u) +
-            (candidateReadsCandidateHdr ? 1u : 0u) +
-            (!legacyCandidateBridgePresent ? 1u : 0u));
-    candidateBeautyDomain.requiredChannelCount = 6u;
-    candidateBeautyDomain.readyChannelCount =
-        context.candidateBeautyReady ? candidateBeautyDomain.requiredChannelCount : 0u;
+        context.candidateBeautyReadyPredicateCount;
+    candidateBeautyDomain.requiredChannelCount = context.candidateBeautyPredicateCount;
+    candidateBeautyDomain.readyChannelCount = context.candidateBeautyReadyPredicateCount;
     candidateBeautyDomain.missingRequiredChannelCount =
         candidateBeautyDomain.requiredChannelCount - candidateBeautyDomain.readyChannelCount;
 

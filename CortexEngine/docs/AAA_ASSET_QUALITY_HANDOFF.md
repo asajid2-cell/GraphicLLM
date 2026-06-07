@@ -40,6 +40,75 @@ Current planning checkpoint:
   old-office/gallery stress case with IBL enabled and sharp enough to expose
   bad reflections.
 
+Latest implementation checkpoint:
+
+- Implemented the first true resource-backed `SceneLocalEnvironmentV3` slice.
+- `SceneLocalEnvironmentV3` now allocates a two-slot transient SRV table and
+  binds it at graphics root parameter `3` before drawing:
+  - `t0`: scene-local payload albedo
+  - `t1`: scene-local payload normal/detail
+  - null SRVs are still written when payload textures are not resident
+- `SceneLocalEnvironmentV3.hlsl` now samples the payload albedo/normal table
+  and gates the contribution by actual texture signal so null descriptors
+  remain a reported fallback rather than a black-resource artifact.
+- Added `Renderer::BuildSceneLocalEnvironmentV3PayloadBindingInfo()` to choose
+  a representative payload albedo/normal pair, prefer cached GPU textures, and
+  queue missing uploads outside render-graph execution.
+- Frame reports now expose both environment and V3 aliases for:
+  - `scene_local_payload_resource_table_required`
+  - `scene_local_payload_resource_table_bindable`
+  - `scene_local_payload_bound_resource_count`
+  - `scene_local_payload_binding_source`
+  - `scene_local_payload_fallback_reason`
+- Environment readiness now requires `18` channels. Payload-missing scenes can
+  remain environment-ready, but payload-ready scenes must prove bindable
+  shader resources or report binding debt.
+- Contract, placeholder analyzer, environment-payload analyzer, and static V3
+  validator now gate the new resource-binding fields.
+
+Validation for latest slice:
+
+```powershell
+python -m py_compile tools\analyze_full_scene_shader_v3_environment_payload.py tools\analyze_full_scene_shader_v3_placeholders.py tools\validate_full_scene_shader_pipeline_v3_plan.py
+python tools\validate_full_scene_shader_pipeline_v3_plan.py
+git -c submodule.recurse=false diff --check -- src\Graphics\Renderer.h src\Graphics\Renderer_FramePostConstants.cpp src\Graphics\Renderer_FrameContractSnapshot.cpp src\Graphics\FrameContract.h src\Graphics\FrameContractJson.cpp src\Graphics\FullSceneShaderFrameContext.h src\Graphics\Renderer_RenderGraphEndFrame.cpp assets\shaders\SceneLocalEnvironmentV3.hlsl assets\final_art\full_scene_shader_pipeline_v3_contract.json tools\analyze_full_scene_shader_v3_environment_payload.py tools\analyze_full_scene_shader_v3_placeholders.py tools\validate_full_scene_shader_pipeline_v3_plan.py
+cmd.exe /d /c "call ""C:\Program Files\Microsoft Visual Studio\18\Community\Common7\Tools\VsDevCmd.bat"" -arch=x64 -host_arch=x64 >nul && set ""CORTEX_SKIP_ASSET_SYNC=1"" && ""C:\Program Files\Ninja\ninja.exe"" -C build CortexEngine -j 8"
+Copy-Item -LiteralPath assets\final_art\full_scene_shader_pipeline_v3_contract.json -Destination build\bin\assets\final_art\full_scene_shader_pipeline_v3_contract.json -Force
+$env:CORTEX_V3_REFLECTION_SOURCE_OVERRIDE='ssr'
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_full_scene_shader_pipeline_v3_packet.ps1 -NoBuild -SkipSceneAnalyzers -StressSceneOnly -StressSceneFilter rt_showcase:reflection_closeup -SmokeFrames 18 -CaptureFrame 10 -CaptureSequenceCount 1 -StabilityMotionMode static -OutputRoot build\captures\v3_environment_payload_resource_binding_gallery_20260607
+Remove-Item Env:\CORTEX_V3_REFLECTION_SOURCE_OVERRIDE -ErrorAction SilentlyContinue
+ctest --test-dir build --output-on-failure -C Release
+```
+
+Evidence:
+
+- Native `CortexEngine` build passed. The existing trailing `vswhere.exe`
+  warning still printed after successful link.
+- `ctest` exited successfully but this build has no registered tests.
+- Focused packet:
+  `build\captures\v3_environment_payload_resource_binding_gallery_20260607`
+  passed V2 evidence, V3 placeholder checks, scene-profile analysis,
+  environment-payload analysis, material-payload analysis, CompositeV3
+  diagnostics, and promotion decision.
+- Environment-payload proof:
+  - reports: `54`
+  - payload-ready reports: `54`
+  - resource-bindable reports: `54`
+  - bound-resource reports: `54`
+  - first row: texture set `rt_showcase_gallery`, `12` DDS textures,
+    `5` albedo, `6` normal, `2` bound resources,
+    binding source `cached_scene_local_payload_pair`, fallback reason `none`
+
+Current next work:
+
+1. Add or alias non-gallery payload sets for enclosed room, stage/red room,
+   exterior water, and stadium profiles.
+2. Promote the environment payload resource-binding proof from gallery-only to
+   a cross-profile packet.
+3. Continue with `LightingShadowV3` high-contrast source attribution and
+   `ReflectionV3` provider resolver hardening before any strong
+   `CinematicPostV3` tuning.
+
 Authoritative plan:
 
 - `docs\FULL_SCENE_SHADER_AAA_REFACTOR_PLAN.md`

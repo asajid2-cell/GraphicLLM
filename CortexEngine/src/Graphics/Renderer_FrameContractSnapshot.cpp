@@ -359,6 +359,18 @@ void Renderer::UpdateFrameContractSnapshot(Scene::ECS_Registry* registry,
     contract.environment.sceneLocalPayloadTextureRichness = sceneLocalEnvironmentPayload.y;
     contract.environment.sceneLocalPayloadProxyScore = sceneLocalEnvironmentPayload.z;
     contract.environment.sceneLocalPayloadShaderInfluence = sceneLocalEnvironmentPayload.w;
+    const SceneLocalEnvironmentV3PayloadBindingInfo sceneLocalPayloadBinding =
+        BuildSceneLocalEnvironmentV3PayloadBindingInfo(true);
+    contract.environment.sceneLocalPayloadResourceTableRequired =
+        sceneLocalPayloadBinding.resourceTableRequired;
+    contract.environment.sceneLocalPayloadResourceTableBindable =
+        sceneLocalPayloadBinding.resourceTableBindable;
+    contract.environment.sceneLocalPayloadBoundResourceCount =
+        sceneLocalPayloadBinding.boundResourceCount;
+    contract.environment.sceneLocalPayloadBindingSource =
+        sceneLocalPayloadBinding.bindingSource;
+    contract.environment.sceneLocalPayloadFallbackReason =
+        sceneLocalPayloadBinding.fallbackReason;
 
     contract.plannedFeatures = featurePlan.planned;
     contract.executedFeatures = featurePlan.active;

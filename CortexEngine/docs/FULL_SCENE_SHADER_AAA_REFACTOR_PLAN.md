@@ -3929,3 +3929,43 @@ Next refactor direction:
 - Add payload sets or aliases for enclosed room, stage, and exterior profiles.
 - Resume LightingShadowV3/ReflectionV3 work after the environment resource path
   has at least one non-gallery payload-backed proof.
+
+### SceneLocalEnvironmentV3 Payload Resource Binding - 2026-06-07
+
+Implemented:
+
+- `SceneLocalEnvironmentV3` now binds a real two-slot payload SRV table:
+  `t0` scene-local payload albedo and `t1` scene-local payload normal/detail.
+- The pass always writes valid descriptors. Missing payload resources become
+  null SRVs with explicit frame-report fallback fields.
+- `Renderer::BuildSceneLocalEnvironmentV3PayloadBindingInfo()` selects a
+  representative scene-local albedo/normal pair, prefers resident cached GPU
+  textures, and queues missing uploads outside render-graph execution.
+- `SceneLocalEnvironmentV3.hlsl` samples the payload resources and gates their
+  influence by actual sample signal so scalar payload readiness is no longer
+  the only shader-side input.
+- Frame reports, V3 aliases, the JSON contract, placeholder analyzer,
+  environment-payload analyzer, and static V3 validator all include resource
+  binding fields.
+
+Validated evidence:
+
+- Native `CortexEngine` build passed.
+- `ctest --test-dir build --output-on-failure -C Release` exited successfully,
+  though the current build has no registered tests.
+- Focused packet:
+  `build/captures/v3_environment_payload_resource_binding_gallery_20260607`.
+- Packet passed V2 evidence, V3 placeholder checks, scene-profile analysis,
+  environment-payload analysis, material-payload analysis, CompositeV3
+  diagnostics, and promotion decision.
+- Environment payload proof:
+  `54/54` reports payload-ready, `54/54` resource-bindable,
+  `54/54` bound-resource reports, `2` bound resources per row, binding source
+  `cached_scene_local_payload_pair`, fallback reason `none`.
+
+Remaining environment debt:
+
+- This proves one gallery/stress payload pair. It is not yet full
+  scene-local irradiance/specular/background proxy generation.
+- Cross-profile payload resource evidence is still required for enclosed room,
+  stage/red room, exterior water, and stadium-like spaces.

@@ -69,6 +69,16 @@ def analyze_report(path: Path) -> dict[str, Any]:
         "v3_texture_richness": float(v3.get("scene_local_texture_payload_richness", -1.0) or -1.0),
         "v3_proxy_score": float(v3.get("scene_local_texture_payload_proxy_score", -1.0) or -1.0),
         "v3_shader_influence": float(v3.get("scene_local_texture_payload_shader_influence", -1.0) or -1.0),
+        "resource_table_required": environment.get("scene_local_payload_resource_table_required") is True,
+        "resource_table_bindable": environment.get("scene_local_payload_resource_table_bindable") is True,
+        "bound_resource_count": int(environment.get("scene_local_payload_bound_resource_count", 0) or 0),
+        "binding_source": environment.get("scene_local_payload_binding_source", "none"),
+        "fallback_reason": environment.get("scene_local_payload_fallback_reason", "none"),
+        "v3_resource_table_required": v3.get("scene_local_texture_payload_resource_table_required") is True,
+        "v3_resource_table_bindable": v3.get("scene_local_texture_payload_resource_table_bindable") is True,
+        "v3_bound_resource_count": int(v3.get("scene_local_texture_payload_bound_resource_count", 0) or 0),
+        "v3_binding_source": v3.get("scene_local_texture_payload_binding_source", "none"),
+        "v3_fallback_reason": v3.get("scene_local_texture_payload_fallback_reason", "none"),
         "failures": [],
     }
     if row["environment_ready"]:
@@ -115,6 +125,22 @@ def analyze_report(path: Path) -> dict[str, Any]:
             row["failures"].append("V3 proxy score does not match environment value")
         if abs(row["v3_shader_influence"] - row["shader_influence"]) > 0.001:
             row["failures"].append("V3 shader influence does not match environment value")
+        if not row["resource_table_required"]:
+            row["failures"].append("payload ready without resource table requirement")
+        if not row["resource_table_bindable"]:
+            row["failures"].append("payload ready without bindable shader resource table")
+        if row["bound_resource_count"] <= 0:
+            row["failures"].append("payload ready without bound payload resources")
+        if row["v3_resource_table_required"] != row["resource_table_required"]:
+            row["failures"].append("V3 resource-table-required flag does not match environment value")
+        if row["v3_resource_table_bindable"] != row["resource_table_bindable"]:
+            row["failures"].append("V3 resource-table-bindable flag does not match environment value")
+        if row["v3_bound_resource_count"] != row["bound_resource_count"]:
+            row["failures"].append("V3 bound resource count does not match environment value")
+        if row["v3_binding_source"] != row["binding_source"]:
+            row["failures"].append("V3 binding source does not match environment value")
+        if row["v3_fallback_reason"] != row["fallback_reason"]:
+            row["failures"].append("V3 fallback reason does not match environment value")
     return row
 
 
@@ -129,8 +155,8 @@ def write_markdown(path: Path, result: dict[str, Any]) -> None:
         f"- profile-policy-consumed reports: `{result['profile_policy_consumed_report_count']}`",
         f"- failures: `{len(result['failures'])}`",
         "",
-        "| Family | Profile Policy | Shader Profile | Local Background | Texture Set | Textures | Albedo | Normal | Payload | Influence | Proxies |",
-        "|---|---|---|---:|---|---:|---:|---:|---|---:|---|",
+        "| Family | Profile Policy | Shader Profile | Local Background | Texture Set | Textures | Albedo | Normal | Payload | Influence | Bound | Binding | Proxies |",
+        "|---|---|---|---:|---|---:|---:|---:|---|---:|---:|---|---|",
     ]
     for row in result["rows"]:
         proxies = ",".join(
@@ -156,6 +182,8 @@ def write_markdown(path: Path, result: dict[str, Any]) -> None:
                     str(row["normal_count"]),
                     str(row["payload_ready"]).lower(),
                     f"{row['shader_influence']:.2f}",
+                    str(row["bound_resource_count"]),
+                    f"`{row['binding_source']}`",
                     proxies,
                 ]
             )
@@ -193,6 +221,8 @@ def main() -> int:
         "texture_set_present_report_count": sum(1 for row in rows if row["texture_set_present"]),
         "payload_ready_report_count": payload_ready_count,
         "shader_influence_report_count": sum(1 for row in rows if row["shader_influence"] > 0.0),
+        "resource_bindable_report_count": sum(1 for row in rows if row["resource_table_bindable"]),
+        "bound_resource_report_count": sum(1 for row in rows if row["bound_resource_count"] > 0),
         "profile_policy_consumed_report_count": sum(1 for row in rows if row["profile_policy_consumed"]),
         "rows": rows,
         "failures": failures,

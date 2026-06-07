@@ -7035,3 +7035,119 @@ Current limitation:
 - Next renderer slice should reduce this fallback dependency in
   `FullSceneCompositeV3` and rerun static plus mouse-jitter/camera-sweep
   packets.
+
+### Full Scene Shader AAA Refactor Planning Decision - 2026-06-06
+
+User direction:
+
+- move from local renderer patches toward full-scene shaders capable of
+  high-end, Unreal-style visuals.
+- plan the whole refactor before completing the next goal feature.
+- do not treat blur, disabled IBL, hidden reflections, or scene changes as
+  renderer fixes.
+
+Planning update:
+
+- `docs/FULL_SCENE_SHADER_AAA_REFACTOR_PLAN.md` now has a top-level
+  `2026-06-06 Goal Feature Refactor Decision`.
+- The next feature is defined as an opt-in `FullSceneCandidateBeautyV3`
+  renderer path, not a single post effect or local shader tweak.
+- The candidate path must assemble final pixels from owned V3 resources:
+  material payload, scene-local environment, lighting/shadows, reflections,
+  transparency/media, HDR composite, and cinematic post.
+- Default beauty remains unchanged until promotion packets pass and the user
+  accepts the result.
+
+First implementation slice after planning:
+
+```text
+FullSceneCandidateBeautyV3 contract
+  -> explicit target resource names
+  -> candidate-only render graph ownership
+  -> promotion gate rejects missing/legacy-owned resources
+  -> packet output contains candidate HDR, candidate LDR, and domain evidence
+```
+
+Do next:
+
+1. Finish the uncommitted CompositeV3 material-albedo / scene-local-floor
+   rescue-reduction slice, document packet metrics, commit, and push.
+2. Start the candidate-path scaffolding slice from the refactor plan.
+3. Avoid jumping directly to bloom, tone mapping, or cinematic grade until
+   the candidate path can honestly report which upstream V3 resources are real
+   and which are still debt.
+
+### CompositeV3 Material Albedo / Scene-Local Floor Slice - 2026-06-06
+
+Implemented:
+
+- `FullSceneCompositeV3` now reads `vb_gbuffer_albedo` through a concrete
+  `MaterialAlbedo` render-graph import.
+- The composite shader uses material albedo plus a small neutral scene-local
+  floor before falling back to legacy `hdr_color`.
+- CompositeV3 readiness, frame-context backing resources, analyzer tokens, and
+  the V3 contract now require the material-albedo read edge.
+- The legacy HDR fallback path remains present and measured, but it is no
+  longer used in the tested gallery static/mouse-jitter packets.
+
+Why:
+
+- The previous diagnostic gate showed `mean_legacy_rescue=0.048630`, proving
+  `FullSceneCompositeV3` still depended on legacy beauty for dark/no-term
+  pixels.
+- Material albedo and a bounded local floor make those pixels candidate-owned
+  enough to inspect without hiding the remaining V3 renderer debt.
+
+Validation:
+
+```powershell
+python -m py_compile tools\analyze_full_scene_shader_v3_placeholders.py tools\validate_full_scene_shader_pipeline_v3_plan.py tools\analyze_full_scene_shader_v3_composite_diagnostics.py
+python -m json.tool assets\final_art\full_scene_shader_pipeline_v3_contract.json
+python tools\validate_full_scene_shader_pipeline_v3_plan.py
+cmd.exe /d /c "call ""C:\Program Files\Microsoft Visual Studio\18\Community\Common7\Tools\VsDevCmd.bat"" -arch=x64 -host_arch=x64 >nul && set ""CORTEX_SKIP_ASSET_SYNC=1"" && ""C:\Program Files\Ninja\ninja.exe"" -C build CortexEngine -j 8"
+Copy-Item -LiteralPath assets\shaders\FullSceneCompositeV3.hlsl -Destination build\bin\assets\shaders\FullSceneCompositeV3.hlsl -Force
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_full_scene_shader_pipeline_v3_packet.ps1 -NoBuild -SkipSceneAnalyzers -NoStressScene -FamilyFilter gallery -SmokeFrames 18 -CaptureFrame 9 -CaptureSequenceCount 1 -StabilityMotionMode static -OutputRoot build\captures\v3_composite_scene_floor_static_gallery_20260606
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_full_scene_shader_pipeline_v3_packet.ps1 -NoBuild -SkipSceneAnalyzers -NoStressScene -FamilyFilter gallery -SmokeFrames 18 -CaptureFrame 9 -CaptureSequenceCount 2 -StabilityMotionMode mouse_jitter -OutputRoot build\captures\v3_composite_scene_floor_mouse_jitter_gallery_20260606
+```
+
+Evidence:
+
+- baseline packet:
+  `build/captures/v3_composite_diagnostics_gate_static_gallery_20260606`.
+  - failures `0`, warnings `0`.
+  - `mean_clamp_mask=0.000045`.
+  - `mean_clamp_ratio=0.000011`.
+  - `mean_legacy_rescue=0.048630`.
+  - `mean_underlit=0.083867`.
+  - `mean_overbright=0.009254`.
+- static scene-floor packet:
+  `build/captures/v3_composite_scene_floor_static_gallery_20260606`.
+  - failures `0`, warnings `0`.
+  - `mean_clamp_mask=0.000045`.
+  - `mean_clamp_ratio=0.000011`.
+  - `mean_legacy_rescue=0.000000`.
+  - `mean_underlit=0.080436`.
+  - `mean_overbright=0.009254`.
+- mouse-jitter scene-floor packet:
+  `build/captures/v3_composite_scene_floor_mouse_jitter_gallery_20260606`.
+  - failures `0`, warnings `0`.
+  - `mean_clamp_mask=0.000029`.
+  - `mean_clamp_ratio=0.000009`.
+  - `mean_legacy_rescue=0.000000`.
+  - `mean_underlit=0.082492`.
+  - `mean_overbright=0.009322`.
+
+Frame-report proof:
+
+- `FullSceneCompositeV3` reads now include:
+  `direct_lighting`, `indirect_lighting`, `shadow_visibility`, `hdr_color`,
+  `reflection_radiance`, `reflection_confidence`, and `vb_gbuffer_albedo`.
+- V3 composite channels include `material_albedo_input_read`.
+
+Current limitation:
+
+- This is a CompositeV3 candidate-rescue reduction, not final AAA beauty.
+- The scene-local floor is a bounded neutral fallback, not the final
+  texture-backed `SceneLocalEnvironmentV3`.
+- Evidence is gallery static/mouse-jitter only. Cross-family and camera-sweep
+  packets are still required before candidate/default promotion.

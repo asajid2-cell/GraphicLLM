@@ -29,6 +29,7 @@ struct FullSceneCompositeV3Context {
     RGResourceHandle legacyHdr;
     RGResourceHandle localReflectionRadiance;
     RGResourceHandle reflectionConfidence;
+    RGResourceHandle materialAlbedo;
     RGResourceHandle output;
     RGResourceHandle energyClampPolicy;
     RGResourceHandle overbrightDiagnostics;
@@ -160,6 +161,7 @@ void FailFullSceneReflectionHistoryV3Copy(const FullSceneReflectionHistoryV3Copy
         !context.indirectLighting.IsValid() ||
         !context.shadowVisibility.IsValid() ||
         !context.legacyHdr.IsValid() ||
+        !context.materialAlbedo.IsValid() ||
         !context.output.IsValid() ||
         !context.energyClampPolicy.IsValid() ||
         !context.overbrightDiagnostics.IsValid() ||
@@ -200,25 +202,29 @@ void FailFullSceneReflectionHistoryV3Copy(const FullSceneReflectionHistoryV3Copy
             if (context.reflectionConfidence.IsValid()) {
                 builder.Read(context.reflectionConfidence, RGResourceUsage::ShaderResource);
             }
+            if (context.materialAlbedo.IsValid()) {
+                builder.Read(context.materialAlbedo, RGResourceUsage::ShaderResource);
+            }
             builder.Write(context.output, RGResourceUsage::RenderTarget);
             builder.Write(context.energyClampPolicy, RGResourceUsage::RenderTarget);
             builder.Write(context.overbrightDiagnostics, RGResourceUsage::RenderTarget);
         },
         [context](ID3D12GraphicsCommandList*, const RenderGraph& graph) {
-            auto tableResult = context.descriptorManager->AllocateTransientCBV_SRV_UAVRange(6);
+            auto tableResult = context.descriptorManager->AllocateTransientCBV_SRV_UAVRange(7);
             if (tableResult.IsErr()) {
                 FailFullSceneCompositeV3(context, "full_scene_composite_v3_descriptor");
                 return;
             }
 
             const DescriptorHandle base = tableResult.Value();
-            const DescriptorHandle table[6] = {
+            const DescriptorHandle table[7] = {
                 context.descriptorManager->GetCBV_SRV_UAVHandle(base.index + 0u),
                 context.descriptorManager->GetCBV_SRV_UAVHandle(base.index + 1u),
                 context.descriptorManager->GetCBV_SRV_UAVHandle(base.index + 2u),
                 context.descriptorManager->GetCBV_SRV_UAVHandle(base.index + 3u),
                 context.descriptorManager->GetCBV_SRV_UAVHandle(base.index + 4u),
                 context.descriptorManager->GetCBV_SRV_UAVHandle(base.index + 5u),
+                context.descriptorManager->GetCBV_SRV_UAVHandle(base.index + 6u),
             };
             for (const DescriptorHandle& handle : table) {
                 if (!handle.IsValid()) {
@@ -251,6 +257,17 @@ void FailFullSceneReflectionHistoryV3Copy(const FullSceneReflectionHistoryV3Copy
                     reflectionConfidence,
                     DXGI_FORMAT_R16G16B16A16_FLOAT)) {
                 FailFullSceneCompositeV3(context, "full_scene_composite_v3_reflection_confidence_srv");
+                return;
+            }
+            ID3D12Resource* materialAlbedo = context.materialAlbedo.IsValid()
+                ? graph.GetResource(context.materialAlbedo)
+                : nullptr;
+            if (!DescriptorTable::WriteTexture2DSRV(
+                    context.device,
+                    table[6],
+                    materialAlbedo,
+                    DXGI_FORMAT_R8G8B8A8_UNORM)) {
+                FailFullSceneCompositeV3(context, "full_scene_composite_v3_material_albedo_srv");
                 return;
             }
 
@@ -892,6 +909,7 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
     RGResourceHandle bloomHandle{};
     RGResourceHandle historyHandle{};
     RGResourceHandle depthPpHandle{};
+    RGResourceHandle albedoHandle{};
     RGResourceHandle normalHandle{};
     RGResourceHandle emissiveMetallicHandle{};
     RGResourceHandle materialExt1Handle{};
@@ -937,6 +955,7 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
     VisibilityBufferRenderer::ResourceStateSnapshot vbPostInitialStates{};
     bool hasVBPostStates = false;
     ID3D12Resource* postNormalResource = nullptr;
+    ID3D12Resource* postAlbedoResource = nullptr;
     ID3D12Resource* postEmissiveMetallicResource = nullptr;
     ID3D12Resource* postMaterialExt1Resource = nullptr;
     ID3D12Resource* postMaterialExt2Resource = nullptr;
@@ -1045,6 +1064,13 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
         if (m_visibilityBufferState.renderedThisFrame && m_services.visibilityBuffer) {
             vbPostInitialStates = m_services.visibilityBuffer->GetResourceStateSnapshot();
             hasVBPostStates = true;
+        }
+        if (m_visibilityBufferState.renderedThisFrame && m_services.visibilityBuffer && m_services.visibilityBuffer->GetAlbedoBuffer()) {
+            postAlbedoResource = m_services.visibilityBuffer->GetAlbedoBuffer();
+            albedoHandle = m_services.renderGraph->ImportResource(
+                postAlbedoResource,
+                vbPostInitialStates.albedo,
+                "MaterialAlbedo");
         }
         {
             ID3D12Resource* normalRes = m_mainTargets.normalRoughness.resources.texture.Get();
@@ -1429,7 +1455,8 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
         if (wantsCompositeV3ThisFrame &&
             candidateHdrSceneColorHandle.IsValid() &&
             energyClampPolicyHandle.IsValid() &&
-            overbrightDiagnosticsHandle.IsValid()) {
+            overbrightDiagnosticsHandle.IsValid() &&
+            albedoHandle.IsValid()) {
             FullSceneCompositeV3Context compositeContext{};
             compositeContext.directLighting = v3DirectLightingHandle;
             compositeContext.indirectLighting = v3IndirectLightingHandle;
@@ -1441,6 +1468,7 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
             compositeContext.reflectionConfidence = scheduledReflectionResolverV3 && reflectionConfidenceHandle.IsValid()
                 ? reflectionConfidenceHandle
                 : RGResourceHandle{};
+            compositeContext.materialAlbedo = albedoHandle;
             compositeContext.output = candidateHdrSceneColorHandle;
             compositeContext.energyClampPolicy = energyClampPolicyHandle;
             compositeContext.overbrightDiagnostics = overbrightDiagnosticsHandle;
@@ -1738,6 +1766,9 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
         }
         if (hasVBPostStates) {
             auto finalStates = m_services.visibilityBuffer->GetResourceStateSnapshot();
+            if (albedoHandle.IsValid()) {
+                finalStates.albedo = m_services.renderGraph->GetResourceState(albedoHandle);
+            }
             if (normalHandle.IsValid()) {
                 finalStates.normalRoughness = m_services.renderGraph->GetResourceState(normalHandle);
             }
@@ -1903,7 +1934,7 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
                                 result.ranCompositeV3,
                                 result.ranCompositeV3 ? 1u : 0u,
                                 {"direct_lighting", "indirect_lighting", "shadow_visibility", "hdr_color",
-                                 "reflection_radiance", "reflection_confidence"},
+                                 "reflection_radiance", "reflection_confidence", "vb_gbuffer_albedo"},
                                 {"candidate_hdr_scene_color", "energy_clamp_policy", "overbright_diagnostics"},
                                 false,
                                 nullptr,
@@ -1914,7 +1945,7 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
                                 result.ranCompositeV3,
                                 result.ranCompositeV3 ? 1u : 0u,
                                 {"direct_lighting", "indirect_lighting", "shadow_visibility", "hdr_color",
-                                 "local_reflection_radiance"},
+                                 "local_reflection_radiance", "vb_gbuffer_albedo"},
                                 {"candidate_hdr_scene_color", "energy_clamp_policy", "overbright_diagnostics"},
                                 false,
                                 nullptr,
@@ -1924,7 +1955,7 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
                                 true,
                                 result.ranCompositeV3,
                                 result.ranCompositeV3 ? 1u : 0u,
-                                {"direct_lighting", "indirect_lighting", "shadow_visibility", "hdr_color"},
+                                {"direct_lighting", "indirect_lighting", "shadow_visibility", "hdr_color", "vb_gbuffer_albedo"},
                                 {"candidate_hdr_scene_color", "energy_clamp_policy", "overbright_diagnostics"},
                                 false,
                                 nullptr,

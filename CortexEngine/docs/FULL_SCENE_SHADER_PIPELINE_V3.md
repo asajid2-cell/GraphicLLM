@@ -1566,3 +1566,42 @@ Remaining limitation:
 - The gate establishes a baseline; it does not yet reduce legacy HDR rescue.
 - Next CompositeV3 shader work should reduce `mean_legacy_rescue` and then run
   motion packets.
+
+### CompositeV3 Material Albedo / Scene-Local Floor - 2026-06-06
+
+Implemented:
+
+- `FullSceneCompositeV3` now reads `vb_gbuffer_albedo` through a concrete
+  `MaterialAlbedo` render-graph import.
+- CompositeV3 readiness, runtime frame context, analyzers, and the V3 contract
+  require the material-albedo read edge.
+- Before using legacy `hdr_color` rescue, the shader applies a bounded
+  candidate-owned fill from material albedo and a small neutral scene-local
+  floor.
+
+Evidence:
+
+- baseline diagnostic packet:
+  `build/captures/v3_composite_diagnostics_gate_static_gallery_20260606`.
+  - `mean_legacy_rescue=0.048630`.
+  - failures `0`, warnings `0`.
+- static scene-floor packet:
+  `build/captures/v3_composite_scene_floor_static_gallery_20260606`.
+  - `mean_legacy_rescue=0.000000`.
+  - `mean_underlit=0.080436`.
+  - failures `0`, warnings `0`.
+- mouse-jitter scene-floor packet:
+  `build/captures/v3_composite_scene_floor_mouse_jitter_gallery_20260606`.
+  - `mean_legacy_rescue=0.000000`.
+  - `mean_underlit=0.082492`.
+  - failures `0`, warnings `0`.
+- frame report proof:
+  `FullSceneCompositeV3.reads` includes `vb_gbuffer_albedo`, and V3 composite
+  channels include `material_albedo_input_read`.
+
+Remaining limitation:
+
+- This reduces legacy HDR rescue in gallery static/mouse-jitter evidence only.
+- It is still candidate-only and not a default-beauty promotion.
+- The neutral floor is a temporary bounded scene-local fallback, not the final
+  texture-backed `SceneLocalEnvironmentV3`.

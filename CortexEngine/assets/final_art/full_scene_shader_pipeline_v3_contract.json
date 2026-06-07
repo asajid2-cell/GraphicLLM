@@ -216,6 +216,7 @@
         "material_attributes",
         "direct_lighting",
         "indirect_lighting",
+        "vb_gbuffer_albedo",
         "reflection_radiance",
         "reflection_confidence",
         "scene_local_environment"

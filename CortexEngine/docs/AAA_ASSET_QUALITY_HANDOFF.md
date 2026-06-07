@@ -6854,3 +6854,52 @@ Results:
 - metal/glass packet still passes with `warnings=0`.
 - Next actual renderer work remains source/BRDF quality, but this harness gate
   now respects pass ownership.
+
+### CompositeV3 Reflection Confidence Input - 2026-06-06
+
+Implemented:
+
+- `FullSceneCompositeV3.hlsl` now reads `reflection_confidence` alongside
+  `reflection_radiance`.
+- Candidate HDR reflection contribution is weighted by the actual
+  ReflectionV3 resolver confidence instead of re-deriving confidence from
+  reflection luma.
+- Render-graph CompositeV3 descriptor table expanded from 5 to 6 SRVs.
+- CompositeV3 frame pass records now include `reflection_confidence` when the
+  ReflectionV3 resolver path is active.
+- The V3 JSON contract, runtime readiness, and placeholder analyzer now require
+  `reflection_confidence` as a real CompositeV3 input.
+
+Validation:
+
+```powershell
+python -m py_compile tools\analyze_full_scene_shader_v3_placeholders.py tools\validate_full_scene_shader_pipeline_v3_plan.py
+python -m json.tool assets\final_art\full_scene_shader_pipeline_v3_contract.json
+python tools\validate_full_scene_shader_pipeline_v3_plan.py
+git -C z:\328\CMPUT328-A2\codexworks\301\graphics diff --check -- CortexEngine\assets\final_art\full_scene_shader_pipeline_v3_contract.json CortexEngine\assets\shaders\FullSceneCompositeV3.hlsl CortexEngine\src\Graphics\Renderer_RenderGraphEndFrame.cpp CortexEngine\src\Graphics\FullSceneShaderFrameContext.h CortexEngine\tools\analyze_full_scene_shader_v3_placeholders.py
+cmd.exe /d /c "call ""C:\Program Files\Microsoft Visual Studio\18\Community\Common7\Tools\VsDevCmd.bat"" -arch=x64 -host_arch=x64 >nul && set ""CORTEX_SKIP_ASSET_SYNC=1"" && ""C:\Program Files\Ninja\ninja.exe"" -C build CortexEngine -j 8"
+Copy-Item -LiteralPath assets\shaders\FullSceneCompositeV3.hlsl -Destination build\bin\assets\shaders\FullSceneCompositeV3.hlsl -Force
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_full_scene_shader_pipeline_v3_packet.ps1 -NoBuild -SkipSceneAnalyzers -NoStressScene -FamilyFilter gallery -SmokeFrames 24 -CaptureFrame 12 -CaptureSequenceCount 1 -StabilityMotionMode static -OutputRoot build\captures\v3_composite_reflection_confidence_static_fullviews_20260606
+```
+
+Results:
+
+- native build completed after a long link.
+- full V3 static gallery packet passed:
+  `build/captures/v3_composite_reflection_confidence_static_fullviews_20260606`.
+- `promotion_decision.md` status: `review_packet_passed`,
+  `default beauty promotable=false`.
+- frame report evidence from
+  `gallery/candidate_hdr_scene_color/frame_report_shutdown.json`:
+  - `composite_v3_ready=true`.
+  - `composite_v3_producer=FullSceneCompositeV3`.
+  - `reflection_confidence_ready=true`.
+  - `candidate_hdr_scene_color_owned_by_full_scene_composite_v3`.
+  - `FullSceneCompositeV3` pass/resource sections include
+    `reflection_confidence`.
+
+Current limitation:
+
+- CompositeV3 still keeps `hdr_color` as a bounded rescue/reference input.
+- Next CompositeV3 work should add explicit candidate energy diagnostics and
+  reduce legacy HDR fallback use, rather than claiming final beauty promotion.

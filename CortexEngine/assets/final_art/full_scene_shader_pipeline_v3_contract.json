@@ -215,6 +215,7 @@
         "direct_lighting",
         "indirect_lighting",
         "reflection_radiance",
+        "reflection_confidence",
         "scene_local_environment"
       ],
       "required_outputs": [

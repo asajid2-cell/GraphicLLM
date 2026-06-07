@@ -1867,7 +1867,8 @@ inline FullSceneShaderPipelineV3FrameContext BuildFullSceneShaderPipelineV3Frame
         FullSceneShaderPassReadsResource(contract, "FullSceneCompositeV3", "indirect_lighting") &&
         FullSceneShaderPassReadsResource(contract, "FullSceneCompositeV3", "shadow_visibility") &&
         FullSceneShaderPassReadsResource(contract, "FullSceneCompositeV3", "hdr_color") &&
-        FullSceneShaderPassReadsResource(contract, "FullSceneCompositeV3", "reflection_radiance");
+        FullSceneShaderPassReadsResource(contract, "FullSceneCompositeV3", "reflection_radiance") &&
+        FullSceneShaderPassReadsResource(contract, "FullSceneCompositeV3", "reflection_confidence");
     const bool realCompositeV3ProducerReady = candidateHdrSceneColorReady && compositeReadsV3Inputs;
     context.hdrSceneColorReady = candidateHdrSceneColorReady || legacyHdrSceneColorReady;
     context.compositeInputsReady =

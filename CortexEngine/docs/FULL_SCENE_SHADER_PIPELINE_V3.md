@@ -1448,3 +1448,21 @@ Update:
   `frame_contract.water.roughness` when `water.surface_count > 0`.
 - `glass_water_courtyard:water_closeup` now reports opaque roughness center
   `0.75008`, target roughness `0.03000`, and `warnings=0`.
+
+### CompositeV3 Reflection Confidence Input - 2026-06-06
+
+Implemented:
+
+- `FullSceneCompositeV3` consumes `reflection_confidence` alongside
+  `reflection_radiance`.
+- candidate HDR reflection weight is now driven by the ReflectionV3 resolver's
+  confidence output, not a luma estimate inside the composite shader.
+- the V3 contract, frame readiness, and analyzer require
+  `reflection_confidence` before CompositeV3 is treated as the real producer.
+
+Validation:
+
+- `build/captures/v3_composite_reflection_confidence_static_fullviews_20260606`.
+- static gallery V3 packet passed with `review_packet_passed`.
+- `composite_v3_producer=FullSceneCompositeV3`.
+- `candidate_hdr_scene_color_owned_by_full_scene_composite_v3`.

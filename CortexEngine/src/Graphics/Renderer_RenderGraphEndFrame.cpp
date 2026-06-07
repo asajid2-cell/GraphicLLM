@@ -28,6 +28,7 @@ struct FullSceneCompositeV3Context {
     RGResourceHandle shadowVisibility;
     RGResourceHandle legacyHdr;
     RGResourceHandle localReflectionRadiance;
+    RGResourceHandle reflectionConfidence;
     RGResourceHandle output;
     ID3D12Device* device = nullptr;
     DescriptorHeapManager* descriptorManager = nullptr;
@@ -187,22 +188,26 @@ void FailFullSceneReflectionHistoryV3Copy(const FullSceneReflectionHistoryV3Copy
             if (context.localReflectionRadiance.IsValid()) {
                 builder.Read(context.localReflectionRadiance, RGResourceUsage::ShaderResource);
             }
+            if (context.reflectionConfidence.IsValid()) {
+                builder.Read(context.reflectionConfidence, RGResourceUsage::ShaderResource);
+            }
             builder.Write(context.output, RGResourceUsage::RenderTarget);
         },
         [context](ID3D12GraphicsCommandList*, const RenderGraph& graph) {
-            auto tableResult = context.descriptorManager->AllocateTransientCBV_SRV_UAVRange(5);
+            auto tableResult = context.descriptorManager->AllocateTransientCBV_SRV_UAVRange(6);
             if (tableResult.IsErr()) {
                 FailFullSceneCompositeV3(context, "full_scene_composite_v3_descriptor");
                 return;
             }
 
             const DescriptorHandle base = tableResult.Value();
-            const DescriptorHandle table[5] = {
+            const DescriptorHandle table[6] = {
                 context.descriptorManager->GetCBV_SRV_UAVHandle(base.index + 0u),
                 context.descriptorManager->GetCBV_SRV_UAVHandle(base.index + 1u),
                 context.descriptorManager->GetCBV_SRV_UAVHandle(base.index + 2u),
                 context.descriptorManager->GetCBV_SRV_UAVHandle(base.index + 3u),
                 context.descriptorManager->GetCBV_SRV_UAVHandle(base.index + 4u),
+                context.descriptorManager->GetCBV_SRV_UAVHandle(base.index + 5u),
             };
             for (const DescriptorHandle& handle : table) {
                 if (!handle.IsValid()) {
@@ -224,6 +229,17 @@ void FailFullSceneReflectionHistoryV3Copy(const FullSceneReflectionHistoryV3Copy
                     reflectionRadiance,
                     DXGI_FORMAT_R16G16B16A16_FLOAT)) {
                 FailFullSceneCompositeV3(context, "full_scene_composite_v3_reflection_srv");
+                return;
+            }
+            ID3D12Resource* reflectionConfidence = context.reflectionConfidence.IsValid()
+                ? graph.GetResource(context.reflectionConfidence)
+                : nullptr;
+            if (!DescriptorTable::WriteTexture2DSRV(
+                    context.device,
+                    table[5],
+                    reflectionConfidence,
+                    DXGI_FORMAT_R16G16B16A16_FLOAT)) {
+                FailFullSceneCompositeV3(context, "full_scene_composite_v3_reflection_confidence_srv");
                 return;
             }
 
@@ -1384,6 +1400,9 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
             compositeContext.localReflectionRadiance = scheduledReflectionResolverV3 && reflectionRadianceHandle.IsValid()
                 ? reflectionRadianceHandle
                 : localReflRadianceHandle;
+            compositeContext.reflectionConfidence = scheduledReflectionResolverV3 && reflectionConfidenceHandle.IsValid()
+                ? reflectionConfidenceHandle
+                : RGResourceHandle{};
             compositeContext.output = candidateHdrSceneColorHandle;
             compositeContext.device = m_services.device ? m_services.device->GetDevice() : nullptr;
             compositeContext.descriptorManager = m_services.descriptorManager.get();
@@ -1821,7 +1840,7 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
                                 result.ranCompositeV3,
                                 result.ranCompositeV3 ? 1u : 0u,
                                 {"direct_lighting", "indirect_lighting", "shadow_visibility", "hdr_color",
-                                 "reflection_radiance"},
+                                 "reflection_radiance", "reflection_confidence"},
                                 {"candidate_hdr_scene_color"},
                                 false,
                                 nullptr,

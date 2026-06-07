@@ -6971,3 +6971,67 @@ Current limitation:
 - Default beauty remains unchanged and not promotable.
 - Next CompositeV3 work should use the new diagnostics to reduce measured
   legacy HDR rescue usage and then run mouse-jitter/camera-sweep packets.
+
+### CompositeV3 Diagnostic Gate - 2026-06-06
+
+Implemented:
+
+- Added `tools/analyze_full_scene_shader_v3_composite_diagnostics.py`.
+- The analyzer reads the packet manifest and measures the CompositeV3
+  diagnostic debug captures:
+  - `energy_clamp_policy`.
+  - `overbright_diagnostics`.
+- It emits:
+  - `v3_composite_diagnostics.json`.
+  - `v3_composite_diagnostics.md`.
+- It fails missing diagnostic captures and severe clamp/legacy-rescue debt.
+- It reports softer visual debt as warnings so quality work has numbers to
+  improve instead of relying on screenshots.
+- `tools/run_full_scene_shader_pipeline_v3_packet.ps1` now runs this analyzer
+  automatically before the promotion decision.
+
+Lane interpretation:
+
+- `energy_clamp_policy.R`: pre-clamp luma.
+- `energy_clamp_policy.G`: clamp mask.
+- `energy_clamp_policy.B`: clamp ratio.
+- `overbright_diagnostics.R`: overbright.
+- `overbright_diagnostics.G`: underlit.
+- `overbright_diagnostics.B`: legacy HDR rescue usage.
+
+Validation:
+
+```powershell
+python -m py_compile tools\analyze_full_scene_shader_v3_composite_diagnostics.py tools\analyze_full_scene_shader_v3_placeholders.py tools\validate_full_scene_shader_pipeline_v3_plan.py
+python tools\analyze_full_scene_shader_v3_composite_diagnostics.py --manifest build\captures\v3_composite_energy_diagnostics_static_fullviews_20260606\manifest.json --output-json build\captures\v3_composite_energy_diagnostics_static_fullviews_20260606\v3_composite_diagnostics.json --output-md build\captures\v3_composite_energy_diagnostics_static_fullviews_20260606\v3_composite_diagnostics.md
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_full_scene_shader_pipeline_v3_packet.ps1 -NoBuild -SkipSceneAnalyzers -NoStressScene -FamilyFilter gallery -SmokeFrames 18 -CaptureFrame 9 -CaptureSequenceCount 1 -StabilityMotionMode static -OutputRoot build\captures\v3_composite_diagnostics_gate_static_gallery_20260606
+```
+
+Evidence:
+
+- direct analyzer pass on
+  `build/captures/v3_composite_energy_diagnostics_static_fullviews_20260606`:
+  - `ready=true`.
+  - failures `0`.
+  - warnings `0`.
+  - `mean_clamp_mask=0.000045`.
+  - `mean_clamp_ratio=0.000011`.
+  - `mean_legacy_rescue=0.048630`.
+  - `mean_underlit=0.083867`.
+  - `mean_overbright=0.009254`.
+- integrated packet:
+  `build/captures/v3_composite_diagnostics_gate_static_gallery_20260606`.
+  - `Scene-local cinematic renderer packet run passed`.
+  - `Full Scene Shader Pipeline V2 packet evidence passed`.
+  - `PASS: Full Scene Shader Pipeline V3 placeholder packet artifacts are coherent`.
+  - `PASS: CompositeV3 diagnostics are measurable`.
+  - `PASS: V3 promotion decision status=review_packet_passed`.
+
+Current limitation:
+
+- This gate measures gallery/static only in the latest integrated packet.
+- It does not reduce legacy rescue usage yet; it establishes the baseline
+  `mean_legacy_rescue=0.048630` to beat.
+- Next renderer slice should reduce this fallback dependency in
+  `FullSceneCompositeV3` and rerun static plus mouse-jitter/camera-sweep
+  packets.

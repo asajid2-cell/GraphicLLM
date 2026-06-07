@@ -1526,3 +1526,43 @@ Remaining limitation:
 - Default beauty remains unchanged and not promotable.
 - Cross-family and motion evidence are still required before this can support
   candidate/default promotion.
+
+### CompositeV3 Diagnostic Gate - 2026-06-06
+
+Implemented:
+
+- Added `tools/analyze_full_scene_shader_v3_composite_diagnostics.py`.
+- The analyzer measures lane-aware CompositeV3 diagnostic captures:
+  - `energy_clamp_policy`.
+  - `overbright_diagnostics`.
+- It emits `v3_composite_diagnostics.json` and
+  `v3_composite_diagnostics.md`.
+- It is now run by `tools/run_full_scene_shader_pipeline_v3_packet.ps1` before
+  the promotion decision.
+
+Validation:
+
+- direct analyzer pass on
+  `build/captures/v3_composite_energy_diagnostics_static_fullviews_20260606`.
+- integrated packet:
+  `build/captures/v3_composite_diagnostics_gate_static_gallery_20260606`.
+
+Evidence:
+
+- direct analyzer output:
+  - failures `0`.
+  - warnings `0`.
+  - `mean_clamp_mask=0.000045`.
+  - `mean_clamp_ratio=0.000011`.
+  - `mean_legacy_rescue=0.048630`.
+  - `mean_underlit=0.083867`.
+  - `mean_overbright=0.009254`.
+- integrated packet output:
+  - `PASS: CompositeV3 diagnostics are measurable`.
+  - `PASS: V3 promotion decision status=review_packet_passed`.
+
+Remaining limitation:
+
+- The gate establishes a baseline; it does not yet reduce legacy HDR rescue.
+- Next CompositeV3 shader work should reduce `mean_legacy_rescue` and then run
+  motion packets.

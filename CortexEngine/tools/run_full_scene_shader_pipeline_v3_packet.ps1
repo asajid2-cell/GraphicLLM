@@ -19,6 +19,7 @@ $v2Packet = Join-Path $root "tools/run_full_scene_shader_pipeline_v2_packet.ps1"
 $v3Analyzer = Join-Path $root "tools/analyze_full_scene_shader_v3_placeholders.py"
 $v3LightingMotionAnalyzer = Join-Path $root "tools/analyze_full_scene_shader_v3_lighting_motion.py"
 $v3MaterialPayloadAnalyzer = Join-Path $root "tools/analyze_full_scene_shader_v3_material_payload.py"
+$v3SceneProfileAnalyzer = Join-Path $root "tools/analyze_full_scene_shader_v3_scene_profile.py"
 $v3CompositeDiagnosticsAnalyzer = Join-Path $root "tools/analyze_full_scene_shader_v3_composite_diagnostics.py"
 $v3PromotionDecision = Join-Path $root "tools/build_full_scene_shader_v3_promotion_decision.py"
 $outputPath = Join-Path $root $OutputRoot
@@ -28,6 +29,8 @@ $lightingMotionOutput = Join-Path $outputPath "v3_lighting_motion.json"
 $lightingMotionMarkdown = Join-Path $outputPath "v3_lighting_motion.md"
 $materialPayloadOutput = Join-Path $outputPath "v3_material_payload.json"
 $materialPayloadMarkdown = Join-Path $outputPath "v3_material_payload.md"
+$sceneProfileOutput = Join-Path $outputPath "v3_scene_profile.json"
+$sceneProfileMarkdown = Join-Path $outputPath "v3_scene_profile.md"
 $compositeDiagnosticsOutput = Join-Path $outputPath "v3_composite_diagnostics.json"
 $compositeDiagnosticsMarkdown = Join-Path $outputPath "v3_composite_diagnostics.md"
 $promotionDecisionOutput = Join-Path $outputPath "promotion_decision.json"
@@ -82,6 +85,11 @@ try {
     }
 
     $manifestPath = Join-Path $outputPath "manifest.json"
+    & python $v3SceneProfileAnalyzer --manifest $manifestPath --output-json $sceneProfileOutput --output-md $sceneProfileMarkdown --min-family-count 1
+    if ($LASTEXITCODE -ne 0) {
+        exit $LASTEXITCODE
+    }
+
     & python $v3MaterialPayloadAnalyzer --manifest $manifestPath --output-json $materialPayloadOutput --output-md $materialPayloadMarkdown
     if ($LASTEXITCODE -ne 0) {
         exit $LASTEXITCODE
@@ -111,5 +119,6 @@ if ($CaptureSequenceCount -ge 2) {
     Write-Host "lighting_motion=$lightingMotionOutput"
 }
 Write-Host "material_payload=$materialPayloadOutput"
+Write-Host "scene_profile=$sceneProfileOutput"
 Write-Host "composite_diagnostics=$compositeDiagnosticsOutput"
 Write-Host "promotion_decision=$promotionDecisionOutput"

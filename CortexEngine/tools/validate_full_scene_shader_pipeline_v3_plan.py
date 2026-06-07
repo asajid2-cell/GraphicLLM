@@ -15,6 +15,7 @@ V3_PLACEHOLDER_ANALYZER_PATH = ROOT / "tools" / "analyze_full_scene_shader_v3_pl
 V3_PACKET_RUNNER_PATH = ROOT / "tools" / "run_full_scene_shader_pipeline_v3_packet.ps1"
 V3_PROMOTION_DECISION_PATH = ROOT / "tools" / "build_full_scene_shader_v3_promotion_decision.py"
 V3_MATERIAL_PAYLOAD_ANALYZER_PATH = ROOT / "tools" / "analyze_full_scene_shader_v3_material_payload.py"
+V3_SCENE_PROFILE_ANALYZER_PATH = ROOT / "tools" / "analyze_full_scene_shader_v3_scene_profile.py"
 
 
 REQUIRED_PLAN_TOKENS = [
@@ -58,6 +59,7 @@ REQUIRED_PLAN_TOKENS = [
 
 REQUIRED_DOMAINS = [
     "render_graph",
+    "scene_profile",
     "material",
     "lighting",
     "reflection",
@@ -137,6 +139,11 @@ def main() -> int:
         errors,
         f"Missing V3 material payload analyzer: {V3_MATERIAL_PAYLOAD_ANALYZER_PATH}",
     )
+    require(
+        V3_SCENE_PROFILE_ANALYZER_PATH.exists(),
+        errors,
+        f"Missing V3 scene profile analyzer: {V3_SCENE_PROFILE_ANALYZER_PATH}",
+    )
     if errors:
         for error in errors:
             print(f"ERROR: {error}")
@@ -150,8 +157,17 @@ def main() -> int:
     packet_source = V3_PACKET_RUNNER_PATH.read_text(encoding="utf-8")
     promotion_source = V3_PROMOTION_DECISION_PATH.read_text(encoding="utf-8")
     material_payload_source = V3_MATERIAL_PAYLOAD_ANALYZER_PATH.read_text(encoding="utf-8")
+    scene_profile_source = V3_SCENE_PROFILE_ANALYZER_PATH.read_text(encoding="utf-8")
     runtime_surface = "\n".join(
-        [frame_contract_source, frame_context_source, analyzer_source, packet_source, promotion_source, material_payload_source]
+        [
+            frame_contract_source,
+            frame_context_source,
+            analyzer_source,
+            packet_source,
+            promotion_source,
+            material_payload_source,
+            scene_profile_source,
+        ]
     )
 
     for token in REQUIRED_PLAN_TOKENS:
@@ -180,6 +196,50 @@ def main() -> int:
     for output in REQUIRED_OUTPUTS:
         require(output in render_graph_outputs, errors, f"V3 render graph missing output: {output}")
         require(output in runtime_surface, errors, f"V3 runtime placeholder missing output: {output}")
+
+    scene_profile_contract = domains.get("scene_profile", {})
+    require(
+        scene_profile_contract.get("producer") == "SceneCinematicProfileV1Adapter",
+        errors,
+        "V3 scene_profile domain must adapt the existing SceneCinematicProfile contract",
+    )
+    require(
+        scene_profile_contract.get("output_resource") == "scene_visual_contract",
+        errors,
+        "V3 scene_profile contract must output scene_visual_contract",
+    )
+    for field in [
+        "profile_id",
+        "family",
+        "environment_owner",
+        "reflection_owner",
+        "light_rig_id",
+        "shadow_policy_id",
+        "exposure_policy_id",
+        "material_palette_id",
+        "lighting_script_id",
+        "material_class_set_id",
+        "material_layer_set_id",
+        "temporal_policy_id",
+        "post_policy_id",
+        "post_quality_set_id",
+        "tone_mapper_preset",
+    ]:
+        require(
+            field in scene_profile_contract.get("required_fields", []),
+            errors,
+            f"V3 scene_profile contract missing required field: {field}",
+        )
+    for token in [
+        "sceneProfileReady",
+        '"scene_profile_ready"',
+        "sceneProfilePolicyCount",
+        '"scene_profile_policy_count"',
+        "SceneCinematicProfileV1Adapter",
+        "scene_visual_contract",
+        "scene_profile",
+    ]:
+        require(token in runtime_surface, errors, f"V3 scene_profile runtime missing token: {token}")
 
     material_contract = domains.get("material", {})
     require(
@@ -220,6 +280,8 @@ def main() -> int:
     validation_gates = set(domains.get("validation", {}).get("required_gates", []))
     for gate in [
         "no_missing_required_resource",
+        "scene_profile_policy_ready",
+        "scene_profile_family_differences_present",
         "reflection_temporal_delta_bounded",
         "environment_mode_matches_scene",
         "material_payload_debug_views_present",
@@ -227,6 +289,9 @@ def main() -> int:
         "default_beauty_unchanged_until_promotion",
     ]:
         require(gate in validation_gates, errors, f"V3 validation missing gate: {gate}")
+
+    required_artifacts = set(domains.get("validation", {}).get("required_artifacts", []))
+    require("v3_scene_profile.json" in required_artifacts, errors, "V3 validation missing v3_scene_profile.json artifact")
 
     candidate_beauty_contract = domains.get("candidate_beauty", {})
     require(

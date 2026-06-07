@@ -46,6 +46,7 @@ REQUIRED_OUTPUTS = {
 
 REQUIRED_DOMAINS = {
     "render_graph",
+    "scene_profile",
     "material",
     "lighting",
     "reflection",
@@ -56,6 +57,7 @@ REQUIRED_DOMAINS = {
 }
 
 ALLOWED_READY_DOMAINS = {
+    "scene_profile",
     "material",
     "lighting",
     "environment",
@@ -867,6 +869,10 @@ def analyze_report(
         "required_output_count": len(outputs),
         "domain_count": len(domain_ids),
         "ready_domains": ready_domains,
+        "scene_profile_ready": v3.get("scene_profile_ready"),
+        "scene_profile_policy_count": v3.get("scene_profile_policy_count"),
+        "scene_profile_producer": v3.get("scene_profile_producer"),
+        "scene_profile_output": v3.get("scene_profile_output"),
         "material_attributes_ready": v3.get("material_attributes_ready"),
         "material_attributes_resource_count": v3.get("material_attributes_resource_count"),
         "material_attributes_channel_count": v3.get("material_attributes_channel_count"),
@@ -978,6 +984,9 @@ def main() -> int:
             1 for row in rows if row.get("v3_status") != "planned_not_promoted"
         ),
         "ready_domain_report_count": sum(1 for row in full_pipeline_rows if row.get("ready_domains")),
+        "scene_profile_ready_report_count": sum(
+            1 for row in full_pipeline_rows if row.get("scene_profile_ready") is True
+        ),
         "material_ready_report_count": sum(
             1 for row in rows if row.get("material_attributes_ready") is True
         ),

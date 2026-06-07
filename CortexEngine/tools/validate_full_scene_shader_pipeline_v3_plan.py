@@ -296,6 +296,26 @@ def main() -> int:
     families = set(contract.get("required_scene_families", []))
     for family in ["gallery", "kitchen", "office", "gym", "concert", "red_room", "stadium"]:
         require(family in families, errors, f"V3 contract missing scene family: {family}")
+    candidate_path_debt_fields = set(contract.get("candidate_path_debt_fields", []))
+    for field in [
+        "render_graph_missing_producer_count",
+        "render_graph_missing_producer_resources",
+        "material_missing_required_channels",
+        "lighting_missing_required_channels",
+        "environment_missing_required_channels",
+        "reflection_missing_required_channels",
+        "composite_missing_required_channels",
+        "cinematic_post_missing_required_channels",
+        "candidate_beauty_missing_required_channels",
+        "total_missing_required_channels",
+        "not_ready_domain_count",
+        "legacy_rescue_resource_ready",
+    ]:
+        require(
+            field in candidate_path_debt_fields,
+            errors,
+            f"V3 contract missing candidate-path debt field: {field}",
+        )
 
     domains = contract.get("domains", {})
     for domain in REQUIRED_DOMAINS:
@@ -624,6 +644,20 @@ def main() -> int:
         "RenderGraphV3Inventory",
         "v3_resource_inventory",
         "v3_resource_ownership",
+        "candidate_path_debt",
+        '"candidate_path_debt"',
+        "totalMissingRequiredChannels",
+        '"total_missing_required_channels"',
+        "notReadyDomainCount",
+        '"not_ready_domain_count"',
+        '"material_missing_required_channels"',
+        '"lighting_missing_required_channels"',
+        '"environment_missing_required_channels"',
+        '"reflection_missing_required_channels"',
+        '"composite_missing_required_channels"',
+        '"cinematic_post_missing_required_channels"',
+        '"candidate_beauty_missing_required_channels"',
+        '"legacy_rescue_resource_ready"',
         "materialAttributesReady",
         '"material_attributes_ready"',
         "lightingAdapterReady",

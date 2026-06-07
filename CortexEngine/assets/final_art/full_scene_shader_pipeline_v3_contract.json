@@ -3,6 +3,20 @@
   "purpose": "Ground the FullSceneShaderPipeline V3 refactor in named render-graph resources, debug views, frame-report evidence, and packet gates before beauty promotion.",
   "status": "planned_not_promoted",
   "promotion_rule": "No V3 domain may affect default beauty until its producer resource, consumer path, debug view, frame-report fields, packet analyzer, and contact sheet evidence pass on the required stress families.",
+  "candidate_path_debt_fields": [
+    "render_graph_missing_producer_count",
+    "render_graph_missing_producer_resources",
+    "material_missing_required_channels",
+    "lighting_missing_required_channels",
+    "environment_missing_required_channels",
+    "reflection_missing_required_channels",
+    "composite_missing_required_channels",
+    "cinematic_post_missing_required_channels",
+    "candidate_beauty_missing_required_channels",
+    "total_missing_required_channels",
+    "not_ready_domain_count",
+    "legacy_rescue_resource_ready"
+  ],
   "required_scene_families": [
     "gallery",
     "kitchen",

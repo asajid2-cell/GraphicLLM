@@ -363,6 +363,24 @@ def analyze_report(
         failures.append("render_graph_v3_pass_names must be populated")
     if not v3.get("render_graph_v3_written_resources"):
         failures.append("render_graph_v3_written_resources must be populated")
+    candidate_path_debt = v3.get("candidate_path_debt")
+    if not isinstance(candidate_path_debt, dict):
+        failures.append("candidate_path_debt must be present")
+        candidate_path_debt = {}
+    for debt_field in [
+        "render_graph_missing_producer_count",
+        "material_missing_required_channels",
+        "lighting_missing_required_channels",
+        "environment_missing_required_channels",
+        "reflection_missing_required_channels",
+        "composite_missing_required_channels",
+        "cinematic_post_missing_required_channels",
+        "candidate_beauty_missing_required_channels",
+        "total_missing_required_channels",
+        "not_ready_domain_count",
+    ]:
+        if debt_field not in candidate_path_debt:
+            failures.append(f"candidate_path_debt missing {debt_field}")
 
     missing_outputs = sorted(REQUIRED_OUTPUTS - outputs)
     if missing_outputs:

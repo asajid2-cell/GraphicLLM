@@ -903,6 +903,82 @@ Current next work after this checkpoint:
 3. Feed the room/light contract into renderer frame reports directly, not only
    the offline proxy manifest.
 
+Latest SceneLocalEnvironmentV3 runtime proxy-contract checkpoint:
+
+- Runtime frame reports now carry the proxy contract fields that were
+  previously only present in the offline manifest.
+- Added environment/frame-contract fields:
+  - `scene_local_proxy_derivation_method`
+  - `scene_local_proxy_room_shell`
+  - `scene_local_proxy_room_occlusion`
+  - `scene_local_proxy_light_rig`
+  - `scene_local_proxy_light_accent_strength`
+- Added matching V3 report fields:
+  - `scene_local_environment_proxy_derivation_method`
+  - `scene_local_environment_proxy_room_shell`
+  - `scene_local_environment_proxy_room_occlusion`
+  - `scene_local_environment_proxy_light_rig`
+  - `scene_local_environment_proxy_light_accent_strength`
+- Runtime mapping lives in `Renderer_FramePostConstants.cpp` as
+  `SceneLocalProxyContractForSetId()`. It currently mirrors the generator's
+  eight tracked room/light contracts.
+- `tools\analyze_full_scene_shader_v3_environment_payload.py` now checks that
+  runtime derivation, room shell, room occlusion, light rig, and light accent
+  strength match the proxy manifest.
+- Updated
+  `assets\final_art\full_scene_shader_pipeline_v3_contract.json` and
+  `tools\validate_full_scene_shader_pipeline_v3_plan.py` so these fields are
+  part of the checked V3 payload channel surface.
+
+Validation commands:
+
+```powershell
+python -m py_compile tools\analyze_full_scene_shader_v3_environment_payload.py tools\validate_full_scene_shader_pipeline_v3_plan.py
+python tools\validate_full_scene_shader_pipeline_v3_plan.py
+git -c submodule.recurse=false diff --check -- src\Graphics\FrameContract.h src\Graphics\Renderer.h src\Graphics\Renderer_FramePostConstants.cpp src\Graphics\Renderer_FrameContractSnapshot.cpp src\Graphics\FrameContractJson.cpp src\Graphics\FullSceneShaderFrameContext.h assets\final_art\full_scene_shader_pipeline_v3_contract.json tools\analyze_full_scene_shader_v3_environment_payload.py tools\validate_full_scene_shader_pipeline_v3_plan.py
+cmd.exe /d /c "call ""C:\Program Files\Microsoft Visual Studio\18\Community\Common7\Tools\VsDevCmd.bat"" -arch=x64 -host_arch=x64 >nul && set ""CORTEX_SKIP_ASSET_SYNC=1"" && ""C:\Program Files\Ninja\ninja.exe"" -C build CortexEngine -j 8"
+Copy-Item -LiteralPath assets\final_art\full_scene_shader_pipeline_v3_contract.json -Destination build\bin\assets\final_art\full_scene_shader_pipeline_v3_contract.json -Force
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_full_scene_shader_pipeline_v3_packet.ps1 -NoBuild -SkipSceneAnalyzers -StressSceneOnly -StressSceneFilter rt_showcase:reflection_closeup -SmokeFrames 10 -CaptureFrame 5 -CaptureSequenceCount 1 -StabilityMotionMode static -OutputRoot build\captures\v3_scene_local_runtime_proxy_contract_fresh_smoke_20260607
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_scene_local_cinematic_renderer_v1_packets.ps1 -NoBuild -OutputRoot build\captures\v3_scene_local_runtime_proxy_contract_cross_profile_20260607 -FamilyFilter gallery,office,concert,stadium -ViewFilter scene_local_environment -SmokeFrames 10 -CaptureFrame 5 -CaptureSequenceCount 1 -SkipOwnerAnalysis -SkipMaterialAnalysis -SkipStabilityAnalysis -SkipVisualQualityAnalysis
+python tools\analyze_full_scene_shader_v3_environment_payload.py --manifest build\captures\v3_scene_local_runtime_proxy_contract_cross_profile_20260607\manifest.json --output-json build\captures\v3_scene_local_runtime_proxy_contract_cross_profile_20260607\v3_environment_payload_cross_profile.json --output-md build\captures\v3_scene_local_runtime_proxy_contract_cross_profile_20260607\v3_environment_payload_cross_profile.md --min-payload-ready 3
+python tools\analyze_full_scene_shader_v3_environment_profiles.py --manifest build\captures\v3_scene_local_runtime_proxy_contract_cross_profile_20260607\manifest.json --output-json build\captures\v3_scene_local_runtime_proxy_contract_cross_profile_20260607\v3_environment_profiles_cross_profile.json --output-md build\captures\v3_scene_local_runtime_proxy_contract_cross_profile_20260607\v3_environment_profiles_cross_profile.md --min-ready-reports 3 --min-distinct-modes 3 --min-distinct-profiles 3 --require-profile gallery_neutral=1 --require-profile enclosed_room=2 --require-profile stage=3 --require-profile open_exterior=4
+```
+
+Evidence:
+
+- Native `CortexEngine` target built successfully. The known trailing
+  `vswhere.exe` warning printed after link.
+- Focused packet:
+  `build\captures\v3_scene_local_runtime_proxy_contract_fresh_smoke_20260607`
+  - full V3 packet passed end to end
+  - `54` reports, `54` payload-ready, `54` derived proxy,
+    `54` material-sampled proxy, `54` scene-contract proxy
+  - runtime derivation: `profile_payload_material_room_light_v1`
+  - runtime room: `gallery_partial`
+  - runtime light: `neutral_gallery_key`
+- Cross-profile packet:
+  `build\captures\v3_scene_local_runtime_proxy_contract_cross_profile_20260607`
+  - packet runner passed
+  - environment payload analyzer passed
+  - environment profile analyzer passed
+  - `4` reports, `4` payload-ready, `4` derived proxy,
+    `4` material-sampled proxy, `4` scene-contract proxy
+  - runtime rooms:
+    `dark_stage_volume`, `evening_enclosed_room`, `gallery_partial`,
+    `open_exterior_bowl`
+  - runtime light rigs:
+    `cool_floodlights`, `cyan_magenta_stage`, `neutral_gallery_key`,
+    `soft_warm_desk_fill`
+
+Current next work after this checkpoint:
+
+1. Replace the duplicated C++ room/light mapping with manifest loading or a
+   generated header so the generator and runtime share one source of truth.
+2. Convert flat BC1 proxy colors into filtered irradiance/specular/probe-like
+   resources.
+3. Separate report diagnostics from visual capture success for kitchen/gym/red
+   room model-scene instability.
+
 Latest LightingShadowV3 source-attribution checkpoint:
 
 - `FullSceneLightingV3` now splits `shadow_source_attribution` by source:

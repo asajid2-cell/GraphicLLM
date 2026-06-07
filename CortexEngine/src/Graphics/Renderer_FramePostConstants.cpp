@@ -95,11 +95,46 @@ struct SceneLocalPayloadTextureCandidates {
     bool explicitProxyTriplePresent = false;
 };
 
+struct SceneLocalProxyContract {
+    const char* roomShell = "none";
+    float roomOcclusion = 0.0f;
+    const char* lightRig = "none";
+    float lightAccentStrength = 0.0f;
+};
+
 std::string ToLowerAscii(std::string value) {
     for (char& c : value) {
         c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
     }
     return value;
+}
+
+SceneLocalProxyContract SceneLocalProxyContractForSetId(const std::string& setId) {
+    if (setId == "rt_showcase_gallery") {
+        return {"gallery_partial", 0.22f, "neutral_gallery_key", 0.10f};
+    }
+    if (setId == "home_kitchen_lantern") {
+        return {"warm_enclosed_room", 0.46f, "warm_practical_plus_fill", 0.24f};
+    }
+    if (setId == "home_office_evening") {
+        return {"evening_enclosed_room", 0.52f, "soft_warm_desk_fill", 0.18f};
+    }
+    if (setId == "school_classroom_day") {
+        return {"bright_enclosed_room", 0.28f, "cool_daylight_windows", 0.08f};
+    }
+    if (setId == "basketball_gym_day") {
+        return {"tall_gym_volume", 0.34f, "high_bay_day_fill", 0.12f};
+    }
+    if (setId == "neon_streamer_concert") {
+        return {"dark_stage_volume", 0.72f, "cyan_magenta_stage", 0.42f};
+    }
+    if (setId == "red_light_room") {
+        return {"dark_red_room", 0.66f, "red_practical_accent", 0.36f};
+    }
+    if (setId == "stadium_night_match") {
+        return {"open_exterior_bowl", 0.18f, "cool_floodlights", 0.20f};
+    }
+    return {};
 }
 
 bool IsDdsPath(const std::filesystem::path& path) {
@@ -565,6 +600,13 @@ Renderer::BuildSceneLocalEnvironmentV3PayloadBindingInfo(bool queueMissingUpload
     info.irradianceProxyPath = candidates.irradianceProxyPath;
     info.specularProxyPath = candidates.specularProxyPath;
     info.visibleBackgroundProxyPath = candidates.visibleBackgroundProxyPath;
+    const SceneLocalProxyContract proxyContract =
+        SceneLocalProxyContractForSetId(candidates.textureSetId);
+    info.proxyDerivationMethod = "profile_payload_material_room_light_v1";
+    info.proxyRoomShell = proxyContract.roomShell;
+    info.proxyRoomOcclusion = proxyContract.roomOcclusion;
+    info.proxyLightRig = proxyContract.lightRig;
+    info.proxyLightAccentStrength = proxyContract.lightAccentStrength;
     info.resourceTableRequired = candidates.present;
     info.proxyResourceTableRequired =
         candidates.present &&

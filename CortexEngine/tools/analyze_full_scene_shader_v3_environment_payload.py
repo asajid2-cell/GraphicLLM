@@ -118,6 +118,13 @@ def analyze_report(path: Path, proxy_manifest: dict[str, Any]) -> dict[str, Any]
         "bound_proxy_resource_count": int(environment.get("scene_local_proxy_bound_resource_count", 0) or 0),
         "proxy_binding_source": environment.get("scene_local_proxy_binding_source", "none"),
         "proxy_fallback_reason": environment.get("scene_local_proxy_fallback_reason", "none"),
+        "runtime_proxy_derivation_method": environment.get("scene_local_proxy_derivation_method", "none"),
+        "runtime_proxy_room_shell": environment.get("scene_local_proxy_room_shell", "none"),
+        "runtime_proxy_room_occlusion": float(environment.get("scene_local_proxy_room_occlusion", -1.0) or -1.0),
+        "runtime_proxy_light_rig": environment.get("scene_local_proxy_light_rig", "none"),
+        "runtime_proxy_light_accent_strength": float(
+            environment.get("scene_local_proxy_light_accent_strength", -1.0) or -1.0
+        ),
         "v3_proxy_resource_table_required": (
             v3.get("scene_local_environment_proxy_resource_table_required") is True
         ),
@@ -129,6 +136,15 @@ def analyze_report(path: Path, proxy_manifest: dict[str, Any]) -> dict[str, Any]
         ),
         "v3_proxy_binding_source": v3.get("scene_local_environment_proxy_binding_source", "none"),
         "v3_proxy_fallback_reason": v3.get("scene_local_environment_proxy_fallback_reason", "none"),
+        "v3_proxy_derivation_method": v3.get("scene_local_environment_proxy_derivation_method", "none"),
+        "v3_proxy_room_shell": v3.get("scene_local_environment_proxy_room_shell", "none"),
+        "v3_proxy_room_occlusion": float(
+            v3.get("scene_local_environment_proxy_room_occlusion", -1.0) or -1.0
+        ),
+        "v3_proxy_light_rig": v3.get("scene_local_environment_proxy_light_rig", "none"),
+        "v3_proxy_light_accent_strength": float(
+            v3.get("scene_local_environment_proxy_light_accent_strength", -1.0) or -1.0
+        ),
         "proxy_manifest_present": bool(proxy_manifest_set),
         "proxy_derivation_method": proxy_derivation.get("method", "none"),
         "proxy_material_sample_decoder": proxy_material_samples.get("decoder", "none"),
@@ -221,6 +237,16 @@ def analyze_report(path: Path, proxy_manifest: dict[str, Any]) -> dict[str, Any]
             row["failures"].append("V3 proxy binding source does not match environment value")
         if row["v3_proxy_fallback_reason"] != row["proxy_fallback_reason"]:
             row["failures"].append("V3 proxy fallback reason does not match environment value")
+        if row["v3_proxy_derivation_method"] != row["runtime_proxy_derivation_method"]:
+            row["failures"].append("V3 proxy derivation method does not match environment value")
+        if row["v3_proxy_room_shell"] != row["runtime_proxy_room_shell"]:
+            row["failures"].append("V3 proxy room shell does not match environment value")
+        if abs(row["v3_proxy_room_occlusion"] - row["runtime_proxy_room_occlusion"]) > 0.001:
+            row["failures"].append("V3 proxy room occlusion does not match environment value")
+        if row["v3_proxy_light_rig"] != row["runtime_proxy_light_rig"]:
+            row["failures"].append("V3 proxy light rig does not match environment value")
+        if abs(row["v3_proxy_light_accent_strength"] - row["runtime_proxy_light_accent_strength"]) > 0.001:
+            row["failures"].append("V3 proxy light accent strength does not match environment value")
         if row["proxy_binding_source"] != "cached_explicit_scene_local_proxy_triple":
             row["failures"].append(
                 f"payload ready without explicit generated/authored proxy binding: {row['proxy_binding_source']}"
@@ -232,6 +258,11 @@ def analyze_report(path: Path, proxy_manifest: dict[str, Any]) -> dict[str, Any]
                 "payload ready without current derived scene-local proxy assets: "
                 f"{row['proxy_derivation_method']}"
             )
+        if row["runtime_proxy_derivation_method"] != row["proxy_derivation_method"]:
+            row["failures"].append(
+                "runtime proxy derivation method does not match manifest: "
+                f"{row['runtime_proxy_derivation_method']} vs {row['proxy_derivation_method']}"
+            )
         if row["proxy_material_sampled_color_count"] <= 0:
             row["failures"].append("payload ready without decoded material-color proxy samples")
         if row["proxy_material_sample_decoder"] != "pillow_dds":
@@ -240,12 +271,33 @@ def analyze_report(path: Path, proxy_manifest: dict[str, Any]) -> dict[str, Any]
             )
         if str(row["proxy_room_shell_enclosure"]).strip().lower() in {"", "none", "unknown"}:
             row["failures"].append("payload ready without room-shell proxy influence")
+        if row["runtime_proxy_room_shell"] != row["proxy_room_shell_enclosure"]:
+            row["failures"].append(
+                "runtime proxy room shell does not match manifest: "
+                f"{row['runtime_proxy_room_shell']} vs {row['proxy_room_shell_enclosure']}"
+            )
         if row["proxy_room_shell_occlusion"] < 0.0 or row["proxy_room_shell_occlusion"] > 1.0:
             row["failures"].append("payload ready with invalid room-shell occlusion influence")
+        if abs(row["runtime_proxy_room_occlusion"] - row["proxy_room_shell_occlusion"]) > 0.001:
+            row["failures"].append(
+                "runtime proxy room occlusion does not match manifest: "
+                f"{row['runtime_proxy_room_occlusion']:.3f} vs {row['proxy_room_shell_occlusion']:.3f}"
+            )
         if str(row["proxy_light_rig_mode"]).strip().lower() in {"", "none", "unknown"}:
             row["failures"].append("payload ready without light-rig proxy influence")
+        if row["runtime_proxy_light_rig"] != row["proxy_light_rig_mode"]:
+            row["failures"].append(
+                "runtime proxy light rig does not match manifest: "
+                f"{row['runtime_proxy_light_rig']} vs {row['proxy_light_rig_mode']}"
+            )
         if row["proxy_light_rig_accent_strength"] < 0.0 or row["proxy_light_rig_accent_strength"] > 1.0:
             row["failures"].append("payload ready with invalid light-rig accent influence")
+        if abs(row["runtime_proxy_light_accent_strength"] - row["proxy_light_rig_accent_strength"]) > 0.001:
+            row["failures"].append(
+                "runtime proxy light accent strength does not match manifest: "
+                f"{row['runtime_proxy_light_accent_strength']:.3f} vs "
+                f"{row['proxy_light_rig_accent_strength']:.3f}"
+            )
     return row
 
 

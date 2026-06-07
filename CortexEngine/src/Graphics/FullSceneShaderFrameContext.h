@@ -1259,6 +1259,11 @@ struct FullSceneShaderPipelineV3FrameContext {
     uint32_t sceneLocalEnvironmentProxyBoundResourceCount = 0;
     std::string sceneLocalEnvironmentProxyBindingSource = "none";
     std::string sceneLocalEnvironmentProxyFallbackReason = "none";
+    std::string sceneLocalEnvironmentProxyDerivationMethod = "none";
+    std::string sceneLocalEnvironmentProxyRoomShell = "none";
+    float sceneLocalEnvironmentProxyRoomOcclusion = 0.0f;
+    std::string sceneLocalEnvironmentProxyLightRig = "none";
+    float sceneLocalEnvironmentProxyLightAccentStrength = 0.0f;
     std::string sceneProfileProducer = "unknown";
     std::string sceneProfileOutput = "unknown";
     std::string sceneProfilePolicyOwner = "unknown";
@@ -1936,6 +1941,16 @@ inline FullSceneShaderPipelineV3FrameContext BuildFullSceneShaderPipelineV3Frame
         contract.environment.sceneLocalProxyBindingSource;
     context.sceneLocalEnvironmentProxyFallbackReason =
         contract.environment.sceneLocalProxyFallbackReason;
+    context.sceneLocalEnvironmentProxyDerivationMethod =
+        contract.environment.sceneLocalProxyDerivationMethod;
+    context.sceneLocalEnvironmentProxyRoomShell =
+        contract.environment.sceneLocalProxyRoomShell;
+    context.sceneLocalEnvironmentProxyRoomOcclusion =
+        contract.environment.sceneLocalProxyRoomOcclusion;
+    context.sceneLocalEnvironmentProxyLightRig =
+        contract.environment.sceneLocalProxyLightRig;
+    context.sceneLocalEnvironmentProxyLightAccentStrength =
+        contract.environment.sceneLocalProxyLightAccentStrength;
 
     FullSceneShaderPipelineV3DomainEvidence environmentDomain =
         MakeFullSceneShaderPipelineV3DomainEvidence(
@@ -1997,6 +2012,9 @@ inline FullSceneShaderPipelineV3FrameContext BuildFullSceneShaderPipelineV3Frame
                                              : "scene_local_environment_proxy_resource_binding_missing",
         context.sceneLocalEnvironmentProxyBindingSource,
         context.sceneLocalEnvironmentProxyFallbackReason,
+        context.sceneLocalEnvironmentProxyDerivationMethod,
+        context.sceneLocalEnvironmentProxyRoomShell,
+        context.sceneLocalEnvironmentProxyLightRig,
     };
     environmentDomain.backingResourceCount =
         readyEnvironmentResources + (environmentConsumesSceneProfilePolicy ? 1u : 0u) +

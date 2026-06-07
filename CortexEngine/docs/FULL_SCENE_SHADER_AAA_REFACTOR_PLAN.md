@@ -269,6 +269,21 @@ Follow-up diagnosis:
   gate. Do not promote forced SSR for this view until SSR continuity or a
   stronger RT/local-probe fallback is proven.
 
+Family packet extension:
+
+- `run_reflection_v3_motion_focus_packet.ps1` now accepts `-FamilyFilter`.
+- Omitted `-FamilyFilter` preserves the original stress-only packet behavior.
+- Present `-FamilyFilter` runs gallery/model family packets through the same
+  reflection motion analyzer, source-resolver analyzer, and review sheet.
+- First bounded family evidence:
+  `build\captures\v3_reflection_source_family_probe_gallery_office_20260607`.
+  It passed for `gallery,office` with `26` reflection motion view sequences and
+  `0` source-resolver warnings.
+- Gallery max source switch was `0.000152`; office max source switch was
+  `0.000000`.
+- This moves ReflectionV3 from one stress-scene proof toward cross-family
+  evidence, but does not satisfy the final promotion matrix.
+
 ## 2026-06-07 Master Refactor Before Goal Feature Completion
 
 This is the current authoritative plan for moving CortexEngine from

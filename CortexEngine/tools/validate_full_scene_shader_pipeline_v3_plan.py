@@ -751,6 +751,8 @@ def main() -> int:
         "active_source_switch_ratio",
         "ssr_signal_changes_under_motion",
         "temporal_delta_tracks_source_churn",
+        "FamilyFilter",
+        "runStressSceneOnly",
         "hysteresisMargin",
         "hysteresisHold",
         "SceneLocalEnvironmentV3",

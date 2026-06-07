@@ -11,6 +11,7 @@ param(
     [double]$MotionLookAmplitude = 0.025,
     [double]$MotionLookCycles = 8.0,
     [double]$FixedDeltaTime = 0.008333333,
+    [string]$FamilyFilter = "",
     [ValidateSet("auto", "local", "ssr", "rt", "environment", "none")]
     [string]$SourceOverride = "auto",
     [switch]$NoBuild,
@@ -50,11 +51,10 @@ if (-not (Test-Path $reviewSheetBuilder)) {
 
 $previousFullSceneLightingV3 = $env:CORTEX_ENABLE_FULL_SCENE_LIGHTING_V3_SPLIT
 $previousReflectionOverride = $env:CORTEX_V3_REFLECTION_SOURCE_OVERRIDE
+$runStressSceneOnly = [string]::IsNullOrWhiteSpace($FamilyFilter)
 
 $packetArgs = @(
     "-OutputRoot", $OutputRoot,
-    "-StressSceneOnly",
-    "-StressSceneFilter", $StressSceneFilter,
     "-ViewFilter", $ViewFilter,
     "-SmokeFrames", [string]$SmokeFrames,
     "-CaptureFrame", [string]$CaptureFrame,
@@ -65,6 +65,17 @@ $packetArgs = @(
     "-MotionLookCycles", [string]$MotionLookCycles,
     "-FixedDeltaTime", [string]$FixedDeltaTime
 )
+
+if ($runStressSceneOnly) {
+    $packetArgs += @(
+        "-StressSceneOnly",
+        "-StressSceneFilter", $StressSceneFilter
+    )
+} else {
+    $packetArgs += @(
+        "-FamilyFilter", $FamilyFilter
+    )
+}
 
 if ($NoBuild) {
     $packetArgs += "-NoBuild"

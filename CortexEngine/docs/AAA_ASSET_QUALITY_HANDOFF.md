@@ -184,6 +184,54 @@ Current next work after this checkpoint:
    alternatives than local/environment fallback on glossy surfaces.
 3. Promote `ReflectionV3` auto resolver packet evidence across more families.
 
+Latest ReflectionV3 bounded family packet checkpoint:
+
+- `tools\run_reflection_v3_motion_focus_packet.ps1` now supports
+  `-FamilyFilter`.
+- When `-FamilyFilter` is omitted, the wrapper keeps the old focused stress
+  behavior and passes `-StressSceneOnly` plus `-StressSceneFilter`.
+- When `-FamilyFilter` is present, the wrapper runs the scene-local packet
+  runner in family mode instead of stress-only mode. This lets the same
+  reflection motion analyzer, source resolver analyzer, and review sheet run on
+  model/gallery families.
+- Updated the static V3 validator to require the family-mode wrapper surface.
+
+Validation for family-mode ReflectionV3 evidence:
+
+```powershell
+$tokens=$null; $errors=$null; [System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path tools\run_reflection_v3_motion_focus_packet.ps1), [ref]$tokens, [ref]$errors) | Out-Null; if($errors.Count -gt 0){$errors | Format-List; exit 1}
+python -m py_compile tools\analyze_reflection_v3_source_resolver.py tools\validate_full_scene_shader_pipeline_v3_plan.py
+python tools\validate_full_scene_shader_pipeline_v3_plan.py
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_reflection_v3_motion_focus_packet.ps1 -NoBuild -OutputRoot build\captures\v3_reflection_source_family_probe_gallery_office_20260607 -FamilyFilter gallery,office -SourceOverride auto -SmokeFrames 12 -CaptureFrame 6 -CaptureSequenceCount 2 -MotionFrames 48 -MotionLookAmplitude 0.02 -MotionLookCycles 4.0
+```
+
+Evidence:
+
+- Family packet:
+  `build\captures\v3_reflection_source_family_probe_gallery_office_20260607`
+  passed end to end.
+- Generic reflection motion analyzer:
+  `26` view sequences across `2` families, `0` warnings, `0` failures.
+- Source resolver analyzer:
+  `2` families, `0` warnings, `0` failures.
+- Gallery row:
+  dominant source `local`, active source `1.00000`, mean source delta
+  `0.000047`, max source switch `0.000152`, max active source switch
+  `0.000152`, mean confidence delta `0.004118`.
+- Office row:
+  dominant source `local`, active source `1.00000`, mean source delta
+  `0.000000`, max source switch `0.000000`, max active source switch
+  `0.000000`, mean confidence delta `0.005103`.
+
+Interpretation:
+
+- This is the first bounded cross-family ReflectionV3 auto-resolver packet.
+- It is useful evidence that auto source resolution is stable beyond the single
+  `rt_showcase:reflection_closeup` stress scene.
+- It is not promotion-grade coverage yet; remaining families and motion modes
+  still need broader runs, and model-scene crash/report separation remains
+  separate debt.
+
 - Added the authoritative
   `2026-06-07 Full Scene Shader Refactor Blueprint` section to
   `docs\FULL_SCENE_SHADER_AAA_REFACTOR_PLAN.md`.

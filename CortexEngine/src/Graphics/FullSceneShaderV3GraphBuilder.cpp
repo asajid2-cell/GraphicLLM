@@ -59,6 +59,43 @@ bool FullSceneShaderV3GraphBuilder::SubmitComposite(
     return FullSceneShaderV3Passes::AddFullSceneCompositeV3Pass(m_graph, context);
 }
 
+bool FullSceneShaderV3GraphBuilder::SubmitComposite(
+    const CompositeCommon& common,
+    const CompositeSubmission& submission) {
+    FullSceneShaderV3Passes::FullSceneCompositeV3Context context{};
+    context.directLighting = submission.directLighting;
+    context.indirectLighting = submission.indirectLighting;
+    context.shadowVisibility = submission.shadowVisibility;
+    context.legacyHdr = submission.legacyHdr;
+    context.localReflectionRadiance = submission.localReflectionRadiance;
+    context.reflectionConfidence = submission.reflectionConfidence;
+    context.materialAlbedo = submission.materialAlbedo;
+    context.sceneLocalEnvironment = submission.sceneLocalEnvironment;
+    context.output = submission.output;
+    context.energyClampPolicy = submission.energyClampPolicy;
+    context.overbrightDiagnostics = submission.overbrightDiagnostics;
+    context.compositeContributionMap = submission.compositeContributionMap;
+    context.legacyRescueUsage = submission.legacyRescueUsage;
+    context.device = common.device;
+    context.descriptorManager = common.descriptorManager;
+    context.commandList = common.commandList;
+    context.rootSignature = common.rootSignature;
+    context.pipeline = common.pipeline;
+    context.frameConstants = common.frameConstants;
+    context.directLightingSRV = submission.directLightingSRV;
+    context.indirectLightingSRV = submission.indirectLightingSRV;
+    context.shadowVisibilitySRV = submission.shadowVisibilitySRV;
+    context.legacyHdrSRV = submission.legacyHdrSRV;
+    context.sceneLocalEnvironmentSRV = submission.sceneLocalEnvironmentSRV;
+    context.outputRTVs = submission.outputRTVs;
+    context.width = common.width;
+    context.height = common.height;
+    context.ran = submission.ran;
+    context.failed = common.failed;
+    context.stage = common.stage;
+    return SubmitComposite(context);
+}
+
 bool FullSceneShaderV3GraphBuilder::SubmitDisplay(
     const FullSceneShaderV3Passes::CandidateBeautyDisplayContext& context) {
     return FullSceneShaderV3Passes::AddCandidateBeautyDisplayPass(m_graph, context);

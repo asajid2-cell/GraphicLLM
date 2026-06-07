@@ -832,49 +832,51 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
             legacyRescueUsageHandle.IsValid() &&
             albedoHandle.IsValid() &&
             sceneLocalEnvironmentHandle.IsValid()) {
-            FullSceneCompositeV3Context compositeContext{};
-            compositeContext.directLighting = v3DirectLightingHandle;
-            compositeContext.indirectLighting = v3IndirectLightingHandle;
-            compositeContext.shadowVisibility = v3ShadowVisibilityHandle;
-            compositeContext.legacyHdr = hdrHandle;
-            compositeContext.localReflectionRadiance = scheduledReflectionResolverV3 && reflectionRadianceHandle.IsValid()
+            FullSceneShaderV3GraphBuilder::CompositeCommon compositeCommon{};
+            compositeCommon.device = m_services.device ? m_services.device->GetDevice() : nullptr;
+            compositeCommon.descriptorManager = m_services.descriptorManager.get();
+            compositeCommon.commandList = m_commandResources.graphicsList.Get();
+            compositeCommon.rootSignature = m_pipelineState.rootSignature.get();
+            compositeCommon.pipeline = m_pipelineState.fullSceneCompositeV3.get();
+            compositeCommon.frameConstants = m_constantBuffers.currentFrameGPU;
+            compositeCommon.width = GetInternalRenderWidth();
+            compositeCommon.height = GetInternalRenderHeight();
+            compositeCommon.failed = &bloomStageFailed;
+            compositeCommon.stage = &postProcessGraphStageError;
+
+            FullSceneShaderV3GraphBuilder::CompositeSubmission compositeSubmission{};
+            compositeSubmission.directLighting = v3DirectLightingHandle;
+            compositeSubmission.indirectLighting = v3IndirectLightingHandle;
+            compositeSubmission.shadowVisibility = v3ShadowVisibilityHandle;
+            compositeSubmission.legacyHdr = hdrHandle;
+            compositeSubmission.localReflectionRadiance = scheduledReflectionResolverV3 && reflectionRadianceHandle.IsValid()
                 ? reflectionRadianceHandle
                 : localReflRadianceHandle;
-            compositeContext.reflectionConfidence = scheduledReflectionResolverV3 && reflectionConfidenceHandle.IsValid()
+            compositeSubmission.reflectionConfidence = scheduledReflectionResolverV3 && reflectionConfidenceHandle.IsValid()
                 ? reflectionConfidenceHandle
                 : RGResourceHandle{};
-            compositeContext.materialAlbedo = albedoHandle;
-            compositeContext.sceneLocalEnvironment = sceneLocalEnvironmentHandle;
-            compositeContext.output = candidateHdrSceneColorHandle;
-            compositeContext.energyClampPolicy = energyClampPolicyHandle;
-            compositeContext.overbrightDiagnostics = overbrightDiagnosticsHandle;
-            compositeContext.compositeContributionMap = compositeContributionMapHandle;
-            compositeContext.legacyRescueUsage = legacyRescueUsageHandle;
-            compositeContext.device = m_services.device ? m_services.device->GetDevice() : nullptr;
-            compositeContext.descriptorManager = m_services.descriptorManager.get();
-            compositeContext.commandList = m_commandResources.graphicsList.Get();
-            compositeContext.rootSignature = m_pipelineState.rootSignature.get();
-            compositeContext.pipeline = m_pipelineState.fullSceneCompositeV3.get();
-            compositeContext.frameConstants = m_constantBuffers.currentFrameGPU;
-            compositeContext.directLightingSRV = m_mainTargets.lightingV3.descriptors.directLightingSRV;
-            compositeContext.indirectLightingSRV = m_mainTargets.lightingV3.descriptors.indirectLightingSRV;
-            compositeContext.shadowVisibilitySRV = m_mainTargets.lightingV3.descriptors.shadowVisibilitySRV;
-            compositeContext.legacyHdrSRV = m_mainTargets.hdr.descriptors.srv;
-            compositeContext.sceneLocalEnvironmentSRV =
+            compositeSubmission.materialAlbedo = albedoHandle;
+            compositeSubmission.sceneLocalEnvironment = sceneLocalEnvironmentHandle;
+            compositeSubmission.output = candidateHdrSceneColorHandle;
+            compositeSubmission.energyClampPolicy = energyClampPolicyHandle;
+            compositeSubmission.overbrightDiagnostics = overbrightDiagnosticsHandle;
+            compositeSubmission.compositeContributionMap = compositeContributionMapHandle;
+            compositeSubmission.legacyRescueUsage = legacyRescueUsageHandle;
+            compositeSubmission.directLightingSRV = m_mainTargets.lightingV3.descriptors.directLightingSRV;
+            compositeSubmission.indirectLightingSRV = m_mainTargets.lightingV3.descriptors.indirectLightingSRV;
+            compositeSubmission.shadowVisibilitySRV = m_mainTargets.lightingV3.descriptors.shadowVisibilitySRV;
+            compositeSubmission.legacyHdrSRV = m_mainTargets.hdr.descriptors.srv;
+            compositeSubmission.sceneLocalEnvironmentSRV =
                 m_mainTargets.environmentV3.descriptors.sceneLocalEnvironmentSRV;
-            compositeContext.outputRTVs = {
+            compositeSubmission.outputRTVs = {
                 m_mainTargets.compositeV3.descriptors.hdrSceneColorRTV.cpu,
                 m_mainTargets.compositeV3.descriptors.energyClampPolicyRTV.cpu,
                 m_mainTargets.compositeV3.descriptors.overbrightDiagnosticsRTV.cpu,
                 m_mainTargets.compositeV3.descriptors.compositeContributionMapRTV.cpu,
                 m_mainTargets.compositeV3.descriptors.legacyRescueUsageRTV.cpu,
             };
-            compositeContext.width = GetInternalRenderWidth();
-            compositeContext.height = GetInternalRenderHeight();
-            compositeContext.ran = &result.ranCompositeV3;
-            compositeContext.failed = &bloomStageFailed;
-            compositeContext.stage = &postProcessGraphStageError;
-            if (!fullSceneShaderV3.SubmitComposite(compositeContext)) {
+            compositeSubmission.ran = &result.ranCompositeV3;
+            if (!fullSceneShaderV3.SubmitComposite(compositeCommon, compositeSubmission)) {
                 bloomStageFailed = true;
             }
         }

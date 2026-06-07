@@ -363,6 +363,8 @@ def main() -> int:
         "FullSceneShaderV3GraphBuilder",
         "DisplayCommon",
         "DisplaySubmission",
+        "CompositeCommon",
+        "CompositeSubmission",
         "SceneLocalEnvironmentCommon",
         "SceneLocalEnvironmentSubmission",
         "SubmitSceneLocalEnvironment",
@@ -441,6 +443,26 @@ def main() -> int:
         "SubmitSceneLocalEnvironment(environmentCommon, environmentSubmission)" in render_graph_end_frame_source,
         errors,
         "Renderer_RenderGraphEndFrame.cpp must submit environment through graph-builder environment API",
+    )
+    require(
+        "FullSceneCompositeV3Context" not in render_graph_end_frame_source,
+        errors,
+        "Renderer_RenderGraphEndFrame.cpp must not construct FullSceneCompositeV3Context directly",
+    )
+    require(
+        "CompositeCommon compositeCommon" in render_graph_end_frame_source,
+        errors,
+        "Renderer_RenderGraphEndFrame.cpp must use shared V3 composite common state",
+    )
+    require(
+        "CompositeSubmission compositeSubmission" in render_graph_end_frame_source,
+        errors,
+        "Renderer_RenderGraphEndFrame.cpp must use V3 composite submission data",
+    )
+    require(
+        "SubmitComposite(compositeCommon, compositeSubmission)" in render_graph_end_frame_source,
+        errors,
+        "Renderer_RenderGraphEndFrame.cpp must submit composite through graph-builder composite API",
     )
     for token in [
         "AddSceneLocalEnvironmentV3Pass(",

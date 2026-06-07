@@ -52,33 +52,57 @@ def classify_material_target(scene: str, bookmark: str, family: str) -> str:
 
 def measure_rgb(path: Path) -> dict[str, Any]:
     width, height, pixels = read_bmp_rgb(path)
-    count = max(len(pixels), 1)
-    sums = [0.0, 0.0, 0.0]
-    maxes = [0, 0, 0]
-    active = [0, 0, 0]
-    luma_sum = 0.0
-    nonblack = 0
-    for r, g, b in pixels:
-        channels = (r, g, b)
-        luma = 0.2126 * r + 0.7152 * g + 0.0722 * b
-        luma_sum += luma
-        if max(channels) > 3:
-            nonblack += 1
-        for i, value in enumerate(channels):
-            sums[i] += value
-            maxes[i] = max(maxes[i], value)
-            if value > 12:
-                active[i] += 1
+
+    def summarize(sample_pixels: list[tuple[int, int, int]]) -> dict[str, Any]:
+        count = max(len(sample_pixels), 1)
+        sums = [0.0, 0.0, 0.0]
+        maxes = [0, 0, 0]
+        active = [0, 0, 0]
+        luma_sum = 0.0
+        nonblack = 0
+        for r, g, b in sample_pixels:
+            channels = (r, g, b)
+            luma = 0.2126 * r + 0.7152 * g + 0.0722 * b
+            luma_sum += luma
+            if max(channels) > 3:
+                nonblack += 1
+            for i, value in enumerate(channels):
+                sums[i] += value
+                maxes[i] = max(maxes[i], value)
+                if value > 12:
+                    active[i] += 1
+        return {
+            "pixel_count": count,
+            "mean_rgb": [v / count / 255.0 for v in sums],
+            "max_rgb": [v / 255.0 for v in maxes],
+            "active_rgb_ratio": [v / count for v in active],
+            "mean_luma": luma_sum / count / 255.0,
+            "nonblack_ratio": nonblack / count,
+        }
+
+    center_x0 = width // 4
+    center_x1 = width - center_x0
+    center_y0 = height // 4
+    center_y1 = height - center_y0
+    center_pixels = [
+        pixels[y * width + x]
+        for y in range(center_y0, center_y1)
+        for x in range(center_x0, center_x1)
+    ]
+    full = summarize(pixels)
+    center = summarize(center_pixels)
+    count = full["pixel_count"]
     return {
         "path": str(path),
         "width": width,
         "height": height,
         "pixel_count": count,
-        "mean_rgb": [v / count / 255.0 for v in sums],
-        "max_rgb": [v / 255.0 for v in maxes],
-        "active_rgb_ratio": [v / count for v in active],
-        "mean_luma": luma_sum / count / 255.0,
-        "nonblack_ratio": nonblack / count,
+        "mean_rgb": full["mean_rgb"],
+        "max_rgb": full["max_rgb"],
+        "active_rgb_ratio": full["active_rgb_ratio"],
+        "mean_luma": full["mean_luma"],
+        "nonblack_ratio": full["nonblack_ratio"],
+        "center_roi": center,
     }
 
 
@@ -184,6 +208,20 @@ def read_material_policy_counts(capture: Path | None) -> dict[str, Any]:
     return find_material_policy_counts(report)
 
 
+def read_frame_contract_section(capture: Path | None, section: str) -> dict[str, Any]:
+    if capture is None:
+        return {}
+    report_path = capture.parent / "frame_report_shutdown.json"
+    if not report_path.exists():
+        return {}
+    try:
+        report = json.loads(report_path.read_text(encoding="utf-8-sig"))
+    except Exception:  # noqa: BLE001 - optional diagnostic path.
+        return {}
+    value = report.get("frame_contract", {}).get(section, {})
+    return value if isinstance(value, dict) else {}
+
+
 def build_report(manifest_path: Path) -> dict[str, Any]:
     manifest = json.loads(manifest_path.read_text(encoding="utf-8-sig"))
     by_family: dict[str, dict[str, dict[str, Any]]] = {}
@@ -228,16 +266,27 @@ def build_report(manifest_path: Path) -> dict[str, Any]:
         suppression = views.get("reflection_source_suppression", {})
         roughness = views.get("roughness", {})
         metallic = views.get("metallic", {})
-        material_counts = read_material_policy_counts(first_capture(suppression) or first_capture(roughness) or first_capture(metallic))
+        report_capture = first_capture(suppression) or first_capture(roughness) or first_capture(metallic)
+        material_counts = read_material_policy_counts(report_capture)
+        water_contract = read_frame_contract_section(report_capture, "water")
         suppression_mean = suppression.get("metrics", {}).get("mean_rgb", [0.0, 0.0, 0.0])
         suppression_motion = suppression.get("motion", {}).get("mean_abs_rgb_delta", [0.0, 0.0, 0.0])
         roughness_metrics = roughness.get("metrics", {})
         metallic_metrics = metallic.get("metrics", {})
         roughness_mean = roughness_metrics.get("mean_luma", 0.0)
+        roughness_center_mean = roughness_metrics.get("center_roi", {}).get("mean_luma", roughness_mean)
         roughness_max = roughness_metrics.get("max_rgb", [0.0, 0.0, 0.0])[0]
         metallic_mean = metallic_metrics.get("mean_luma", 0.0)
+        metallic_center_mean = metallic_metrics.get("center_roi", {}).get("mean_luma", metallic_mean)
         metallic_max = metallic_metrics.get("max_rgb", [0.0, 0.0, 0.0])[0]
         metallic_active_ratio = metallic_metrics.get("active_rgb_ratio", [0.0, 0.0, 0.0])[0]
+        water_surface_count = int(water_contract.get("surface_count", 0))
+        water_contract_roughness = float(water_contract.get("roughness", roughness_center_mean))
+        target_roughness_for_warning = (
+            water_contract_roughness
+            if material_target == "water" and water_surface_count > 0
+            else roughness_center_mean
+        )
         sampled_materials = max(int(material_counts.get("sampled", 0)), 0)
         water_class_count = int(material_counts.get("scene_material_water", 0)) + int(material_counts.get("surface_water", 0))
         glass_class_count = int(material_counts.get("scene_material_glass_pane", 0)) + int(material_counts.get("surface_glass", 0))
@@ -261,8 +310,10 @@ def build_report(manifest_path: Path) -> dict[str, Any]:
             row_warnings.append("suppression_roughness_channel_diverges_from_roughness_view")
         if material_target in {"glossy_metal", "chrome"} and metallic_max < 0.35 and metallic_active_ratio < 0.01:
             row_warnings.append("metal_target_has_low_metallic_signal")
-        if material_target in {"glass", "water"} and roughness_mean > 0.72:
-            row_warnings.append("smooth_target_has_high_roughness_signal")
+        if material_target in {"glass", "water"} and target_roughness_for_warning > 0.72:
+            row_warnings.append("smooth_target_center_roi_has_high_roughness_signal")
+        elif material_target in {"glass", "water"} and material_target != "water" and roughness_mean > 0.72:
+            row_warnings.append("smooth_target_full_frame_has_high_roughness_signal")
         if material_target in {"glass", "water", "chrome", "glossy_metal"} and sampled_materials > 0 and smooth_class_ratio < 0.12:
             row_warnings.append("smooth_target_has_sparse_scene_class_coverage")
         if max(suppression_motion[:2]) > 0.08:
@@ -279,8 +330,11 @@ def build_report(manifest_path: Path) -> dict[str, Any]:
                 "material_suppression_mean": suppression_mean[1],
                 "suppression_roughness_mean": suppression_mean[2],
                 "roughness_view_mean": roughness_mean,
+                "roughness_center_mean": roughness_center_mean,
+                "target_roughness_for_warning": target_roughness_for_warning,
                 "roughness_view_max": roughness_max,
                 "metallic_view_mean": metallic_mean,
+                "metallic_center_mean": metallic_center_mean,
                 "metallic_view_max": metallic_max,
                 "metallic_active_ratio": metallic_active_ratio,
                 "sampled_materials": sampled_materials,
@@ -290,6 +344,9 @@ def build_report(manifest_path: Path) -> dict[str, Any]:
                 "smooth_class_count": smooth_class_count,
                 "smooth_class_ratio": smooth_class_ratio,
                 "material_policy_counts": material_counts,
+                "water_surface_count": water_surface_count,
+                "water_contract_roughness": water_contract_roughness,
+                "water_contract": water_contract,
                 "history_suppression_motion_delta": suppression_motion[0],
                 "material_suppression_motion_delta": suppression_motion[1],
                 "roughness_motion_delta": suppression_motion[2],
@@ -322,13 +379,13 @@ def write_markdown(report: dict[str, Any], output: Path) -> None:
         f"- failures: {len(report['failures'])}",
         f"- warnings: {len(report['warnings'])}",
         "",
-        "| Family | Target | History Supp | Material Supp | Supp Rough | Rough Mean | Metal Mean | Metal Max | Metal Active | Smooth Class | Hist Motion | Mat Motion | Rough Motion | Warnings |",
-        "|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|",
+        "| Family | Target | History Supp | Material Supp | Supp Rough | Rough Mean | Rough Center | Target Rough | Metal Mean | Metal Center | Metal Max | Metal Active | Smooth Class | Hist Motion | Mat Motion | Rough Motion | Warnings |",
+        "|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|",
     ]
     for row in report["rows"]:
         lines.append(
             "| {family} | {target} | {history:.5f} | {material:.5f} | {supp_rough:.5f} | "
-            "{rough:.5f} | {metal:.5f} | {metal_max:.5f} | {metal_active:.5f} | {smooth_class} | {hist_motion:.5f} | {mat_motion:.5f} | "
+            "{rough:.5f} | {rough_center:.5f} | {target_rough:.5f} | {metal:.5f} | {metal_center:.5f} | {metal_max:.5f} | {metal_active:.5f} | {smooth_class} | {hist_motion:.5f} | {mat_motion:.5f} | "
             "{rough_motion:.5f} | {warnings} |".format(
                 family=row["family"],
                 target=row["material_target"],
@@ -336,7 +393,10 @@ def write_markdown(report: dict[str, Any], output: Path) -> None:
                 material=row["material_suppression_mean"],
                 supp_rough=row["suppression_roughness_mean"],
                 rough=row["roughness_view_mean"],
+                rough_center=row["roughness_center_mean"],
+                target_rough=row["target_roughness_for_warning"],
                 metal=row["metallic_view_mean"],
+                metal_center=row["metallic_center_mean"],
                 metal_max=row["metallic_view_max"],
                 metal_active=row["metallic_active_ratio"],
                 smooth_class=(

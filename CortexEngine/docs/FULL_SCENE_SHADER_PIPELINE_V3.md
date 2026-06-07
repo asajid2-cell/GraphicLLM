@@ -1440,3 +1440,11 @@ Result:
 - water still reports `smooth_target_has_high_roughness_signal` with smooth
   class coverage `31/66`; this is now a roughness/source-policy problem, not a
   missing semantic input problem.
+
+Update:
+
+- The water warning was a diagnostic ownership bug. Water closeups are owned by
+  the water pass, so the material stress analyzer now uses
+  `frame_contract.water.roughness` when `water.surface_count > 0`.
+- `glass_water_courtyard:water_closeup` now reports opaque roughness center
+  `0.75008`, target roughness `0.03000`, and `warnings=0`.

@@ -89,6 +89,7 @@ def make_decision(
     signal_path = packet_root / "v3_signal.json"
     stability_path = packet_root / "v3_stability.json"
     lighting_motion_path = packet_root / "v3_lighting_motion.json"
+    material_payload_path = packet_root / "v3_material_payload.json"
 
     failures: list[str] = []
     warnings: list[str] = []
@@ -97,6 +98,7 @@ def make_decision(
         "signal": str(signal_path),
         "stability": str(stability_path),
         "lighting_motion": str(lighting_motion_path) if lighting_motion_path.exists() else None,
+        "material_payload": str(material_payload_path) if material_payload_path.exists() else None,
     }
 
     if not manifest_path.exists():
@@ -121,6 +123,7 @@ def make_decision(
     signal = load_json(signal_path)
     stability = load_json(stability_path)
     lighting_motion = load_json(lighting_motion_path) if lighting_motion_path.exists() else None
+    material_payload = load_json(material_payload_path) if material_payload_path.exists() else None
 
     signal_failures = [str(item) for item in signal.get("failures", [])]
     stability_failures = [str(item) for item in stability.get("failures", [])]
@@ -135,13 +138,23 @@ def make_decision(
         failures.extend(str(item) for item in lighting_motion.get("failures", []))
         warnings.extend(str(item) for item in lighting_motion.get("warnings", []))
 
+    if material_payload is None:
+        failures.append("missing v3_material_payload.json")
+    else:
+        failures.extend(str(item) for item in material_payload.get("failures", []))
+        warnings.extend(str(item) for item in material_payload.get("warnings", []))
+
     report_count = int(stability.get("report_count", 0) or 0)
+    full_pipeline_report_count = int(stability.get("full_pipeline_report_count", report_count) or 0)
+    material_payload_report_count = int(stability.get("material_payload_report_count", 0) or 0)
     if report_count <= 0:
         failures.append("no frame reports were analyzed")
     if signal.get("ok_report_count") != report_count:
         failures.append(
             f"ok_report_count {signal.get('ok_report_count')} does not match report_count {report_count}"
         )
+    if full_pipeline_report_count <= 0:
+        failures.append("no full-pipeline V3 reports were analyzed")
     if stability.get("default_beauty_affects_any") is not False:
         failures.append("V3 affected default beauty in a review packet")
     if stability.get("promoted_report_count") not in (0, None):
@@ -161,11 +174,20 @@ def make_decision(
     for domain, field in required_count_fields.items():
         value = int(stability.get(field, 0) or 0)
         domain_counts[domain] = value
-        if value != report_count:
-            failures.append(f"{field} {value} does not match report_count {report_count}")
+        expected_count = report_count if domain == "material" else full_pipeline_report_count
+        expected_label = "report_count" if domain == "material" else "full_pipeline_report_count"
+        if value != expected_count:
+            failures.append(f"{field} {value} does not match {expected_label} {expected_count}")
 
-    ready_by_report = find_ready_domains(signal)
-    for report, domains in ready_by_report.items():
+    for row in signal.get("rows", []):
+        if not isinstance(row, dict):
+            continue
+        report = str(row.get("report", ""))
+        domains = {str(domain) for domain in row.get("ready_domains", []) if isinstance(domain, str)}
+        if row.get("diagnostic_scope") == "material_payload":
+            if "material" not in domains:
+                failures.append(f"{report} material diagnostic row is missing material ready domain")
+            continue
         missing = sorted(REQUIRED_DOMAINS - domains)
         if missing:
             failures.append(f"{report} missing ready domains: {', '.join(missing)}")
@@ -236,6 +258,8 @@ def make_decision(
         "review_packet_passed": review_packet_passed,
         "full_coverage_ready": full_coverage_ready,
         "report_count": report_count,
+        "full_pipeline_report_count": full_pipeline_report_count,
+        "material_payload_report_count": material_payload_report_count,
         "captured_families": families,
         "required_families": required_families,
         "missing_families": missing_families,
@@ -261,6 +285,8 @@ def write_markdown(path: pathlib.Path, decision: dict[str, Any]) -> None:
         f"- default beauty promotable: `{str(decision.get('default_beauty_promotable')).lower()}`",
         f"- review packet passed: `{str(decision.get('review_packet_passed')).lower()}`",
         f"- report count: `{decision.get('report_count', 0)}`",
+        f"- full-pipeline reports: `{decision.get('full_pipeline_report_count', 0)}`",
+        f"- material-payload reports: `{decision.get('material_payload_report_count', 0)}`",
         f"- candidate beauty requested reports: `{decision.get('candidate_beauty_requested_report_count', 0)}`",
         f"- candidate beauty ready reports: `{decision.get('candidate_beauty_ready_report_count', 0)}`",
         f"- captured families: `{','.join(decision.get('captured_families', []))}`",

@@ -1643,3 +1643,56 @@ Remaining limitation:
 - This is a strict candidate-path gate, not a final visual-quality change.
 - Cross-family and motion evidence remain required before candidate/default
   promotion.
+
+### V3 Material Payload Diagnostic Gate - 2026-06-06
+
+Implemented:
+
+- Added `tools/analyze_full_scene_shader_v3_material_payload.py`.
+- V3 packets now capture material payload views:
+  `roughness`, `metallic`, `surface_class`, `surface_policy`,
+  `material_family`, `reflection_policy`, `temporal_policy`,
+  `post_sensitivity`, `material_id`, and `object_id`.
+- V3 packets now emit `v3_material_payload.json` and
+  `v3_material_payload.md`.
+- Promotion decisions now require `v3_material_payload.json`.
+- The V3 placeholder analyzer now distinguishes full-pipeline reports from
+  material-payload diagnostic reports, so material debug views are not forced
+  to prove lighting/reflection/post readiness.
+
+Evidence:
+
+- packet:
+  `build/captures/v3_material_payload_gate_static_gallery_retry_20260606`.
+- `v3_signal.json`:
+  - reports `42`.
+  - full-pipeline reports `32`.
+  - material-payload reports `10`.
+  - ok reports `42`.
+  - failures `0`, warnings `0`.
+- `v3_material_payload.json`:
+  - ready `true`.
+  - failures `0`.
+  - warnings `2`.
+  - required material debug views `9`.
+  - optional material debug views `1`.
+  - sampled materials total across reports `2520`.
+  - named materials total across reports `2520`.
+  - representative per-report stats: sampled `60`, named `60`, average
+    roughness `0.5013`, average metallic `0.2167`, average albedo luminance
+    `0.4559`.
+  - material debug views are nonblank, including roughness, surface class,
+    material family, material ID, and object ID at `1.00000` nonblack ratio.
+- `promotion_decision.json`:
+  - status `review_packet_passed`.
+  - `default_beauty_promotable=false`.
+  - failures `0`.
+  - warnings are material fallback debt plus expected subset coverage warnings.
+
+Remaining limitation:
+
+- This gate measures material payload evidence; it does not yet replace the
+  current VB material resolve with a richer standalone PBR resource set.
+- Current material debt is explicit:
+  `preset_default_roughness fallback count 8` and
+  `preset_default_transmission fallback count 5`.

@@ -2,7 +2,7 @@ param(
     [string]$OutputRoot = "build/captures/full_scene_shader_pipeline_v3_placeholder_packet",
     [string]$FamilyFilter = "gallery",
     [string]$StressSceneFilter = "rt_showcase:reflection_closeup",
-    [string]$ViewFilter = "beauty,candidate_beauty_v3,candidate_hdr_scene_color,energy_clamp_policy,overbright_diagnostics,direct_light,direct_light_unshadowed,direct_light_shadow_loss,shadow_factor,ambient_ibl,v3_direct_lighting,v3_direct_lighting_unshadowed,v3_shadow_visibility,v3_shadow_loss,v3_indirect_lighting,local_reflection_radiance,reflection_radiance,reflection_confidence,reflection_source_id,reflection_rejected_source_mask,reflection_temporal_delta,reflection_ssr_source_signal,reflection_rt_source_signal,reflection_source_suppression,reflection_history_v3_curr,reflection_history_v3_prev,reflection_history_v3_validity,reflection_history_v3_rejection,reflection_source_authority,reflection_source_weights,reflection_resolver_candidate,reflection_resolver_candidate_delta",
+    [string]$ViewFilter = "beauty,candidate_beauty_v3,roughness,metallic,surface_class,surface_policy,material_family,reflection_policy,temporal_policy,post_sensitivity,material_id,object_id,candidate_hdr_scene_color,energy_clamp_policy,overbright_diagnostics,direct_light,direct_light_unshadowed,direct_light_shadow_loss,shadow_factor,ambient_ibl,v3_direct_lighting,v3_direct_lighting_unshadowed,v3_shadow_visibility,v3_shadow_loss,v3_indirect_lighting,local_reflection_radiance,reflection_radiance,reflection_confidence,reflection_source_id,reflection_rejected_source_mask,reflection_temporal_delta,reflection_ssr_source_signal,reflection_rt_source_signal,reflection_source_suppression,reflection_history_v3_curr,reflection_history_v3_prev,reflection_history_v3_validity,reflection_history_v3_rejection,reflection_source_authority,reflection_source_weights,reflection_resolver_candidate,reflection_resolver_candidate_delta",
     [int]$SmokeFrames = 30,
     [int]$CaptureFrame = 15,
     [int]$CaptureSequenceCount = 1,
@@ -18,6 +18,7 @@ $root = Split-Path -Parent $PSScriptRoot
 $v2Packet = Join-Path $root "tools/run_full_scene_shader_pipeline_v2_packet.ps1"
 $v3Analyzer = Join-Path $root "tools/analyze_full_scene_shader_v3_placeholders.py"
 $v3LightingMotionAnalyzer = Join-Path $root "tools/analyze_full_scene_shader_v3_lighting_motion.py"
+$v3MaterialPayloadAnalyzer = Join-Path $root "tools/analyze_full_scene_shader_v3_material_payload.py"
 $v3CompositeDiagnosticsAnalyzer = Join-Path $root "tools/analyze_full_scene_shader_v3_composite_diagnostics.py"
 $v3PromotionDecision = Join-Path $root "tools/build_full_scene_shader_v3_promotion_decision.py"
 $outputPath = Join-Path $root $OutputRoot
@@ -25,6 +26,8 @@ $signalOutput = Join-Path $outputPath "v3_signal.json"
 $stabilityOutput = Join-Path $outputPath "v3_stability.json"
 $lightingMotionOutput = Join-Path $outputPath "v3_lighting_motion.json"
 $lightingMotionMarkdown = Join-Path $outputPath "v3_lighting_motion.md"
+$materialPayloadOutput = Join-Path $outputPath "v3_material_payload.json"
+$materialPayloadMarkdown = Join-Path $outputPath "v3_material_payload.md"
 $compositeDiagnosticsOutput = Join-Path $outputPath "v3_composite_diagnostics.json"
 $compositeDiagnosticsMarkdown = Join-Path $outputPath "v3_composite_diagnostics.md"
 $promotionDecisionOutput = Join-Path $outputPath "promotion_decision.json"
@@ -79,6 +82,11 @@ try {
     }
 
     $manifestPath = Join-Path $outputPath "manifest.json"
+    & python $v3MaterialPayloadAnalyzer --manifest $manifestPath --output-json $materialPayloadOutput --output-md $materialPayloadMarkdown
+    if ($LASTEXITCODE -ne 0) {
+        exit $LASTEXITCODE
+    }
+
     & python $v3CompositeDiagnosticsAnalyzer --manifest $manifestPath --output-json $compositeDiagnosticsOutput --output-md $compositeDiagnosticsMarkdown
     if ($LASTEXITCODE -ne 0) {
         exit $LASTEXITCODE
@@ -102,5 +110,6 @@ Write-Host "stability=$stabilityOutput"
 if ($CaptureSequenceCount -ge 2) {
     Write-Host "lighting_motion=$lightingMotionOutput"
 }
+Write-Host "material_payload=$materialPayloadOutput"
 Write-Host "composite_diagnostics=$compositeDiagnosticsOutput"
 Write-Host "promotion_decision=$promotionDecisionOutput"

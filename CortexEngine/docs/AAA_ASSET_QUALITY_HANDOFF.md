@@ -7225,3 +7225,96 @@ Current limitation:
   contract.
 - Cross-family and motion rows remain required before candidate/default
   promotion.
+
+### V3 Material Payload Diagnostic Gate - 2026-06-06
+
+Implemented:
+
+- Added `tools/analyze_full_scene_shader_v3_material_payload.py`.
+- The V3 packet default view set now captures material payload views:
+  `roughness`, `metallic`, `surface_class`, `surface_policy`,
+  `material_family`, `reflection_policy`, `temporal_policy`,
+  `post_sensitivity`, `material_id`, and `object_id`.
+- `tools/run_full_scene_shader_pipeline_v3_packet.ps1` now emits:
+  - `v3_material_payload.json`.
+  - `v3_material_payload.md`.
+- `tools/build_full_scene_shader_v3_promotion_decision.py` now requires
+  `v3_material_payload.json` before a packet can pass review.
+- `tools/analyze_full_scene_shader_v3_placeholders.py` now separates
+  `material_payload` diagnostic reports from `full_pipeline` reports. Material
+  debug views no longer have to prove lighting/reflection/post readiness, but
+  full-pipeline reports still do.
+- The V3 contract now requires material packet debug views and validation
+  gates:
+  - `material_payload_debug_views_present`.
+  - `material_payload_ranges_valid`.
+
+Why:
+
+- Material V3 was previously too weak: the domain became ready when VB
+  material resources existed, but packet evidence did not prove that material
+  identity, policy, roughness, metallic, and object/material ID views were
+  visible and in usable ranges.
+- This gate makes material payload debt measurable before stronger lighting,
+  reflection, composite, and post work depend on it.
+
+Validation:
+
+```powershell
+python -m py_compile tools\analyze_full_scene_shader_v3_placeholders.py tools\analyze_full_scene_shader_v3_material_payload.py tools\build_full_scene_shader_v3_promotion_decision.py tools\validate_full_scene_shader_pipeline_v3_plan.py
+python -m json.tool assets\final_art\full_scene_shader_pipeline_v3_contract.json
+python tools\validate_full_scene_shader_pipeline_v3_plan.py
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_full_scene_shader_pipeline_v3_packet.ps1 -NoBuild -SkipSceneAnalyzers -NoStressScene -FamilyFilter gallery -SmokeFrames 10 -CaptureFrame 5 -CaptureSequenceCount 1 -StabilityMotionMode static -OutputRoot build\captures\v3_material_payload_gate_static_gallery_retry_20260606
+python tools\analyze_full_scene_shader_v3_material_payload.py --manifest build\captures\v3_material_payload_gate_static_gallery_retry_20260606\manifest.json --output-json build\captures\v3_material_payload_gate_static_gallery_retry_20260606\v3_material_payload.json --output-md build\captures\v3_material_payload_gate_static_gallery_retry_20260606\v3_material_payload.md
+python tools\build_full_scene_shader_v3_promotion_decision.py --packet-root build\captures\v3_material_payload_gate_static_gallery_retry_20260606 --output-json build\captures\v3_material_payload_gate_static_gallery_retry_20260606\promotion_decision.json --output-md build\captures\v3_material_payload_gate_static_gallery_retry_20260606\promotion_decision.md --allow-subset-review
+```
+
+Evidence:
+
+- packet:
+  `build/captures/v3_material_payload_gate_static_gallery_retry_20260606`.
+- `v3_signal.json`:
+  - report count `42`.
+  - full-pipeline reports `32`.
+  - material-payload reports `10`.
+  - ok reports `42`.
+  - failures `0`, warnings `0`.
+- `v3_stability.json`:
+  - material ready reports `42`.
+  - lighting ready reports `32`.
+  - cinematic post ready reports `32`.
+- `v3_material_payload.json`:
+  - ready `true`.
+  - failures `0`.
+  - warnings `2`.
+  - required debug views `9`, optional debug views `1`.
+  - material report count `42`.
+  - sampled materials total across reports `2520`.
+  - named materials total across reports `2520`.
+  - advanced feature materials total across reports `1344`.
+  - reflection eligible total across reports `756`.
+  - representative material stats per report:
+    sampled `60`, named `60`, average roughness `0.5013`, average metallic
+    `0.2167`, average albedo luminance `0.4559`.
+  - material debug-view signals:
+    roughness nonblack `1.00000`, surface class `1.00000`, material family
+    `1.00000`, material ID `1.00000`, object ID `1.00000`, metallic nonblack
+    `0.06651`.
+- `promotion_decision.json`:
+  - status `review_packet_passed`.
+  - `default_beauty_promotable=false`.
+  - failures `0`.
+  - warnings `5`: two material fallback warnings plus expected subset
+    warnings for missing non-gallery families, missing motion modes, and
+    capture sequence count below promotion evidence.
+
+Current limitation:
+
+- This is gallery/static material payload evidence only.
+- The gate proves material visibility and range sanity; it does not yet create
+  new PBR material resources beyond the current VB material resolve outputs.
+- Remaining material debt is explicit:
+  `preset_default_roughness fallback count 8` and
+  `preset_default_transmission fallback count 5`.
+  The next material-quality slice should reduce those fallback counts or attach
+  authored/provider-backed values.

@@ -14,6 +14,7 @@ FULL_SCENE_SHADER_FRAME_CONTEXT_PATH = ROOT / "src" / "Graphics" / "FullSceneSha
 V3_PLACEHOLDER_ANALYZER_PATH = ROOT / "tools" / "analyze_full_scene_shader_v3_placeholders.py"
 V3_PACKET_RUNNER_PATH = ROOT / "tools" / "run_full_scene_shader_pipeline_v3_packet.ps1"
 V3_PROMOTION_DECISION_PATH = ROOT / "tools" / "build_full_scene_shader_v3_promotion_decision.py"
+V3_MATERIAL_PAYLOAD_ANALYZER_PATH = ROOT / "tools" / "analyze_full_scene_shader_v3_material_payload.py"
 
 
 REQUIRED_PLAN_TOKENS = [
@@ -124,6 +125,11 @@ def main() -> int:
         errors,
         f"Missing V3 promotion decision builder: {V3_PROMOTION_DECISION_PATH}",
     )
+    require(
+        V3_MATERIAL_PAYLOAD_ANALYZER_PATH.exists(),
+        errors,
+        f"Missing V3 material payload analyzer: {V3_MATERIAL_PAYLOAD_ANALYZER_PATH}",
+    )
     if errors:
         for error in errors:
             print(f"ERROR: {error}")
@@ -136,8 +142,9 @@ def main() -> int:
     analyzer_source = V3_PLACEHOLDER_ANALYZER_PATH.read_text(encoding="utf-8")
     packet_source = V3_PACKET_RUNNER_PATH.read_text(encoding="utf-8")
     promotion_source = V3_PROMOTION_DECISION_PATH.read_text(encoding="utf-8")
+    material_payload_source = V3_MATERIAL_PAYLOAD_ANALYZER_PATH.read_text(encoding="utf-8")
     runtime_surface = "\n".join(
-        [frame_contract_source, frame_context_source, analyzer_source, packet_source, promotion_source]
+        [frame_contract_source, frame_context_source, analyzer_source, packet_source, promotion_source, material_payload_source]
     )
 
     for token in REQUIRED_PLAN_TOKENS:
@@ -187,12 +194,29 @@ def main() -> int:
             errors,
             f"V3 material contract missing backing resource: {resource}",
         )
+    material_packet_debug_views = set(material_contract.get("packet_debug_views", []))
+    for view in [
+        "roughness",
+        "metallic",
+        "surface_class",
+        "surface_policy",
+        "material_family",
+        "reflection_policy",
+        "temporal_policy",
+        "post_sensitivity",
+        "material_id",
+        "object_id",
+    ]:
+        require(view in material_packet_debug_views, errors, f"V3 material contract missing packet debug view: {view}")
+        require(view in runtime_surface, errors, f"V3 runtime surface missing material packet debug view: {view}")
 
     validation_gates = set(domains.get("validation", {}).get("required_gates", []))
     for gate in [
         "no_missing_required_resource",
         "reflection_temporal_delta_bounded",
         "environment_mode_matches_scene",
+        "material_payload_debug_views_present",
+        "material_payload_ranges_valid",
         "default_beauty_unchanged_until_promotion",
     ]:
         require(gate in validation_gates, errors, f"V3 validation missing gate: {gate}")
@@ -416,6 +440,11 @@ def main() -> int:
         "cortex.full_scene_shader_pipeline_v3.placeholder_stability.v1",
         "v3_signal.json",
         "v3_stability.json",
+        "v3_material_payload.json",
+        "cortex.full_scene_shader_pipeline_v3.material_payload.v1",
+        "diagnostic_scope",
+        "material_payload_report_count",
+        "full_pipeline_report_count",
         "promotion_decision.json",
         "promotion_decision.md",
         "cortex.full_scene_shader_pipeline_v3.promotion_decision.v1",

@@ -95,6 +95,16 @@ struct FrameContract {
         bool localReflectionProbeRadianceEnabled = false;
         float localReflectionProbeDiffuseIntensity = 0.0f;
         float localReflectionProbeSpecularIntensity = 0.0f;
+        std::string sceneLocalTextureSetId = "none";
+        std::string sceneLocalTextureSetPath;
+        bool sceneLocalTextureSetPresent = false;
+        uint32_t sceneLocalTextureCount = 0;
+        uint32_t sceneLocalAlbedoTextureCount = 0;
+        uint32_t sceneLocalNormalTextureCount = 0;
+        bool sceneLocalPayloadReady = false;
+        bool sceneLocalIrradianceProxyReady = false;
+        bool sceneLocalSpecularProxyReady = false;
+        bool sceneLocalVisibleBackgroundProxyReady = false;
     };
 
     struct GraphicsPresetInfo {

@@ -9,8 +9,10 @@
 #include "Scene/ECS_Registry.h"
 
 #include <algorithm>
+#include <cctype>
 #include <cmath>
 #include <cstdlib>
+#include <filesystem>
 #include <string>
 #include <vector>
 
@@ -19,6 +21,98 @@
 namespace Cortex::Graphics {
 
 namespace {
+std::string SceneLocalTextureSetIdForFamily(const std::string& family) {
+    std::string id;
+    id.reserve(family.size());
+    for (char c : family) {
+        if ((c >= 'a' && c <= 'z') ||
+            (c >= 'A' && c <= 'Z') ||
+            (c >= '0' && c <= '9')) {
+            id.push_back(static_cast<char>(std::tolower(static_cast<unsigned char>(c))));
+        } else if (!id.empty() && id.back() != '_') {
+            id.push_back('_');
+        }
+    }
+    while (!id.empty() && id.back() == '_') {
+        id.pop_back();
+    }
+    return id.empty() ? "none" : id;
+}
+
+void PopulateSceneLocalTexturePayload(FrameContract::EnvironmentInfo& environment,
+                                      const FrameContract::SceneVisualInfo& sceneVisual) {
+    environment.sceneLocalTextureSetId = SceneLocalTextureSetIdForFamily(sceneVisual.family);
+    environment.sceneLocalTextureSetPath =
+        environment.sceneLocalTextureSetId == "none"
+            ? ""
+            : std::string("assets/textures/scene_local/") + environment.sceneLocalTextureSetId;
+    environment.sceneLocalTextureSetPresent = false;
+    environment.sceneLocalTextureCount = 0;
+    environment.sceneLocalAlbedoTextureCount = 0;
+    environment.sceneLocalNormalTextureCount = 0;
+    environment.sceneLocalPayloadReady = false;
+    environment.sceneLocalIrradianceProxyReady = false;
+    environment.sceneLocalSpecularProxyReady = false;
+    environment.sceneLocalVisibleBackgroundProxyReady = false;
+
+    if (environment.sceneLocalTextureSetPath.empty()) {
+        return;
+    }
+
+    std::filesystem::path textureSetPath(environment.sceneLocalTextureSetPath);
+    std::error_code ec;
+    if ((!std::filesystem::exists(textureSetPath, ec) || !std::filesystem::is_directory(textureSetPath, ec)) &&
+        environment.sceneLocalTextureSetId != "none") {
+        ec.clear();
+        textureSetPath =
+            std::filesystem::path("../../assets/textures/scene_local") / environment.sceneLocalTextureSetId;
+    }
+    if (!std::filesystem::exists(textureSetPath, ec) || !std::filesystem::is_directory(textureSetPath, ec)) {
+        return;
+    }
+
+    environment.sceneLocalTextureSetPresent = true;
+    for (const auto& entry : std::filesystem::directory_iterator(textureSetPath, ec)) {
+        if (ec) {
+            break;
+        }
+        if (!entry.is_regular_file(ec)) {
+            continue;
+        }
+        const auto extension = entry.path().extension().string();
+        if (extension != ".dds" && extension != ".DDS") {
+            continue;
+        }
+        ++environment.sceneLocalTextureCount;
+        const std::string filename = entry.path().filename().string();
+        if (filename.find("albedo") != std::string::npos) {
+            ++environment.sceneLocalAlbedoTextureCount;
+        }
+        if (filename.find("normal") != std::string::npos) {
+            ++environment.sceneLocalNormalTextureCount;
+        }
+    }
+
+    environment.sceneLocalIrradianceProxyReady =
+        environment.sceneLocalAlbedoTextureCount > 0 &&
+        environment.localReflectionProbeDiffuseIntensity > 0.0f;
+    environment.sceneLocalSpecularProxyReady =
+        environment.sceneLocalNormalTextureCount > 0 &&
+        environment.localReflectionProbeSpecularIntensity > 0.0f;
+    environment.sceneLocalVisibleBackgroundProxyReady =
+        sceneVisual.enclosedScene &&
+        !sceneVisual.externalHDRIVisible &&
+        environment.sceneLocalAlbedoTextureCount > 0;
+    environment.sceneLocalPayloadReady =
+        environment.sceneLocalTextureSetPresent &&
+        environment.sceneLocalTextureCount >= 2 &&
+        environment.sceneLocalAlbedoTextureCount > 0 &&
+        environment.sceneLocalNormalTextureCount > 0 &&
+        (environment.sceneLocalIrradianceProxyReady ||
+         environment.sceneLocalSpecularProxyReady ||
+         environment.sceneLocalVisibleBackgroundProxyReady);
+}
+
 void ApplyRTPlanToContract(FrameContract::RayTracingInfo& info, const RTFramePlan& plan) {
     info.schedulerEnabled = plan.enabled;
     info.schedulerBuildTLAS = plan.buildTLAS;
@@ -229,6 +323,7 @@ void Renderer::UpdateFrameContractSnapshot(Scene::ECS_Registry* registry,
     contract.sceneVisual.materialPaletteId = m_lightingState.activeWorldShaderPaletteId;
     contract.sceneVisual.lightingScriptId = m_lightingState.activeLightingScriptId;
     contract.sceneVisual.toneMapperPreset = m_postProcessState.toneMapperPreset;
+    PopulateSceneLocalTexturePayload(contract.environment, contract.sceneVisual);
 
     contract.plannedFeatures = featurePlan.planned;
     contract.executedFeatures = featurePlan.active;

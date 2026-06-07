@@ -7,8 +7,19 @@ from pathlib import Path
 from typing import Any
 
 
+ROOT = Path(__file__).resolve().parents[1]
+EXPECTED_PROXY_DERIVATION = "profile_payload_inventory_v1"
+PROXY_MANIFEST_PATH = ROOT / "assets" / "textures" / "scene_local_proxy" / "proxy_manifest.json"
+
+
 def load_json(path: Path) -> dict[str, Any]:
     return json.loads(path.read_text(encoding="utf-8-sig"))
+
+
+def load_proxy_manifest() -> dict[str, Any]:
+    if PROXY_MANIFEST_PATH.exists():
+        return load_json(PROXY_MANIFEST_PATH)
+    return {}
 
 
 def report_paths(manifest: dict[str, Any]) -> list[Path]:
@@ -22,7 +33,7 @@ def report_paths(manifest: dict[str, Any]) -> list[Path]:
     return paths
 
 
-def analyze_report(path: Path) -> dict[str, Any]:
+def analyze_report(path: Path, proxy_manifest: dict[str, Any]) -> dict[str, Any]:
     report = load_json(path)
     contract = report.get("frame_contract", {})
     environment = contract.get("environment", {})
@@ -31,6 +42,12 @@ def analyze_report(path: Path) -> dict[str, Any]:
     policy_contract = v3.get("scene_profile_policy_contract", {})
     if not isinstance(policy_contract, dict):
         policy_contract = {}
+    texture_set_id = environment.get("scene_local_texture_set_id", "none")
+    proxy_sets = proxy_manifest.get("sets", {})
+    proxy_manifest_set = proxy_sets.get(texture_set_id, {}) if isinstance(proxy_sets, dict) else {}
+    proxy_derivation = proxy_manifest_set.get("derivation", {}) if isinstance(proxy_manifest_set, dict) else {}
+    if not isinstance(proxy_derivation, dict):
+        proxy_derivation = {}
     row = {
         "report": str(path),
         "family": scene_visual.get("family", "unknown"),
@@ -50,7 +67,7 @@ def analyze_report(path: Path) -> dict[str, Any]:
         "scene_profile_policy_environment": policy_contract.get("environment_policy", "unknown"),
         "scene_profile_policy_enclosure_mode": policy_contract.get("enclosure_mode", "unknown"),
         "scene_profile_policy_reflection": policy_contract.get("reflection_policy", "unknown"),
-        "texture_set_id": environment.get("scene_local_texture_set_id", "none"),
+        "texture_set_id": texture_set_id,
         "texture_set_path": environment.get("scene_local_texture_set_path", ""),
         "texture_set_present": environment.get("scene_local_texture_set_present") is True,
         "texture_count": int(environment.get("scene_local_texture_count", 0) or 0),
@@ -95,6 +112,8 @@ def analyze_report(path: Path) -> dict[str, Any]:
         ),
         "v3_proxy_binding_source": v3.get("scene_local_environment_proxy_binding_source", "none"),
         "v3_proxy_fallback_reason": v3.get("scene_local_environment_proxy_fallback_reason", "none"),
+        "proxy_manifest_present": bool(proxy_manifest_set),
+        "proxy_derivation_method": proxy_derivation.get("method", "none"),
         "failures": [],
     }
     if row["environment_ready"]:
@@ -177,6 +196,13 @@ def analyze_report(path: Path) -> dict[str, Any]:
             row["failures"].append(
                 f"payload ready without explicit generated/authored proxy binding: {row['proxy_binding_source']}"
             )
+        if not row["proxy_manifest_present"]:
+            row["failures"].append("payload ready without scene-local proxy manifest entry")
+        if row["proxy_derivation_method"] != EXPECTED_PROXY_DERIVATION:
+            row["failures"].append(
+                "payload ready without current derived scene-local proxy assets: "
+                f"{row['proxy_derivation_method']}"
+            )
     return row
 
 
@@ -191,8 +217,8 @@ def write_markdown(path: Path, result: dict[str, Any]) -> None:
         f"- profile-policy-consumed reports: `{result['profile_policy_consumed_report_count']}`",
         f"- failures: `{len(result['failures'])}`",
         "",
-        "| Family | Profile Policy | Shader Profile | Local Background | Texture Set | Textures | Albedo | Normal | Payload | Influence | Bound | Proxy Bound | Binding | Proxy Binding | Proxies |",
-        "|---|---|---|---:|---|---:|---:|---:|---|---:|---:|---:|---|---|---|",
+        "| Family | Profile Policy | Shader Profile | Local Background | Texture Set | Textures | Albedo | Normal | Payload | Influence | Bound | Proxy Bound | Binding | Proxy Binding | Derivation | Proxies |",
+        "|---|---|---|---:|---|---:|---:|---:|---|---:|---:|---:|---|---|---|---|",
     ]
     for row in result["rows"]:
         proxies = ",".join(
@@ -222,6 +248,7 @@ def write_markdown(path: Path, result: dict[str, Any]) -> None:
                     str(row["bound_proxy_resource_count"]),
                     f"`{row['binding_source']}`",
                     f"`{row['proxy_binding_source']}`",
+                    f"`{row['proxy_derivation_method']}`",
                     proxies,
                 ]
             )
@@ -242,7 +269,8 @@ def main() -> int:
     args = parser.parse_args()
 
     manifest = load_json(args.manifest)
-    rows = [analyze_report(path) for path in report_paths(manifest)]
+    proxy_manifest = load_proxy_manifest()
+    rows = [analyze_report(path, proxy_manifest) for path in report_paths(manifest)]
     failures: list[str] = []
     for row in rows:
         failures.extend(f"{row['report']}: {failure}" for failure in row["failures"])
@@ -266,6 +294,10 @@ def main() -> int:
         "explicit_proxy_binding_report_count": sum(
             1 for row in rows if row["proxy_binding_source"] == "cached_explicit_scene_local_proxy_triple"
         ),
+        "derived_proxy_report_count": sum(
+            1 for row in rows if row["proxy_derivation_method"] == EXPECTED_PROXY_DERIVATION
+        ),
+        "proxy_manifest": str(PROXY_MANIFEST_PATH),
         "profile_policy_consumed_report_count": sum(1 for row in rows if row["profile_policy_consumed"]),
         "rows": rows,
         "failures": failures,

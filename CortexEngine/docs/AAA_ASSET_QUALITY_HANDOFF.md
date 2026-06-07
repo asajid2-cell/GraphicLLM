@@ -639,12 +639,82 @@ Evidence:
 
 Current next work after this checkpoint:
 
-1. Replace solid-color BC1 proxy placeholders with actual generated radiance
-   proxies derived from scene materials, room shell, lights, and camera policy.
+1. Replace solid BC1 proxy maps with texture-aware/radiance-filtered proxy
+   bakes derived from decoded material color, room shell, lights, and camera
+   policy.
 2. Expand explicit proxy proof to kitchen/gym/red-room after report/capture
    separation is clean enough for those unstable model-scene paths.
 3. Continue `LightingShadowV3` and `ReflectionV3` matrix coverage before
    tuning `CinematicPostV3`.
+
+Latest SceneLocalEnvironmentV3 derived proxy checkpoint:
+
+- `tools\generate_scene_local_environment_proxies.py` now derives proxy colors
+  using `profile_payload_inventory_v1` instead of only static per-family color
+  constants.
+- The derivation reads scene-local payload inventory:
+  texture count, albedo count, normal count, and filename role signals for
+  floor, wall, cube, cylinder, and metal/brushed surfaces.
+- The generator writes
+  `assets\textures\scene_local_proxy\proxy_manifest.json` with:
+  - derivation method
+  - source payload path
+  - base RGB
+  - derived RGB
+  - payload inventory
+  - role weights
+- Runtime mirrors are still written under `build\bin`.
+- `tools\analyze_full_scene_shader_v3_environment_payload.py` now reads the
+  proxy manifest and fails payload-ready scenes unless:
+  - proxy source is `cached_explicit_scene_local_proxy_triple`
+  - derivation method is `profile_payload_inventory_v1`
+  - the current texture set has a proxy manifest entry
+
+Validation for derived proxy assets:
+
+```powershell
+python tools\generate_scene_local_environment_proxies.py --overwrite --out build\captures\scene_local_environment_proxy_generation_20260607\derived_proxy_generation_report.json
+python -m py_compile tools\generate_scene_local_environment_proxies.py tools\analyze_full_scene_shader_v3_environment_payload.py tools\analyze_full_scene_shader_v3_placeholders.py tools\validate_full_scene_shader_pipeline_v3_plan.py
+python tools\validate_full_scene_shader_pipeline_v3_plan.py
+git -c submodule.recurse=false diff --check -- tools\generate_scene_local_environment_proxies.py tools\analyze_full_scene_shader_v3_environment_payload.py assets\textures\scene_local_proxy
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_full_scene_shader_pipeline_v3_packet.ps1 -NoBuild -SkipSceneAnalyzers -StressSceneOnly -StressSceneFilter rt_showcase:reflection_closeup -SmokeFrames 10 -CaptureFrame 5 -CaptureSequenceCount 1 -StabilityMotionMode static -OutputRoot build\captures\v3_scene_local_derived_proxy_fresh_smoke_20260607
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_scene_local_cinematic_renderer_v1_packets.ps1 -NoBuild -OutputRoot build\captures\v3_scene_local_derived_proxy_cross_profile_20260607 -FamilyFilter gallery,office,concert,stadium -ViewFilter scene_local_environment -SmokeFrames 10 -CaptureFrame 5 -CaptureSequenceCount 1 -SkipOwnerAnalysis -SkipMaterialAnalysis -SkipStabilityAnalysis -SkipVisualQualityAnalysis
+python tools\analyze_full_scene_shader_v3_environment_payload.py --manifest build\captures\v3_scene_local_derived_proxy_cross_profile_20260607\manifest.json --output-json build\captures\v3_scene_local_derived_proxy_cross_profile_20260607\v3_environment_payload_cross_profile.json --output-md build\captures\v3_scene_local_derived_proxy_cross_profile_20260607\v3_environment_payload_cross_profile.md --min-payload-ready 3
+python tools\analyze_full_scene_shader_v3_environment_profiles.py --manifest build\captures\v3_scene_local_derived_proxy_cross_profile_20260607\manifest.json --output-json build\captures\v3_scene_local_derived_proxy_cross_profile_20260607\v3_environment_profiles_cross_profile.json --output-md build\captures\v3_scene_local_derived_proxy_cross_profile_20260607\v3_environment_profiles_cross_profile.md --min-ready-reports 3 --min-distinct-modes 3 --min-distinct-profiles 3 --require-profile gallery_neutral=1 --require-profile enclosed_room=2 --require-profile stage=3 --require-profile open_exterior=4
+```
+
+Evidence:
+
+- Derived proxy generation report:
+  `build\captures\scene_local_environment_proxy_generation_20260607\derived_proxy_generation_report.json`.
+- Focused V3 packet:
+  `build\captures\v3_scene_local_derived_proxy_fresh_smoke_20260607`.
+  - full V3 packet passed end to end
+  - `54` reports
+  - `54` payload-ready reports
+  - `54` explicit proxy binding reports
+  - `54` derived proxy reports
+  - only source: `cached_explicit_scene_local_proxy_triple`
+  - only derivation: `profile_payload_inventory_v1`
+- Cross-profile packet:
+  `build\captures\v3_scene_local_derived_proxy_cross_profile_20260607`.
+  - packet runner passed
+  - environment payload analyzer passed
+  - environment profile analyzer passed
+  - `4` reports, `4` payload-ready, `4` explicit proxy binding,
+    `4` derived proxy
+  - only source: `cached_explicit_scene_local_proxy_triple`
+  - only derivation: `profile_payload_inventory_v1`
+
+Current next work after this checkpoint:
+
+1. Add real material-color sampling for BC7 albedo payloads or an offline
+   decompression path so proxy bakes use decoded texture colors, not filename
+   role inventory.
+2. Add light-rig and room-shell influence to the proxy bake manifest and
+   analyzer.
+3. Expand derived proxy proof to kitchen/gym/red-room after model-scene
+   report/capture separation is reliable.
 
 Latest LightingShadowV3 source-attribution checkpoint:
 

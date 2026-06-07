@@ -1,0 +1,631 @@
+{
+  "schema": "cortex.scene_local_environment_proxy_manifest.v1",
+  "source": "generate_scene_local_environment_proxies.py",
+  "derivation_method": "profile_payload_inventory_v1",
+  "sets": {
+    "basketball_gym_day": {
+      "set_id": "basketball_gym_day",
+      "output_dir": "assets/textures/scene_local_proxy/basketball_gym_day",
+      "derivation": {
+        "method": "profile_payload_inventory_v1",
+        "base_rgb": {
+          "irradiance": [
+            179,
+            158,
+            111
+          ],
+          "specular": [
+            200,
+            192,
+            166
+          ],
+          "visible_background": [
+            74,
+            112,
+            158
+          ]
+        },
+        "derived_rgb": {
+          "irradiance": [
+            179,
+            164,
+            130
+          ],
+          "specular": [
+            202,
+            197,
+            182
+          ],
+          "visible_background": [
+            101,
+            125,
+            151
+          ]
+        },
+        "payload_inventory": {
+          "source_paths": [
+            "assets/textures/scene_local/basketball_gym_day"
+          ],
+          "texture_count": 10,
+          "albedo_count": 5,
+          "normal_count": 5,
+          "roles": {
+            "floor": 2,
+            "wall": 4,
+            "cube": 2,
+            "cylinder": 2,
+            "metal": 2
+          },
+          "sample_textures": [
+            "rt_gallery_cube_plastic_albedo.dds",
+            "rt_gallery_cube_plastic_normal_bc5.dds",
+            "rt_gallery_cylinder_brushed_albedo.dds",
+            "rt_gallery_cylinder_brushed_normal_bc5.dds",
+            "rt_gallery_floor_albedo.dds",
+            "rt_gallery_floor_normal_bc5.dds",
+            "rt_gallery_leftwall_albedo.dds",
+            "rt_gallery_leftwall_normal_bc5.dds"
+          ]
+        },
+        "weights": {
+          "floor": 0.26,
+          "wall": 0.44,
+          "object": 0.28,
+          "metal": 0.24,
+          "role_count": 12
+        }
+      },
+      "outputs": {
+        "irradiance": "assets/textures/scene_local_proxy/basketball_gym_day/scene_local_irradiance_proxy.dds",
+        "specular": "assets/textures/scene_local_proxy/basketball_gym_day/scene_local_specular_proxy.dds",
+        "visible_background": "assets/textures/scene_local_proxy/basketball_gym_day/scene_local_visible_background_proxy.dds"
+      }
+    },
+    "home_kitchen_lantern": {
+      "set_id": "home_kitchen_lantern",
+      "output_dir": "assets/textures/scene_local_proxy/home_kitchen_lantern",
+      "derivation": {
+        "method": "profile_payload_inventory_v1",
+        "base_rgb": {
+          "irradiance": [
+            186,
+            143,
+            98
+          ],
+          "specular": [
+            212,
+            179,
+            130
+          ],
+          "visible_background": [
+            132,
+            106,
+            82
+          ]
+        },
+        "derived_rgb": {
+          "irradiance": [
+            177,
+            146,
+            111
+          ],
+          "specular": [
+            203,
+            184,
+            154
+          ],
+          "visible_background": [
+            134,
+            122,
+            109
+          ]
+        },
+        "payload_inventory": {
+          "source_paths": [
+            "assets/textures/rtshowcase"
+          ],
+          "texture_count": 12,
+          "albedo_count": 6,
+          "normal_count": 6,
+          "roles": {
+            "floor": 2,
+            "wall": 4,
+            "cube": 2,
+            "cylinder": 2,
+            "metal": 3
+          },
+          "sample_textures": [
+            "metal_plate_diff_4k.dds",
+            "rt_gallery_cube_plastic_albedo.dds",
+            "rt_gallery_cube_plastic_normal_bc5.dds",
+            "rt_gallery_cylinder_brushed_albedo.dds",
+            "rt_gallery_cylinder_brushed_normal_bc5.dds",
+            "rt_gallery_floor_albedo.dds",
+            "rt_gallery_floor_normal_bc5.dds",
+            "rt_gallery_leftwall_albedo.dds"
+          ]
+        },
+        "weights": {
+          "floor": 0.26,
+          "wall": 0.44,
+          "object": 0.28,
+          "metal": 0.32,
+          "role_count": 13
+        }
+      },
+      "outputs": {
+        "irradiance": "assets/textures/scene_local_proxy/home_kitchen_lantern/scene_local_irradiance_proxy.dds",
+        "specular": "assets/textures/scene_local_proxy/home_kitchen_lantern/scene_local_specular_proxy.dds",
+        "visible_background": "assets/textures/scene_local_proxy/home_kitchen_lantern/scene_local_visible_background_proxy.dds"
+      }
+    },
+    "home_office_evening": {
+      "set_id": "home_office_evening",
+      "output_dir": "assets/textures/scene_local_proxy/home_office_evening",
+      "derivation": {
+        "method": "profile_payload_inventory_v1",
+        "base_rgb": {
+          "irradiance": [
+            124,
+            105,
+            84
+          ],
+          "specular": [
+            170,
+            156,
+            138
+          ],
+          "visible_background": [
+            88,
+            83,
+            78
+          ]
+        },
+        "derived_rgb": {
+          "irradiance": [
+            138,
+            123,
+            102
+          ],
+          "specular": [
+            178,
+            170,
+            159
+          ],
+          "visible_background": [
+            109,
+            109,
+            107
+          ]
+        },
+        "payload_inventory": {
+          "source_paths": [
+            "assets/textures/rtshowcase"
+          ],
+          "texture_count": 12,
+          "albedo_count": 6,
+          "normal_count": 6,
+          "roles": {
+            "floor": 2,
+            "wall": 4,
+            "cube": 2,
+            "cylinder": 2,
+            "metal": 3
+          },
+          "sample_textures": [
+            "metal_plate_diff_4k.dds",
+            "rt_gallery_cube_plastic_albedo.dds",
+            "rt_gallery_cube_plastic_normal_bc5.dds",
+            "rt_gallery_cylinder_brushed_albedo.dds",
+            "rt_gallery_cylinder_brushed_normal_bc5.dds",
+            "rt_gallery_floor_albedo.dds",
+            "rt_gallery_floor_normal_bc5.dds",
+            "rt_gallery_leftwall_albedo.dds"
+          ]
+        },
+        "weights": {
+          "floor": 0.26,
+          "wall": 0.44,
+          "object": 0.28,
+          "metal": 0.32,
+          "role_count": 13
+        }
+      },
+      "outputs": {
+        "irradiance": "assets/textures/scene_local_proxy/home_office_evening/scene_local_irradiance_proxy.dds",
+        "specular": "assets/textures/scene_local_proxy/home_office_evening/scene_local_specular_proxy.dds",
+        "visible_background": "assets/textures/scene_local_proxy/home_office_evening/scene_local_visible_background_proxy.dds"
+      }
+    },
+    "neon_streamer_concert": {
+      "set_id": "neon_streamer_concert",
+      "output_dir": "assets/textures/scene_local_proxy/neon_streamer_concert",
+      "derivation": {
+        "method": "profile_payload_inventory_v1",
+        "base_rgb": {
+          "irradiance": [
+            86,
+            34,
+            126
+          ],
+          "specular": [
+            61,
+            190,
+            218
+          ],
+          "visible_background": [
+            23,
+            18,
+            42
+          ]
+        },
+        "derived_rgb": {
+          "irradiance": [
+            99,
+            66,
+            121
+          ],
+          "specular": [
+            130,
+            199,
+            213
+          ],
+          "visible_background": [
+            59,
+            48,
+            78
+          ]
+        },
+        "payload_inventory": {
+          "source_paths": [
+            "assets/textures/rtshowcase"
+          ],
+          "texture_count": 12,
+          "albedo_count": 6,
+          "normal_count": 6,
+          "roles": {
+            "floor": 2,
+            "wall": 4,
+            "cube": 2,
+            "cylinder": 2,
+            "metal": 3
+          },
+          "sample_textures": [
+            "metal_plate_diff_4k.dds",
+            "rt_gallery_cube_plastic_albedo.dds",
+            "rt_gallery_cube_plastic_normal_bc5.dds",
+            "rt_gallery_cylinder_brushed_albedo.dds",
+            "rt_gallery_cylinder_brushed_normal_bc5.dds",
+            "rt_gallery_floor_albedo.dds",
+            "rt_gallery_floor_normal_bc5.dds",
+            "rt_gallery_leftwall_albedo.dds"
+          ]
+        },
+        "weights": {
+          "floor": 0.26,
+          "wall": 0.44,
+          "object": 0.28,
+          "metal": 0.32,
+          "role_count": 13
+        }
+      },
+      "outputs": {
+        "irradiance": "assets/textures/scene_local_proxy/neon_streamer_concert/scene_local_irradiance_proxy.dds",
+        "specular": "assets/textures/scene_local_proxy/neon_streamer_concert/scene_local_specular_proxy.dds",
+        "visible_background": "assets/textures/scene_local_proxy/neon_streamer_concert/scene_local_visible_background_proxy.dds"
+      }
+    },
+    "red_light_room": {
+      "set_id": "red_light_room",
+      "output_dir": "assets/textures/scene_local_proxy/red_light_room",
+      "derivation": {
+        "method": "profile_payload_inventory_v1",
+        "base_rgb": {
+          "irradiance": [
+            138,
+            31,
+            38
+          ],
+          "specular": [
+            207,
+            76,
+            70
+          ],
+          "visible_background": [
+            59,
+            20,
+            24
+          ]
+        },
+        "derived_rgb": {
+          "irradiance": [
+            119,
+            65,
+            85
+          ],
+          "specular": [
+            207,
+            139,
+            135
+          ],
+          "visible_background": [
+            68,
+            49,
+            73
+          ]
+        },
+        "payload_inventory": {
+          "source_paths": [
+            "assets/textures/rtshowcase"
+          ],
+          "texture_count": 12,
+          "albedo_count": 6,
+          "normal_count": 6,
+          "roles": {
+            "floor": 2,
+            "wall": 4,
+            "cube": 2,
+            "cylinder": 2,
+            "metal": 3
+          },
+          "sample_textures": [
+            "metal_plate_diff_4k.dds",
+            "rt_gallery_cube_plastic_albedo.dds",
+            "rt_gallery_cube_plastic_normal_bc5.dds",
+            "rt_gallery_cylinder_brushed_albedo.dds",
+            "rt_gallery_cylinder_brushed_normal_bc5.dds",
+            "rt_gallery_floor_albedo.dds",
+            "rt_gallery_floor_normal_bc5.dds",
+            "rt_gallery_leftwall_albedo.dds"
+          ]
+        },
+        "weights": {
+          "floor": 0.26,
+          "wall": 0.44,
+          "object": 0.28,
+          "metal": 0.32,
+          "role_count": 13
+        }
+      },
+      "outputs": {
+        "irradiance": "assets/textures/scene_local_proxy/red_light_room/scene_local_irradiance_proxy.dds",
+        "specular": "assets/textures/scene_local_proxy/red_light_room/scene_local_specular_proxy.dds",
+        "visible_background": "assets/textures/scene_local_proxy/red_light_room/scene_local_visible_background_proxy.dds"
+      }
+    },
+    "rt_showcase_gallery": {
+      "set_id": "rt_showcase_gallery",
+      "output_dir": "assets/textures/scene_local_proxy/rt_showcase_gallery",
+      "derivation": {
+        "method": "profile_payload_inventory_v1",
+        "base_rgb": {
+          "irradiance": [
+            150,
+            146,
+            134
+          ],
+          "specular": [
+            183,
+            186,
+            188
+          ],
+          "visible_background": [
+            169,
+            174,
+            181
+          ]
+        },
+        "derived_rgb": {
+          "irradiance": [
+            154,
+            149,
+            134
+          ],
+          "specular": [
+            186,
+            188,
+            188
+          ],
+          "visible_background": [
+            154,
+            160,
+            164
+          ]
+        },
+        "payload_inventory": {
+          "source_paths": [
+            "assets/textures/rtshowcase"
+          ],
+          "texture_count": 12,
+          "albedo_count": 6,
+          "normal_count": 6,
+          "roles": {
+            "floor": 2,
+            "wall": 4,
+            "cube": 2,
+            "cylinder": 2,
+            "metal": 3
+          },
+          "sample_textures": [
+            "metal_plate_diff_4k.dds",
+            "rt_gallery_cube_plastic_albedo.dds",
+            "rt_gallery_cube_plastic_normal_bc5.dds",
+            "rt_gallery_cylinder_brushed_albedo.dds",
+            "rt_gallery_cylinder_brushed_normal_bc5.dds",
+            "rt_gallery_floor_albedo.dds",
+            "rt_gallery_floor_normal_bc5.dds",
+            "rt_gallery_leftwall_albedo.dds"
+          ]
+        },
+        "weights": {
+          "floor": 0.26,
+          "wall": 0.44,
+          "object": 0.28,
+          "metal": 0.32,
+          "role_count": 13
+        }
+      },
+      "outputs": {
+        "irradiance": "assets/textures/scene_local_proxy/rt_showcase_gallery/scene_local_irradiance_proxy.dds",
+        "specular": "assets/textures/scene_local_proxy/rt_showcase_gallery/scene_local_specular_proxy.dds",
+        "visible_background": "assets/textures/scene_local_proxy/rt_showcase_gallery/scene_local_visible_background_proxy.dds"
+      }
+    },
+    "school_classroom_day": {
+      "set_id": "school_classroom_day",
+      "output_dir": "assets/textures/scene_local_proxy/school_classroom_day",
+      "derivation": {
+        "method": "profile_payload_inventory_v1",
+        "base_rgb": {
+          "irradiance": [
+            161,
+            173,
+            154
+          ],
+          "specular": [
+            190,
+            202,
+            194
+          ],
+          "visible_background": [
+            144,
+            157,
+            168
+          ]
+        },
+        "derived_rgb": {
+          "irradiance": [
+            161,
+            166,
+            146
+          ],
+          "specular": [
+            190,
+            198,
+            192
+          ],
+          "visible_background": [
+            140,
+            150,
+            157
+          ]
+        },
+        "payload_inventory": {
+          "source_paths": [
+            "assets/textures/rtshowcase"
+          ],
+          "texture_count": 12,
+          "albedo_count": 6,
+          "normal_count": 6,
+          "roles": {
+            "floor": 2,
+            "wall": 4,
+            "cube": 2,
+            "cylinder": 2,
+            "metal": 3
+          },
+          "sample_textures": [
+            "metal_plate_diff_4k.dds",
+            "rt_gallery_cube_plastic_albedo.dds",
+            "rt_gallery_cube_plastic_normal_bc5.dds",
+            "rt_gallery_cylinder_brushed_albedo.dds",
+            "rt_gallery_cylinder_brushed_normal_bc5.dds",
+            "rt_gallery_floor_albedo.dds",
+            "rt_gallery_floor_normal_bc5.dds",
+            "rt_gallery_leftwall_albedo.dds"
+          ]
+        },
+        "weights": {
+          "floor": 0.26,
+          "wall": 0.44,
+          "object": 0.28,
+          "metal": 0.32,
+          "role_count": 13
+        }
+      },
+      "outputs": {
+        "irradiance": "assets/textures/scene_local_proxy/school_classroom_day/scene_local_irradiance_proxy.dds",
+        "specular": "assets/textures/scene_local_proxy/school_classroom_day/scene_local_specular_proxy.dds",
+        "visible_background": "assets/textures/scene_local_proxy/school_classroom_day/scene_local_visible_background_proxy.dds"
+      }
+    },
+    "stadium_night_match": {
+      "set_id": "stadium_night_match",
+      "output_dir": "assets/textures/scene_local_proxy/stadium_night_match",
+      "derivation": {
+        "method": "profile_payload_inventory_v1",
+        "base_rgb": {
+          "irradiance": [
+            62,
+            82,
+            96
+          ],
+          "specular": [
+            172,
+            192,
+            204
+          ],
+          "visible_background": [
+            21,
+            34,
+            48
+          ]
+        },
+        "derived_rgb": {
+          "irradiance": [
+            83,
+            97,
+            106
+          ],
+          "specular": [
+            167,
+            180,
+            188
+          ],
+          "visible_background": [
+            62,
+            79,
+            94
+          ]
+        },
+        "payload_inventory": {
+          "source_paths": [
+            "assets/textures/rtshowcase"
+          ],
+          "texture_count": 12,
+          "albedo_count": 6,
+          "normal_count": 6,
+          "roles": {
+            "floor": 2,
+            "wall": 4,
+            "cube": 2,
+            "cylinder": 2,
+            "metal": 3
+          },
+          "sample_textures": [
+            "metal_plate_diff_4k.dds",
+            "rt_gallery_cube_plastic_albedo.dds",
+            "rt_gallery_cube_plastic_normal_bc5.dds",
+            "rt_gallery_cylinder_brushed_albedo.dds",
+            "rt_gallery_cylinder_brushed_normal_bc5.dds",
+            "rt_gallery_floor_albedo.dds",
+            "rt_gallery_floor_normal_bc5.dds",
+            "rt_gallery_leftwall_albedo.dds"
+          ]
+        },
+        "weights": {
+          "floor": 0.26,
+          "wall": 0.44,
+          "object": 0.28,
+          "metal": 0.32,
+          "role_count": 13
+        }
+      },
+      "outputs": {
+        "irradiance": "assets/textures/scene_local_proxy/stadium_night_match/scene_local_irradiance_proxy.dds",
+        "specular": "assets/textures/scene_local_proxy/stadium_night_match/scene_local_specular_proxy.dds",
+        "visible_background": "assets/textures/scene_local_proxy/stadium_night_match/scene_local_visible_background_proxy.dds"
+      }
+    }
+  }
+}

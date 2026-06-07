@@ -4,6 +4,320 @@ Status: planning ledger.
 
 Default beauty stays unchanged until a separate promotion gate passes.
 
+## 2026-06-07 Full Scene Shader Refactor Execution Blueprint
+
+The refactor should be planned as a renderer product line: the current public
+renderer remains the stable line, while `FullSceneCandidateBeautyV3` becomes
+the AAA-quality line under review. The goal feature is not complete when a
+single scene looks better. It is complete when the candidate line can produce a
+beautiful image from named, stable, inspectable scene-shader resources and prove
+that each visible contribution is owned.
+
+### Why This Is The Right Direction
+
+The existing failure pattern was predictable: blur, stronger IBL filtering,
+scene changes, or local material tweaks could reduce a visible artifact without
+proving that the renderer understood the image. Unreal-style results need a
+coherent stack:
+
+```text
+scene intent
+  -> stable visibility
+  -> rich material payload
+  -> scene-local environment
+  -> owned lights and shadows
+  -> source-aware reflections
+  -> transparent/media layers
+  -> HDR composite
+  -> cinematic post
+  -> promotion evidence
+```
+
+If any layer is hidden behind legacy `hdr_color`, old global IBL behavior, or
+anonymous fallback material defaults, the image can look acceptable in one
+camera angle and still break under mouse motion or another scene family. The
+refactor therefore prioritizes ownership and diagnostics before visual strength.
+
+### Final Candidate Render Graph
+
+The target graph is:
+
+```text
+SceneProfileV3
+  produces policy constants:
+    scene family, enclosure mode, key/fill/rim rig, exposure policy,
+    reflection provider priority, local environment policy, post look,
+    material palette, motion stability tolerances
+
+VisibilityV3
+  writes:
+    depth, velocity, object_id, material_id, surface_id,
+    normal_for_history, disocclusion_mask
+
+MaterialPayloadV3
+  reads:
+    visibility IDs, mesh material table, texture/material descriptors
+  writes:
+    base_color, normal_world, roughness, metallic, specular, ao,
+    emissive, opacity, transmission, clearcoat, sheen, anisotropy,
+    ior, thickness, material_class, missing_channel_mask,
+    invalid_range_mask
+
+SceneLocalEnvironmentV3
+  reads:
+    SceneProfileV3, environment state, optional IBL/probe assets
+  writes:
+    visible_background, ambient_lighting, reflection_background,
+    specular_prefilter, atmosphere, environment_ownership_mask
+
+LightingShadowV3
+  reads:
+    SceneProfileV3, VisibilityV3, MaterialPayloadV3,
+    SceneLocalEnvironmentV3, light records, shadow maps/RT data
+  writes:
+    direct_lighting, direct_lighting_unshadowed, shadow_visibility,
+    shadow_loss, indirect_lighting, emissive_indirect,
+    lighting_energy_budget, shadow_source_id
+
+ReflectionV3
+  reads:
+    VisibilityV3, MaterialPayloadV3, SceneLocalEnvironmentV3,
+    local probes, SSR, RT reflection, previous reflection history
+  writes:
+    reflection_radiance, reflection_confidence, reflection_source_id,
+    reflection_rejected_source_mask, reflection_temporal_delta,
+    reflection_ssr_source_signal, reflection_rt_source_signal,
+    reflection_probe_source_signal, reflection_env_source_signal,
+    reflection_history_validity, reflection_source_suppression
+
+TransparencyMediaV3
+  reads:
+    VisibilityV3, MaterialPayloadV3, LightingShadowV3, ReflectionV3,
+    water/glass/decal/particle/volume records
+  writes:
+    glass_radiance, water_radiance, transparent_accumulation,
+    decal_accumulation, volumetric_inscatter, volumetric_transmittance,
+    transparency_order_diagnostics
+
+CompositeV3
+  reads:
+    MaterialPayloadV3, LightingShadowV3, ReflectionV3,
+    SceneLocalEnvironmentV3, TransparencyMediaV3, legacy hdr_color reference
+  writes:
+    candidate_hdr_scene_color, contribution_map, legacy_rescue_usage,
+    overbright_diagnostics, underlit_diagnostics, invalid_energy_mask
+
+CinematicPostV3
+  reads:
+    candidate_hdr_scene_color, contribution/energy diagnostics,
+    SceneProfileV3 post policy
+  writes:
+    exposure_meter, bloom_extract, bloom_resolve, tone_mapped_ldr,
+    color_grade_delta, candidate_ldr_cinematic_output
+```
+
+The rule is simple: if a resource is not in this graph, not in the frame
+contract, and not visible in a debug packet, it cannot be used to claim AAA
+candidate quality.
+
+### Refactor Milestones
+
+Milestone 0: freeze the contract.
+
+- Make the JSON contract, C++ frame context, render-graph resource names,
+  debug view registry, packet scripts, and analyzers agree on the same V3
+  resource vocabulary.
+- Add a promotion gate that rejects missing, blank, stale, legacy-owned, or
+  uninspected candidate resources.
+- Make legacy `hdr_color` legal only as `legacy_reference` or
+  `legacy_rescue_usage`.
+
+Exit proof:
+
+- A broken/missing V3 resource fails the packet for the correct named reason.
+- Default beauty remains untouched.
+
+Milestone 1: build the policy layer.
+
+- Promote `SceneProfileV3` from a convenience helper into the single policy
+  source for environment, lights, reflections, exposure, post, and material
+  expectations.
+- Profiles must exist for gallery, kitchen, office, gym, classroom, concert,
+  red room, stadium, exterior water, and neutral lab.
+
+Exit proof:
+
+- Two scene families produce different declared policies without changing
+  renderer code.
+- The frame report records which profile controlled the frame.
+
+Milestone 2: harden visibility and material payload.
+
+- Convert the material path into a typed `MaterialPayloadV3` boundary.
+- Normalize PBR ranges at the boundary.
+- Track missing channels and invalid ranges as visible debt.
+- Ensure categorical IDs use point/exact sampling, not filtered reads.
+
+Exit proof:
+
+- Material debug packets explain roughness, metallic, normal, emissive,
+  transparency, and missing-channel behavior on close-up material scenes.
+
+Milestone 3: make scene-local environment real.
+
+- Split visible background, lighting environment, reflection background,
+  atmosphere, and ownership mask.
+- Keep sharp old-office IBL as a stress case, not a disabled case.
+- Let enclosed rooms borrow IBL lighting without reflecting/showing unrelated
+  panorama imagery unless the profile explicitly allows it.
+
+Exit proof:
+
+- Old-office IBL, kitchen, concert, and exterior water packets show different
+  environment ownership and pass motion stability checks.
+
+Milestone 4: rebuild lighting and shadows as owned resources.
+
+- Split direct, unshadowed direct, shadow visibility, shadow loss, indirect,
+  emissive indirect, and energy budget.
+- Add debug views that show whether floor/wall darkening came from a named
+  shadow, ambient term, exposure, or invalid fallback.
+- Validate with locked exposure before any cinematic exposure or bloom.
+
+Exit proof:
+
+- Mouse-jitter packets can attribute dark flicker to a named term or prove it
+  is absent.
+- Shadow/resource source IDs remain stable during camera rotation.
+
+Milestone 5: refactor reflections into a source-aware resolver.
+
+- Keep SSR, RT/ray query, local probe, planar/hero probe, and environment
+  fallback as separate source signals.
+- Resolve with source IDs, confidence, rejection masks, history validity,
+  disocclusion checks, and hysteresis.
+- Do not strengthen reflection weight until source choice is stable.
+
+Exit proof:
+
+- Smooth/metallic object packets show stable source ID, confidence, and
+  temporal delta under mouse jitter and close reflective-object orbit.
+
+Milestone 6: give glass, water, decals, and media their own lane.
+
+- Stop hiding transparent/media behavior inside opaque composite paths.
+- Add owned glass, water, transparent accumulation, decal accumulation, and
+  volumetric resources.
+- Add ordering and energy diagnostics so transparency cannot double-light or
+  fight reflections.
+
+Exit proof:
+
+- Glass/water closeups remain stable under motion and have separable
+  reflection/refraction/transmission evidence.
+
+Milestone 7: build honest HDR composition.
+
+- Assemble `candidate_hdr_scene_color` only from V3-owned inputs.
+- Emit a contribution map with material/direct/indirect/reflection/
+  environment/transparency/emissive/rescue channels.
+- Emit `legacy_rescue_usage` as promotion debt.
+
+Exit proof:
+
+- Candidate HDR remains nonblank with legacy rescue disabled or near zero on
+  target packets.
+- Contribution debug views explain the image.
+
+Milestone 8: add cinematic post last.
+
+- Implement locked/manual exposure first, then bounded auto exposure.
+- Add bloom extract/resolve, glare, filmic tone map, color grade, sharpening,
+  optional DOF, and bypass views.
+- Bloom and glare must come from real HDR/emissive masks.
+
+Exit proof:
+
+- Turning off bloom/grade/DOF does not hide upstream instability.
+- Candidate LDR and raw HDR both pass review packets.
+
+Milestone 9: cross-family promotion.
+
+- Run focused packets by subsystem first.
+- Then run the full matrix:
+  gallery, kitchen, office, gym, classroom, concert, red room, stadium,
+  bathroom, bedroom, workshop, store, street, exterior water/vegetation.
+- Required motion rows:
+  static, mouse jitter, camera sweep, close-surface orbit,
+  reflective-object orbit, high-contrast light sweep.
+
+Exit proof:
+
+- Metrics pass.
+- Debug views are present and nonblank where expected.
+- Contact sheets pass human review.
+- The user accepts candidate visuals as good enough for promotion.
+
+### Implementation Slices
+
+The implementation should land as small committed slices:
+
+1. Contract and debug registry freeze.
+2. Composite contribution and legacy rescue diagnostics.
+3. `SceneProfileV3` frame-report/policy completion.
+4. `MaterialPayloadV3` typed payload and invalid-channel gates.
+5. `SceneLocalEnvironmentV3` ownership mask/specular prefilter completion.
+6. `LightingShadowV3` split resources and locked-exposure stability packets.
+7. `ReflectionV3` source resolver/history/hysteresis pass.
+8. `TransparencyMediaV3` glass/water/decal/media resources.
+9. `CompositeV3` V3-only HDR assembly.
+10. `CinematicPostV3` final candidate LDR path.
+11. Cross-family promotion runner and review packet.
+
+Each slice must update:
+
+- shader/resource code.
+- frame report ownership.
+- debug view names and IDs.
+- packet aliases.
+- analyzer gates.
+- `assets/final_art/full_scene_shader_pipeline_v3_contract.json`.
+- this handoff/plan when architecture changes.
+
+### Do Not Do
+
+- Do not use IBL blur as correctness proof.
+- Do not disable a feature and call the root issue fixed.
+- Do not make default beauty depend on candidate resources before promotion.
+- Do not let legacy `hdr_color` silently fill missing candidate terms.
+- Do not strengthen post before raw HDR, shadows, materials, environment, and
+  reflections are stable.
+- Do not rely on one camera angle or one scene family.
+
+### First Concrete Goal Feature Boundary
+
+The next goal feature should be:
+
+```text
+FullSceneCandidateBeautyV3 scaffolding and diagnostics
+  includes:
+    contract freeze,
+    CompositeV3 contribution outputs,
+    legacy rescue usage output,
+    debug views,
+    packet/analyzer gates,
+    candidate-only review capture
+  excludes:
+    default-beauty promotion,
+    heavy cinematic post,
+    broad visual tuning
+```
+
+That feature is the correct first step because it makes every later visual
+upgrade measurable. Once candidate HDR can say exactly how much came from
+material, light, shadow, reflection, environment, transparency, emissive, and
+legacy rescue, we can push beauty hard without guessing.
+
 ## 2026-06-07 Full Scene Shader Master Refactor Plan
 
 The next goal feature should be treated as a renderer architecture shift, not

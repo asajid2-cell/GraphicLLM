@@ -11,8 +11,12 @@ PLAN_PATH = ROOT / "docs" / "FULL_SCENE_SHADER_PIPELINE_V3.md"
 CONTRACT_PATH = ROOT / "assets" / "final_art" / "full_scene_shader_pipeline_v3_contract.json"
 FRAME_CONTRACT_JSON_SOURCE_PATH = ROOT / "src" / "Graphics" / "FrameContractJson.cpp"
 FULL_SCENE_SHADER_FRAME_CONTEXT_PATH = ROOT / "src" / "Graphics" / "FullSceneShaderFrameContext.h"
+RENDERER_RENDER_GRAPH_END_FRAME_PATH = ROOT / "src" / "Graphics" / "Renderer_RenderGraphEndFrame.cpp"
 RENDERER_FRAME_POST_CONSTANTS_PATH = ROOT / "src" / "Graphics" / "Renderer_FramePostConstants.cpp"
 ENGINE_SOURCE_PATH = ROOT / "src" / "Core" / "Engine.cpp"
+V3_PASSES_HEADER_PATH = ROOT / "src" / "Graphics" / "Passes" / "FullSceneShaderV3Passes.h"
+V3_PASSES_SOURCE_PATH = ROOT / "src" / "Graphics" / "Passes" / "FullSceneShaderV3Passes.cpp"
+CMAKE_PATH = ROOT / "CMakeLists.txt"
 V3_PLACEHOLDER_ANALYZER_PATH = ROOT / "tools" / "analyze_full_scene_shader_v3_placeholders.py"
 V3_PACKET_RUNNER_PATH = ROOT / "tools" / "run_full_scene_shader_pipeline_v3_packet.ps1"
 V3_MATRIX_RUNNER_PATH = ROOT / "tools" / "run_full_scene_shader_pipeline_v3_matrix.ps1"
@@ -238,6 +242,8 @@ def main() -> int:
         errors,
         f"Missing FullSceneReflectionResolverV3 shader: {FULL_SCENE_REFLECTION_RESOLVER_V3_SHADER_PATH}",
     )
+    require(V3_PASSES_HEADER_PATH.exists(), errors, f"Missing V3 pass helper header: {V3_PASSES_HEADER_PATH}")
+    require(V3_PASSES_SOURCE_PATH.exists(), errors, f"Missing V3 pass helper source: {V3_PASSES_SOURCE_PATH}")
     if errors:
         for error in errors:
             print(f"ERROR: {error}")
@@ -247,8 +253,12 @@ def main() -> int:
     contract = json.loads(CONTRACT_PATH.read_text(encoding="utf-8"))
     frame_contract_source = FRAME_CONTRACT_JSON_SOURCE_PATH.read_text(encoding="utf-8")
     frame_context_source = FULL_SCENE_SHADER_FRAME_CONTEXT_PATH.read_text(encoding="utf-8")
+    render_graph_end_frame_source = RENDERER_RENDER_GRAPH_END_FRAME_PATH.read_text(encoding="utf-8")
     frame_post_constants_source = RENDERER_FRAME_POST_CONSTANTS_PATH.read_text(encoding="utf-8")
     engine_source = ENGINE_SOURCE_PATH.read_text(encoding="utf-8")
+    v3_passes_header_source = V3_PASSES_HEADER_PATH.read_text(encoding="utf-8")
+    v3_passes_source = V3_PASSES_SOURCE_PATH.read_text(encoding="utf-8")
+    cmake_source = CMAKE_PATH.read_text(encoding="utf-8")
     analyzer_source = V3_PLACEHOLDER_ANALYZER_PATH.read_text(encoding="utf-8")
     packet_source = V3_PACKET_RUNNER_PATH.read_text(encoding="utf-8")
     matrix_runner_source = V3_MATRIX_RUNNER_PATH.read_text(encoding="utf-8")
@@ -272,8 +282,12 @@ def main() -> int:
         [
             frame_contract_source,
             frame_context_source,
+            render_graph_end_frame_source,
             frame_post_constants_source,
             engine_source,
+            v3_passes_header_source,
+            v3_passes_source,
+            cmake_source,
             analyzer_source,
             packet_source,
             matrix_runner_source,
@@ -298,6 +312,52 @@ def main() -> int:
 
     for token in REQUIRED_PLAN_TOKENS:
         require(token in plan, errors, f"V3 plan missing token: {token}")
+
+    require(
+        "Passes/FullSceneShaderV3Passes.h" in render_graph_end_frame_source,
+        errors,
+        "Renderer_RenderGraphEndFrame.cpp must include the extracted V3 pass helper module",
+    )
+    require(
+        "struct FullSceneCompositeV3Context" not in render_graph_end_frame_source,
+        errors,
+        "FullSceneCompositeV3Context must not live in Renderer_RenderGraphEndFrame.cpp",
+    )
+    require(
+        "struct SceneLocalEnvironmentV3Context" not in render_graph_end_frame_source,
+        errors,
+        "SceneLocalEnvironmentV3Context must not live in Renderer_RenderGraphEndFrame.cpp",
+    )
+    require(
+        "struct FullSceneReflectionResolverV3Context" not in render_graph_end_frame_source,
+        errors,
+        "FullSceneReflectionResolverV3Context must not live in Renderer_RenderGraphEndFrame.cpp",
+    )
+    require(
+        "struct CandidateBeautyDisplayContext" not in render_graph_end_frame_source,
+        errors,
+        "CandidateBeautyDisplayContext must not live in Renderer_RenderGraphEndFrame.cpp",
+    )
+    for token in [
+        "FullSceneShaderV3Passes",
+        "FullSceneCompositeV3Context",
+        "SceneLocalEnvironmentV3Context",
+        "FullSceneReflectionResolverV3Context",
+        "FullSceneReflectionHistoryV3Context",
+        "CandidateBeautyDisplayContext",
+        "AddSceneLocalEnvironmentV3Pass",
+        "AddFullSceneCompositeV3Pass",
+        "AddFullSceneReflectionResolverV3Pass",
+        "AddFullSceneReflectionHistoryV3Pass",
+        "AddCandidateBeautyDisplayPass",
+    ]:
+        require(token in v3_passes_header_source, errors, f"V3 pass helper header missing token: {token}")
+        require(token in v3_passes_source, errors, f"V3 pass helper source missing token: {token}")
+    require(
+        "src/Graphics/Passes/FullSceneShaderV3Passes.cpp" in cmake_source,
+        errors,
+        "CMakeLists.txt must compile FullSceneShaderV3Passes.cpp",
+    )
 
     require(
         contract.get("schema") == "cortex.full_scene_shader_pipeline_v3.contract.v1",

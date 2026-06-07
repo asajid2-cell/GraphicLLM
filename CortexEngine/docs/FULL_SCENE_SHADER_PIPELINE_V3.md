@@ -1785,3 +1785,38 @@ Remaining limitation:
 - This packet used a manual copy into `build/bin/assets/shaders` because the
   current generated Ninja asset graph was stale and full `CortexAssets`
   regeneration timed out in this session.
+
+### ReflectionV3 History Stability Slice - 2026-06-07
+
+Implemented:
+
+- `FullSceneReflectionHistoryV3` now loads current-frame reflection radiance,
+  source ID, and temporal-delta resources pixel-exactly.
+- Reprojected depth and normal tests now use filtered samples with a wider
+  acceptance band, reducing false disocclusion under small mouse motion.
+- History activity/reuse is confidence-driven instead of radiance-luma-driven.
+- Source-switch rejection is continuous rather than hard-thresholded.
+
+Evidence:
+
+- baseline packet:
+  `build/captures/v3_forced_ssr_reflection_continuous_masks_synced_mouse_jitter_20260606`.
+- after packet:
+  `build/captures/v3_reflection_history_confidence_validity_mouse_jitter_20260607`.
+- after status:
+  - V3 packet passed.
+  - material payload passed.
+  - CompositeV3 diagnostics passed.
+  - promotion decision `review_packet_passed`.
+- forced-SSR mouse-jitter motion:
+  - `reflection_history_v3_validity`: `0.053437 -> 0.052630`.
+  - `reflection_history_v3_rejection`: `0.070312 -> 0.061797`.
+  - `reflection_history_v3_rejection` active delta:
+    `0.343471 -> 0.278238`.
+
+Remaining limitation:
+
+- History/rejection motion improved but still warns.
+- The next reflection slice should target resolver-side
+  `reflection_rejected_source_mask` and `reflection_temporal_delta`, whose
+  forced-SSR availability channel still moves at `0.082185` RGB delta.

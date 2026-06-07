@@ -67,6 +67,11 @@ static float3 LoadNormal(uint2 p) {
     return normalize(n + 1e-5f);
 }
 
+static float3 SampleNormal(float2 uv) {
+    float3 n = g_NormalRoughness.Sample(g_LinearClamp, uv).xyz * 2.0f - 1.0f;
+    return normalize(n + 1e-5f);
+}
+
 PSOutput PSMain(VSOutput input) {
     uint width;
     uint height;
@@ -80,20 +85,23 @@ PSOutput PSMain(VSOutput input) {
         historyUv.y >= 0.0f && historyUv.y <= 1.0f;
     uint2 hp = min(uint2(saturate(historyUv) * dim), uint2(width - 1u, height - 1u));
 
-    float4 radiance = g_ReflectionRadiance.Sample(g_LinearClamp, input.texCoord);
-    float4 sourceId = g_ReflectionSourceId.Sample(g_LinearClamp, input.texCoord);
-    float4 temporalDelta = g_ReflectionTemporalDelta.Sample(g_LinearClamp, input.texCoord);
+    // Current-frame reflection resources are pixel-aligned. Load them exactly
+    // so source class, confidence, and temporal debt are not blended across
+    // neighboring pixels during mouse jitter.
+    float4 radiance = g_ReflectionRadiance.Load(int3(p, 0));
+    float4 sourceId = g_ReflectionSourceId.Load(int3(p, 0));
+    float4 temporalDelta = g_ReflectionTemporalDelta.Load(int3(p, 0));
     float4 historyPrev = g_ReflectionHistoryPrev.Sample(g_LinearClamp, historyUv);
     float4 historyPrevSourceId = g_ReflectionHistoryPrevSourceId.Sample(g_LinearClamp, historyUv);
 
     float centerDepth = g_Depth.Load(int3(p, 0));
-    float historyDepth = g_Depth.Load(int3(hp, 0));
+    float historyDepth = g_Depth.Sample(g_LinearClamp, saturate(historyUv));
     float3 centerNormal = LoadNormal(p);
-    float3 historyNormal = LoadNormal(hp);
+    float3 historyNormal = SampleNormal(saturate(historyUv));
     float speedPixels = length(velocity * dim);
 
-    float depthAcceptance = exp2(-abs(centerDepth - historyDepth) * 160.0f);
-    float normalAcceptance = saturate((dot(centerNormal, historyNormal) - 0.78f) / 0.22f);
+    float depthAcceptance = exp2(-abs(centerDepth - historyDepth) * 96.0f);
+    float normalAcceptance = saturate((dot(centerNormal, historyNormal) - 0.62f) / 0.38f);
     float motionAcceptance = saturate(1.0f - max(speedPixels - 4.0f, 0.0f) / 56.0f);
     float boundsAcceptance = inBounds ? 1.0f : 0.0f;
     float disocclusionRejection = 1.0f - saturate(depthAcceptance * normalAcceptance * boundsAcceptance);
@@ -102,18 +110,20 @@ PSOutput PSMain(VSOutput input) {
         saturate(depthAcceptance * normalAcceptance * motionAcceptance * boundsAcceptance);
 
     float confidence = saturate(radiance.a);
-    float active = step(0.001f, confidence + Luma(max(radiance.rgb, 0.0f.xxx)));
+    float currentActivity = confidence;
+    float active = smoothstep(0.001f, 0.025f, currentActivity);
     float sourceClass = saturate(sourceId.r);
     float prevConfidence = saturate(historyPrev.a);
-    float previousHistoryAvailable = step(0.001f, prevConfidence + Luma(max(historyPrev.rgb, 0.0f.xxx)));
+    float previousHistoryStrength = prevConfidence;
+    float previousHistoryAvailable = smoothstep(0.001f, 0.025f, previousHistoryStrength);
     float historyRequiredButMissing = saturate(temporalDelta.b);
     float forcedUnavailable = saturate(temporalDelta.g);
     float historyReusable = previousHistoryAvailable * reprojectionAcceptance;
     float reprojectionRejected = 1.0f - reprojectionAcceptance;
     float previousSourceClass = saturate(historyPrevSourceId.r);
-    float previousSourceAvailable = step(0.001f, historyPrevSourceId.a + previousSourceClass);
+    float previousSourceAvailable = smoothstep(0.001f, 0.025f, saturate(historyPrevSourceId.a + previousSourceClass));
     float sourceSwitch = previousSourceAvailable * previousHistoryAvailable *
-        step(0.08f, abs(sourceClass - previousSourceClass));
+        smoothstep(0.04f, 0.16f, abs(sourceClass - previousSourceClass));
     float outOfBoundsRejection = 1.0f - boundsAcceptance;
 
     PSOutput output;

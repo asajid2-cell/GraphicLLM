@@ -244,12 +244,13 @@ void CSMain(uint3 dispatchThreadId : SV_DispatchThreadID)
     }
 
     float3 worldPos = ReconstructWorldPosition(uv, depth);
-    float4 nr = g_NormalRoughness.SampleLevel(g_Sampler, uv, 0);
+    int3 loadCoord = int3(dispatchThreadId.xy, 0);
+    float4 nr = g_NormalRoughness.Load(loadCoord);
     float3 normal = normalize(nr.xyz * 2.0f - 1.0f);
     float roughness = saturate(nr.w);
-    float metallic = saturate(g_EmissiveMetallic.SampleLevel(g_Sampler, uv, 0).a);
-    float transmission = saturate(g_MaterialExt1.SampleLevel(g_Sampler, uv, 0).a);
-    float4 materialExt2 = g_MaterialExt2.SampleLevel(g_Sampler, uv, 0);
+    float metallic = saturate(g_EmissiveMetallic.Load(loadCoord).a);
+    float transmission = saturate(g_MaterialExt1.Load(loadCoord).a);
+    float4 materialExt2 = g_MaterialExt2.Load(loadCoord);
     uint surfaceClass = DecodeSurfaceClass(materialExt2.r);
     uint sceneMaterialClass = DecodeSceneMaterialClass(materialExt2.a);
 

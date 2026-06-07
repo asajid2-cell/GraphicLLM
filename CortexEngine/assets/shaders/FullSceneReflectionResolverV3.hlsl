@@ -1,4 +1,5 @@
 // Full-scene reflection resolver producer for the V3 shader stack.
+#include "SurfaceClassification.hlsli"
 //
 // This resolver owns ReflectionV3 source admission. It starts with scene-local
 // reflection radiance and a scene-local environment fallback; SSR/RT source
@@ -70,6 +71,7 @@ Texture2D<float4> g_HistoryValidity : register(t4);
 Texture2D<float4> g_HistoryRejection : register(t5);
 Texture2D<float4> g_NormalRoughness : register(t6);
 Texture2D<float4> g_EmissiveMetallic : register(t7);
+Texture2D<float4> g_MaterialExt2 : register(t8);
 SamplerState g_LinearClamp : register(s0);
 
 struct VSOutput {
@@ -93,20 +95,41 @@ static float Luma(float3 color) {
 }
 
 PSOutput PSMain(VSOutput input) {
+    int2 pixelCoord = int2(input.position.xy);
     float4 local = g_LocalReflectionRadiance.Sample(g_LinearClamp, input.texCoord);
     float3 localRadiance = max(local.rgb, 0.0f.xxx);
     float localConfidence = saturate(local.a);
     float localActive = step(0.001f, localConfidence + Luma(localRadiance));
 
-    float4 normalRoughness = g_NormalRoughness.Sample(g_LinearClamp, input.texCoord);
-    float4 emissiveMetallic = g_EmissiveMetallic.Sample(g_LinearClamp, input.texCoord);
+    float4 normalRoughness = g_NormalRoughness.Load(int3(pixelCoord, 0));
+    float4 emissiveMetallic = g_EmissiveMetallic.Load(int3(pixelCoord, 0));
+    float4 materialExt2 = g_MaterialExt2.Load(int3(pixelCoord, 0));
     float roughness = saturate(normalRoughness.w);
     float metallic = saturate(emissiveMetallic.a);
+    uint surfaceClass = DecodeSurfaceClass(materialExt2.r);
+    uint sceneMaterialClass = DecodeSceneMaterialClass(materialExt2.a);
+    bool waterLike = surfaceClass == SURFACE_CLASS_WATER ||
+                     sceneMaterialClass == SCENE_MATERIAL_WATER;
+    bool glassLike = surfaceClass == SURFACE_CLASS_GLASS ||
+                     sceneMaterialClass == SCENE_MATERIAL_GLASS_PANE;
+    bool mirrorLike = surfaceClass == SURFACE_CLASS_MIRROR ||
+                      sceneMaterialClass == SCENE_MATERIAL_MIRROR;
+    bool conductorLike = surfaceClass == SURFACE_CLASS_BRUSHED_METAL ||
+                         sceneMaterialClass == SCENE_MATERIAL_BRUSHED_METAL ||
+                         sceneMaterialClass == SCENE_MATERIAL_POLISHED_METAL;
+    bool wetLike = sceneMaterialClass == SCENE_MATERIAL_WET_SURFACE;
     float smoothness = saturate(1.0f - roughness);
     float roughReflection = smoothstep(0.45f, 0.92f, roughness);
     float glossyMaterial = saturate(smoothness * (0.62f + 0.38f * metallic));
-    float ssrMaterialWeight = saturate(0.24f + 0.76f * glossyMaterial);
-    float rtMaterialWeight = saturate(0.32f + 0.68f * glossyMaterial);
+    float classSourceFloor =
+        mirrorLike ? 1.00f :
+        waterLike ? 0.92f :
+        glassLike ? 0.84f :
+        conductorLike ? 0.76f :
+        wetLike ? 0.70f :
+        0.0f;
+    float ssrMaterialWeight = max(saturate(0.24f + 0.76f * glossyMaterial), classSourceFloor);
+    float rtMaterialWeight = max(saturate(0.32f + 0.68f * glossyMaterial), classSourceFloor);
 
     float4 ssr = g_SSRReflection.Sample(g_LinearClamp, input.texCoord);
     float3 ssrRadiance = max(ssr.rgb, 0.0f.xxx);

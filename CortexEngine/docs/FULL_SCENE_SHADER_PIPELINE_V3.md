@@ -1399,3 +1399,44 @@ Required evidence:
 - Next safe implementation slice is replacing the debug-term redraw producer
   with a direct split-output lighting shader/pass and then adding lighting
   signal gates.
+### ReflectionV3 Semantic Material Input - 2026-06-06
+
+Implemented:
+
+- `FullSceneReflectionV3` now reads `vb_gbuffer_material_ext2` in addition to
+  normal/roughness and emissive/metallic.
+- `FullSceneReflectionResolverV3.hlsl` decodes surface class and named scene
+  material class and applies class-specific source floors for water, glass,
+  mirror, conductor, and wet surfaces.
+- Reflection resolver material payload reads now use pixel-exact `Load()`
+  instead of linear sampling. This applies to `FullSceneReflectionV3` and
+  `LocalReflectionRadiance`, preventing categorical material classes and
+  per-pixel roughness/metallic from blending across object edges during camera
+  motion.
+- The V3 JSON contract, runtime readiness, analyzer, and plan validator now
+  require `FullSceneReflectionV3` to read `vb_gbuffer_material_ext2`.
+- `tools/run_reflection_v3_material_stress_packet.ps1` captures
+  `surface_class` and `material_family` by default.
+- `tools/analyze_reflection_v3_material_stress.py` reports material-policy
+  class coverage from frame reports, including smooth-class coverage for
+  glass/water/metal targets.
+
+Validation:
+
+- `python -m py_compile tools/analyze_reflection_v3_material_stress.py
+  tools/analyze_full_scene_shader_v3_placeholders.py
+  tools/validate_full_scene_shader_pipeline_v3_plan.py`
+- `python tools/validate_full_scene_shader_pipeline_v3_plan.py`
+- native `CortexEngine` build passed.
+- water stress packet:
+  `build/captures/reflection_v3_material_policy_water_after_pixel_loads_20260606`.
+- metal/glass stress packet:
+  `build/captures/reflection_v3_material_policy_metal_glass_after_pixel_loads_20260606`.
+
+Result:
+
+- metal/glass stress has no material-stress warnings after pixel-exact material
+  reads.
+- water still reports `smooth_target_has_high_roughness_signal` with smooth
+  class coverage `31/66`; this is now a roughness/source-policy problem, not a
+  missing semantic input problem.

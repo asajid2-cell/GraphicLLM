@@ -140,7 +140,8 @@
         "reflection_history_v3_validity",
         "reflection_history_v3_rejection",
         "normal_roughness",
-        "vb_gbuffer_emissive_metallic"
+        "vb_gbuffer_emissive_metallic",
+        "vb_gbuffer_material_ext2"
       ],
       "required_history_inputs": [
         "reflection_radiance",

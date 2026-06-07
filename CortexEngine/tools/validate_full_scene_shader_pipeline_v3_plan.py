@@ -205,6 +205,7 @@ def main() -> int:
         "reflection_history_v3_rejection",
         "normal_roughness",
         "vb_gbuffer_emissive_metallic",
+        "vb_gbuffer_material_ext2",
     ]:
         require(
             resource in reflection_resolver_inputs,

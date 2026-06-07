@@ -1649,6 +1649,7 @@ inline FullSceneShaderPipelineV3FrameContext BuildFullSceneShaderPipelineV3Frame
          FullSceneShaderPassReadsResource(contract, "FullSceneReflectionV3", "vb_gbuffer_normal_roughness") ||
          FullSceneShaderPassReadsResource(contract, "FullSceneReflectionV3", "normal_roughness")) &&
         FullSceneShaderPassReadsResource(contract, "FullSceneReflectionV3", "vb_gbuffer_emissive_metallic") &&
+        FullSceneShaderPassReadsResource(contract, "FullSceneReflectionV3", "vb_gbuffer_material_ext2") &&
         FullSceneShaderPassWritesResource(contract, "FullSceneReflectionV3", "reflection_radiance") &&
         FullSceneShaderPassWritesResource(contract, "FullSceneReflectionV3", "reflection_confidence") &&
         FullSceneShaderPassWritesResource(contract, "FullSceneReflectionV3", "reflection_source_id") &&

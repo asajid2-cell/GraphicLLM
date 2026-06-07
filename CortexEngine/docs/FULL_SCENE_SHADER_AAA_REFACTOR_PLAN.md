@@ -1826,3 +1826,26 @@ This order keeps the known user-visible issues in scope: smooth/metal jitter,
 shadow flicker, IBL leakage, flat materials, weak lighting, and adapter-based
 beauty. It also prevents the old failure pattern where one scene becomes less
 bad while the renderer remains unexplainable.
+
+### Current ReflectionV3 Material Policy Slice - 2026-06-06
+
+Status:
+
+- semantic material input is now wired into `FullSceneReflectionV3` through
+  `vb_gbuffer_material_ext2`.
+- reflection material payload reads now use pixel-exact `Load()` in
+  `FullSceneReflectionResolverV3.hlsl` and `LocalReflectionRadiance.hlsl`
+  instead of linear filtering categorical IDs/classes.
+- material stress packets now capture and summarize `surface_class`,
+  `material_family`, and frame-report smooth-class coverage.
+
+Evidence:
+
+- water packet:
+  `build/captures/reflection_v3_material_policy_water_after_pixel_loads_20260606`.
+- metal/glass packet:
+  `build/captures/reflection_v3_material_policy_metal_glass_after_pixel_loads_20260606`.
+- metal/glass reports no material-stress warnings.
+- water remains high roughness despite smooth-class coverage, so the next
+  refactor should target water/glass BRDF roughness policy and source
+  admission, not descriptor plumbing.

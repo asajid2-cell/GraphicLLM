@@ -56,6 +56,7 @@ struct FullSceneReflectionResolverV3Context {
     RGResourceHandle historyRejection;
     RGResourceHandle normalRoughness;
     RGResourceHandle emissiveMetallic;
+    RGResourceHandle materialExt2;
     RGResourceHandle radiance;
     RGResourceHandle confidence;
     RGResourceHandle sourceId;
@@ -264,6 +265,7 @@ void FailFullSceneReflectionHistoryV3Copy(const FullSceneReflectionHistoryV3Copy
         !context.historyRejection.IsValid() ||
         !context.normalRoughness.IsValid() ||
         !context.emissiveMetallic.IsValid() ||
+        !context.materialExt2.IsValid() ||
         !context.device ||
         !context.descriptorManager ||
         !context.commandList ||
@@ -299,6 +301,7 @@ void FailFullSceneReflectionHistoryV3Copy(const FullSceneReflectionHistoryV3Copy
             builder.Read(context.historyRejection, RGResourceUsage::ShaderResource);
             builder.Read(context.normalRoughness, RGResourceUsage::ShaderResource);
             builder.Read(context.emissiveMetallic, RGResourceUsage::ShaderResource);
+            builder.Read(context.materialExt2, RGResourceUsage::ShaderResource);
             builder.Write(context.radiance, RGResourceUsage::RenderTarget);
             builder.Write(context.confidence, RGResourceUsage::RenderTarget);
             builder.Write(context.sourceId, RGResourceUsage::RenderTarget);
@@ -309,7 +312,7 @@ void FailFullSceneReflectionHistoryV3Copy(const FullSceneReflectionHistoryV3Copy
             builder.Write(context.sourceSuppression, RGResourceUsage::RenderTarget);
         },
         [context](ID3D12GraphicsCommandList*, const RenderGraph& graph) {
-            auto srvResult = context.descriptorManager->AllocateTransientCBV_SRV_UAVRange(8);
+            auto srvResult = context.descriptorManager->AllocateTransientCBV_SRV_UAVRange(9);
             if (srvResult.IsErr()) {
                 FailFullSceneReflectionResolverV3(context, "full_scene_reflection_resolver_v3_descriptor");
                 return;
@@ -328,13 +331,16 @@ void FailFullSceneReflectionHistoryV3Copy(const FullSceneReflectionHistoryV3Copy
                 context.descriptorManager->GetCBV_SRV_UAVHandle(inputSRV.index + 6u);
             const DescriptorHandle emissiveMetallicSRV =
                 context.descriptorManager->GetCBV_SRV_UAVHandle(inputSRV.index + 7u);
+            const DescriptorHandle materialExt2SRV =
+                context.descriptorManager->GetCBV_SRV_UAVHandle(inputSRV.index + 8u);
             if (!ssrSRV.IsValid() ||
                 !rtReflectionSRV.IsValid() ||
                 !historyPrevSourceIdSRV.IsValid() ||
                 !historyValiditySRV.IsValid() ||
                 !historyRejectionSRV.IsValid() ||
                 !normalRoughnessSRV.IsValid() ||
-                !emissiveMetallicSRV.IsValid()) {
+                !emissiveMetallicSRV.IsValid() ||
+                !materialExt2SRV.IsValid()) {
                 FailFullSceneReflectionResolverV3(context, "full_scene_reflection_resolver_v3_source_descriptors");
                 return;
             }
@@ -393,7 +399,12 @@ void FailFullSceneReflectionHistoryV3Copy(const FullSceneReflectionHistoryV3Copy
                     context.device,
                     emissiveMetallicSRV,
                     graph.GetResource(context.emissiveMetallic),
-                    DXGI_FORMAT_R16G16B16A16_FLOAT)) {
+                    DXGI_FORMAT_R16G16B16A16_FLOAT) ||
+                !DescriptorTable::WriteTexture2DSRV(
+                    context.device,
+                    materialExt2SRV,
+                    graph.GetResource(context.materialExt2),
+                    DXGI_FORMAT_R8G8B8A8_UNORM)) {
                 FailFullSceneReflectionResolverV3(context, "full_scene_reflection_resolver_v3_history_material_srv");
                 return;
             }
@@ -1187,6 +1198,7 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
             reflectionContext.historyRejection = reflectionHistoryRejectionHandle;
             reflectionContext.normalRoughness = normalHandle;
             reflectionContext.emissiveMetallic = emissiveMetallicHandle;
+            reflectionContext.materialExt2 = materialExt2Handle;
             reflectionContext.radiance = reflectionRadianceHandle;
             reflectionContext.confidence = reflectionConfidenceHandle;
             reflectionContext.sourceId = reflectionSourceIdHandle;
@@ -1761,7 +1773,7 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
                             {"local_reflection_radiance", "ssr_color", "rt_reflection",
                              "reflection_history_v3_prev_source_id", "reflection_history_v3_validity",
                              "reflection_history_v3_rejection", inputs.frameNormalRoughnessResource,
-                             "vb_gbuffer_emissive_metallic"},
+                             "vb_gbuffer_emissive_metallic", "vb_gbuffer_material_ext2"},
                             {"reflection_radiance", "reflection_confidence", "reflection_source_id",
                              "reflection_rejected_source_mask", "reflection_temporal_delta",
                              "reflection_ssr_source_signal", "reflection_rt_source_signal",

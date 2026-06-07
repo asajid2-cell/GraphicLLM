@@ -1,13 +1,13 @@
 {
   "schema": "cortex.scene_local_environment_proxy_manifest.v1",
   "source": "generate_scene_local_environment_proxies.py",
-  "derivation_method": "profile_payload_material_sample_v1",
+  "derivation_method": "profile_payload_material_room_light_v1",
   "sets": {
     "basketball_gym_day": {
       "set_id": "basketball_gym_day",
       "output_dir": "assets/textures/scene_local_proxy/basketball_gym_day",
       "derivation": {
-        "method": "profile_payload_material_sample_v1",
+        "method": "profile_payload_material_room_light_v1",
         "base_rgb": {
           "irradiance": [
             179,
@@ -27,19 +27,19 @@
         },
         "derived_rgb": {
           "irradiance": [
-            168,
-            146,
-            112
+            162,
+            152,
+            133
           ],
           "specular": [
-            181,
-            176,
-            160
+            192,
+            186,
+            168
           ],
           "visible_background": [
-            108,
-            123,
-            140
+            109,
+            122,
+            136
           ]
         },
         "payload_inventory": {
@@ -153,6 +153,35 @@
             "rt_gallery_leftwall_normal_bc5.dds"
           ]
         },
+        "scene_contract_influence": {
+          "room_shell": {
+            "enclosure": "tall_gym_volume",
+            "wall_reflectance": 0.62,
+            "ceiling_reflectance": 0.68,
+            "local_background_occlusion": 0.34,
+            "diffuse_reflectance": 0.65,
+            "ambient_strength": 0.30300000000000005
+          },
+          "light_rig": {
+            "mode": "high_bay_day_fill",
+            "key_rgb": [
+              228,
+              230,
+              220
+            ],
+            "fill_rgb": [
+              184,
+              198,
+              211
+            ],
+            "accent_rgb": [
+              255,
+              188,
+              86
+            ],
+            "accent_strength": 0.12
+          }
+        },
         "weights": {
           "floor": 0.26,
           "wall": 0.44,
@@ -172,7 +201,7 @@
       "set_id": "home_kitchen_lantern",
       "output_dir": "assets/textures/scene_local_proxy/home_kitchen_lantern",
       "derivation": {
-        "method": "profile_payload_material_sample_v1",
+        "method": "profile_payload_material_room_light_v1",
         "base_rgb": {
           "irradiance": [
             186,
@@ -192,19 +221,19 @@
         },
         "derived_rgb": {
           "irradiance": [
-            162,
-            127,
-            92
+            150,
+            123,
+            95
           ],
           "specular": [
-            176,
-            159,
-            130
+            195,
+            164,
+            124
           ],
           "visible_background": [
-            134,
-            121,
-            106
+            118,
+            106,
+            93
           ]
         },
         "payload_inventory": {
@@ -327,6 +356,35 @@
             "rt_gallery_floor_normal_bc5.dds",
             "rt_gallery_leftwall_albedo.dds"
           ]
+        },
+        "scene_contract_influence": {
+          "room_shell": {
+            "enclosure": "warm_enclosed_room",
+            "wall_reflectance": 0.58,
+            "ceiling_reflectance": 0.62,
+            "local_background_occlusion": 0.46,
+            "diffuse_reflectance": 0.6,
+            "ambient_strength": 0.29200000000000004
+          },
+          "light_rig": {
+            "mode": "warm_practical_plus_fill",
+            "key_rgb": [
+              255,
+              191,
+              119
+            ],
+            "fill_rgb": [
+              167,
+              150,
+              133
+            ],
+            "accent_rgb": [
+              255,
+              148,
+              70
+            ],
+            "accent_strength": 0.24
+          }
         },
         "weights": {
           "floor": 0.26,
@@ -347,7 +405,7 @@
       "set_id": "home_office_evening",
       "output_dir": "assets/textures/scene_local_proxy/home_office_evening",
       "derivation": {
-        "method": "profile_payload_material_sample_v1",
+        "method": "profile_payload_material_room_light_v1",
         "base_rgb": {
           "irradiance": [
             124,
@@ -367,19 +425,19 @@
         },
         "derived_rgb": {
           "irradiance": [
-            133,
-            110,
-            85
+            117,
+            105,
+            93
           ],
           "specular": [
-            156,
-            147,
-            134
+            175,
+            155,
+            131
           ],
           "visible_background": [
-            115,
-            111,
-            104
+            94,
+            93,
+            92
           ]
         },
         "payload_inventory": {
@@ -502,6 +560,35 @@
             "rt_gallery_floor_normal_bc5.dds",
             "rt_gallery_leftwall_albedo.dds"
           ]
+        },
+        "scene_contract_influence": {
+          "room_shell": {
+            "enclosure": "evening_enclosed_room",
+            "wall_reflectance": 0.52,
+            "ceiling_reflectance": 0.56,
+            "local_background_occlusion": 0.52,
+            "diffuse_reflectance": 0.54,
+            "ambient_strength": 0.2788
+          },
+          "light_rig": {
+            "mode": "soft_warm_desk_fill",
+            "key_rgb": [
+              235,
+              187,
+              127
+            ],
+            "fill_rgb": [
+              120,
+              130,
+              148
+            ],
+            "accent_rgb": [
+              255,
+              171,
+              92
+            ],
+            "accent_strength": 0.18
+          }
         },
         "weights": {
           "floor": 0.26,
@@ -522,7 +609,7 @@
       "set_id": "neon_streamer_concert",
       "output_dir": "assets/textures/scene_local_proxy/neon_streamer_concert",
       "derivation": {
-        "method": "profile_payload_material_sample_v1",
+        "method": "profile_payload_material_room_light_v1",
         "base_rgb": {
           "irradiance": [
             86,
@@ -542,19 +629,19 @@
         },
         "derived_rgb": {
           "irradiance": [
-            99,
-            65,
-            105
+            97,
+            54,
+            106
           ],
           "specular": [
-            121,
-            175,
-            183
+            126,
+            164,
+            192
           ],
           "visible_background": [
-            65,
-            53,
-            79
+            70,
+            41,
+            76
           ]
         },
         "payload_inventory": {
@@ -677,6 +764,35 @@
             "rt_gallery_floor_normal_bc5.dds",
             "rt_gallery_leftwall_albedo.dds"
           ]
+        },
+        "scene_contract_influence": {
+          "room_shell": {
+            "enclosure": "dark_stage_volume",
+            "wall_reflectance": 0.24,
+            "ceiling_reflectance": 0.18,
+            "local_background_occlusion": 0.72,
+            "diffuse_reflectance": 0.21,
+            "ambient_strength": 0.2062
+          },
+          "light_rig": {
+            "mode": "cyan_magenta_stage",
+            "key_rgb": [
+              40,
+              205,
+              255
+            ],
+            "fill_rgb": [
+              89,
+              48,
+              156
+            ],
+            "accent_rgb": [
+              255,
+              61,
+              166
+            ],
+            "accent_strength": 0.42
+          }
         },
         "weights": {
           "floor": 0.26,
@@ -697,7 +813,7 @@
       "set_id": "red_light_room",
       "output_dir": "assets/textures/scene_local_proxy/red_light_room",
       "derivation": {
-        "method": "profile_payload_material_sample_v1",
+        "method": "profile_payload_material_room_light_v1",
         "base_rgb": {
           "irradiance": [
             138,
@@ -717,19 +833,19 @@
         },
         "derived_rgb": {
           "irradiance": [
-            115,
-            64,
-            78
+            110,
+            51,
+            60
           ],
           "specular": [
-            184,
-            127,
-            120
+            204,
+            110,
+            102
           ],
           "visible_background": [
-            72,
-            53,
-            75
+            75,
+            42,
+            54
           ]
         },
         "payload_inventory": {
@@ -852,6 +968,35 @@
             "rt_gallery_floor_normal_bc5.dds",
             "rt_gallery_leftwall_albedo.dds"
           ]
+        },
+        "scene_contract_influence": {
+          "room_shell": {
+            "enclosure": "dark_red_room",
+            "wall_reflectance": 0.3,
+            "ceiling_reflectance": 0.24,
+            "local_background_occlusion": 0.66,
+            "diffuse_reflectance": 0.27,
+            "ambient_strength": 0.2194
+          },
+          "light_rig": {
+            "mode": "red_practical_accent",
+            "key_rgb": [
+              255,
+              42,
+              50
+            ],
+            "fill_rgb": [
+              110,
+              24,
+              34
+            ],
+            "accent_rgb": [
+              255,
+              94,
+              62
+            ],
+            "accent_strength": 0.36
+          }
         },
         "weights": {
           "floor": 0.26,
@@ -872,7 +1017,7 @@
       "set_id": "rt_showcase_gallery",
       "output_dir": "assets/textures/scene_local_proxy/rt_showcase_gallery",
       "derivation": {
-        "method": "profile_payload_material_sample_v1",
+        "method": "profile_payload_material_room_light_v1",
         "base_rgb": {
           "irradiance": [
             150,
@@ -892,19 +1037,19 @@
         },
         "derived_rgb": {
           "irradiance": [
-            145,
-            129,
-            109
+            147,
+            138,
+            127
           ],
           "specular": [
-            162,
-            162,
-            158
+            172,
+            173,
+            171
           ],
           "visible_background": [
-            149,
-            150,
-            148
+            142,
+            144,
+            144
           ]
         },
         "payload_inventory": {
@@ -1027,6 +1172,35 @@
             "rt_gallery_floor_normal_bc5.dds",
             "rt_gallery_leftwall_albedo.dds"
           ]
+        },
+        "scene_contract_influence": {
+          "room_shell": {
+            "enclosure": "gallery_partial",
+            "wall_reflectance": 0.66,
+            "ceiling_reflectance": 0.72,
+            "local_background_occlusion": 0.22,
+            "diffuse_reflectance": 0.69,
+            "ambient_strength": 0.31179999999999997
+          },
+          "light_rig": {
+            "mode": "neutral_gallery_key",
+            "key_rgb": [
+              214,
+              218,
+              224
+            ],
+            "fill_rgb": [
+              170,
+              176,
+              184
+            ],
+            "accent_rgb": [
+              192,
+              196,
+              198
+            ],
+            "accent_strength": 0.1
+          }
         },
         "weights": {
           "floor": 0.26,
@@ -1047,7 +1221,7 @@
       "set_id": "school_classroom_day",
       "output_dir": "assets/textures/scene_local_proxy/school_classroom_day",
       "derivation": {
-        "method": "profile_payload_material_sample_v1",
+        "method": "profile_payload_material_room_light_v1",
         "base_rgb": {
           "irradiance": [
             161,
@@ -1068,18 +1242,18 @@
         "derived_rgb": {
           "irradiance": [
             150,
-            142,
-            118
+            148,
+            129
           ],
           "specular": [
-            166,
-            170,
-            161
+            175,
+            181,
+            177
           ],
           "visible_background": [
-            139,
-            142,
-            143
+            132,
+            137,
+            135
           ]
         },
         "payload_inventory": {
@@ -1202,6 +1376,35 @@
             "rt_gallery_floor_normal_bc5.dds",
             "rt_gallery_leftwall_albedo.dds"
           ]
+        },
+        "scene_contract_influence": {
+          "room_shell": {
+            "enclosure": "bright_enclosed_room",
+            "wall_reflectance": 0.72,
+            "ceiling_reflectance": 0.78,
+            "local_background_occlusion": 0.28,
+            "diffuse_reflectance": 0.75,
+            "ambient_strength": 0.325
+          },
+          "light_rig": {
+            "mode": "cool_daylight_windows",
+            "key_rgb": [
+              210,
+              226,
+              242
+            ],
+            "fill_rgb": [
+              174,
+              185,
+              174
+            ],
+            "accent_rgb": [
+              206,
+              216,
+              196
+            ],
+            "accent_strength": 0.08
+          }
         },
         "weights": {
           "floor": 0.26,
@@ -1222,7 +1425,7 @@
       "set_id": "stadium_night_match",
       "output_dir": "assets/textures/scene_local_proxy/stadium_night_match",
       "derivation": {
-        "method": "profile_payload_material_sample_v1",
+        "method": "profile_payload_material_room_light_v1",
         "base_rgb": {
           "irradiance": [
             62,
@@ -1242,19 +1445,19 @@
         },
         "derived_rgb": {
           "irradiance": [
-            86,
             91,
-            93
+            99,
+            108
           ],
           "specular": [
-            153,
-            163,
-            168
+            161,
+            176,
+            189
           ],
           "visible_background": [
-            68,
             83,
-            95
+            97,
+            112
           ]
         },
         "payload_inventory": {
@@ -1377,6 +1580,35 @@
             "rt_gallery_floor_normal_bc5.dds",
             "rt_gallery_leftwall_albedo.dds"
           ]
+        },
+        "scene_contract_influence": {
+          "room_shell": {
+            "enclosure": "open_exterior_bowl",
+            "wall_reflectance": 0.36,
+            "ceiling_reflectance": 0.04,
+            "local_background_occlusion": 0.18,
+            "diffuse_reflectance": 0.19999999999999998,
+            "ambient_strength": 0.20400000000000001
+          },
+          "light_rig": {
+            "mode": "cool_floodlights",
+            "key_rgb": [
+              214,
+              229,
+              255
+            ],
+            "fill_rgb": [
+              72,
+              92,
+              118
+            ],
+            "accent_rgb": [
+              122,
+              185,
+              255
+            ],
+            "accent_strength": 0.2
+          }
         },
         "weights": {
           "floor": 0.26,

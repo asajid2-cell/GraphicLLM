@@ -326,6 +326,21 @@ def main() -> int:
             f"V3 candidate_beauty contract must reject ready input: {resource}",
         )
 
+    environment_contract = domains.get("environment", {})
+    environment_policy_channels = set(environment_contract.get("required_policy_channels", []))
+    for channel in [
+        "scene_local_environment_policy",
+        "visible_background_source",
+        "reflection_background_source",
+        "ambient_source",
+        "atmosphere_source",
+    ]:
+        require(
+            channel in environment_policy_channels,
+            errors,
+            f"V3 environment contract missing policy channel: {channel}",
+        )
+
     reflection_contract = domains.get("reflection", {})
     reflection_resolver_inputs = set(reflection_contract.get("required_resolver_inputs", []))
     for resource in [
@@ -391,6 +406,18 @@ def main() -> int:
         '"scene_local_environment_ready"',
         "sceneLocalEnvironmentMode",
         '"scene_local_environment_mode"',
+        "sceneLocalEnvironmentPolicy",
+        '"scene_local_environment_policy"',
+        "sceneLocalVisibleBackgroundSource",
+        '"scene_local_visible_background_source"',
+        "sceneLocalReflectionBackgroundSource",
+        '"scene_local_reflection_background_source"',
+        "sceneLocalAmbientSource",
+        '"scene_local_ambient_source"',
+        "sceneLocalAtmosphereSource",
+        '"scene_local_atmosphere_source"',
+        "sceneLocalEnvironmentSourceCount",
+        '"scene_local_environment_source_count"',
         "reflectionV3Ready",
         '"reflection_v3_ready"',
         "reflectionRadianceReady",

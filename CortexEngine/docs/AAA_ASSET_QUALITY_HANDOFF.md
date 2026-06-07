@@ -8810,3 +8810,74 @@ Current next work:
    `SceneLocalEnvironmentV3`, richer material payloads, and cross-family /
    motion packets.
 3. Keep monitoring capture size; generated packet output can fill `Z:` quickly.
+
+### SceneLocalEnvironmentV3 Provenance Contract - 2026-06-07
+
+Implemented:
+
+- `FullSceneShaderPipelineV3FrameContext` now carries explicit environment
+  provenance fields:
+  - `scene_local_environment_policy`
+  - `scene_local_visible_background_source`
+  - `scene_local_reflection_background_source`
+  - `scene_local_ambient_source`
+  - `scene_local_atmosphere_source`
+  - `scene_local_environment_source_count`
+- The `environment` domain now requires `10` ready channels instead of the
+  previous `5`: mode, policy, ownership bits, and source provenance for
+  ambient, visible background, reflection background, and atmosphere.
+- `FrameContractJson.cpp` serializes the provenance fields into frame reports.
+- `assets/final_art/full_scene_shader_pipeline_v3_contract.json` now lists the
+  required environment policy channels.
+- `tools/analyze_full_scene_shader_v3_placeholders.py` now fails environment
+  readiness if these source/provenance fields are missing or unknown.
+- `tools/validate_full_scene_shader_pipeline_v3_plan.py` validates the new
+  contract/runtime surface.
+
+Validation:
+
+```powershell
+python -m py_compile tools\analyze_full_scene_shader_v3_placeholders.py tools\validate_full_scene_shader_pipeline_v3_plan.py
+python tools\validate_full_scene_shader_pipeline_v3_plan.py
+git -c submodule.recurse=false diff --check -- src\Graphics\FullSceneShaderFrameContext.h src\Graphics\FrameContractJson.cpp assets\final_art\full_scene_shader_pipeline_v3_contract.json tools\analyze_full_scene_shader_v3_placeholders.py tools\validate_full_scene_shader_pipeline_v3_plan.py
+cmd.exe /d /c "call ""C:\Program Files\Microsoft Visual Studio\18\Community\Common7\Tools\VsDevCmd.bat"" -arch=x64 -host_arch=x64 >nul && set ""CORTEX_SKIP_ASSET_SYNC=1"" && ""C:\Program Files\Ninja\ninja.exe"" -C build CortexEngine -j 8"
+Copy-Item -LiteralPath assets\final_art\full_scene_shader_pipeline_v3_contract.json -Destination build\bin\assets\final_art\full_scene_shader_pipeline_v3_contract.json -Force
+$env:CORTEX_V3_REFLECTION_SOURCE_OVERRIDE='ssr'
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_full_scene_shader_pipeline_v3_packet.ps1 -NoBuild -SkipSceneAnalyzers -StressSceneOnly -StressSceneFilter rt_showcase:reflection_closeup -SmokeFrames 16 -CaptureFrame 8 -CaptureSequenceCount 1 -StabilityMotionMode static -OutputRoot build\captures\v3_scene_local_environment_provenance_full_stress_20260607
+Remove-Item Env:\CORTEX_V3_REFLECTION_SOURCE_OVERRIDE -ErrorAction SilentlyContinue
+```
+
+Evidence:
+
+- Plan validator passed with `10` V3 domains and `29` required outputs.
+- Native target rebuilt successfully; the known trailing `vswhere.exe` warning
+  printed after success.
+- Full V3 stress packet:
+  `build\captures\v3_scene_local_environment_provenance_full_stress_20260607`.
+  - scene-local packet run passed.
+  - V2 evidence passed.
+  - V3 placeholder packet passed with `54` reports.
+  - scene profile, material payload, CompositeV3 diagnostics, and promotion
+    decision passed.
+  - promotion status: `review_packet_passed`, default beauty still not
+    promotable because this is stress-only/static-only.
+- Environment counts:
+  - full-pipeline reports: `41`
+  - `scene_local_environment_ready_report_count=41`
+  - environment domain ready channels: `10/10`
+  - source count in beauty report: `4`
+- Sample beauty provenance:
+  - mode: `neutral_lab`
+  - policy: `authorized_external_visible_background`
+  - visible background: `authorized_visible_hdri`
+  - reflection background: `local_reflection_probe_radiance`
+  - ambient: `scene_profile_lighting_balance`
+  - atmosphere: `environment_matched_fog`
+
+Current next work:
+
+1. Move from provenance to texture-backed environment payloads: local
+   irradiance/specular proxies, room-visible background color fields, and
+   authored atmosphere parameters per scene profile.
+2. Add cross-family/motion evidence once packet size is controlled.
+3. Keep default beauty unpromoted until cross-family and motion evidence pass.

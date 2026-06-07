@@ -1228,6 +1228,12 @@ struct FullSceneShaderPipelineV3FrameContext {
     uint32_t compositeV3ChannelCount = 0;
     uint32_t cinematicPostV3ChannelCount = 0;
     std::string sceneLocalEnvironmentMode = "unknown";
+    std::string sceneLocalEnvironmentPolicy = "unknown";
+    std::string sceneLocalVisibleBackgroundSource = "unknown";
+    std::string sceneLocalReflectionBackgroundSource = "unknown";
+    std::string sceneLocalAmbientSource = "unknown";
+    std::string sceneLocalAtmosphereSource = "unknown";
+    uint32_t sceneLocalEnvironmentSourceCount = 0;
     std::string sceneProfileProducer = "unknown";
     std::string sceneProfileOutput = "unknown";
     std::string reflectionV3SourceContract = "unknown";
@@ -1643,6 +1649,60 @@ inline FullSceneShaderPipelineV3FrameContext BuildFullSceneShaderPipelineV3Frame
         FullSceneShaderPassWritesResource(contract, "SceneLocalEnvironmentV3", "visible_background") &&
         FullSceneShaderPassWritesResource(contract, "SceneLocalEnvironmentV3", "reflection_background") &&
         FullSceneShaderPassWritesResource(contract, "SceneLocalEnvironmentV3", "atmosphere");
+    const std::string environmentPolicy =
+        !contract.sceneVisual.active ? "inactive" :
+        contract.sceneVisual.enclosedScene && !contract.sceneVisual.visibleExternalHDRIAllowed
+            ? "enclosed_scene_local_only"
+            : contract.sceneVisual.externalHDRIVisible && contract.sceneVisual.visibleExternalHDRIAllowed
+                  ? "authorized_external_visible_background"
+                  : environmentMode == "open_exterior"
+                        ? "open_exterior_scene_environment"
+                        : "scene_local_neutral_background";
+    const std::string visibleBackgroundSource =
+        !contract.sceneVisual.active ? "inactive" :
+        contract.sceneVisual.invalidExternalHDRI ? "invalid_external_hdri_rejected" :
+        contract.sceneVisual.externalHDRIVisible && contract.sceneVisual.visibleExternalHDRIAllowed
+            ? "authorized_visible_hdri"
+            : contract.sceneVisual.enclosedScene
+                  ? "authored_enclosed_room"
+                  : contract.features.iblEnabled && contract.environment.backgroundExposure > 0.001f
+                        ? "open_scene_environment"
+                        : "scene_local_neutral_visible";
+    const std::string reflectionBackgroundSource =
+        !contract.sceneVisual.active ? "inactive" :
+        contract.environment.localReflectionProbeRadianceEnabled
+            ? "local_reflection_probe_radiance"
+            : contract.features.iblEnabled && !contract.sceneVisual.invalidExternalHDRI
+                  ? (contract.sceneVisual.externalHDRIVisible && !contract.sceneVisual.visibleExternalHDRIAllowed
+                         ? "reflection_only_hidden_ibl"
+                         : "authorized_reflection_ibl")
+                  : "scene_local_reflection_neutral";
+    const std::string ambientSource =
+        !contract.sceneVisual.active ? "inactive" :
+        contract.sceneVisual.lightingBalancePolicyActive
+            ? "scene_profile_lighting_balance"
+            : contract.environment.localReflectionProbeRadianceEnabled
+                  ? "local_probe_diffuse"
+                  : contract.features.iblEnabled
+                        ? "ibl_diffuse"
+                        : contract.lighting.lightCount > 0
+                              ? "direct_light_fill"
+                              : "scene_local_neutral_ambient";
+    const std::string atmosphereSource =
+        !contract.sceneVisual.active ? "inactive" :
+        contract.atmosphere.enabled
+            ? (contract.atmosphere.environmentMatchedFog
+                   ? "environment_matched_fog"
+                   : "scene_profile_fog")
+            : contract.sceneVisual.enclosedScene
+                  ? "enclosed_room_air"
+                  : "clear_scene_air";
+    const bool environmentPolicyReady =
+        FullSceneShaderKnownContractString(environmentPolicy) &&
+        FullSceneShaderKnownContractString(visibleBackgroundSource) &&
+        FullSceneShaderKnownContractString(reflectionBackgroundSource) &&
+        FullSceneShaderKnownContractString(ambientSource) &&
+        FullSceneShaderKnownContractString(atmosphereSource);
     uint32_t readyEnvironmentResources = 0;
     readyEnvironmentResources += FullSceneShaderHasResource(contract, "scene_local_environment") ? 1u : 0u;
     readyEnvironmentResources += FullSceneShaderHasResource(contract, "ambient_lighting") ? 1u : 0u;
@@ -1655,12 +1715,23 @@ inline FullSceneShaderPipelineV3FrameContext BuildFullSceneShaderPipelineV3Frame
     readyEnvironmentChannels += visibleBackgroundReady ? 1u : 0u;
     readyEnvironmentChannels += reflectionBackgroundReady ? 1u : 0u;
     readyEnvironmentChannels += atmosphereReady ? 1u : 0u;
+    readyEnvironmentChannels += environmentPolicyReady ? 5u : 0u;
     context.sceneLocalEnvironmentReady =
         environmentOwnerKnown &&
         environmentProducerReady &&
-        readyEnvironmentChannels == 5u;
+        readyEnvironmentChannels == 10u;
     context.sceneLocalEnvironmentChannelCount = readyEnvironmentChannels;
     context.sceneLocalEnvironmentMode = environmentMode;
+    context.sceneLocalEnvironmentPolicy = environmentPolicy;
+    context.sceneLocalVisibleBackgroundSource = visibleBackgroundSource;
+    context.sceneLocalReflectionBackgroundSource = reflectionBackgroundSource;
+    context.sceneLocalAmbientSource = ambientSource;
+    context.sceneLocalAtmosphereSource = atmosphereSource;
+    context.sceneLocalEnvironmentSourceCount =
+        (FullSceneShaderKnownContractString(visibleBackgroundSource) ? 1u : 0u) +
+        (FullSceneShaderKnownContractString(reflectionBackgroundSource) ? 1u : 0u) +
+        (FullSceneShaderKnownContractString(ambientSource) ? 1u : 0u) +
+        (FullSceneShaderKnownContractString(atmosphereSource) ? 1u : 0u);
 
     FullSceneShaderPipelineV3DomainEvidence environmentDomain =
         MakeFullSceneShaderPipelineV3DomainEvidence(
@@ -1691,13 +1762,18 @@ inline FullSceneShaderPipelineV3FrameContext BuildFullSceneShaderPipelineV3Frame
     };
     environmentDomain.channels = {
         environmentMode,
+        environmentPolicy,
         ambientLightingReady ? "ambient_lighting_owned" : "ambient_lighting_missing",
+        ambientSource,
         visibleBackgroundReady ? "visible_background_owned" : "visible_background_missing",
+        visibleBackgroundSource,
         reflectionBackgroundReady ? "reflection_background_owned" : "reflection_background_missing",
+        reflectionBackgroundSource,
         atmosphereReady ? "atmosphere_owned" : "atmosphere_missing",
+        atmosphereSource,
     };
     environmentDomain.backingResourceCount = readyEnvironmentResources;
-    environmentDomain.requiredChannelCount = 5u;
+    environmentDomain.requiredChannelCount = 10u;
     environmentDomain.readyChannelCount = readyEnvironmentChannels;
     environmentDomain.missingRequiredChannelCount =
         environmentDomain.requiredChannelCount - environmentDomain.readyChannelCount;

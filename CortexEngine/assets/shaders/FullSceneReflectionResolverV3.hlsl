@@ -234,7 +234,7 @@ PSOutput PSMain(VSOutput input) {
     float rtAvailability = saturate(max(rtConfidence, max(rtRawConfidence, saturate(rtLuma))) * rtRawActive);
     float envAvailability = saturate(envConfidence + Luma(envRadiance));
     float localRejected = chooseLocal ? 0.0f : saturate(1.0f - localAvailability);
-    float ssrRejected = chooseSSR ? 0.0f : saturate(1.0f - ssrAvailability);
+    float ssrRejected = (chooseSSR && !forceSSR) ? 0.0f : saturate(1.0f - ssrAvailability);
     float rtRejected = chooseRT ? 0.0f : saturate(1.0f - rtAvailability);
     float environmentRejected = chooseEnvironment ? 0.0f : saturate(1.0f - envAvailability);
     float materialSuppressedSource = max(
@@ -256,13 +256,12 @@ PSOutput PSMain(VSOutput input) {
     // cannot be satisfied are visible in G so packets can prove the override
     // was rejected instead of silently falling through.
     float forcedButUnavailable =
-        (forceLocal && localActive <= 0.0f) ||
-        (forceSSR && ssrRawActive <= 0.0f) ||
-        (forceRT && rtRawActive <= 0.0f) ||
-        (forceEnvironment && envActive <= 0.0f) ||
-        forceNone
-            ? 1.0f
-            : 0.0f;
+        forceNone ? 1.0f :
+        forceLocal ? saturate(1.0f - localAvailability) :
+        forceSSR ? saturate(1.0f - ssrAvailability) :
+        forceRT ? saturate(1.0f - rtAvailability) :
+        forceEnvironment ? saturate(1.0f - envAvailability) :
+        0.0f;
     float historyRequiredButMissing = (chooseSSR || chooseRT) ? (1.0f - step(0.5f, g_TAAParams.w)) : 0.0f;
     float inactiveContinuous = saturate(1.0f - saturate(confidence + Luma(radiance)));
     output.temporalDelta = float4(inactiveContinuous, forcedButUnavailable, historyRequiredButMissing, 1.0f);

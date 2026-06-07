@@ -1820,3 +1820,35 @@ Remaining limitation:
 - The next reflection slice should target resolver-side
   `reflection_rejected_source_mask` and `reflection_temporal_delta`, whose
   forced-SSR availability channel still moves at `0.082185` RGB delta.
+
+### ReflectionV3 Forced-Availability Diagnostic Stability - 2026-06-07
+
+Implemented:
+
+- `FullSceneReflectionResolverV3` now reports forced-source unavailability as
+  continuous availability debt instead of a binary raw-active threshold.
+- Forced SSR keeps continuous SSR availability debt in
+  `reflection_rejected_source_mask.g`.
+
+Evidence:
+
+- baseline packet:
+  `build/captures/v3_reflection_history_confidence_validity_mouse_jitter_20260607`.
+- after packet:
+  `build/captures/v3_reflection_resolver_continuous_forced_availability_mouse_jitter_20260607`.
+- after status:
+  - V3 packet passed.
+  - material payload passed.
+  - CompositeV3 diagnostics passed.
+  - promotion decision `review_packet_passed`.
+- forced-SSR mouse-jitter motion:
+  - `reflection_rejected_source_mask`: `0.060360 -> 0.014533`, warning
+    cleared.
+  - `reflection_temporal_delta`: `0.068744 -> 0.022837`, warning cleared.
+  - shared G-channel delta:
+    `0.082185 -> 0.018025`.
+
+Remaining limitation:
+
+- The only reflection diagnostic warnings left in this packet are
+  `reflection_history_v3_validity` and `reflection_history_v3_rejection`.

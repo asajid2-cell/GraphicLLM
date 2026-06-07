@@ -56,7 +56,7 @@ Result<void> Renderer::CreateScreenSpacePipelineStates(const RendererCompiledSha
         PipelineDesc compositeV3Desc = postDesc;
         compositeV3Desc.pixelShader = *shaders.fullSceneCompositeV3PS;
         compositeV3Desc.rtvFormat = DXGI_FORMAT_R16G16B16A16_FLOAT;
-        compositeV3Desc.numRenderTargets = 3;
+        compositeV3Desc.numRenderTargets = 5;
 
         auto compositeV3PipelineResult = m_pipelineState.fullSceneCompositeV3->Initialize(
             m_services.device->GetDevice(),

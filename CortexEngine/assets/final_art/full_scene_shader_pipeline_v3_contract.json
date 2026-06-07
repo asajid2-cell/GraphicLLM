@@ -38,6 +38,8 @@
         "candidate_hdr_scene_color",
         "energy_clamp_policy",
         "overbright_diagnostics",
+        "composite_contribution_map",
+        "legacy_rescue_usage",
         "ldr_cinematic_output",
         "candidate_ldr_cinematic_output"
       ],
@@ -247,13 +249,17 @@
         "hdr_scene_color",
         "candidate_hdr_scene_color",
         "energy_clamp_policy",
-        "overbright_diagnostics"
+        "overbright_diagnostics",
+        "composite_contribution_map",
+        "legacy_rescue_usage"
       ],
       "required_debug_views": [
         "hdr_scene_color",
         "candidate_hdr_scene_color",
         "energy_clamp_mask",
-        "overbright_mask"
+        "overbright_mask",
+        "composite_contribution_map",
+        "legacy_rescue_usage"
       ]
     },
     "cinematic_post": {

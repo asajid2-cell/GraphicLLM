@@ -21,6 +21,8 @@ struct PSOutput {
     float4 hdrSceneColor : SV_Target0;
     float4 energyClampPolicy : SV_Target1;
     float4 overbrightDiagnostics : SV_Target2;
+    float4 compositeContributionMap : SV_Target3;
+    float4 legacyRescueUsage : SV_Target4;
 };
 
 static float Luma(float3 color) {
@@ -42,7 +44,11 @@ PSOutput PSMain(VSOutput input) {
     // an explicit ownership input and to keep a bounded rescue path for early
     // split-lighting bring-up.
     float3 composite = direct + indirect;
-    composite += reflection * (0.10f * reflectionConfidence);
+    float3 reflectionContribution = reflection * (0.10f * reflectionConfidence);
+    composite += reflectionContribution;
+
+    float3 materialContribution = 0.0f.xxx;
+    float3 environmentContribution = 0.0f.xxx;
 
     float splitLuma = Luma(composite);
     if (splitLuma < 0.002f) {
@@ -51,14 +57,18 @@ PSOutput PSMain(VSOutput input) {
         float3 sceneLocalFloor = lerp(float3(0.018f, 0.020f, 0.024f),
                                       float3(0.028f, 0.034f, 0.042f),
                                       saturate(sceneEnvironment.g + sceneEnvironment.b));
-        composite = max(composite, max(materialFill, sceneLocalFloor * (1.0f - saturate(albedoLuma * 4.0f))));
+        materialContribution = materialFill;
+        environmentContribution = sceneLocalFloor * (1.0f - saturate(albedoLuma * 4.0f));
+        composite = max(composite, max(materialContribution, environmentContribution));
         splitLuma = Luma(composite);
     }
 
     float fallbackLuma = Luma(fallback);
     float legacyFallbackUsed = 0.0f;
+    float legacyRescueWeight = 0.0f;
     if (splitLuma < 0.002f && fallbackLuma > 0.002f) {
-        composite = fallback * lerp(0.10f, 0.18f, shadow);
+        legacyRescueWeight = lerp(0.10f, 0.18f, shadow);
+        composite = fallback * legacyRescueWeight;
         legacyFallbackUsed = 1.0f;
     }
 
@@ -76,5 +86,15 @@ PSOutput PSMain(VSOutput input) {
     output.hdrSceneColor = float4(composite, 1.0f);
     output.energyClampPolicy = float4(saturate(unclampedLuma / 16.0f), clampMask, clampRatio, legacyFallbackUsed);
     output.overbrightDiagnostics = float4(overbrightMask, underlitMask, legacyFallbackUsed, reflectionConfidence);
+    output.compositeContributionMap = float4(
+        saturate(Luma(direct) / max(unclampedLuma, 1.0e-4f)),
+        saturate(Luma(indirect + environmentContribution + materialContribution) / max(unclampedLuma, 1.0e-4f)),
+        saturate(Luma(reflectionContribution) / max(unclampedLuma, 1.0e-4f)),
+        legacyFallbackUsed);
+    output.legacyRescueUsage = float4(
+        legacyFallbackUsed,
+        saturate(fallbackLuma / 16.0f),
+        legacyRescueWeight,
+        saturate(splitLuma / 16.0f));
     return output;
 }

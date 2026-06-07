@@ -79,6 +79,8 @@ $views = @(
     [pscustomobject]@{ Name = "candidate_hdr_scene_color"; DebugView = 67; CandidateBeautyV3 = $true },
     [pscustomobject]@{ Name = "energy_clamp_policy"; DebugView = 80; CandidateBeautyV3 = $true },
     [pscustomobject]@{ Name = "overbright_diagnostics"; DebugView = 81; CandidateBeautyV3 = $true },
+    [pscustomobject]@{ Name = "composite_contribution_map"; DebugView = 88; CandidateBeautyV3 = $true },
+    [pscustomobject]@{ Name = "legacy_rescue_usage"; DebugView = 89; CandidateBeautyV3 = $true },
     [pscustomobject]@{ Name = "scene_local_environment"; DebugView = 83 },
     [pscustomobject]@{ Name = "ambient_lighting"; DebugView = 84 },
     [pscustomobject]@{ Name = "visible_background"; DebugView = 85 },

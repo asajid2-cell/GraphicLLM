@@ -409,6 +409,14 @@ void Renderer::UpdateFrameContractSnapshot(Scene::ECS_Registry* registry,
                 m_mainTargets.compositeV3.resources.overbrightDiagnostics.Get(),
                 contract.renderWidth,
                 contract.renderHeight);
+    addResource("composite_contribution_map",
+                m_mainTargets.compositeV3.resources.compositeContributionMap.Get(),
+                contract.renderWidth,
+                contract.renderHeight);
+    addResource("legacy_rescue_usage",
+                m_mainTargets.compositeV3.resources.legacyRescueUsage.Get(),
+                contract.renderWidth,
+                contract.renderHeight);
     addResource("candidate_ldr_cinematic_output",
                 m_mainTargets.candidateBeautyV3.resources.ldrOutput.Get(),
                 contract.renderWidth,

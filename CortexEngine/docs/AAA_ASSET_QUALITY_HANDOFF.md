@@ -6758,3 +6758,64 @@ Current limitation:
 - Next aligned pass: run closeup stress packets for glossy metal, glass, rough
   dielectric, and water; then use `reflection_source_suppression` to tune
   material-class-specific reflection policy before candidate beauty promotion.
+
+### ReflectionV3 Semantic Material Input and Pixel-Exact Reads - 2026-06-06
+
+Implemented:
+
+- Added `tools/analyze_reflection_v3_material_stress.py`.
+- Added `tools/run_reflection_v3_material_stress_packet.ps1`.
+- `FullSceneReflectionV3` now reads `vb_gbuffer_material_ext2`.
+- `FullSceneReflectionResolverV3.hlsl` decodes surface class and named scene
+  material class, then applies source floors for water, glass, mirror,
+  conductor, and wet surfaces.
+- `FullSceneReflectionResolverV3.hlsl` now loads normal/roughness,
+  emissive/metallic, and material ext2 by exact pixel coordinate.
+- `LocalReflectionRadiance.hlsl` now loads normal/roughness, emissive/metallic,
+  material ext1, and material ext2 by exact pixel coordinate.
+- The V3 contract JSON, runtime readiness, placeholder analyzer, and plan
+  validator now require `FullSceneReflectionV3` to read
+  `vb_gbuffer_material_ext2`.
+- The material stress wrapper captures `surface_class` and `material_family` by
+  default.
+- The material stress analyzer reports smooth-class coverage from frame-report
+  material policy counts.
+
+Validation:
+
+```powershell
+python -m py_compile tools\analyze_reflection_v3_material_stress.py tools\analyze_full_scene_shader_v3_placeholders.py tools\validate_full_scene_shader_pipeline_v3_plan.py
+python tools\validate_full_scene_shader_pipeline_v3_plan.py
+python -m json.tool assets\final_art\full_scene_shader_pipeline_v3_contract.json
+cmd.exe /d /c "call ""C:\Program Files\Microsoft Visual Studio\18\Community\Common7\Tools\VsDevCmd.bat"" -arch=x64 -host_arch=x64 >nul && set ""CORTEX_SKIP_ASSET_SYNC=1"" && ""C:\Program Files\Ninja\ninja.exe"" -C build CortexEngine -j 8"
+Copy-Item -LiteralPath assets\shaders\FullSceneReflectionResolverV3.hlsl -Destination build\bin\assets\shaders\FullSceneReflectionResolverV3.hlsl -Force
+Copy-Item -LiteralPath assets\shaders\LocalReflectionRadiance.hlsl -Destination build\bin\assets\shaders\LocalReflectionRadiance.hlsl -Force
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_reflection_v3_material_stress_packet.ps1 -NoBuild -SkipSceneAnalyzers -StressSceneFilter "glass_water_courtyard:water_closeup" -ViewFilter "beauty,roughness,metallic,surface_class,material_family,reflection_source_suppression,reflection_ssr_source_signal,reflection_rt_source_signal,reflection_history_v3_rejection" -OutputRoot build\captures\reflection_v3_material_policy_water_after_pixel_loads_20260606 -SmokeFrames 18 -CaptureFrame 9 -CaptureSequenceCount 2 -StabilityMotionMode mouse_jitter
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_reflection_v3_material_stress_packet.ps1 -NoBuild -SkipSceneAnalyzers -StressSceneFilter "material_lab:metal_closeup,material_lab:glass_emissive" -ViewFilter "beauty,roughness,metallic,surface_class,material_family,reflection_source_suppression,reflection_ssr_source_signal,reflection_rt_source_signal,reflection_history_v3_rejection" -OutputRoot build\captures\reflection_v3_material_policy_metal_glass_after_pixel_loads_20260606 -SmokeFrames 18 -CaptureFrame 9 -CaptureSequenceCount 2 -StabilityMotionMode mouse_jitter
+python tools\analyze_reflection_v3_material_stress.py --manifest build\captures\reflection_v3_material_policy_metal_glass_after_pixel_loads_20260606\manifest.json --output-json build\captures\reflection_v3_material_policy_metal_glass_after_pixel_loads_20260606\reflection_v3_material_stress.json --output-md build\captures\reflection_v3_material_policy_metal_glass_after_pixel_loads_20260606\reflection_v3_material_stress.md
+```
+
+Results:
+
+- Water packet passed the wrapper and material stress analyzer:
+  `build/captures/reflection_v3_material_policy_water_after_pixel_loads_20260606`.
+- Water still reports `smooth_target_has_high_roughness_signal`:
+  material suppression `0.27838`, roughness mean `0.72708`, smooth-class
+  coverage `31/66`.
+- Metal/glass packet captured successfully; the V3 placeholder gate failed on
+  material-lab lighting split readiness, but the material stress analyzer
+  passed with no warnings:
+  `build/captures/reflection_v3_material_policy_metal_glass_after_pixel_loads_20260606`.
+- Treat the pixel-exact material reads as a real root stability fix for
+  smooth/metal edge jitter. Treat the remaining water warning as a BRDF/source
+  policy issue, not missing `materialExt2` wiring.
+
+Next aligned work:
+
+- Add water/glass roughness policy diagnostics that distinguish authored
+  material roughness from screen-view closeup composition.
+- Tune water/glass source admission and local reflection radiance confidence
+  using `surface_class`, `scene_material_class`, clearcoat/transmission, and
+  Fresnel.
+- Fix the material-lab diagnostic wrapper so it can run material stress without
+  requiring full lighting-split promotion readiness.

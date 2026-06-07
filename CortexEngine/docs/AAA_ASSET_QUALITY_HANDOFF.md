@@ -112,6 +112,58 @@ Evidence:
   - runtime shape `filtered_directional_bc1_v1`
   - minimum runtime filter variance `0.014379`
 
+Latest RenderGraphV3 inventory checkpoint:
+
+- Continued the second foundation slice from the renderer blueprint:
+  expose a V3 pass/resource inventory in runtime reports.
+- `FullSceneShaderPipelineV3FrameContext` now derives inventory from existing
+  `FrameContract::PassRecord` entries instead of maintaining a parallel pass
+  list.
+- V3 pass/resource classification includes named V3 passes and resources such
+  as scene-local environment, lighting split outputs, reflection resources,
+  candidate HDR/LDR, composite contribution/debt, and relevant legacy bridge
+  resources.
+- New top-level V3 JSON fields:
+  - `render_graph_v3_inventory_ready`
+  - `render_graph_v3_pass_count`
+  - `render_graph_v3_executed_pass_count`
+  - `render_graph_v3_read_resource_count`
+  - `render_graph_v3_write_resource_count`
+  - `render_graph_v3_missing_producer_count`
+  - `render_graph_v3_pass_names`
+  - `render_graph_v3_read_resources`
+  - `render_graph_v3_written_resources`
+  - `render_graph_v3_missing_producer_resources`
+- The V3 `render_graph` domain now reports producer
+  `RenderGraphV3Inventory`, output `v3_resource_inventory`, debug view
+  `v3_resource_ownership`, and backing resources from the runtime written
+  resource set.
+- `tools\analyze_full_scene_shader_v3_placeholders.py` now allows
+  `render_graph` to be ready and fails reports where the V3 inventory is
+  missing or empty.
+- `tools\validate_full_scene_shader_pipeline_v3_plan.py` and
+  `assets\final_art\full_scene_shader_pipeline_v3_contract.json` require the
+  new inventory fields.
+- Fresh focused packet:
+  `build\captures\v3_render_graph_inventory_fresh_smoke_20260607`
+  passed end to end.
+  - sampled report:
+    `stress_rt_showcase_reflection_closeup\beauty\frame_report_shutdown.json`
+  - `render_graph_v3_inventory_ready=true`
+  - V3 inventory pass count `20`
+  - V3 executed pass count `20`
+  - V3 read resource count `11`
+  - V3 written resource count `28`
+  - V3 missing producer count `1`
+  - missing producer resource: `local_reflection_radiance`
+  - V3 `render_graph` domain is now ready/instrumented with producer
+    `RenderGraphV3Inventory`, output `v3_resource_inventory`, and debug view
+    `v3_resource_ownership`
+- Interpretation:
+  - The renderer now has a real V3 pass/resource inventory in runtime JSON.
+  - `local_reflection_radiance` is visible remaining provider debt for the next
+    ReflectionV3/local-probe slice, not a hidden failure.
+
 Current planning checkpoint:
 
 - Latest implementation moved `SceneLocalEnvironmentV3` proxy generation from

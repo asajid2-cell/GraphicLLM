@@ -52,7 +52,17 @@
         "consumer_passes",
         "debug_view_id",
         "default_beauty_affects",
-        "packet_gate"
+        "packet_gate",
+        "render_graph_v3_inventory_ready",
+        "render_graph_v3_pass_count",
+        "render_graph_v3_executed_pass_count",
+        "render_graph_v3_read_resource_count",
+        "render_graph_v3_write_resource_count",
+        "render_graph_v3_missing_producer_count",
+        "render_graph_v3_pass_names",
+        "render_graph_v3_read_resources",
+        "render_graph_v3_written_resources",
+        "render_graph_v3_missing_producer_resources"
       ]
     },
     "scene_profile": {

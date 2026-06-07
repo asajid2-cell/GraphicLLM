@@ -57,6 +57,7 @@ REQUIRED_DOMAINS = {
 }
 
 ALLOWED_READY_DOMAINS = {
+    "render_graph",
     "scene_profile",
     "material",
     "lighting",
@@ -350,6 +351,18 @@ def analyze_report(
         failures.append("contract_grounded must be true")
     if v3.get("packet_gate_ready") is not False:
         failures.append("packet_gate_ready must remain false until V3 packets are real gates")
+    if v3.get("render_graph_v3_inventory_ready") is not True:
+        failures.append("render_graph_v3_inventory_ready must be true once V3 pass reports exist")
+    if int(v3.get("render_graph_v3_pass_count", 0) or 0) <= 0:
+        failures.append("render_graph_v3_pass_count must be positive")
+    if int(v3.get("render_graph_v3_executed_pass_count", 0) or 0) <= 0:
+        failures.append("render_graph_v3_executed_pass_count must be positive")
+    if int(v3.get("render_graph_v3_write_resource_count", 0) or 0) <= 0:
+        failures.append("render_graph_v3_write_resource_count must be positive")
+    if not v3.get("render_graph_v3_pass_names"):
+        failures.append("render_graph_v3_pass_names must be populated")
+    if not v3.get("render_graph_v3_written_resources"):
+        failures.append("render_graph_v3_written_resources must be populated")
 
     missing_outputs = sorted(REQUIRED_OUTPUTS - outputs)
     if missing_outputs:

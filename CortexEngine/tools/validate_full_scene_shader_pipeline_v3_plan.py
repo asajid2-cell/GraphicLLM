@@ -305,6 +305,24 @@ def main() -> int:
     for output in REQUIRED_OUTPUTS:
         require(output in render_graph_outputs, errors, f"V3 render graph missing output: {output}")
         require(output in runtime_surface, errors, f"V3 runtime placeholder missing output: {output}")
+    render_graph_contract_fields = set(domains.get("render_graph", {}).get("required_contract_fields", []))
+    for field in [
+        "render_graph_v3_inventory_ready",
+        "render_graph_v3_pass_count",
+        "render_graph_v3_executed_pass_count",
+        "render_graph_v3_read_resource_count",
+        "render_graph_v3_write_resource_count",
+        "render_graph_v3_missing_producer_count",
+        "render_graph_v3_pass_names",
+        "render_graph_v3_read_resources",
+        "render_graph_v3_written_resources",
+        "render_graph_v3_missing_producer_resources",
+    ]:
+        require(
+            field in render_graph_contract_fields,
+            errors,
+            f"V3 render graph missing contract field: {field}",
+        )
 
     scene_profile_contract = domains.get("scene_profile", {})
     require(
@@ -583,6 +601,29 @@ def main() -> int:
         '"contract_grounded"',
         "packetGateReady",
         '"packet_gate_ready"',
+        "renderGraphV3InventoryReady",
+        '"render_graph_v3_inventory_ready"',
+        "renderGraphV3PassCount",
+        '"render_graph_v3_pass_count"',
+        "renderGraphV3ExecutedPassCount",
+        '"render_graph_v3_executed_pass_count"',
+        "renderGraphV3ReadResourceCount",
+        '"render_graph_v3_read_resource_count"',
+        "renderGraphV3WriteResourceCount",
+        '"render_graph_v3_write_resource_count"',
+        "renderGraphV3MissingProducerCount",
+        '"render_graph_v3_missing_producer_count"',
+        "renderGraphV3PassNames",
+        '"render_graph_v3_pass_names"',
+        "renderGraphV3ReadResources",
+        '"render_graph_v3_read_resources"',
+        "renderGraphV3WrittenResources",
+        '"render_graph_v3_written_resources"',
+        "renderGraphV3MissingProducerResources",
+        '"render_graph_v3_missing_producer_resources"',
+        "RenderGraphV3Inventory",
+        "v3_resource_inventory",
+        "v3_resource_ownership",
         "materialAttributesReady",
         '"material_attributes_ready"',
         "lightingAdapterReady",

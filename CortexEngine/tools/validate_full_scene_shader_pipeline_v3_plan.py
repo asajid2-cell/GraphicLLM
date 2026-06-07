@@ -657,7 +657,7 @@ def main() -> int:
         '"scene_local_proxy_fallback_reason"',
         '"v3_environment_payload.json"',
         "generate_scene_local_environment_proxies.py",
-        "profile_payload_inventory_v1",
+        "profile_payload_material_sample_v1",
         "reflectionV3Ready",
         '"reflection_v3_ready"',
         "reflectionRadianceReady",

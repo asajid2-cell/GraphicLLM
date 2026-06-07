@@ -613,10 +613,31 @@ SceneLocalEnvironmentV3 proxy-resource binding:
 - Cross-profile derived-proxy evidence
   `build\captures\v3_scene_local_derived_proxy_cross_profile_20260607` passed
   with `4/4` explicit proxy bindings and `4/4` derived proxy manifest matches.
+- Material-sampled proxy generation now exists through
+  `profile_payload_material_sample_v1`.
+- The proxy generator decodes albedo/diffuse DDS payloads through Pillow,
+  including current BC7 DX10 payload textures, and records material sample
+  evidence in `assets\textures\scene_local_proxy\proxy_manifest.json`.
+- The environment-payload analyzer now fails payload-ready packets unless the
+  explicit proxy manifest proves decoded material-color samples are present.
+- Latest generation report:
+  `build\captures\scene_local_environment_proxy_generation_20260607\material_sample_proxy_generation_report.json`.
+- Current material-sampled evidence: `basketball_gym_day` has `5` sampled
+  color payloads with `0` failed; the other tracked proxy sets have `6` sampled
+  color payloads with `0` failed.
+- Fresh material-sampled proxy packet
+  `build\captures\v3_scene_local_material_sample_proxy_fresh_smoke_20260607`
+  passed with `54/54` explicit proxy bindings and `54/54` material-sampled
+  proxy reports. The only derivation was
+  `profile_payload_material_sample_v1`.
+- Cross-profile material-sampled proxy packet
+  `build\captures\v3_scene_local_material_sample_proxy_cross_profile_20260607`
+  passed environment payload/profile analysis across gallery, office, concert,
+  and stadium with `4/4` material-sampled proxy reports.
 - This is still not final environment generation. The next environment step is
-  to add actual decoded material-color sampling, light-rig influence, room-shell
-  influence, and filtered radiance/probe generation instead of filename-role
-  inventory only.
+  to add light-rig influence, room-shell influence, filtered diffuse
+  irradiance, filtered specular prefilter, and fresh packet proof for the
+  material-sampled derivation.
 
 ## 2026-06-07 Master Refactor Before Goal Feature Completion
 

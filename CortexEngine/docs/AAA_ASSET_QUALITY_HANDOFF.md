@@ -3,6 +3,73 @@
 This is the living handoff for the AAA asset-quality goal.
 Read this after compaction before continuing.
 
+## 2026-06-07 Current AAA Full-Scene Shader Resume Point
+
+User direction:
+
+- Move from local renderer fixes toward full-scene shaders that can reach
+  high-end realtime/Unreal-style visuals.
+- Plan and execute the architecture before calling any goal feature complete.
+- Do not use IBL blur, disabled features, post strength, or scene swaps as
+  correctness proof.
+
+Authoritative plan:
+
+- `docs\FULL_SCENE_SHADER_AAA_REFACTOR_PLAN.md`
+- Use its `2026-06-07 Authoritative Execution Queue` section as the current
+  ordering when older "next work" notes conflict.
+
+Current candidate-only state:
+
+- `FullSceneCompositeV3` has contribution and legacy rescue diagnostics.
+- `FullSceneLightingV3` owns direct, unshadowed direct, shadow visibility,
+  shadow loss, indirect, lighting-energy budget, and shadow-source
+  attribution resources.
+- Focused reflection motion packets exist, and forced-SSR reflection-history
+  warnings were resolved in the latest focused/full stress evidence.
+- Standard V3 packets cover material base color, normal, roughness, metallic,
+  and material class.
+- Remaining explicit material debt: `material_missing_channel_mask` is still
+  absent as a real debug resource or strict equivalent gate.
+- Focused shadow-motion packets exist; high-contrast light-sweep coverage is
+  still missing.
+
+Current refactor queue:
+
+1. Contract reconciliation and promotion gate hardening.
+2. `MaterialPayloadV3` missing-channel ownership.
+3. `SceneProfileV3` policy owner.
+4. `SceneLocalEnvironmentV3` texture/resource ownership.
+5. `LightingShadowV3` high-contrast stress and source split.
+6. `ReflectionV3` provider expansion and resolver hardening.
+7. `TransparencyMediaV3`.
+8. `CompositeV3` V3-only HDR assembly.
+9. `CinematicPostV3`.
+10. Cross-family promotion matrix.
+
+Next concrete implementation slice:
+
+```text
+MaterialPayloadV3 missing-channel ownership
+  -> contract resource or equivalent strict frame-report gate
+  -> packet aliases and debug mode
+  -> analyzer failure when required material ownership is absent
+  -> focused material packet evidence
+```
+
+Why next:
+
+- Stronger lighting, reflections, composite, and post all depend on honest
+  material payload ownership. If missing normals, roughness, emissive,
+  transparency, or other channels silently fall back, later beauty work will
+  tune around bad inputs.
+
+Goal status:
+
+- Do not mark complete. The plan is now clearer, but the full AAA candidate
+  renderer and cross-family promotion proof are not done.
+- Keep default beauty unchanged until the candidate path passes promotion.
+
 ## 2026-06-07 LightingV3 Shadow Motion Focus Harness
 
 Purpose:

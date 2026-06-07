@@ -4,6 +4,153 @@ Status: planning ledger.
 
 Default beauty stays unchanged until a separate promotion gate passes.
 
+## 2026-06-07 Authoritative Execution Queue
+
+This section supersedes older "next work" notes below when they conflict. The
+goal is a full-scene shader architecture, not another local beauty patch. The
+current renderer already has useful V3 slices for composite contribution,
+reflection history, material debug coverage, and LightingV3 energy/shadow
+attribution. The remaining work should now move through the stack in dependency
+order so each later visual feature consumes owned resources instead of legacy
+adapters.
+
+### Current State
+
+Implemented and kept candidate-only:
+
+- `FullSceneCompositeV3` contribution and legacy rescue diagnostics exist.
+- `FullSceneLightingV3` writes direct, unshadowed direct, shadow visibility,
+  shadow loss, indirect, lighting-energy budget, and shadow-source
+  attribution.
+- Reflection-focused motion packets exist and the latest forced-SSR history
+  warning was resolved with confidence-weighted history diagnostics.
+- Standard V3 packets cover material base color, normal, roughness, metallic,
+  and material class. The remaining explicit material payload debt is a real
+  `material_missing_channel_mask` or equivalent stricter ownership gate.
+- Focused shadow-motion packets exist. The missing focused row is a
+  high-contrast light-sweep/stress row that keeps IBL and scene conditions
+  visible instead of hiding instability.
+
+Still not complete:
+
+- `SceneProfileV3` is not yet the single policy owner for environment,
+  lighting, reflection, exposure, material expectations, and post.
+- `SceneLocalEnvironmentV3` is not yet the texture-backed owner of visible
+  background, diffuse irradiance, specular prefilter, reflection background,
+  atmosphere, and ownership mask across indoor/stage/exterior profiles.
+- `CompositeV3` still has measured legacy rescue debt; it is not yet a
+  V3-only HDR owner.
+- `CinematicPostV3` is not ready for strong beauty tuning because upstream
+  material, environment, lighting, reflection, transparency, and composite
+  ownership are not fully promoted.
+- Cross-family promotion has not happened. One passing stress packet is not a
+  promotion proof.
+
+### Refactor Queue
+
+Work in this order unless a failing packet proves a different root dependency:
+
+1. **Contract reconciliation and promotion gate hardening.**
+   - Make the JSON contract, C++ frame context, debug registry, packet aliases,
+     and analyzers agree on the canonical V3 resource list.
+   - Add failure reasons for missing, blank, stale, legacy-owned, and
+     uninspected resources.
+   - Promotion evidence: an intentionally missing V3 resource fails the packet
+     by name; default beauty remains untouched.
+
+2. **MaterialPayloadV3 missing-channel ownership.**
+   - Add a real `material_missing_channel_mask` debug resource or a stricter
+     equivalent frame-report gate.
+   - Track missing base-color, normal, roughness, metallic, AO, emissive,
+     opacity/transmission, clearcoat, sheen, anisotropy, IOR, and thickness.
+   - Promotion evidence: material packets can show which channels are owned,
+     which are fallback, and which consumers read fallback debt.
+
+3. **SceneProfileV3 policy owner.**
+   - Replace scattered scene-family conditionals with a declared profile that
+     owns enclosure mode, local environment mode, light rig, reflection source
+     priority, exposure policy, material expectations, post look, and motion
+     tolerances.
+   - Required initial profiles: neutral lab, gallery, kitchen, office, gym,
+     classroom, concert, red room, stadium, and exterior water.
+   - Promotion evidence: changing scene family changes profile output in the
+     frame report without changing renderer code.
+
+4. **SceneLocalEnvironmentV3 ownership.**
+   - Build the texture/resource split for visible background, diffuse
+     irradiance, specular prefilter, reflection background, atmosphere, and
+     environment ownership.
+   - Keep old-office IBL as a stress case with IBL on and sharp enough to
+     reveal wrong reflections. Do not blur or disable it to pass.
+   - Promotion evidence: enclosed kitchen/concert/gym packets no longer show
+     or sharply reflect unrelated IBL scenery unless the profile explicitly
+     permits it.
+
+5. **LightingShadowV3 high-contrast stress and source split.**
+   - Add the focused high-contrast light-sweep row.
+   - Split attribution further if needed: directional shadow map, local light
+     shadow map, contact shadow, RT/screen-space shadow, PCSS/filter radius,
+     and exposure contribution.
+   - Promotion evidence: floor/wall darkening and motion flicker can be
+     attributed to a named term or proven absent under locked exposure.
+
+6. **ReflectionV3 provider expansion and resolver hardening.**
+   - Keep SSR, RT/ray query, local probe, planar/hero probe, and environment
+     fallback as separate source signals.
+   - Resolve with source ID, confidence, rejection mask, history validity,
+     disocclusion, and hysteresis.
+   - Promotion evidence: smooth/metallic objects keep stable source IDs and
+     confidence under mouse jitter, close orbit, and reflective-object orbit.
+
+7. **TransparencyMediaV3.**
+   - Add owned water, glass, transparent accumulation, decals, particles,
+     volumetric inscatter, volumetric transmittance, and ordering diagnostics.
+   - Promotion evidence: water/glass closeups are stable and separable from
+     opaque reflection/composite behavior.
+
+8. **CompositeV3 V3-only HDR assembly.**
+   - Reduce legacy rescue from normal operation to a measured emergency lane.
+   - Expand contribution diagnostics into material, direct, shadow loss,
+     indirect, reflection, environment, transparency, emissive, atmosphere,
+     decals, and rescue terms.
+   - Promotion evidence: target packets produce nonblank candidate HDR with
+     near-zero legacy rescue and explainable channel contribution.
+
+9. **CinematicPostV3.**
+   - Add locked/manual exposure, bounded auto exposure, bloom extract/resolve,
+     glare, filmic tonemap, color grade, sharpening, vignette, optional DOF,
+     and bypass views.
+   - Promotion evidence: raw HDR, post without bloom, post without grade, and
+     final candidate LDR all pass stability packets. Bloom/glare must come
+     from real HDR/emissive masks.
+
+10. **Cross-family promotion matrix.**
+    - Families: gallery, kitchen, office, gym, classroom, concert, red room,
+      stadium, bathroom, bedroom, workshop, store, street, and exterior
+      water/vegetation.
+    - Motion rows: static, mouse jitter, camera sweep, close-surface orbit,
+      reflective-object orbit, and high-contrast light sweep.
+    - Promotion evidence: metrics, frame reports, contact sheets, failure
+      reports, and user review accept the candidate visuals. Only then can
+      default beauty be considered for promotion.
+
+### Next Concrete Slice
+
+The next implementation slice should not be cinematic post. It should be:
+
+```text
+MaterialPayloadV3 missing-channel ownership
+  -> contract resource or equivalent strict frame-report gate
+  -> packet aliases and debug mode
+  -> analyzer failure when required material ownership is absent
+  -> focused material packet evidence
+```
+
+This is the right next step because stronger lighting, reflections, composite,
+and post all depend on honest material payload ownership. If a surface looks
+flat or unstable because roughness, normal, emissive, or transparency silently
+fell back, later shader work will tune around a lie.
+
 ## 2026-06-07 Full Scene Shader Refactor Execution Blueprint
 
 The refactor should be planned as a renderer product line: the current public

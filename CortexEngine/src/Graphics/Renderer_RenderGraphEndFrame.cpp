@@ -1153,6 +1153,7 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
     std::array<ComPtr<ID3D12Resource>, kBloomLevels> savedBloomA{};
     std::array<ComPtr<ID3D12Resource>, kBloomLevels> savedBloomB{};
     bool bloomStageFailed = false;
+    bool ranLocalReflectionRadiance = false;
     bool ranReflectionResolverV3 = false;
     bool ranReflectionHistoryV3 = false;
     bool ranReflectionHistoryV3Copy = false;
@@ -1537,6 +1538,7 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
             localRadianceContext.dispatch.width = m_services.window->GetWidth();
             localRadianceContext.dispatch.height = m_services.window->GetHeight();
             localRadianceContext.status.failed = &bloomStageFailed;
+            localRadianceContext.status.ran = &ranLocalReflectionRadiance;
             localRadianceContext.status.stage = &postProcessGraphStageError;
             localReflRadianceHandle =
                 LocalReflectionRadiancePass::AddToGraph(*m_services.renderGraph, localRadianceContext);
@@ -2267,6 +2269,20 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
                             {"frame_constants", "scene_visual_contract", "environment_state"},
                             {"scene_local_environment", "ambient_lighting", "visible_background",
                              "reflection_background", "atmosphere"},
+                            false,
+                            nullptr,
+                            true);
+        }
+        if (localReflRadianceHandle.IsValid()) {
+            RecordFramePass("LocalReflectionRadiance",
+                            true,
+                            ranLocalReflectionRadiance,
+                            ranLocalReflectionRadiance ? 1u : 0u,
+                            {"depth", inputs.frameNormalRoughnessResource,
+                             "vb_gbuffer_emissive_metallic", "vb_gbuffer_material_ext1",
+                             "vb_gbuffer_material_ext2", "hdr_color",
+                             "environment_specular_prefilter"},
+                            {"local_reflection_radiance"},
                             false,
                             nullptr,
                             true);

@@ -136,6 +136,7 @@ void Renderer::RecordFramePass(const char* name,
                 write == "reflection_source_id" || write == "reflection_rejected_source_mask" ||
                 write == "reflection_temporal_delta" || write == "reflection_ssr_source_signal" ||
                 write == "reflection_rt_source_signal" || write == "reflection_source_suppression" ||
+                write == "local_reflection_radiance" ||
                 write == "reflection_history_v3_curr" ||
                 write == "reflection_history_v3_prev" ||
                 write == "reflection_history_v3_prev_source_id" ||

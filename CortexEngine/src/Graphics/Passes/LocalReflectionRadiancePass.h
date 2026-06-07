@@ -10,6 +10,7 @@ namespace Cortex::Graphics::LocalReflectionRadiancePass {
 
 struct GraphStatus {
     bool* failed = nullptr;
+    bool* ran = nullptr;
     const char** stage = nullptr;
 };
 

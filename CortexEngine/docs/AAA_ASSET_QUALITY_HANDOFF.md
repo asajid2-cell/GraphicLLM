@@ -203,6 +203,48 @@ Latest candidate-path debt checkpoint:
     required channels are all `0`
   - `legacy_rescue_resource_ready=false`
 
+Latest local reflection radiance producer checkpoint:
+
+- Closed the explicit RenderGraphV3 missing-producer debt for
+  `local_reflection_radiance`.
+- `LocalReflectionRadiancePass::GraphStatus` now has a `ran` flag, set only
+  after the compute dispatch succeeds.
+- `Renderer_RenderGraphEndFrame.cpp` now records a real frame pass:
+  - pass: `LocalReflectionRadiance`
+  - reads: `depth`, `vb_gbuffer_normal_roughness`,
+    `vb_gbuffer_emissive_metallic`, `vb_gbuffer_material_ext1`,
+    `vb_gbuffer_material_ext2`, `hdr_color`,
+    `environment_specular_prefilter`
+  - writes: `local_reflection_radiance`
+- `local_reflection_radiance` is now a required V3 render-graph output in
+  `assets\final_art\full_scene_shader_pipeline_v3_contract.json`, runtime
+  `required_outputs`, static validator, and placeholder analyzer.
+- `tools\analyze_full_scene_shader_v3_placeholders.py` now fails if
+  `FullSceneReflectionV3` is ready but the `LocalReflectionRadiance` producer
+  pass is missing, not executed, or does not write `local_reflection_radiance`.
+- Focused packet:
+  `build\captures\v3_local_reflection_radiance_producer_fresh_smoke_20260607_rerun`
+  passed end to end.
+  - `LocalReflectionRadiance.executed=true`
+  - `LocalReflectionRadiance.writes=["local_reflection_radiance"]`
+  - `render_graph_v3_missing_producer_count=0`
+  - `render_graph_v3_missing_producer_resources=[]`
+  - `local_reflection_radiance` appears in
+    `render_graph_v3_written_resources`
+  - candidate path debt now has
+    `render_graph_missing_producer_count=0`
+- A later packet attempt,
+  `build\captures\v3_local_reflection_radiance_producer_final_smoke_20260607`,
+  timed out before producing a manifest and left a wrapper process behind.
+  Treat it as no evidence. The stale wrapper was cleaned up; validation after
+  the final resolution-class patch is static/build validated, while runtime
+  packet evidence remains the successful `..._rerun` packet above.
+- Remaining candidate-path debt after this slice:
+  - `total_missing_required_channels=8`
+  - `candidate_beauty_missing_required_channels=6`
+  - `composite_missing_required_channels=2`
+  - `not_ready_domain_count=4`
+
 Current planning checkpoint:
 
 - Latest implementation moved `SceneLocalEnvironmentV3` proxy generation from

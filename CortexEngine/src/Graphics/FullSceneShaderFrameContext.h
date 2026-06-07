@@ -1349,6 +1349,7 @@ struct FullSceneShaderPipelineV3FrameContext {
         "shadow_loss",
         "lighting_energy_budget",
         "shadow_source_attribution",
+        "local_reflection_radiance",
         "reflection_radiance",
         "reflection_confidence",
         "reflection_source_id",

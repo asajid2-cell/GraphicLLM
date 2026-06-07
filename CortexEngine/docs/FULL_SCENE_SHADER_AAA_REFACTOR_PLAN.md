@@ -4052,3 +4052,50 @@ Known limitation:
 - This is still mouse-jitter stress, not the planned high-contrast light-sweep
   row. The next LightingShadowV3 pass should add scripted light-rig variation
   or cascade/slice attribution if source-specific instability remains.
+
+### LightingShadowV3 Light-Sweep Stress Row - 2026-06-07
+
+Implemented:
+
+- Added an opt-in runtime light sweep for capture automation:
+  `CORTEX_LIGHT_SWEEP`, `CORTEX_LIGHT_SWEEP_FRAMES`,
+  `CORTEX_LIGHT_SWEEP_CYCLES`,
+  `CORTEX_LIGHT_SWEEP_YAW_AMPLITUDE_DEGREES`,
+  `CORTEX_LIGHT_SWEEP_ELEVATION_AMPLITUDE`, and
+  `CORTEX_LIGHT_SWEEP_INTENSITY_AMPLITUDE`.
+- The sweep runs in `Engine::Update()` and changes real renderer lighting
+  state via `SetSunDirection()` and `SetSunIntensity()`, so shadow maps,
+  LightingV3 buffers, frame reports, and analyzers all see the same condition.
+- Added `light_sweep` to the scene-local packet runner and the focused
+  LightingShadowV3 runner.
+- Added `light_sweep` support to the V3 lighting-motion matrix runner.
+- Extended the scene-local contract tests and V3 static validator to keep the
+  light-sweep interface covered.
+
+Validated evidence:
+
+- Native build passed.
+- Scene-local packet contract tests passed.
+- Focused packet:
+  `build/captures/v3_lighting_shadow_light_sweep_focus_20260607`.
+- Packet wrapper passed end to end.
+- Motion analyzer passed:
+  `11` view sequences, `0` warnings, `0` failures.
+- Shadow-attribution analyzer passed:
+  `1` family, `0` warnings, `0` failures.
+- Key rows:
+  - `v3_shadow_visibility.delta=0.01310343`, `1.000x` legacy,
+    `31.476x` beauty.
+  - `v3_shadow_loss.delta=0.00762285`, `0.957x` legacy,
+    `18.311x` beauty.
+  - `v3_shadow_source_attribution.delta=0.00207217`, `4.978x` beauty.
+- Attribution row for `stress_rt_showcase_reflection_closeup`:
+  sun loss `0.621078`, local loss `0.007351`, source active `0.777158`,
+  shadow-loss active `0.998522`, visibility occlusion `1.000000`,
+  shadow-map enabled `1.000000`, energy active `1.000000`.
+
+Known limitation:
+
+- This is a focused gallery/stress-scene row. The next promotion-grade step is
+  to run `light_sweep` in a bounded cross-family matrix after model-scene
+  capture/report instability is separated from diagnostics.

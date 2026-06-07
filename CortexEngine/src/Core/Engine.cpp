@@ -159,6 +159,77 @@ namespace {
         return parsed;
     }
 
+    float ReadEnvFloatOr(const char* name, float fallback) {
+        auto parsed = ReadOptionalEnvFloat(name);
+        return parsed ? *parsed : fallback;
+    }
+
+    uint64_t ReadEnvUInt64Or(const char* name, uint64_t fallback) {
+        auto parsed = ReadOptionalEnvUInt64(name);
+        return parsed ? *parsed : fallback;
+    }
+
+    void ApplyAutomationLightSweep(Graphics::Renderer& renderer, uint64_t frameIndex) {
+        if (!std::getenv("CORTEX_LIGHT_SWEEP")) {
+            return;
+        }
+
+        static bool s_initialized = false;
+        static glm::vec3 s_baseSunDirection = glm::normalize(glm::vec3(0.5f, 1.0f, 0.3f));
+        static float s_baseSunIntensity = 1.0f;
+        if (!s_initialized) {
+            const auto features = renderer.GetFeatureState();
+            s_baseSunDirection = glm::normalize(features.sunDirection);
+            s_baseSunIntensity = std::max(features.sunIntensity, 0.01f);
+            s_initialized = true;
+            spdlog::info(
+                "Automation light sweep enabled: baseDir=({:.3f},{:.3f},{:.3f}) baseIntensity={:.3f}",
+                s_baseSunDirection.x,
+                s_baseSunDirection.y,
+                s_baseSunDirection.z,
+                s_baseSunIntensity);
+        }
+
+        const uint64_t frames = std::max<uint64_t>(
+            2ull,
+            ReadEnvUInt64Or("CORTEX_LIGHT_SWEEP_FRAMES", 96ull));
+        const float cycles = std::max(
+            0.01f,
+            ReadEnvFloatOr("CORTEX_LIGHT_SWEEP_CYCLES", 1.0f));
+        const float yawAmplitudeRadians = glm::radians(std::clamp(
+            ReadEnvFloatOr("CORTEX_LIGHT_SWEEP_YAW_AMPLITUDE_DEGREES", 28.0f),
+            0.0f,
+            89.0f));
+        const float elevationAmplitude = std::clamp(
+            ReadEnvFloatOr("CORTEX_LIGHT_SWEEP_ELEVATION_AMPLITUDE", 0.20f),
+            0.0f,
+            0.75f);
+        const float intensityAmplitude = std::clamp(
+            ReadEnvFloatOr("CORTEX_LIGHT_SWEEP_INTENSITY_AMPLITUDE", 0.35f),
+            0.0f,
+            2.0f);
+
+        const float t = static_cast<float>(frameIndex % frames) / static_cast<float>(frames);
+        const float phase = t * cycles * 6.28318530718f;
+        const float yaw = std::sin(phase) * yawAmplitudeRadians;
+        const float c = std::cos(yaw);
+        const float s = std::sin(yaw);
+        glm::vec3 swept{
+            s_baseSunDirection.x * c + s_baseSunDirection.z * s,
+            s_baseSunDirection.y + std::sin(phase * 1.37f + 1.57079632679f) * elevationAmplitude,
+            -s_baseSunDirection.x * s + s_baseSunDirection.z * c,
+        };
+        if (glm::length2(swept) < 1e-6f) {
+            swept = s_baseSunDirection;
+        }
+
+        const float intensityScale = std::max(
+            0.0f,
+            1.0f + std::sin(phase * 1.19f + 0.35f) * intensityAmplitude);
+        renderer.SetSunDirection(glm::normalize(swept));
+        renderer.SetSunIntensity(s_baseSunIntensity * intensityScale);
+    }
+
     bool InitialPresetUsesRTShowcase(const std::string& preset) {
         if (preset.empty()) {
             return true;
@@ -1307,6 +1378,10 @@ void Engine::Update(float deltaTime) {
     // Pump LLM callbacks on the main thread to avoid cross-thread scene mutations
     if (m_llmService) {
         m_llmService->PumpCallbacks();
+    }
+
+    if (m_renderer) {
+        ApplyAutomationLightSweep(*m_renderer, m_totalFrameCount);
     }
 
     if (!m_startupArchitectCommandSubmitted &&

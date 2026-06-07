@@ -3,7 +3,7 @@ param(
     [int]$SmokeFrames = 140,
     [int]$CaptureFrame = 60,
     [int]$CaptureSequenceCount = 1,
-    [ValidateSet("static", "mouse_jitter", "camera_sweep")]
+    [ValidateSet("static", "mouse_jitter", "camera_sweep", "light_sweep")]
     [string]$StabilityMotionMode = "static",
     [int]$MotionFrames = 120,
     [double]$MotionLookAmplitude = 0.025,
@@ -226,6 +226,12 @@ $oldEnv = @{
     CORTEX_CAMERA_MOUSE_JITTER_YAW_AMPLITUDE = $env:CORTEX_CAMERA_MOUSE_JITTER_YAW_AMPLITUDE
     CORTEX_CAMERA_MOUSE_JITTER_PITCH_AMPLITUDE = $env:CORTEX_CAMERA_MOUSE_JITTER_PITCH_AMPLITUDE
     CORTEX_CAMERA_MOUSE_JITTER_CYCLES = $env:CORTEX_CAMERA_MOUSE_JITTER_CYCLES
+    CORTEX_LIGHT_SWEEP = $env:CORTEX_LIGHT_SWEEP
+    CORTEX_LIGHT_SWEEP_FRAMES = $env:CORTEX_LIGHT_SWEEP_FRAMES
+    CORTEX_LIGHT_SWEEP_CYCLES = $env:CORTEX_LIGHT_SWEEP_CYCLES
+    CORTEX_LIGHT_SWEEP_YAW_AMPLITUDE_DEGREES = $env:CORTEX_LIGHT_SWEEP_YAW_AMPLITUDE_DEGREES
+    CORTEX_LIGHT_SWEEP_ELEVATION_AMPLITUDE = $env:CORTEX_LIGHT_SWEEP_ELEVATION_AMPLITUDE
+    CORTEX_LIGHT_SWEEP_INTENSITY_AMPLITUDE = $env:CORTEX_LIGHT_SWEEP_INTENSITY_AMPLITUDE
     CORTEX_ENABLE_FULL_SCENE_CANDIDATE_BEAUTY_V3 = $env:CORTEX_ENABLE_FULL_SCENE_CANDIDATE_BEAUTY_V3
 }
 
@@ -314,6 +320,13 @@ function Resolve-FamilySeed([string]$Family, [string]$ExplicitSeed) {
 }
 
 function Set-PacketMotionEnv {
+    Remove-Item Env:\CORTEX_LIGHT_SWEEP -ErrorAction SilentlyContinue
+    Remove-Item Env:\CORTEX_LIGHT_SWEEP_FRAMES -ErrorAction SilentlyContinue
+    Remove-Item Env:\CORTEX_LIGHT_SWEEP_CYCLES -ErrorAction SilentlyContinue
+    Remove-Item Env:\CORTEX_LIGHT_SWEEP_YAW_AMPLITUDE_DEGREES -ErrorAction SilentlyContinue
+    Remove-Item Env:\CORTEX_LIGHT_SWEEP_ELEVATION_AMPLITUDE -ErrorAction SilentlyContinue
+    Remove-Item Env:\CORTEX_LIGHT_SWEEP_INTENSITY_AMPLITUDE -ErrorAction SilentlyContinue
+
     if ($script:StabilityMotionMode -eq "mouse_jitter") {
         Remove-Item Env:\CORTEX_CAMERA_MOTION_FRAMES -ErrorAction SilentlyContinue
         Remove-Item Env:\CORTEX_CAMERA_MOTION_SIDE_AMPLITUDE -ErrorAction SilentlyContinue
@@ -341,6 +354,27 @@ function Set-PacketMotionEnv {
         $env:CORTEX_CAMERA_MOTION_LOOK_AMPLITUDE = [string]$script:MotionLookAmplitude
         $env:CORTEX_CAMERA_MOTION_LOOK_CYCLES = [string]$script:MotionLookCycles
         $env:CORTEX_CAMERA_MOTION_LIFT_AMPLITUDE = [string]$script:MotionLiftAmplitude
+        return
+    }
+
+    if ($script:StabilityMotionMode -eq "light_sweep") {
+        Remove-Item Env:\CORTEX_CAMERA_MOUSE_JITTER_FRAMES -ErrorAction SilentlyContinue
+        Remove-Item Env:\CORTEX_CAMERA_MOUSE_JITTER_YAW_AMPLITUDE -ErrorAction SilentlyContinue
+        Remove-Item Env:\CORTEX_CAMERA_MOUSE_JITTER_PITCH_AMPLITUDE -ErrorAction SilentlyContinue
+        Remove-Item Env:\CORTEX_CAMERA_MOUSE_JITTER_CYCLES -ErrorAction SilentlyContinue
+        Remove-Item Env:\CORTEX_CAMERA_MOTION_FRAMES -ErrorAction SilentlyContinue
+        Remove-Item Env:\CORTEX_CAMERA_MOTION_SIDE_AMPLITUDE -ErrorAction SilentlyContinue
+        Remove-Item Env:\CORTEX_CAMERA_MOTION_FORWARD_AMPLITUDE -ErrorAction SilentlyContinue
+        Remove-Item Env:\CORTEX_CAMERA_MOTION_LOOK_AMPLITUDE -ErrorAction SilentlyContinue
+        Remove-Item Env:\CORTEX_CAMERA_MOTION_LOOK_CYCLES -ErrorAction SilentlyContinue
+        Remove-Item Env:\CORTEX_CAMERA_MOTION_LIFT_AMPLITUDE -ErrorAction SilentlyContinue
+        $env:CORTEX_FIXED_DELTA_TIME = [string]$script:FixedDeltaTime
+        $env:CORTEX_LIGHT_SWEEP = "1"
+        $env:CORTEX_LIGHT_SWEEP_FRAMES = [string]$script:MotionFrames
+        $env:CORTEX_LIGHT_SWEEP_CYCLES = [string]$script:MotionLookCycles
+        $env:CORTEX_LIGHT_SWEEP_YAW_AMPLITUDE_DEGREES = [string]([Math]::Max(1.0, $script:MotionLookAmplitude * 1200.0))
+        $env:CORTEX_LIGHT_SWEEP_ELEVATION_AMPLITUDE = [string]([Math]::Min(0.65, [Math]::Max(0.02, $script:MotionLiftAmplitude + 0.20)))
+        $env:CORTEX_LIGHT_SWEEP_INTENSITY_AMPLITUDE = [string]([Math]::Min(1.25, [Math]::Max(0.05, $script:MotionForwardAmplitude + 0.35)))
         return
     }
 

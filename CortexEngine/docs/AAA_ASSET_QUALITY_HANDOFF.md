@@ -229,13 +229,78 @@ Evidence:
 
 Current next work after this checkpoint:
 
-1. Add a true high-contrast light-sweep stress mode or scripted light-rig
-   variation; the current packet is still mouse-jitter focused.
-2. Add optional deeper attribution channels if instability remains:
+1. Add optional deeper attribution channels if instability remains:
    directional cascade index, local shadow slice index, RT shadow mask, and
    filter/PCSS radius.
-3. Continue `ReflectionV3` provider resolver hardening after this
+2. Continue `ReflectionV3` provider resolver hardening after this
    LightingShadowV3 source split is saved.
+
+Latest LightingShadowV3 light-sweep stress checkpoint:
+
+- Added a capture-only automation light sweep, off by default:
+  - `CORTEX_LIGHT_SWEEP`
+  - `CORTEX_LIGHT_SWEEP_FRAMES`
+  - `CORTEX_LIGHT_SWEEP_CYCLES`
+  - `CORTEX_LIGHT_SWEEP_YAW_AMPLITUDE_DEGREES`
+  - `CORTEX_LIGHT_SWEEP_ELEVATION_AMPLITUDE`
+  - `CORTEX_LIGHT_SWEEP_INTENSITY_AMPLITUDE`
+- The sweep runs in `Engine::Update()` and drives real renderer state through
+  `SetSunDirection()` and `SetSunIntensity()`. It is not a post-process or
+  debug-view-only trick.
+- `tools\run_scene_local_cinematic_renderer_v1_packets.ps1` now exposes
+  `-StabilityMotionMode light_sweep` and restores the sweep environment after
+  each packet.
+- `tools\run_lighting_v3_shadow_motion_focus_packet.ps1` accepts
+  `light_sweep`.
+- `tools\run_full_scene_shader_pipeline_v3_lighting_motion_matrix.ps1` accepts
+  `light_sweep` so the stress can later become cross-family matrix evidence.
+- `tools\run_scene_local_cinematic_renderer_v1_contract_tests.ps1` and the V3
+  static validator now check the light-sweep runtime surface.
+
+Validation for LightingShadowV3 light sweep:
+
+```powershell
+python -m py_compile tools\analyze_full_scene_shader_v3_shadow_attribution.py tools\analyze_full_scene_shader_v3_lighting_motion.py tools\validate_full_scene_shader_pipeline_v3_plan.py
+$files=@('tools\run_scene_local_cinematic_renderer_v1_packets.ps1','tools\run_lighting_v3_shadow_motion_focus_packet.ps1','tools\run_full_scene_shader_pipeline_v3_lighting_motion_matrix.ps1','tools\run_scene_local_cinematic_renderer_v1_contract_tests.ps1'); foreach($file in $files){$tokens=$null; $errors=$null; [System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path $file), [ref]$tokens, [ref]$errors) | Out-Null; if($errors.Count -gt 0){$errors | Format-List; exit 1}}
+python tools\validate_full_scene_shader_pipeline_v3_plan.py
+cmd.exe /d /c "call ""C:\Program Files\Microsoft Visual Studio\18\Community\Common7\Tools\VsDevCmd.bat"" -arch=x64 -host_arch=x64 >nul && set ""CORTEX_SKIP_ASSET_SYNC=1"" && ""C:\Program Files\Ninja\ninja.exe"" -C build CortexEngine -j 8"
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_lighting_v3_shadow_motion_focus_packet.ps1 -NoBuild -OutputRoot build\captures\v3_lighting_shadow_light_sweep_focus_20260607 -StabilityMotionMode light_sweep -SmokeFrames 18 -CaptureFrame 9 -CaptureSequenceCount 2 -MotionFrames 72 -MotionLookAmplitude 0.035 -MotionForwardAmplitude 0.45 -MotionLiftAmplitude 0.28 -MotionLookCycles 2.0
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_scene_local_cinematic_renderer_v1_contract_tests.ps1
+```
+
+Evidence:
+
+- Focused light-sweep packet:
+  `build\captures\v3_lighting_shadow_light_sweep_focus_20260607`.
+- Packet wrapper passed end to end.
+- Motion analyzer:
+  `11` view sequences, `0` warnings, `0` failures.
+- Attribution analyzer:
+  `1` family, `0` warnings, `0` failures.
+- Key motion rows:
+  - `v3_shadow_visibility.delta=0.01310343`, `1.000x` legacy,
+    `31.476x` beauty.
+  - `v3_shadow_loss.delta=0.00762285`, `0.957x` legacy,
+    `18.311x` beauty.
+  - `v3_shadow_source_attribution.delta=0.00207217`, `4.978x` beauty.
+- Attribution row:
+  - family `stress_rt_showcase_reflection_closeup`
+  - sun loss `0.621078`
+  - local loss `0.007351`
+  - source active `0.777158`
+  - shadow-loss active `0.998522`
+  - visibility occlusion `1.000000`
+  - shadow-map enabled `1.000000`
+  - energy active `1.000000`
+
+Current next work after this checkpoint:
+
+1. Promote light-sweep from focused gallery evidence into a bounded
+   cross-family matrix row once model-scene capture/report separation is less
+   flaky.
+2. Add cascade/slice/RT-mask attribution only if source-specific instability
+   remains visible in the new light-sweep packet family.
+3. Continue `ReflectionV3` provider resolver hardening.
 
 Authoritative plan:
 
@@ -268,8 +333,7 @@ Current candidate-only state:
 - `material_missing_channel_mask` is now required by contract, included in
   frame evidence as `VB_MaterialMissingChannelMask`, and quantified by the V3
   material analyzer.
-- Focused shadow-motion packets exist; high-contrast light-sweep coverage is
-  still missing.
+- Focused shadow-motion and high-contrast light-sweep packets exist.
 
 Current refactor queue:
 

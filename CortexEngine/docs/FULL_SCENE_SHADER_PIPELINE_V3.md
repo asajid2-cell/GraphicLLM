@@ -2038,3 +2038,48 @@ Current limitation:
 - This is a focused mouse-jitter proof. The next LightingShadowV3 step is a
   scripted high-contrast light-sweep row and, if needed, cascade/slice/RT-mask
   attribution.
+
+### LightingShadowV3 Light-Sweep Stress Row - 2026-06-07
+
+Implemented:
+
+- Added `CORTEX_LIGHT_SWEEP` runtime automation plus sweep controls for frame
+  count, cycles, yaw amplitude, elevation amplitude, and intensity amplitude.
+- The sweep updates real renderer sun direction/intensity in
+  `Engine::Update()`, then the normal shadow map and LightingV3 paths consume
+  that state.
+- Added `light_sweep` to:
+  - `tools/run_scene_local_cinematic_renderer_v1_packets.ps1`
+  - `tools/run_lighting_v3_shadow_motion_focus_packet.ps1`
+  - `tools/run_full_scene_shader_pipeline_v3_lighting_motion_matrix.ps1`
+- Contract tests and the V3 static validator cover the new mode.
+
+Validation:
+
+```powershell
+python -m py_compile tools\analyze_full_scene_shader_v3_shadow_attribution.py tools\analyze_full_scene_shader_v3_lighting_motion.py tools\validate_full_scene_shader_pipeline_v3_plan.py
+python tools\validate_full_scene_shader_pipeline_v3_plan.py
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_lighting_v3_shadow_motion_focus_packet.ps1 -NoBuild -OutputRoot build\captures\v3_lighting_shadow_light_sweep_focus_20260607 -StabilityMotionMode light_sweep -SmokeFrames 18 -CaptureFrame 9 -CaptureSequenceCount 2 -MotionFrames 72 -MotionLookAmplitude 0.035 -MotionForwardAmplitude 0.45 -MotionLiftAmplitude 0.28 -MotionLookCycles 2.0
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_scene_local_cinematic_renderer_v1_contract_tests.ps1
+```
+
+Evidence:
+
+- Packet:
+  `build/captures/v3_lighting_shadow_light_sweep_focus_20260607`.
+- Motion analyzer: `11` view sequences, `0` warnings, `0` failures.
+- Shadow-attribution analyzer: `1` family, `0` warnings, `0` failures.
+- `v3_shadow_visibility.delta=0.01310343`, `1.000x` legacy,
+  `31.476x` beauty.
+- `v3_shadow_loss.delta=0.00762285`, `0.957x` legacy,
+  `18.311x` beauty.
+- `v3_shadow_source_attribution.delta=0.00207217`, `4.978x` beauty.
+- Attribution row for `stress_rt_showcase_reflection_closeup`:
+  sun loss `0.621078`, local loss `0.007351`, source active `0.777158`,
+  shadow-loss active `0.998522`, visibility occlusion `1.000000`,
+  shadow-map enabled `1.000000`, energy active `1.000000`.
+
+Current limitation:
+
+- This is still focused stress evidence. Promotion-grade LightingShadowV3
+  evidence needs the same `light_sweep` row in a bounded cross-family matrix.

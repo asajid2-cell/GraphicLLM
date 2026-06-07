@@ -36,6 +36,8 @@
         "scene_local_environment",
         "hdr_scene_color",
         "candidate_hdr_scene_color",
+        "energy_clamp_policy",
+        "overbright_diagnostics",
         "ldr_cinematic_output",
         "candidate_ldr_cinematic_output"
       ],

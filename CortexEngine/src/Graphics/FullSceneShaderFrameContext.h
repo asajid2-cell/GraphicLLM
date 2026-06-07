@@ -1259,6 +1259,8 @@ struct FullSceneShaderPipelineV3FrameContext {
         "scene_local_environment",
         "hdr_scene_color",
         "candidate_hdr_scene_color",
+        "energy_clamp_policy",
+        "overbright_diagnostics",
         "ldr_cinematic_output",
         "candidate_ldr_cinematic_output",
     };
@@ -1862,6 +1864,12 @@ inline FullSceneShaderPipelineV3FrameContext BuildFullSceneShaderPipelineV3Frame
     const bool candidateHdrSceneColorReady =
         FullSceneShaderHasResource(contract, "candidate_hdr_scene_color") &&
         FullSceneShaderPassWritesResource(contract, "FullSceneCompositeV3", "candidate_hdr_scene_color");
+    const bool candidateEnergyClampPolicyReady =
+        FullSceneShaderHasResource(contract, "energy_clamp_policy") &&
+        FullSceneShaderPassWritesResource(contract, "FullSceneCompositeV3", "energy_clamp_policy");
+    const bool candidateOverbrightDiagnosticsReady =
+        FullSceneShaderHasResource(contract, "overbright_diagnostics") &&
+        FullSceneShaderPassWritesResource(contract, "FullSceneCompositeV3", "overbright_diagnostics");
     const bool compositeReadsV3Inputs =
         FullSceneShaderPassReadsResource(contract, "FullSceneCompositeV3", "direct_lighting") &&
         FullSceneShaderPassReadsResource(contract, "FullSceneCompositeV3", "indirect_lighting") &&
@@ -1869,7 +1877,11 @@ inline FullSceneShaderPipelineV3FrameContext BuildFullSceneShaderPipelineV3Frame
         FullSceneShaderPassReadsResource(contract, "FullSceneCompositeV3", "hdr_color") &&
         FullSceneShaderPassReadsResource(contract, "FullSceneCompositeV3", "reflection_radiance") &&
         FullSceneShaderPassReadsResource(contract, "FullSceneCompositeV3", "reflection_confidence");
-    const bool realCompositeV3ProducerReady = candidateHdrSceneColorReady && compositeReadsV3Inputs;
+    const bool realCompositeV3ProducerReady =
+        candidateHdrSceneColorReady &&
+        candidateEnergyClampPolicyReady &&
+        candidateOverbrightDiagnosticsReady &&
+        compositeReadsV3Inputs;
     context.hdrSceneColorReady = candidateHdrSceneColorReady || legacyHdrSceneColorReady;
     context.compositeInputsReady =
         materialResolveReady &&
@@ -1877,12 +1889,14 @@ inline FullSceneShaderPipelineV3FrameContext BuildFullSceneShaderPipelineV3Frame
         context.sceneLocalEnvironmentReady &&
         context.reflectionV3Ready;
     context.compositeEnergyPolicyReady =
-        contract.cinematicPost.exposurePolicyActive &&
-        FullSceneShaderKnownContractString(contract.sceneVisual.exposurePolicyId) &&
-        (contract.cinematicPost.hdrShoulderStrength > 0.0f ||
-         contract.cinematicPost.postWhiteCompression > 0.0f ||
-         contract.cinematicPost.highlightProtection > 0.0f);
+        realCompositeV3ProducerReady ||
+        (contract.cinematicPost.exposurePolicyActive &&
+         FullSceneShaderKnownContractString(contract.sceneVisual.exposurePolicyId) &&
+         (contract.cinematicPost.hdrShoulderStrength > 0.0f ||
+          contract.cinematicPost.postWhiteCompression > 0.0f ||
+          contract.cinematicPost.highlightProtection > 0.0f));
     context.compositeOverbrightDiagnosticsReady =
+        realCompositeV3ProducerReady ||
         contract.materials.materialPostExposureProtected > 0 ||
         contract.materials.materialPostBloomEmitter > 0 ||
         contract.cinematicPost.bloomPlanned;
@@ -1917,6 +1931,8 @@ inline FullSceneShaderPipelineV3FrameContext BuildFullSceneShaderPipelineV3Frame
             : "planned";
     compositeDomain.backingResources = {
         realCompositeV3ProducerReady ? "candidate_hdr_scene_color" : "hdr_color",
+        realCompositeV3ProducerReady ? "energy_clamp_policy" : "energy_clamp_policy_adapter",
+        realCompositeV3ProducerReady ? "overbright_diagnostics" : "overbright_diagnostics_adapter",
         "hdr_color",
         "reflection_radiance",
         "material_attributes",
@@ -1929,6 +1945,8 @@ inline FullSceneShaderPipelineV3FrameContext BuildFullSceneShaderPipelineV3Frame
         "hdr_scene_color",
         "energy_clamp_mask",
         "overbright_mask",
+        "energy_clamp_policy",
+        "overbright_diagnostics",
     };
     compositeDomain.channels = {
         realCompositeV3ProducerReady
@@ -1936,8 +1954,12 @@ inline FullSceneShaderPipelineV3FrameContext BuildFullSceneShaderPipelineV3Frame
             : (context.hdrSceneColorReady ? "hdr_scene_color_owned" : "hdr_scene_color_missing"),
         compositeReadsV3Inputs ? "v3_lighting_and_reflection_inputs_read" : "v3_lighting_and_reflection_inputs_missing",
         context.compositeInputsReady ? "composite_inputs_owned" : "composite_inputs_missing",
-        context.compositeEnergyPolicyReady ? "energy_clamp_policy_owned" : "energy_clamp_policy_missing",
-        context.compositeOverbrightDiagnosticsReady ? "overbright_diagnostics_owned" : "overbright_diagnostics_missing",
+        candidateEnergyClampPolicyReady
+            ? "energy_clamp_policy_owned_by_full_scene_composite_v3"
+            : (context.compositeEnergyPolicyReady ? "energy_clamp_policy_owned" : "energy_clamp_policy_missing"),
+        candidateOverbrightDiagnosticsReady
+            ? "overbright_diagnostics_owned_by_full_scene_composite_v3"
+            : (context.compositeOverbrightDiagnosticsReady ? "overbright_diagnostics_owned" : "overbright_diagnostics_missing"),
     };
     compositeDomain.backingResourceCount = readyCompositeChannels;
     compositeDomain.requiredChannelCount = 4u;

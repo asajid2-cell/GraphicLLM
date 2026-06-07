@@ -401,6 +401,14 @@ void Renderer::UpdateFrameContractSnapshot(Scene::ECS_Registry* registry,
                 m_mainTargets.compositeV3.resources.hdrSceneColor.Get(),
                 contract.renderWidth,
                 contract.renderHeight);
+    addResource("energy_clamp_policy",
+                m_mainTargets.compositeV3.resources.energyClampPolicy.Get(),
+                contract.renderWidth,
+                contract.renderHeight);
+    addResource("overbright_diagnostics",
+                m_mainTargets.compositeV3.resources.overbrightDiagnostics.Get(),
+                contract.renderWidth,
+                contract.renderHeight);
     addResource("candidate_ldr_cinematic_output",
                 m_mainTargets.candidateBeautyV3.resources.ldrOutput.Get(),
                 contract.renderWidth,

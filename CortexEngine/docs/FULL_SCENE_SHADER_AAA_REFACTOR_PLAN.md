@@ -2080,3 +2080,214 @@ Next:
 - Add explicit candidate HDR energy/overbright diagnostics.
 - Reduce or report legacy `hdr_color` rescue usage so CompositeV3 becomes less
   adapter-like and more self-owned.
+
+## 2026-06-07 Full Scene Shader Refactor Before Goal Feature Completion
+
+This is the plan boundary before completing the goal feature. The target is not
+one more reflection patch or a nicer IBL preset. The target is a full scene
+shader architecture that can produce high-end real-time visuals because every
+major term in the final image is owned, inspectable, stable under motion, and
+admitted through a promotion gate.
+
+### Outcome
+
+Build an opt-in `FullSceneCandidateBeautyV3` path with this invariant:
+
+```text
+candidate pixel =
+  material payload
+  + scene-local environment
+  + direct lighting
+  + shadow visibility
+  + indirect/emissive lighting
+  + source-aware reflections
+  + transparent/media terms
+  + HDR energy policy
+  + cinematic post
+```
+
+No part of that equation is allowed to be an anonymous legacy rescue unless it
+is explicitly named, measured, shown in debug views, and treated as debt.
+
+### Why This Refactor Is Needed
+
+The current renderer can produce useful isolated signals, but the final image
+is still partly assembled through adapters and legacy fallback paths. That makes
+it too easy to hide the real problem:
+
+- IBL blur can hide reflection instability without fixing source selection.
+- Post effects can hide bad material ranges or flat lighting.
+- Legacy HDR rescue can make candidate beauty look acceptable while V3 domains
+  are incomplete.
+- A single scene packet can pass while kitchen, gym, concert, glass, water, or
+  metallic stress cases still fail under motion.
+
+The refactor must therefore turn renderer quality into a set of contracts:
+resource ownership, visual diagnostics, motion stability, cross-family proof,
+and promotion decisions.
+
+### Refactor Layers
+
+Layer 1: frame contract and render graph ownership.
+
+- Define the canonical V3 resource names in the JSON contract and C++ frame
+  context.
+- Every V3 producer writes a named render target or buffer.
+- Every V3 consumer records its read edges.
+- Runtime frame reports must say which producer owned each resource, whether it
+  executed, and whether any legacy rescue was used.
+- Candidate promotion fails if any required resource is missing, stale, blank,
+  or silently substituted.
+
+Layer 2: material payload.
+
+- Consolidate PBR channels into a concrete payload consumed by lighting,
+  reflection, composite, transparency, and post.
+- Required channels: base color, world normal, roughness, metallic, specular,
+  AO, emissive, opacity, transmission, clearcoat, sheen, anisotropy, IOR,
+  thickness, material class, surface class, missing-channel mask, and fallback
+  policy.
+- Texture/provider missing cases must be visible as payload debt instead of
+  hidden material defaults.
+- Categorical material IDs/classes must use point or pixel-exact reads.
+
+Layer 3: scene-local environment.
+
+- Split visible background, diffuse irradiance, specular prefilter, reflection
+  background, local probe rig, atmosphere, and environment ownership mask.
+- Enclosed scenes must not visibly show or sharply reflect unrelated external
+  IBLs.
+- Reflection/background blur is an artistic parameter, not a bug fix.
+- Old-office IBL remains a stress case for reflection stability.
+
+Layer 4: lighting and shadows.
+
+- Lighting V3 owns direct light, unshadowed direct light, shadow visibility,
+  shadow loss, indirect diffuse, emissive indirect, and energy-budget views.
+- Shadow maps, contact shadows, RT shadows, and any screen-space shadow terms
+  need separate debug views and stability gates.
+- Locked exposure packets are required before auto exposure can be trusted.
+- The refactor should support semantic rigs for interiors, gyms, concert halls,
+  red rooms, stadiums, streets, and exterior water/vegetation.
+
+Layer 5: reflection source fusion.
+
+- ReflectionV3 chooses between local probes, SSR, RT/ray query, planar/hero
+  probes, and scene-local environment fallback with source IDs and confidence.
+- The resolver must expose rejected-source masks, temporal delta, source
+  suppression, source signal per provider, history validity, and history
+  rejection.
+- Smooth and metallic surfaces are the primary stress tests; they must not
+  jitter or pop under mouse movement.
+- Remaining current blocker: `reflection_history_v3_validity` and
+  `reflection_history_v3_rejection` still move too much in forced-SSR mouse
+  jitter packets.
+
+Layer 6: transparency, water, glass, decals, and media.
+
+- Transparent and layered materials cannot be squeezed through the opaque
+  reflection path.
+- Glass, water, decals, transparent accumulation, volumetric inscatter, and
+  volumetric transmittance need owned resources and debug modes.
+- Water/glass material gates must read the owning pass payload, not only the
+  opaque G-buffer center sample.
+
+Layer 7: HDR composite.
+
+- `FullSceneCompositeV3` assembles candidate HDR from owned V3 terms.
+- Legacy `hdr_color` can remain only as a named comparison/rescue lane with
+  measured usage.
+- Composite diagnostics must include overbright, underlit, invalid energy,
+  reflection contribution, indirect contribution, legacy rescue, and final HDR
+  before post.
+
+Layer 8: cinematic post.
+
+- Start with locked/manual exposure, then bounded auto exposure.
+- Bloom/glare must be sourced from real HDR/emissive masks.
+- Tone mapping, color grading, sharpening, optional DOF, and final LDR output
+  must have bypass/debug views.
+- Post is not allowed to hide upstream instability; packet gates compare raw
+  HDR, post bypass, and final LDR.
+
+Layer 9: proof harness.
+
+- Full packets are too large for rapid iteration on the current disk budget.
+  Add focused packet runners for reflection, shadows, material payload, and
+  post so individual instability can be reproduced without 300 MB captures.
+- Full packets still remain the promotion gate.
+- Required motion modes: static, mouse jitter, camera sweep, close-surface
+  orbit, reflective-object orbit, and high-contrast light sweep.
+- Required families: gallery, kitchen, office, gym, classroom, concert,
+  red room, stadium, bathroom, bedroom, workshop, store, street, and exterior
+  water/vegetation.
+
+### Implementation Sequence
+
+1. Contract freeze and candidate shell.
+   - Update contract/resource schema around the final V3 resource list.
+   - Ensure candidate HDR/LDR, domain diagnostics, and promotion decisions can
+     fail honestly when resources are missing.
+
+2. Focused diagnostic harness.
+   - Add small reflection/shadow/material/post packet runners.
+   - Keep full packets for promotion only.
+   - This avoids disk failures and makes root-cause debugging faster.
+
+3. Reflection history stability.
+   - Fix the remaining forced-SSR mouse-jitter warnings in
+     `reflection_history_v3_validity` and `reflection_history_v3_rejection`.
+   - Add history source-ID hysteresis and explicit disocclusion/source-switch
+     counters before increasing reflection influence.
+
+4. Material payload hardening.
+   - Replace aggregate/ad hoc material reads with a named payload boundary.
+   - Make missing texture channels, fallback presets, and material class
+     disagreements fail the material gate.
+
+5. Scene-local environment split.
+   - Create texture-backed indoor/local diffuse and specular environment
+     resources.
+   - Keep visible background independent from reflection and lighting inputs.
+
+6. Lighting/shadow rebuild.
+   - Make shadow and indirect terms first-class resources.
+   - Add stable contact/soft shadow gates before tuning final mood.
+
+7. Reflection provider expansion.
+   - Add RT/ray-query and optional planar/hero probe source signals behind the
+     same resolver contract.
+   - The resolver admits providers by confidence and stability, not by global
+     toggles.
+
+8. Transparency/media integration.
+   - Add water, glass, decals, and volumetric resources before composite.
+   - Validate with closeups and motion rows.
+
+9. Real CompositeV3 and CinematicPostV3.
+   - Remove or sharply reduce legacy HDR rescue.
+   - Build post from real candidate HDR and measured emissive/highlight masks.
+
+10. Cross-family promotion matrix.
+    - Run focused packets for root causes, then full V3 packets for release
+      promotion.
+    - Promotion requires metrics, contact sheets, frame reports, and a human
+      review packet. Do not declare the goal solved from one screenshot.
+
+### First Concrete Slice
+
+The first implementation slice after this plan should be harness-first:
+
+```text
+focused reflection motion packet
+  -> forced SSR / old-office IBL / smooth-metal closeup
+  -> only reflection and beauty debug views
+  -> history validity/rejection report
+  -> small contact sheet
+  -> no default scene or IBL workaround
+```
+
+This directly attacks the remaining smooth/metal jitter issue and also creates
+the pattern for focused shadow, material, and post packets. Once the focused
+harness can reproduce the issue cheaply, the shader fix can be validated
+without filling the disk or conflating it with unrelated scene quality.

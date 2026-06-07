@@ -18,12 +18,15 @@ $root = Split-Path -Parent $PSScriptRoot
 $v2Packet = Join-Path $root "tools/run_full_scene_shader_pipeline_v2_packet.ps1"
 $v3Analyzer = Join-Path $root "tools/analyze_full_scene_shader_v3_placeholders.py"
 $v3LightingMotionAnalyzer = Join-Path $root "tools/analyze_full_scene_shader_v3_lighting_motion.py"
+$v3CompositeDiagnosticsAnalyzer = Join-Path $root "tools/analyze_full_scene_shader_v3_composite_diagnostics.py"
 $v3PromotionDecision = Join-Path $root "tools/build_full_scene_shader_v3_promotion_decision.py"
 $outputPath = Join-Path $root $OutputRoot
 $signalOutput = Join-Path $outputPath "v3_signal.json"
 $stabilityOutput = Join-Path $outputPath "v3_stability.json"
 $lightingMotionOutput = Join-Path $outputPath "v3_lighting_motion.json"
 $lightingMotionMarkdown = Join-Path $outputPath "v3_lighting_motion.md"
+$compositeDiagnosticsOutput = Join-Path $outputPath "v3_composite_diagnostics.json"
+$compositeDiagnosticsMarkdown = Join-Path $outputPath "v3_composite_diagnostics.md"
 $promotionDecisionOutput = Join-Path $outputPath "promotion_decision.json"
 $promotionDecisionMarkdown = Join-Path $outputPath "promotion_decision.md"
 $previousFullSceneLightingV3 = $env:CORTEX_ENABLE_FULL_SCENE_LIGHTING_V3_SPLIT
@@ -75,6 +78,12 @@ try {
         }
     }
 
+    $manifestPath = Join-Path $outputPath "manifest.json"
+    & python $v3CompositeDiagnosticsAnalyzer --manifest $manifestPath --output-json $compositeDiagnosticsOutput --output-md $compositeDiagnosticsMarkdown
+    if ($LASTEXITCODE -ne 0) {
+        exit $LASTEXITCODE
+    }
+
     & python $v3PromotionDecision --packet-root $outputPath --output-json $promotionDecisionOutput --output-md $promotionDecisionMarkdown --allow-subset-review
     if ($LASTEXITCODE -ne 0) {
         exit $LASTEXITCODE
@@ -93,4 +102,5 @@ Write-Host "stability=$stabilityOutput"
 if ($CaptureSequenceCount -ge 2) {
     Write-Host "lighting_motion=$lightingMotionOutput"
 }
+Write-Host "composite_diagnostics=$compositeDiagnosticsOutput"
 Write-Host "promotion_decision=$promotionDecisionOutput"

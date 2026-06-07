@@ -3,6 +3,53 @@
 This is the living handoff for the AAA asset-quality goal.
 Read this after compaction before continuing.
 
+## 2026-06-07 Full Refactor Plan Before Goal Feature
+
+User direction:
+
+- Move to full-scene shaders capable of high-end Unreal-style visuals.
+- Plan the entire renderer refactor before implementing the goal feature.
+- Do not count stronger post, blurrier IBL, disabled features, or scene swaps
+  as correctness.
+
+Controlling plan update:
+
+- Updated `docs\FULL_SCENE_SHADER_AAA_REFACTOR_PLAN.md` with
+  `2026-06-07 Full Refactor Plan Before Goal Feature`.
+- Treat this new section as the current implementation guide.
+- Current diagnosis:
+  - V3 pieces exist, but too much candidate graph assembly still lives in
+    `src\Graphics\Renderer_RenderGraphEndFrame.cpp`.
+  - `FullSceneLightingV3` is instrumented and split, but still partly
+    adapter-owned by the visibility-buffer deferred path.
+  - `SceneLocalEnvironmentV3` has payload aliases and real SRV binding, but
+    still needs per-family baked local irradiance/specular/background
+    resources.
+  - `ReflectionV3` has source ids, confidence, history, and rejection views,
+    but still needs stronger SSR/local/hero/planar/RT/environment provider
+    fusion.
+  - `CompositeV3` and `CinematicPostV3` are narrow-path candidate-ready, but
+    cross-family HDR ownership and low legacy rescue remain required.
+- Refactor principle:
+  `policy -> typed producer -> named resources -> shader contribution -> debug
+  view -> frame report -> analyzer -> packet matrix -> promotion decision`.
+- Target module boundaries:
+  `SceneProfileV3`, `VisibilityV3`, `MaterialPayloadV3`,
+  `SceneLocalEnvironmentV3`, `LightingShadowV3`, `ReflectionV3`,
+  `TransparencyMediaV3`, `CompositeV3`, `CinematicPostV3`, and `PromotionV3`.
+- Immediate next coding slice should be structural:
+  1. Extract `SceneLocalEnvironmentV3`, `FullSceneReflectionV3`,
+     `FullSceneReflectionHistoryV3`, `FullSceneCompositeV3`, and candidate
+     display helper code out of `Renderer_RenderGraphEndFrame.cpp`.
+  2. Preserve current packet behavior exactly.
+  3. Add a validator rule that non-trivial V3 pass helpers live outside
+     end-frame assembly.
+  4. Update this handoff with the ownership boundary and evidence.
+
+Do not start by tuning beauty. The next implementation pass should make the
+renderer tractable enough that environment, lighting, reflection, composite,
+and post can be improved with source attribution and packet evidence.
+
 ## 2026-06-07 Promotion/Matrix Candidate Predicate Summary Checkpoint
 
 Latest pushed work before this section:

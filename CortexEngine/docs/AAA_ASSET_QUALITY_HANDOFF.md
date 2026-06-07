@@ -13,6 +13,36 @@ User direction:
 - Do not use IBL blur, disabled features, post strength, or scene swaps as
   correctness proof.
 
+Latest planning checkpoint:
+
+- Added `2026-06-07 Whole-Renderer Refactor Blueprint` near the top of
+  `docs\FULL_SCENE_SHADER_AAA_REFACTOR_PLAN.md`.
+- Treat that section as the highest-level plan before continuing feature work.
+  It reframes the goal as a whole candidate renderer, not a single reflection,
+  IBL, material, or post-processing fix.
+- The target visual path is still opt-in `FullSceneShaderV3`, with default
+  beauty unchanged until promotion evidence and user review pass.
+- Required refactor layers:
+  `SceneProfileV3`, `RenderGraphV3`, `VisibilityV3`,
+  `MaterialPayloadV3`, `SceneLocalEnvironmentV3`, `LightingShadowV3`,
+  `ReflectionV3`, `TransparencyMediaV3`, `CompositeV3`,
+  `CinematicPostV3`, and `PromotionV3`.
+- The new blueprint defines ownership rules:
+  scene profile owns environment permissions, material payload owns PBR channel
+  synthesis, lighting owns shadow/source attribution, reflection owns provider
+  selection, composite owns HDR contribution balance, and post owns presentation
+  only.
+- The recommended next coding slice is foundation work, not visual polishing:
+  finish the current `SceneLocalEnvironmentV3` runtime filtered-proxy reporting
+  slice, add `RenderGraphV3` pass/resource inventory to frame reports, add a
+  static ownership validator for V3 shader/debug/report/analyzer links, add
+  candidate-path debt fields, then run one focused packet and one cross-family
+  report-only packet.
+- Completion boundary remains strict: no completion until `FullSceneShaderV3`
+  can own candidate HDR, explain all major visible terms through debug/report
+  evidence, pass cross-family and motion packets, and satisfy user beauty
+  review.
+
 Current planning checkpoint:
 
 - Latest implementation moved `SceneLocalEnvironmentV3` proxy generation from

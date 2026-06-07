@@ -7540,3 +7540,65 @@ Current limitation:
 - Disk was full during this pass; older reproducible V3 capture folders under
   `build/captures` were removed after verifying their paths were inside the
   repo capture directory.
+
+### ReflectionV3 Resolver Continuous Forced-Availability Diagnostics - 2026-06-07
+
+Implemented:
+
+- `FullSceneReflectionResolverV3.hlsl` now reports forced-source
+  unavailability as continuous availability debt instead of a hard binary
+  `rawActive <= 0` flip.
+- Forced SSR no longer zeroes `reflection_rejected_source_mask.g` just because
+  SSR was selected; the diagnostic now carries continuous SSR availability
+  debt in forced-SSR mode.
+
+Why:
+
+- The remaining resolver warnings came from the same hard forced-SSR
+  availability channel:
+  - `reflection_rejected_source_mask.g`.
+  - `reflection_temporal_delta.g`.
+- Both channels had RGB-G motion delta `0.082185` under mouse jitter. That was
+  not a source-quality signal; it was a binary diagnostic threshold popping as
+  SSR availability crossed a tiny epsilon.
+
+Validation:
+
+```powershell
+Copy-Item -LiteralPath assets\shaders\FullSceneReflectionResolverV3.hlsl -Destination build\bin\assets\shaders\FullSceneReflectionResolverV3.hlsl -Force
+$env:CORTEX_V3_REFLECTION_SOURCE_OVERRIDE='ssr'
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_full_scene_shader_pipeline_v3_packet.ps1 -NoBuild -SkipSceneAnalyzers -StressSceneOnly -StressSceneFilter rt_showcase:reflection_closeup -SmokeFrames 24 -CaptureFrame 12 -CaptureSequenceCount 2 -StabilityMotionMode mouse_jitter -OutputRoot build\captures\v3_reflection_resolver_continuous_forced_availability_mouse_jitter_20260607
+```
+
+Evidence:
+
+- baseline packet:
+  `build/captures/v3_reflection_history_confidence_validity_mouse_jitter_20260607`.
+- after packet:
+  `build/captures/v3_reflection_resolver_continuous_forced_availability_mouse_jitter_20260607`.
+- after packet status:
+  - V3 placeholder packet passed.
+  - material payload passed.
+  - CompositeV3 diagnostics passed.
+  - promotion decision `review_packet_passed`.
+- motion comparison:
+  - `reflection_rejected_source_mask`: `0.060360 -> 0.014533`;
+    status warning -> ok.
+  - `reflection_temporal_delta`: `0.068744 -> 0.022837`;
+    status warning -> ok.
+  - `reflection_ssr_source_signal`: remains ok at `0.021202`.
+  - `reflection_source_suppression`: remains ok at `0.014887`.
+  - remaining reflection warnings are now only
+    `reflection_history_v3_validity` and `reflection_history_v3_rejection`.
+- per-channel resolver diagnostic deltas:
+  - `reflection_rejected_source_mask`: RGB
+    `[0.010351, 0.082185, 0.004616] -> [0.010351, 0.018025, 0.004616]`.
+  - `reflection_temporal_delta`: RGB
+    `[0.047651, 0.082185, 0.0] -> [0.047651, 0.018025, 0.0]`.
+
+Current limitation:
+
+- Resolver-side rejected-source and temporal-delta warnings are cleared for
+  forced-SSR mouse jitter, but history validity/rejection still warn.
+- The remaining instability is in history/reprojection confidence, not forced
+  source availability.

@@ -13,6 +13,33 @@ User direction:
 - Do not use IBL blur, disabled features, post strength, or scene swaps as
   correctness proof.
 
+Current planning checkpoint:
+
+- Added the authoritative
+  `2026-06-07 Full Scene Shader Refactor Blueprint` section to
+  `docs\FULL_SCENE_SHADER_AAA_REFACTOR_PLAN.md`.
+- The blueprint reframes the work as a candidate V3 renderer where every
+  visible term follows this chain:
+  `scene profile -> typed resource producer -> shader contribution -> debug
+  view -> frame-report field -> analyzer gate -> promotion packet`.
+- The refactor order is:
+  1. contract/promotion reconciliation
+  2. material payload and missing-channel debt
+  3. consumed `SceneProfileV3` policy
+  4. resource-backed `SceneLocalEnvironmentV3`
+  5. multi-profile environment payloads
+  6. high-contrast `LightingShadowV3` attribution
+  7. `ReflectionV3` provider resolver and history hardening
+  8. `TransparencyMediaV3`
+  9. V3-only `CompositeV3` HDR assembly
+  10. `CinematicPostV3`
+  11. cross-family promotion matrix and human review
+- The next implementation slice remains true resource binding for
+  `SceneLocalEnvironmentV3`: bind local payload/proxy SRVs, report table
+  binding/resource count/source/fallback reason, then prove it with the
+  old-office/gallery stress case with IBL enabled and sharp enough to expose
+  bad reflections.
+
 Authoritative plan:
 
 - `docs\FULL_SCENE_SHADER_AAA_REFACTOR_PLAN.md`

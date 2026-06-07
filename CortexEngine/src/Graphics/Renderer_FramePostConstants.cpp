@@ -211,6 +211,45 @@ glm::vec4 Renderer::BuildCinematicExposureParams() const {
                      glm::clamp(postWhiteCompression, 0.0f, 0.70f));
 }
 
+glm::vec4 Renderer::BuildSceneLocalEnvironmentV3ProfileParams() const {
+    if (!m_sceneVisualContract.active) {
+        return glm::vec4(0.0f);
+    }
+
+    const std::string& family = m_sceneVisualContract.family;
+    const std::string& profile = m_sceneVisualContract.profileId;
+    const std::string& rig = m_sceneVisualContract.lightRigId;
+
+    float profileMode = 0.0f; // neutral / lab
+    float localBackgroundStrength = 0.20f;
+
+    if (family.find("gallery") != std::string::npos ||
+        profile.find("gallery") != std::string::npos) {
+        profileMode = 1.0f;
+        localBackgroundStrength = m_sceneVisualContract.visibleExternalHDRIAllowed ? 0.35f : 0.75f;
+    } else if (family.find("concert") != std::string::npos ||
+               family.find("stage") != std::string::npos ||
+               family.find("red_room") != std::string::npos ||
+               profile.find("concert") != std::string::npos ||
+               profile.find("red_room") != std::string::npos ||
+               rig.find("stage") != std::string::npos ||
+               rig.find("concert") != std::string::npos) {
+        profileMode = 3.0f;
+        localBackgroundStrength = 1.0f;
+    } else if (m_sceneVisualContract.enclosedScene) {
+        profileMode = 2.0f;
+        localBackgroundStrength = m_sceneVisualContract.visibleExternalHDRIAllowed ? 0.55f : 1.0f;
+    } else {
+        profileMode = 4.0f;
+        localBackgroundStrength = 0.05f;
+    }
+
+    return glm::vec4(profileMode,
+                     glm::clamp(localBackgroundStrength, 0.0f, 1.0f),
+                     0.0f,
+                     0.0f);
+}
+
 void Renderer::PopulateFrameDebugAndPostConstants(FrameConstants& frameData,
                                                  Scene::ECS_Registry* registry,
                                                  const FrameConstantCameraState& cameraState) {
@@ -429,11 +468,12 @@ void Renderer::PopulateFrameDebugAndPostConstants(FrameConstants& frameData,
         glm::radians(m_environmentState.rotationDegrees),
         m_rtDenoiseState.giStrength,
         m_rtDenoiseState.giRayDistance);
+    const glm::vec4 sceneLocalEnvironmentProfile = BuildSceneLocalEnvironmentV3ProfileParams();
     frameData.cinematicDofParams = glm::vec4(
         m_postProcessState.dofFocusDistance,
         m_postProcessState.dofAperture,
-        0.0f,
-        0.0f);
+        sceneLocalEnvironmentProfile.x,
+        sceneLocalEnvironmentProfile.y);
     frameData.cinematicStabilityParams = BuildCinematicStabilityParams();
     frameData.cinematicLookParams = BuildCinematicLookParams();
     frameData.cinematicExposureParams = BuildCinematicExposureParams();

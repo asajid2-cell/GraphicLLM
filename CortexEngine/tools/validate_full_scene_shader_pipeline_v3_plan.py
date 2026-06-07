@@ -11,12 +11,14 @@ PLAN_PATH = ROOT / "docs" / "FULL_SCENE_SHADER_PIPELINE_V3.md"
 CONTRACT_PATH = ROOT / "assets" / "final_art" / "full_scene_shader_pipeline_v3_contract.json"
 FRAME_CONTRACT_JSON_SOURCE_PATH = ROOT / "src" / "Graphics" / "FrameContractJson.cpp"
 FULL_SCENE_SHADER_FRAME_CONTEXT_PATH = ROOT / "src" / "Graphics" / "FullSceneShaderFrameContext.h"
+RENDERER_FRAME_POST_CONSTANTS_PATH = ROOT / "src" / "Graphics" / "Renderer_FramePostConstants.cpp"
 V3_PLACEHOLDER_ANALYZER_PATH = ROOT / "tools" / "analyze_full_scene_shader_v3_placeholders.py"
 V3_PACKET_RUNNER_PATH = ROOT / "tools" / "run_full_scene_shader_pipeline_v3_packet.ps1"
 V3_PROMOTION_DECISION_PATH = ROOT / "tools" / "build_full_scene_shader_v3_promotion_decision.py"
 V3_MATERIAL_PAYLOAD_ANALYZER_PATH = ROOT / "tools" / "analyze_full_scene_shader_v3_material_payload.py"
 V3_SCENE_PROFILE_ANALYZER_PATH = ROOT / "tools" / "analyze_full_scene_shader_v3_scene_profile.py"
 V3_ENVIRONMENT_PAYLOAD_ANALYZER_PATH = ROOT / "tools" / "analyze_full_scene_shader_v3_environment_payload.py"
+SCENE_LOCAL_ENVIRONMENT_V3_SHADER_PATH = ROOT / "assets" / "shaders" / "SceneLocalEnvironmentV3.hlsl"
 
 
 REQUIRED_PLAN_TOKENS = [
@@ -121,6 +123,11 @@ def main() -> int:
         f"Missing full scene shader frame context: {FULL_SCENE_SHADER_FRAME_CONTEXT_PATH}",
     )
     require(
+        RENDERER_FRAME_POST_CONSTANTS_PATH.exists(),
+        errors,
+        f"Missing renderer frame post constants source: {RENDERER_FRAME_POST_CONSTANTS_PATH}",
+    )
+    require(
         V3_PLACEHOLDER_ANALYZER_PATH.exists(),
         errors,
         f"Missing V3 placeholder analyzer: {V3_PLACEHOLDER_ANALYZER_PATH}",
@@ -150,6 +157,11 @@ def main() -> int:
         errors,
         f"Missing V3 environment payload analyzer: {V3_ENVIRONMENT_PAYLOAD_ANALYZER_PATH}",
     )
+    require(
+        SCENE_LOCAL_ENVIRONMENT_V3_SHADER_PATH.exists(),
+        errors,
+        f"Missing SceneLocalEnvironmentV3 shader: {SCENE_LOCAL_ENVIRONMENT_V3_SHADER_PATH}",
+    )
     if errors:
         for error in errors:
             print(f"ERROR: {error}")
@@ -159,22 +171,26 @@ def main() -> int:
     contract = json.loads(CONTRACT_PATH.read_text(encoding="utf-8"))
     frame_contract_source = FRAME_CONTRACT_JSON_SOURCE_PATH.read_text(encoding="utf-8")
     frame_context_source = FULL_SCENE_SHADER_FRAME_CONTEXT_PATH.read_text(encoding="utf-8")
+    frame_post_constants_source = RENDERER_FRAME_POST_CONSTANTS_PATH.read_text(encoding="utf-8")
     analyzer_source = V3_PLACEHOLDER_ANALYZER_PATH.read_text(encoding="utf-8")
     packet_source = V3_PACKET_RUNNER_PATH.read_text(encoding="utf-8")
     promotion_source = V3_PROMOTION_DECISION_PATH.read_text(encoding="utf-8")
     material_payload_source = V3_MATERIAL_PAYLOAD_ANALYZER_PATH.read_text(encoding="utf-8")
     scene_profile_source = V3_SCENE_PROFILE_ANALYZER_PATH.read_text(encoding="utf-8")
     environment_payload_source = V3_ENVIRONMENT_PAYLOAD_ANALYZER_PATH.read_text(encoding="utf-8")
+    scene_local_environment_v3_shader = SCENE_LOCAL_ENVIRONMENT_V3_SHADER_PATH.read_text(encoding="utf-8")
     runtime_surface = "\n".join(
         [
             frame_contract_source,
             frame_context_source,
+            frame_post_constants_source,
             analyzer_source,
             packet_source,
             promotion_source,
             material_payload_source,
             scene_profile_source,
             environment_payload_source,
+            scene_local_environment_v3_shader,
         ]
     )
 
@@ -385,6 +401,8 @@ def main() -> int:
         "scene_profile_policy_contract",
         "scene_profile_enclosure_mode",
         "scene_profile_reflection_policy",
+        "scene_local_shader_profile",
+        "scene_local_background_strength",
     ]:
         require(
             channel in environment_policy_channels,
@@ -493,6 +511,15 @@ def main() -> int:
         '"scene_local_environment_profile_policy"',
         "sceneLocalEnvironmentProfileReflectionPolicy",
         '"scene_local_environment_profile_reflection_policy"',
+        "sceneLocalEnvironmentShaderProfile",
+        '"scene_local_environment_shader_profile"',
+        "sceneLocalEnvironmentShaderProfileMode",
+        '"scene_local_environment_shader_profile_mode"',
+        "sceneLocalEnvironmentLocalBackgroundStrength",
+        '"scene_local_environment_local_background_strength"',
+        "BuildSceneLocalEnvironmentV3ProfileParams",
+        "g_CinematicDofParams.z",
+        "g_CinematicDofParams.w",
         "sceneLocalTexturePayloadReady",
         '"scene_local_texture_payload_ready"',
         "sceneLocalTexturePayloadCount",

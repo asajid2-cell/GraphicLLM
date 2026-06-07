@@ -9148,3 +9148,83 @@ Current next work:
    kitchen both write useful reports but fail capture runs.
 3. Feed payload readiness into actual `SceneLocalEnvironmentV3.hlsl`
    color/radiance selection once enough families have texture payloads.
+
+### SceneLocalEnvironmentV3 Shader Profile Resource Selection - 2026-06-07
+
+Implemented:
+
+- Added a compact SceneLocalEnvironmentV3 shader-profile lane produced by
+  `Renderer::BuildSceneLocalEnvironmentV3ProfileParams()`.
+  - mode `0`: neutral/lab
+  - mode `1`: gallery
+  - mode `2`: enclosed room
+  - mode `3`: stage/concert/red room
+  - mode `4`: open exterior
+- Reused `FrameConstants::cinematicDofParams.zw` as owned environment lanes:
+  `.z` carries profile mode and `.w` carries local-background ownership
+  strength. `.x/.y` remain DOF focus/aperture.
+- `SceneLocalEnvironmentV3.hlsl` now consumes those lanes to select local
+  visible-background, ambient, reflection-background, and atmosphere palettes.
+  Enclosed/stage profiles gain stronger local ownership, while authorized
+  gallery/exterior profiles can still admit external HDRI influence.
+- Frame reports now expose:
+  - `scene_local_shader_profile`
+  - `scene_local_shader_profile_mode`
+  - `scene_local_background_strength`
+  - V3 aliases
+    `scene_local_environment_shader_profile`,
+    `scene_local_environment_shader_profile_mode`, and
+    `scene_local_environment_local_background_strength`
+- Environment readiness now requires `15` channels, adding shader-profile and
+  local-background-strength readiness on top of policy consumption and texture
+  payload reporting.
+- The V3 contract, placeholder analyzer, environment-payload analyzer, and plan
+  validator now require and verify the shader-profile lanes. The validator also
+  includes `Renderer_FramePostConstants.cpp` in the runtime surface so it checks
+  the C++ producer, not only JSON/HLSL consumers.
+
+Validation:
+
+```powershell
+python -m py_compile tools\analyze_full_scene_shader_v3_environment_payload.py tools\analyze_full_scene_shader_v3_placeholders.py tools\validate_full_scene_shader_pipeline_v3_plan.py tools\analyze_full_scene_shader_v3_scene_profile.py
+python tools\validate_full_scene_shader_pipeline_v3_plan.py
+git -c submodule.recurse=false diff --check -- src\Graphics\Renderer.h src\Graphics\Renderer_FramePostConstants.cpp src\Graphics\FrameContract.h src\Graphics\Renderer_FrameContractSnapshot.cpp src\Graphics\FrameContractJson.cpp src\Graphics\FullSceneShaderFrameContext.h src\Graphics\ShaderTypes.h assets\shaders\SceneLocalEnvironmentV3.hlsl assets\final_art\full_scene_shader_pipeline_v3_contract.json tools\analyze_full_scene_shader_v3_environment_payload.py tools\analyze_full_scene_shader_v3_placeholders.py tools\validate_full_scene_shader_pipeline_v3_plan.py
+cmd.exe /d /c "call ""C:\Program Files\Microsoft Visual Studio\18\Community\Common7\Tools\VsDevCmd.bat"" -arch=x64 -host_arch=x64 >nul && set ""CORTEX_SKIP_ASSET_SYNC=1"" && ""C:\Program Files\Ninja\ninja.exe"" -C build CortexEngine -j 8"
+Copy-Item -LiteralPath assets\final_art\full_scene_shader_pipeline_v3_contract.json -Destination build\bin\assets\final_art\full_scene_shader_pipeline_v3_contract.json -Force
+$env:CORTEX_V3_REFLECTION_SOURCE_OVERRIDE='ssr'
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_full_scene_shader_pipeline_v3_packet.ps1 -NoBuild -SkipSceneAnalyzers -StressSceneOnly -StressSceneFilter rt_showcase:reflection_closeup -SmokeFrames 16 -CaptureFrame 8 -CaptureSequenceCount 1 -StabilityMotionMode static -OutputRoot build\captures\v3_scene_local_environment_shader_profile_stress_20260607
+Remove-Item Env:\CORTEX_V3_REFLECTION_SOURCE_OVERRIDE -ErrorAction SilentlyContinue
+```
+
+Evidence:
+
+- Plan validator passed with `10` domains and `29` required outputs.
+- Native target rebuilt successfully. The known trailing `vswhere.exe` warning
+  printed after successful link.
+- Focused packet:
+  `build\captures\v3_scene_local_environment_shader_profile_stress_20260607`.
+  - scene-local packet passed.
+  - V2 evidence passed.
+  - V3 placeholder packet passed with `54` reports.
+  - scene profile, environment payload, material payload, CompositeV3
+    diagnostics, and promotion decision passed.
+  - promotion status: `review_packet_passed`; default beauty remains
+    non-promotable because matrix coverage is incomplete.
+- Environment payload proof:
+  - `report_count=54`
+  - `profile_policy_consumed_report_count=54`
+  - `failures=0`
+  - first row: shader profile `gallery_neutral`, mode `1.0`,
+    local-background strength `0.35`
+  - payload-ready count remained `0`, expected until an
+    `rt_showcase_gallery` scene-local texture set exists.
+
+Current next work:
+
+1. Add/import scene-local texture sets for `rt_showcase_gallery` and the first
+   promotion families, then drive richer irradiance/specular/background
+   selection from actual payload readiness instead of profile palettes alone.
+2. Add a small cross-profile packet proving profile modes differ across at
+   least gallery, enclosed room, stage/red room, and exterior.
+3. Continue toward LightingShadowV3 source split and ReflectionV3 resolver
+   hardening before any strong CinematicPostV3 tuning.

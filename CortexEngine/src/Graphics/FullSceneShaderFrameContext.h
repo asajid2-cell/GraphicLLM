@@ -1240,6 +1240,9 @@ struct FullSceneShaderPipelineV3FrameContext {
     std::string sceneLocalEnvironmentProfileEnclosureMode = "unknown";
     std::string sceneLocalEnvironmentProfilePolicy = "unknown";
     std::string sceneLocalEnvironmentProfileReflectionPolicy = "unknown";
+    std::string sceneLocalEnvironmentShaderProfile = "unknown";
+    float sceneLocalEnvironmentShaderProfileMode = 0.0f;
+    float sceneLocalEnvironmentLocalBackgroundStrength = 0.0f;
     bool sceneLocalTexturePayloadReady = false;
     uint32_t sceneLocalTexturePayloadCount = 0;
     std::string sceneLocalTextureSetId = "none";
@@ -1837,6 +1840,12 @@ inline FullSceneShaderPipelineV3FrameContext BuildFullSceneShaderPipelineV3Frame
         context.sceneProfilePolicyEnvironment == environmentPolicy &&
         context.sceneProfilePolicyEnclosureMode == environmentMode &&
         FullSceneShaderKnownContractString(context.sceneProfilePolicyReflection);
+    const bool environmentShaderProfileReady =
+        FullSceneShaderKnownContractString(contract.environment.sceneLocalShaderProfile) &&
+        contract.environment.sceneLocalShaderProfileMode >= 0.0f &&
+        contract.environment.sceneLocalShaderProfileMode <= 4.0f &&
+        contract.environment.sceneLocalBackgroundStrength >= 0.0f &&
+        contract.environment.sceneLocalBackgroundStrength <= 1.0f;
     uint32_t readyEnvironmentResources = 0;
     readyEnvironmentResources += FullSceneShaderHasResource(contract, "scene_local_environment") ? 1u : 0u;
     readyEnvironmentResources += FullSceneShaderHasResource(contract, "ambient_lighting") ? 1u : 0u;
@@ -1851,10 +1860,11 @@ inline FullSceneShaderPipelineV3FrameContext BuildFullSceneShaderPipelineV3Frame
     readyEnvironmentChannels += atmosphereReady ? 1u : 0u;
     readyEnvironmentChannels += environmentPolicyReady ? 5u : 0u;
     readyEnvironmentChannels += environmentConsumesSceneProfilePolicy ? 3u : 0u;
+    readyEnvironmentChannels += environmentShaderProfileReady ? 2u : 0u;
     context.sceneLocalEnvironmentReady =
         environmentOwnerKnown &&
         environmentProducerReady &&
-        readyEnvironmentChannels == 13u;
+        readyEnvironmentChannels == 15u;
     context.sceneLocalEnvironmentChannelCount = readyEnvironmentChannels;
     context.sceneLocalEnvironmentMode = environmentMode;
     context.sceneLocalEnvironmentPolicy = environmentPolicy;
@@ -1872,6 +1882,9 @@ inline FullSceneShaderPipelineV3FrameContext BuildFullSceneShaderPipelineV3Frame
     context.sceneLocalEnvironmentProfileEnclosureMode = context.sceneProfilePolicyEnclosureMode;
     context.sceneLocalEnvironmentProfilePolicy = context.sceneProfilePolicyEnvironment;
     context.sceneLocalEnvironmentProfileReflectionPolicy = context.sceneProfilePolicyReflection;
+    context.sceneLocalEnvironmentShaderProfile = contract.environment.sceneLocalShaderProfile;
+    context.sceneLocalEnvironmentShaderProfileMode = contract.environment.sceneLocalShaderProfileMode;
+    context.sceneLocalEnvironmentLocalBackgroundStrength = contract.environment.sceneLocalBackgroundStrength;
     context.sceneLocalTexturePayloadReady = contract.environment.sceneLocalPayloadReady;
     context.sceneLocalTexturePayloadCount = contract.environment.sceneLocalTextureCount;
     context.sceneLocalTextureSetId = contract.environment.sceneLocalTextureSetId;
@@ -1921,12 +1934,16 @@ inline FullSceneShaderPipelineV3FrameContext BuildFullSceneShaderPipelineV3Frame
                                               : "scene_profile_policy_not_consumed",
         context.sceneLocalEnvironmentProfileEnclosureMode,
         context.sceneLocalEnvironmentProfileReflectionPolicy,
+        context.sceneLocalEnvironmentShaderProfile,
+        environmentShaderProfileReady ? "scene_local_shader_profile_ready"
+                                      : "scene_local_shader_profile_missing",
+        "scene_local_background_strength",
         contract.environment.sceneLocalPayloadReady ? "scene_local_texture_payload_ready"
                                                     : "scene_local_texture_payload_not_ready",
     };
     environmentDomain.backingResourceCount =
         readyEnvironmentResources + (environmentConsumesSceneProfilePolicy ? 1u : 0u);
-    environmentDomain.requiredChannelCount = 13u;
+    environmentDomain.requiredChannelCount = 15u;
     environmentDomain.readyChannelCount = readyEnvironmentChannels;
     environmentDomain.missingRequiredChannelCount =
         environmentDomain.requiredChannelCount - environmentDomain.readyChannelCount;

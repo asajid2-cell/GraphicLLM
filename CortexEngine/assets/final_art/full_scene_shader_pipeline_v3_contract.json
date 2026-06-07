@@ -304,7 +304,9 @@
         "atmosphere_source",
         "scene_profile_policy_contract",
         "scene_profile_enclosure_mode",
-        "scene_profile_reflection_policy"
+        "scene_profile_reflection_policy",
+        "scene_local_shader_profile",
+        "scene_local_background_strength"
       ],
       "payload_channels": [
         "scene_local_texture_set_id",

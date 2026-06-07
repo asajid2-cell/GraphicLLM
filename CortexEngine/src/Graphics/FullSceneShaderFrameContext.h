@@ -1257,6 +1257,10 @@ struct FullSceneShaderPipelineV3FrameContext {
         "reflection_history_v3_validity",
         "reflection_history_v3_rejection",
         "scene_local_environment",
+        "ambient_lighting",
+        "visible_background",
+        "reflection_background",
+        "atmosphere",
         "hdr_scene_color",
         "candidate_hdr_scene_color",
         "energy_clamp_policy",
@@ -1528,6 +1532,23 @@ inline FullSceneShaderPipelineV3FrameContext BuildFullSceneShaderPipelineV3Frame
         contract.sceneVisual.active &&
         environmentOwnerKnown &&
         FullSceneShaderKnownContractString(contract.sceneVisual.exposurePolicyId);
+    const bool environmentProducerReady =
+        FullSceneShaderHasResource(contract, "scene_local_environment") &&
+        FullSceneShaderHasResource(contract, "ambient_lighting") &&
+        FullSceneShaderHasResource(contract, "visible_background") &&
+        FullSceneShaderHasResource(contract, "reflection_background") &&
+        FullSceneShaderHasResource(contract, "atmosphere") &&
+        FullSceneShaderPassWritesResource(contract, "SceneLocalEnvironmentV3", "scene_local_environment") &&
+        FullSceneShaderPassWritesResource(contract, "SceneLocalEnvironmentV3", "ambient_lighting") &&
+        FullSceneShaderPassWritesResource(contract, "SceneLocalEnvironmentV3", "visible_background") &&
+        FullSceneShaderPassWritesResource(contract, "SceneLocalEnvironmentV3", "reflection_background") &&
+        FullSceneShaderPassWritesResource(contract, "SceneLocalEnvironmentV3", "atmosphere");
+    uint32_t readyEnvironmentResources = 0;
+    readyEnvironmentResources += FullSceneShaderHasResource(contract, "scene_local_environment") ? 1u : 0u;
+    readyEnvironmentResources += FullSceneShaderHasResource(contract, "ambient_lighting") ? 1u : 0u;
+    readyEnvironmentResources += FullSceneShaderHasResource(contract, "visible_background") ? 1u : 0u;
+    readyEnvironmentResources += FullSceneShaderHasResource(contract, "reflection_background") ? 1u : 0u;
+    readyEnvironmentResources += FullSceneShaderHasResource(contract, "atmosphere") ? 1u : 0u;
     uint32_t readyEnvironmentChannels = 0;
     readyEnvironmentChannels += environmentModeReady ? 1u : 0u;
     readyEnvironmentChannels += ambientLightingReady ? 1u : 0u;
@@ -1536,6 +1557,7 @@ inline FullSceneShaderPipelineV3FrameContext BuildFullSceneShaderPipelineV3Frame
     readyEnvironmentChannels += atmosphereReady ? 1u : 0u;
     context.sceneLocalEnvironmentReady =
         environmentOwnerKnown &&
+        environmentProducerReady &&
         readyEnvironmentChannels == 5u;
     context.sceneLocalEnvironmentChannelCount = readyEnvironmentChannels;
     context.sceneLocalEnvironmentMode = environmentMode;
@@ -1547,18 +1569,18 @@ inline FullSceneShaderPipelineV3FrameContext BuildFullSceneShaderPipelineV3Frame
             "scene_local_environment",
             "environment_mode",
             context.sceneLocalEnvironmentReady
-                ? "SceneLocalEnvironmentV3 is backed by scene visual, ambient, visible-background, reflection-background, and atmosphere ownership contracts"
-                : "SceneLocalEnvironmentV3 is missing one or more scene-local environment ownership channels");
+                ? "SceneLocalEnvironmentV3 writes scene-local environment, ambient, visible-background, reflection-background, and atmosphere resources"
+                : "SceneLocalEnvironmentV3 is missing producer writes or one or more scene-local environment ownership channels");
     environmentDomain.enabled = contract.sceneVisual.active;
     environmentDomain.ready = context.sceneLocalEnvironmentReady;
     environmentDomain.promotionState =
         context.sceneLocalEnvironmentReady ? "instrumented" : "planned";
     environmentDomain.backingResources = {
-        "scene_visual_contract",
-        "environment_state",
-        "scene_lighting_balance_policy",
-        "local_reflection_probe_rig",
-        "scene_post_exposure_policy",
+        "scene_local_environment",
+        "ambient_lighting",
+        "visible_background",
+        "reflection_background",
+        "atmosphere",
     };
     environmentDomain.debugViews = {
         "environment_mode",
@@ -1574,7 +1596,7 @@ inline FullSceneShaderPipelineV3FrameContext BuildFullSceneShaderPipelineV3Frame
         reflectionBackgroundReady ? "reflection_background_owned" : "reflection_background_missing",
         atmosphereReady ? "atmosphere_owned" : "atmosphere_missing",
     };
-    environmentDomain.backingResourceCount = readyEnvironmentChannels;
+    environmentDomain.backingResourceCount = readyEnvironmentResources;
     environmentDomain.requiredChannelCount = 5u;
     environmentDomain.readyChannelCount = readyEnvironmentChannels;
     environmentDomain.missingRequiredChannelCount =
@@ -1877,7 +1899,8 @@ inline FullSceneShaderPipelineV3FrameContext BuildFullSceneShaderPipelineV3Frame
         FullSceneShaderPassReadsResource(contract, "FullSceneCompositeV3", "hdr_color") &&
         FullSceneShaderPassReadsResource(contract, "FullSceneCompositeV3", "reflection_radiance") &&
         FullSceneShaderPassReadsResource(contract, "FullSceneCompositeV3", "reflection_confidence") &&
-        FullSceneShaderPassReadsResource(contract, "FullSceneCompositeV3", "vb_gbuffer_albedo");
+        FullSceneShaderPassReadsResource(contract, "FullSceneCompositeV3", "vb_gbuffer_albedo") &&
+        FullSceneShaderPassReadsResource(contract, "FullSceneCompositeV3", "scene_local_environment");
     const bool realCompositeV3ProducerReady =
         candidateHdrSceneColorReady &&
         candidateEnergyClampPolicyReady &&

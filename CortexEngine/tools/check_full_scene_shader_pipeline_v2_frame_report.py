@@ -560,7 +560,7 @@ def validate_runtime_material_policy_surface() -> list[str]:
     require_source_token(
         errors,
         renderer_debug_source,
-        "constexpr uint32_t kMaxDebugViewMode = 81u",
+        "constexpr uint32_t kMaxDebugViewMode = 87u",
         "Renderer debug mode range",
     )
     for token in [
@@ -679,7 +679,7 @@ def validate_runtime_lighting_surface() -> list[str]:
         require_source_token(errors, deferred_lighting_constants, token, "Deferred lighting semantic payload upload")
 
     for token in [
-        "constexpr uint32_t kMaxDebugViewMode = 81u",
+        "constexpr uint32_t kMaxDebugViewMode = 87u",
         "VB_DeferredDirectLightUnshadowed",
         "VB_DeferredDirectLightShadowLoss",
     ]:

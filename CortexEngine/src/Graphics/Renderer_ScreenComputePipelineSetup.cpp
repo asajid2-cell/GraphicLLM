@@ -29,6 +29,27 @@ Result<void> Renderer::CreateScreenSpacePipelineStates(const RendererCompiledSha
         return Result<void>::Err("Failed to create post-process pipeline: " + postPipelineResult.Error());
     }
 
+    if (shaders.sceneLocalEnvironmentV3PS) {
+        m_pipelineState.sceneLocalEnvironmentV3 = std::make_unique<DX12Pipeline>();
+
+        PipelineDesc environmentV3Desc = postDesc;
+        environmentV3Desc.pixelShader = *shaders.sceneLocalEnvironmentV3PS;
+        environmentV3Desc.rtvFormat = DXGI_FORMAT_R16G16B16A16_FLOAT;
+        environmentV3Desc.numRenderTargets = 5;
+
+        auto environmentV3PipelineResult = m_pipelineState.sceneLocalEnvironmentV3->Initialize(
+            m_services.device->GetDevice(),
+            m_pipelineState.rootSignature->GetRootSignature(),
+            environmentV3Desc);
+        if (environmentV3PipelineResult.IsErr()) {
+            spdlog::warn("Failed to create SceneLocalEnvironmentV3 pipeline: {}",
+                         environmentV3PipelineResult.Error());
+            m_pipelineState.sceneLocalEnvironmentV3.reset();
+        } else {
+            spdlog::info("SceneLocalEnvironmentV3 pipeline created successfully.");
+        }
+    }
+
     if (shaders.fullSceneCompositeV3PS) {
         m_pipelineState.fullSceneCompositeV3 = std::make_unique<DX12Pipeline>();
 

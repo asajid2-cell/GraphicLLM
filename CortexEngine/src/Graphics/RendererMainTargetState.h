@@ -162,6 +162,60 @@ struct FullSceneCompositeV3TargetDescriptors {
     }
 };
 
+struct SceneLocalEnvironmentV3TargetResources {
+    ComPtr<ID3D12Resource> sceneLocalEnvironment;
+    ComPtr<ID3D12Resource> ambientLighting;
+    ComPtr<ID3D12Resource> visibleBackground;
+    ComPtr<ID3D12Resource> reflectionBackground;
+    ComPtr<ID3D12Resource> atmosphere;
+    D3D12_RESOURCE_STATES state = D3D12_RESOURCE_STATE_COMMON;
+    D3D12_RESOURCE_STATES sceneLocalEnvironmentState = D3D12_RESOURCE_STATE_COMMON;
+    D3D12_RESOURCE_STATES ambientLightingState = D3D12_RESOURCE_STATE_COMMON;
+    D3D12_RESOURCE_STATES visibleBackgroundState = D3D12_RESOURCE_STATE_COMMON;
+    D3D12_RESOURCE_STATES reflectionBackgroundState = D3D12_RESOURCE_STATE_COMMON;
+    D3D12_RESOURCE_STATES atmosphereState = D3D12_RESOURCE_STATE_COMMON;
+
+    void Reset() {
+        sceneLocalEnvironment.Reset();
+        ambientLighting.Reset();
+        visibleBackground.Reset();
+        reflectionBackground.Reset();
+        atmosphere.Reset();
+        state = D3D12_RESOURCE_STATE_COMMON;
+        sceneLocalEnvironmentState = D3D12_RESOURCE_STATE_COMMON;
+        ambientLightingState = D3D12_RESOURCE_STATE_COMMON;
+        visibleBackgroundState = D3D12_RESOURCE_STATE_COMMON;
+        reflectionBackgroundState = D3D12_RESOURCE_STATE_COMMON;
+        atmosphereState = D3D12_RESOURCE_STATE_COMMON;
+    }
+};
+
+struct SceneLocalEnvironmentV3TargetDescriptors {
+    DescriptorHandle sceneLocalEnvironmentRTV;
+    DescriptorHandle sceneLocalEnvironmentSRV;
+    DescriptorHandle ambientLightingRTV;
+    DescriptorHandle ambientLightingSRV;
+    DescriptorHandle visibleBackgroundRTV;
+    DescriptorHandle visibleBackgroundSRV;
+    DescriptorHandle reflectionBackgroundRTV;
+    DescriptorHandle reflectionBackgroundSRV;
+    DescriptorHandle atmosphereRTV;
+    DescriptorHandle atmosphereSRV;
+
+    void Reset() {
+        sceneLocalEnvironmentRTV = {};
+        sceneLocalEnvironmentSRV = {};
+        ambientLightingRTV = {};
+        ambientLightingSRV = {};
+        visibleBackgroundRTV = {};
+        visibleBackgroundSRV = {};
+        reflectionBackgroundRTV = {};
+        reflectionBackgroundSRV = {};
+        atmosphereRTV = {};
+        atmosphereSRV = {};
+    }
+};
+
 struct FullSceneReflectionV3TargetResources {
     ComPtr<ID3D12Resource> radiance;
     ComPtr<ID3D12Resource> confidence;
@@ -656,6 +710,133 @@ struct FullSceneCompositeV3TargetState {
     }
 };
 
+struct SceneLocalEnvironmentV3TargetState {
+    SceneLocalEnvironmentV3TargetResources resources;
+    SceneLocalEnvironmentV3TargetDescriptors descriptors;
+
+    [[nodiscard]] Result<void> CreateTargets(ID3D12Device* device,
+                                             DescriptorHeapManager* descriptorManager,
+                                             UINT width,
+                                             UINT height) {
+        if (!device || !descriptorManager || width == 0 || height == 0) {
+            return Result<void>::Err("Renderer not initialized for SceneLocalEnvironmentV3 target creation");
+        }
+
+        resources.Reset();
+
+        auto createTarget = [&](const char* label,
+                                ComPtr<ID3D12Resource>& target,
+                                DescriptorHandle& rtv,
+                                DescriptorHandle& srv) -> Result<void> {
+            D3D12_RESOURCE_DESC desc = {};
+            desc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+            desc.Width = width;
+            desc.Height = height;
+            desc.DepthOrArraySize = 1;
+            desc.MipLevels = 1;
+            desc.Format = DXGI_FORMAT_R16G16B16A16_FLOAT;
+            desc.SampleDesc.Count = 1;
+            desc.Flags = D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
+
+            D3D12_CLEAR_VALUE clearValue = {};
+            clearValue.Format = desc.Format;
+            clearValue.Color[0] = 0.0f;
+            clearValue.Color[1] = 0.0f;
+            clearValue.Color[2] = 0.0f;
+            clearValue.Color[3] = 1.0f;
+
+            const auto heapProps = MainTargetDefaultHeapProperties();
+            const HRESULT hr = device->CreateCommittedResource(
+                &heapProps,
+                D3D12_HEAP_FLAG_NONE,
+                &desc,
+                D3D12_RESOURCE_STATE_RENDER_TARGET,
+                &clearValue,
+                IID_PPV_ARGS(&target));
+            if (FAILED(hr)) {
+                resources.Reset();
+                return Result<void>::Err(std::string("Failed to create SceneLocalEnvironmentV3 target: ") + label);
+            }
+
+            if (!rtv.IsValid()) {
+                auto rtvResult = descriptorManager->AllocateRTV();
+                if (rtvResult.IsErr()) {
+                    return Result<void>::Err(std::string("Failed to allocate RTV for SceneLocalEnvironmentV3 target: ") +
+                                             label + ": " + rtvResult.Error());
+                }
+                rtv = rtvResult.Value();
+            }
+
+            D3D12_RENDER_TARGET_VIEW_DESC rtvDesc = {};
+            rtvDesc.Format = desc.Format;
+            rtvDesc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
+            device->CreateRenderTargetView(target.Get(), &rtvDesc, rtv.cpu);
+
+            if (!srv.IsValid()) {
+                auto srvResult = descriptorManager->AllocateStagingCBV_SRV_UAV();
+                if (srvResult.IsErr()) {
+                    return Result<void>::Err(std::string("Failed to allocate SRV for SceneLocalEnvironmentV3 target: ") +
+                                             label + ": " + srvResult.Error());
+                }
+                srv = srvResult.Value();
+            }
+
+            D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
+            srvDesc.Format = desc.Format;
+            srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+            srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+            srvDesc.Texture2D.MipLevels = 1;
+            device->CreateShaderResourceView(target.Get(), &srvDesc, srv.cpu);
+
+            return Result<void>::Ok();
+        };
+
+        auto sceneLocal = createTarget("scene_local_environment",
+                                       resources.sceneLocalEnvironment,
+                                       descriptors.sceneLocalEnvironmentRTV,
+                                       descriptors.sceneLocalEnvironmentSRV);
+        if (sceneLocal.IsErr()) return sceneLocal;
+
+        auto ambient = createTarget("ambient_lighting",
+                                    resources.ambientLighting,
+                                    descriptors.ambientLightingRTV,
+                                    descriptors.ambientLightingSRV);
+        if (ambient.IsErr()) return ambient;
+
+        auto visible = createTarget("visible_background",
+                                    resources.visibleBackground,
+                                    descriptors.visibleBackgroundRTV,
+                                    descriptors.visibleBackgroundSRV);
+        if (visible.IsErr()) return visible;
+
+        auto reflection = createTarget("reflection_background",
+                                       resources.reflectionBackground,
+                                       descriptors.reflectionBackgroundRTV,
+                                       descriptors.reflectionBackgroundSRV);
+        if (reflection.IsErr()) return reflection;
+
+        auto atmosphere = createTarget("atmosphere",
+                                       resources.atmosphere,
+                                       descriptors.atmosphereRTV,
+                                       descriptors.atmosphereSRV);
+        if (atmosphere.IsErr()) return atmosphere;
+
+        resources.state = D3D12_RESOURCE_STATE_RENDER_TARGET;
+        resources.sceneLocalEnvironmentState = D3D12_RESOURCE_STATE_RENDER_TARGET;
+        resources.ambientLightingState = D3D12_RESOURCE_STATE_RENDER_TARGET;
+        resources.visibleBackgroundState = D3D12_RESOURCE_STATE_RENDER_TARGET;
+        resources.reflectionBackgroundState = D3D12_RESOURCE_STATE_RENDER_TARGET;
+        resources.atmosphereState = D3D12_RESOURCE_STATE_RENDER_TARGET;
+
+        return Result<void>::Ok();
+    }
+
+    void Reset() {
+        resources.Reset();
+        descriptors.Reset();
+    }
+};
+
 struct FullSceneReflectionV3TargetState {
     FullSceneReflectionV3TargetResources resources;
     FullSceneReflectionV3TargetDescriptors descriptors;
@@ -963,6 +1144,7 @@ struct MainRenderTargetState {
     HDRRenderTargetState hdr;
     GBufferNormalRoughnessTargetState normalRoughness;
     FullSceneLightingV3TargetState lightingV3;
+    SceneLocalEnvironmentV3TargetState environmentV3;
     FullSceneReflectionV3TargetState reflectionV3;
     FullSceneCompositeV3TargetState compositeV3;
     FullSceneCandidateBeautyV3TargetState candidateBeautyV3;
@@ -977,6 +1159,10 @@ struct MainRenderTargetState {
 
     void ResetLightingV3() {
         lightingV3.Reset();
+    }
+
+    void ResetEnvironmentV3() {
+        environmentV3.Reset();
     }
 
     void ResetReflectionV3() {
@@ -995,6 +1181,7 @@ struct MainRenderTargetState {
         ResetHDR();
         ResetGBufferNormalRoughness();
         ResetLightingV3();
+        ResetEnvironmentV3();
         ResetReflectionV3();
         ResetCompositeV3();
         ResetCandidateBeautyV3();

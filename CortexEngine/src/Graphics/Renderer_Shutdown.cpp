@@ -92,6 +92,7 @@ void Renderer::Shutdown() {
     m_shadowResources.resources.map.Reset();
     m_mainTargets.hdr.resources.color.Reset();
     m_mainTargets.lightingV3.resources.Reset();
+    m_mainTargets.environmentV3.resources.Reset();
     m_mainTargets.reflectionV3.resources.Reset();
     m_mainTargets.compositeV3.resources.Reset();
     m_mainTargets.candidateBeautyV3.resources.Reset();

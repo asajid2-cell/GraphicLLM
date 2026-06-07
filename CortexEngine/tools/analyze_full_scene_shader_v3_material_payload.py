@@ -168,7 +168,6 @@ def check_material_stats(paths: list[Path]) -> tuple[list[dict[str, Any]], list[
     rows: list[dict[str, Any]] = []
     failures: list[str] = []
     warnings: list[str] = []
-    fallback_max: dict[str, int] = {}
 
     for path in paths:
         stats = material_stats_from_report(path)
@@ -182,6 +181,10 @@ def check_material_stats(paths: list[Path]) -> tuple[list[dict[str, Any]], list[
         scene_material_default = int(stats.get("scene_material_default", 0) or 0)
         validation_errors = int(stats.get("validation_errors", 0) or 0)
         validation_issues = int(stats.get("validation_issues", 0) or 0)
+        unresolved_default_roughness = int(stats.get("unresolved_default_roughness_fallback", 0) or 0)
+        unresolved_default_transmission = int(stats.get("unresolved_default_transmission_fallback", 0) or 0)
+        class_authored_roughness = int(stats.get("preset_class_authored_default_roughness", 0) or 0)
+        class_authored_transmission = int(stats.get("preset_class_authored_default_transmission", 0) or 0)
         roughness_out = int(stats.get("roughness_out_of_range", 0) or 0)
         metallic_out = int(stats.get("metallic_out_of_range", 0) or 0)
         avg_roughness = float(stats.get("avg_roughness", 0.0) or 0.0)
@@ -211,6 +214,12 @@ def check_material_stats(paths: list[Path]) -> tuple[list[dict[str, Any]], list[
         if scene_material_default > 0:
             failures.append(f"{path}: scene_material_default count {scene_material_default} is unresolved material debt")
             status = "failed"
+        if unresolved_default_roughness > 0 or unresolved_default_transmission > 0:
+            failures.append(
+                f"{path}: unresolved default roughness/transmission fallback nonzero "
+                f"({unresolved_default_roughness}/{unresolved_default_transmission})"
+            )
+            status = "failed"
         if sampled > 0 and preset_named / sampled < 0.80:
             failures.append(f"{path}: named material preset coverage below 80% ({preset_named}/{sampled})")
             status = "failed"
@@ -230,11 +239,6 @@ def check_material_stats(paths: list[Path]) -> tuple[list[dict[str, Any]], list[
             )
             status = "failed"
 
-        for key in ["preset_default_roughness", "preset_default_transmission"]:
-            value = int(stats.get(key, 0) or 0)
-            if value > 0:
-                fallback_max[key] = max(fallback_max.get(key, 0), value)
-
         rows.append(
             {
                 "report": str(path),
@@ -246,6 +250,10 @@ def check_material_stats(paths: list[Path]) -> tuple[list[dict[str, Any]], list[
                 "validation_issues": validation_issues,
                 "roughness_out_of_range": roughness_out,
                 "metallic_out_of_range": metallic_out,
+                "unresolved_default_roughness_fallback": unresolved_default_roughness,
+                "unresolved_default_transmission_fallback": unresolved_default_transmission,
+                "preset_class_authored_default_roughness": class_authored_roughness,
+                "preset_class_authored_default_transmission": class_authored_transmission,
                 "avg_roughness": avg_roughness,
                 "avg_metallic": avg_metallic,
                 "avg_albedo_luminance": avg_albedo,
@@ -253,9 +261,6 @@ def check_material_stats(paths: list[Path]) -> tuple[list[dict[str, Any]], list[
                 "advanced_feature_materials": int(stats.get("advanced_feature_materials", 0) or 0),
             }
         )
-
-    for key, value in sorted(fallback_max.items()):
-        warnings.append(f"{key} fallback count {value}")
 
     return rows, failures, warnings
 
@@ -299,6 +304,18 @@ def build_report(manifest_path: Path) -> dict[str, Any]:
         "named_materials_total": sum(int(row.get("preset_named", 0) or 0) for row in stat_rows),
         "advanced_feature_materials_total": sum(int(row.get("advanced_feature_materials", 0) or 0) for row in stat_rows),
         "reflection_eligible_total": sum(int(row.get("reflection_eligible", 0) or 0) for row in stat_rows),
+        "class_authored_default_roughness_total": sum(
+            int(row.get("preset_class_authored_default_roughness", 0) or 0) for row in stat_rows
+        ),
+        "class_authored_default_transmission_total": sum(
+            int(row.get("preset_class_authored_default_transmission", 0) or 0) for row in stat_rows
+        ),
+        "unresolved_default_roughness_fallback_total": sum(
+            int(row.get("unresolved_default_roughness_fallback", 0) or 0) for row in stat_rows
+        ),
+        "unresolved_default_transmission_fallback_total": sum(
+            int(row.get("unresolved_default_transmission_fallback", 0) or 0) for row in stat_rows
+        ),
     }
 
     return {
@@ -328,6 +345,10 @@ def write_markdown(report: dict[str, Any], path: Path) -> None:
         f"- named materials: {summary.get('named_materials_total', 0)}",
         f"- advanced feature materials: {summary.get('advanced_feature_materials_total', 0)}",
         f"- reflection eligible: {summary.get('reflection_eligible_total', 0)}",
+        f"- class-authored roughness defaults: {summary.get('class_authored_default_roughness_total', 0)}",
+        f"- class-authored transmission defaults: {summary.get('class_authored_default_transmission_total', 0)}",
+        f"- unresolved roughness fallback: {summary.get('unresolved_default_roughness_fallback_total', 0)}",
+        f"- unresolved transmission fallback: {summary.get('unresolved_default_transmission_fallback_total', 0)}",
         "",
         "| Family | View | Status | Mean Luma | Nonblack |",
         "|---|---|---|---:|---:|",

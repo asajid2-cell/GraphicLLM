@@ -1696,3 +1696,48 @@ Remaining limitation:
 - Current material debt is explicit:
   `preset_default_roughness fallback count 8` and
   `preset_default_transmission fallback count 5`.
+
+### Material Default Semantics Split - 2026-06-06
+
+Implemented:
+
+- Added frame-contract fields that distinguish authored material-class defaults
+  from unresolved fallback:
+  - `preset_class_authored_default_roughness`.
+  - `preset_class_authored_default_transmission`.
+  - `unresolved_default_roughness_fallback`.
+  - `unresolved_default_transmission_fallback`.
+- `RendererSceneSnapshot` now counts named material preset roughness and
+  transmission overrides as class-authored defaults.
+- `v3_material_payload` now fails on unresolved default roughness/transmission
+  fallback, but no longer warns on authored material preset values.
+- The V3 plan validator requires the new frame-contract fields.
+
+Evidence:
+
+- packet:
+  `build/captures/v3_material_class_authored_defaults_static_gallery_20260606`.
+- `v3_material_payload.json`:
+  - ready `true`.
+  - failures `0`.
+  - warnings `0`.
+  - sampled materials `2520`.
+  - named materials `2520`.
+  - advanced feature materials `1344`.
+  - reflection eligible `756`.
+  - class-authored roughness defaults `336`.
+  - class-authored transmission defaults `210`.
+  - unresolved roughness fallback `0`.
+  - unresolved transmission fallback `0`.
+- `promotion_decision.json`:
+  - status `review_packet_passed`.
+  - `default_beauty_promotable=false`.
+  - failures `0`.
+  - warnings `3`, all expected subset warnings.
+
+Remaining limitation:
+
+- This is semantics and evidence cleanup, not new material art.
+- The unresolved fallback counters are explicit and gateable, but true
+  provider-missing material cases still need cross-family exercise.
+- Rich texture-backed PBR resources remain the next material quality step.

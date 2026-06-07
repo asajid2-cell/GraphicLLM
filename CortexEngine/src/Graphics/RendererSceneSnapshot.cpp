@@ -268,10 +268,12 @@ RendererSceneSnapshot BuildRendererSceneSnapshot(Scene::ECS_Registry* registry,
             if (!materialModel.textures.roughness &&
                 std::abs(renderable.roughness - materialModel.roughness) > kDefaultEpsilon) {
                 ++snapshot.materials.presetDefaultRoughness;
+                ++snapshot.materials.presetClassAuthoredDefaultRoughness;
             }
             if (!materialModel.textures.transmission &&
                 std::abs(renderable.transmissionFactor - materialModel.transmissionFactor) > kDefaultEpsilon) {
                 ++snapshot.materials.presetDefaultTransmission;
+                ++snapshot.materials.presetClassAuthoredDefaultTransmission;
             }
             if (!materialModel.textures.emissive && resolvedEmissive &&
                 !hasEmissive) {

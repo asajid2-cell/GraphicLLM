@@ -7318,3 +7318,75 @@ Current limitation:
   `preset_default_transmission fallback count 5`.
   The next material-quality slice should reduce those fallback counts or attach
   authored/provider-backed values.
+
+### Material Class-Authored Defaults vs Unresolved Fallback - 2026-06-06
+
+Implemented:
+
+- Split material default counters into explicit semantics:
+  - `preset_class_authored_default_roughness`.
+  - `preset_class_authored_default_transmission`.
+  - `unresolved_default_roughness_fallback`.
+  - `unresolved_default_transmission_fallback`.
+- `RendererSceneSnapshot` now records named material preset roughness and
+  transmission overrides as class-authored material semantics.
+- `FrameContractJson` exports the new counters into every frame report.
+- `tools/analyze_full_scene_shader_v3_material_payload.py` now fails only on
+  unresolved roughness/transmission fallback, while reporting class-authored
+  defaults as material evidence.
+- `tools/validate_full_scene_shader_pipeline_v3_plan.py` now requires the new
+  frame-contract fields so future refactors cannot silently collapse the two
+  meanings again.
+
+Why:
+
+- The previous `preset_default_roughness` and `preset_default_transmission`
+  warnings were ambiguous. In the gallery packet, those counts came from named
+  material presets intentionally overriding raw component defaults, not from
+  missing material data.
+- Treating authored preset values as fallback debt made the material gate noisy
+  and hid the real future blocker: unresolved, provider-missing material scalar
+  values.
+
+Validation:
+
+```powershell
+python -m py_compile tools\analyze_full_scene_shader_v3_material_payload.py tools\validate_full_scene_shader_pipeline_v3_plan.py tools\build_full_scene_shader_v3_promotion_decision.py
+python -m json.tool assets\final_art\full_scene_shader_pipeline_v3_contract.json
+python tools\validate_full_scene_shader_pipeline_v3_plan.py
+cmd.exe /d /c "call ""C:\Program Files\Microsoft Visual Studio\18\Community\Common7\Tools\VsDevCmd.bat"" -arch=x64 -host_arch=x64 >nul && set ""CORTEX_SKIP_ASSET_SYNC=1"" && ""C:\Program Files\Ninja\ninja.exe"" -C build CortexEngine -j 8"
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_full_scene_shader_pipeline_v3_packet.ps1 -NoBuild -SkipSceneAnalyzers -NoStressScene -FamilyFilter gallery -SmokeFrames 10 -CaptureFrame 5 -CaptureSequenceCount 1 -StabilityMotionMode static -OutputRoot build\captures\v3_material_class_authored_defaults_static_gallery_20260606
+```
+
+Evidence:
+
+- packet:
+  `build/captures/v3_material_class_authored_defaults_static_gallery_20260606`.
+- `v3_material_payload.json`:
+  - ready `true`.
+  - failures `0`.
+  - warnings `0`.
+  - sampled materials total `2520`.
+  - named materials total `2520`.
+  - advanced feature materials total `1344`.
+  - reflection eligible total `756`.
+  - class-authored roughness defaults `336`.
+  - class-authored transmission defaults `210`.
+  - unresolved roughness fallback `0`.
+  - unresolved transmission fallback `0`.
+- `promotion_decision.json`:
+  - status `review_packet_passed`.
+  - `default_beauty_promotable=false`.
+  - failures `0`.
+  - warnings `3`, limited to expected subset coverage: missing non-gallery
+    families, missing motion modes, and sequence count below promotion
+    evidence.
+
+Current limitation:
+
+- This is still gallery/static material-contract evidence only.
+- Unresolved fallback attribution is now explicit, but the current gallery
+  packet does not exercise a true unresolved provider-missing material case.
+- The next AAA material slice should attach richer material resources and
+  texture-backed scalar maps, then run the same unresolved fallback gate across
+  the full family and motion matrix.

@@ -51,6 +51,8 @@ New-Item -ItemType Directory -Force -Path $outRootAbs | Out-Null
 $views = @(
     [pscustomobject]@{ Name = "beauty"; DebugView = $null },
     [pscustomobject]@{ Name = "candidate_beauty_v3"; DebugView = $null; CandidateBeautyV3 = $true },
+    [pscustomobject]@{ Name = "material_base_color"; DebugView = 35 },
+    [pscustomobject]@{ Name = "material_normal"; DebugView = 36 },
     [pscustomobject]@{ Name = "roughness"; DebugView = 2 },
     [pscustomobject]@{ Name = "metallic"; DebugView = 3 },
     [pscustomobject]@{ Name = "surface_class"; DebugView = 41 },

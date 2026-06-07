@@ -1924,3 +1924,69 @@ Current limitation:
 - The next renderer slice should move from this now-stable reflection history
   base into material payload hardening or the scene-local environment split,
   not default-beauty promotion.
+
+### Material Payload Contract Debug View Coverage - 2026-06-07
+
+Implemented:
+
+- `tools/run_scene_local_cinematic_renderer_v1_packets.ps1` now exposes
+  material packet aliases:
+  - `material_base_color` -> debug view `35` / VB G-buffer albedo.
+  - `material_normal` -> debug view `36` / VB G-buffer normal-roughness.
+- `tools/run_full_scene_shader_pipeline_v3_packet.ps1` now includes those two
+  aliases in the default V3 packet view set.
+- `tools/analyze_full_scene_shader_v3_material_payload.py` now requires
+  `material_base_color` and `material_normal` debug-view metrics.
+- The material analyzer now reads
+  `assets/final_art/full_scene_shader_pipeline_v3_contract.json` and reports
+  coverage for contract-required material debug views.
+- `tools/analyze_full_scene_shader_v3_placeholders.py` now treats debug modes
+  `35` and `36` as material-payload diagnostic scope, so material-only debug
+  views do not falsely require `FullSceneLightingV3` execution.
+- `assets/final_art/full_scene_shader_pipeline_v3_contract.json` now lists
+  `material_base_color` and `material_normal` in material
+  `packet_debug_views`.
+
+Why:
+
+- The V3 material contract already required base color, normal, roughness,
+  metallic, material class, and missing-channel-mask debug evidence.
+- The previous packet only gated roughness/metallic/class-policy views, so it
+  could pass while contract-required material debug coverage was incomplete.
+
+Validation:
+
+```powershell
+$env:CORTEX_V3_REFLECTION_SOURCE_OVERRIDE='ssr'
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_full_scene_shader_pipeline_v3_packet.ps1 -NoBuild -SkipSceneAnalyzers -StressSceneOnly -StressSceneFilter rt_showcase:reflection_closeup -SmokeFrames 24 -CaptureFrame 12 -CaptureSequenceCount 2 -StabilityMotionMode mouse_jitter -OutputRoot build\captures\v3_material_payload_contract_views_stress_20260607
+python tools\analyze_full_scene_shader_v3_placeholders.py --input build\captures\v3_material_payload_contract_views_stress_20260607 --signal-output build\captures\v3_material_payload_contract_views_stress_20260607\v3_signal.json --stability-output build\captures\v3_material_payload_contract_views_stress_20260607\v3_stability.json --require-lighting-split-ready --require-lighting-split-draw-count 1 --require-lighting-signal-metrics
+python tools\analyze_full_scene_shader_v3_material_payload.py --manifest build\captures\v3_material_payload_contract_views_stress_20260607\manifest.json --output-json build\captures\v3_material_payload_contract_views_stress_20260607\v3_material_payload.json --output-md build\captures\v3_material_payload_contract_views_stress_20260607\v3_material_payload.md
+python tools\build_full_scene_shader_v3_promotion_decision.py --packet-root build\captures\v3_material_payload_contract_views_stress_20260607 --output-json build\captures\v3_material_payload_contract_views_stress_20260607\promotion_decision.json --output-md build\captures\v3_material_payload_contract_views_stress_20260607\promotion_decision.md --allow-subset-review
+```
+
+Evidence:
+
+- packet:
+  `build/captures/v3_material_payload_contract_views_stress_20260607`.
+- V3 placeholder analyzer passed after material debug scope correction.
+- V3 lighting motion passed with `24` view sequences.
+- V3 material payload passed:
+  - `sampled materials`: `2640`.
+  - `named materials`: `2640`.
+  - `advanced feature materials`: `1408`.
+  - `unresolved roughness fallback`: `0`.
+  - `unresolved transmission fallback`: `0`.
+  - `contract required debug views`: `6`.
+  - `contract debug view debt`: `1`.
+  - `material_base_color`, `material_roughness`, `material_metallic`,
+    `material_normal`, and `material_class` are covered.
+  - `material_missing_channel_mask` remains missing packet/debug-view debt.
+- CompositeV3 diagnostics passed.
+- promotion decision: `review_packet_passed`; default beauty remains not
+  promotable because this is still a stress-only subset packet.
+
+Current limitation:
+
+- The missing-channel-mask resource/view is now explicit debt. The next
+  material payload slice should create a real missing-channel mask or a
+  stronger frame-contract equivalent instead of leaving it as a warning.

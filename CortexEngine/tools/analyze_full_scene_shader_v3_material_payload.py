@@ -10,6 +10,8 @@ from typing import Any
 
 
 REQUIRED_DEBUG_VIEWS = {
+    "material_base_color": {"min_nonblack_ratio": 0.05, "min_mean_luma": 0.01, "max_mean_luma": 0.98},
+    "material_normal": {"min_nonblack_ratio": 0.05, "min_mean_luma": 0.01, "max_mean_luma": 0.98},
     "roughness": {"min_nonblack_ratio": 0.05, "min_mean_luma": 0.01, "max_mean_luma": 0.98},
     "surface_class": {"min_nonblack_ratio": 0.01},
     "surface_policy": {"min_nonblack_ratio": 0.01},
@@ -23,6 +25,15 @@ REQUIRED_DEBUG_VIEWS = {
 
 OPTIONAL_DEBUG_VIEWS = {
     "metallic": {"warn_nonblack_below": 0.001},
+}
+
+CONTRACT_DEBUG_VIEW_ALIASES = {
+    "material_base_color": "material_base_color",
+    "material_roughness": "roughness",
+    "material_metallic": "metallic",
+    "material_normal": "material_normal",
+    "material_class": "surface_class",
+    "material_missing_channel_mask": "",
 }
 
 
@@ -64,6 +75,51 @@ def captured_families(manifest: dict[str, Any]) -> list[str]:
         if isinstance(row, dict) and row.get("family")
     }
     return sorted(families)
+
+
+def load_material_contract_debug_views() -> list[str]:
+    contract_path = Path(__file__).resolve().parents[1] / "assets/final_art/full_scene_shader_pipeline_v3_contract.json"
+    if not contract_path.exists():
+        return []
+    contract = load_json(contract_path)
+    domains = contract.get("domains")
+    if not isinstance(domains, dict):
+        return []
+    material = domains.get("material")
+    if not isinstance(material, dict):
+        return []
+    views = material.get("required_debug_views")
+    if not isinstance(views, list):
+        return []
+    return [str(view) for view in views if str(view)]
+
+
+def check_contract_debug_view_coverage(
+    *,
+    contract_views: list[str],
+    captured_views: set[str],
+) -> tuple[list[dict[str, Any]], list[str]]:
+    rows: list[dict[str, Any]] = []
+    warnings: list[str] = []
+    for contract_view in contract_views:
+        packet_view = CONTRACT_DEBUG_VIEW_ALIASES.get(contract_view, "")
+        status = "covered"
+        if not packet_view:
+            status = "missing_packet_alias"
+            warnings.append(f"contract material debug view '{contract_view}' has no packet/debug-view alias yet")
+        elif packet_view not in captured_views:
+            status = "not_captured"
+            warnings.append(
+                f"contract material debug view '{contract_view}' maps to '{packet_view}' but was not captured"
+            )
+        rows.append(
+            {
+                "contract_view": contract_view,
+                "packet_view": packet_view,
+                "status": status,
+            }
+        )
+    return rows, warnings
 
 
 def check_view_metrics(
@@ -287,18 +343,31 @@ def build_report(manifest_path: Path) -> dict[str, Any]:
     metrics = load_json(metrics_path)
     failures.extend(str(item) for item in metrics.get("failures", []))
     families = captured_families(manifest)
+    captured_views = {
+        str(row.get("view", ""))
+        for row in manifest.get("results", [])
+        if isinstance(row, dict) and row.get("view")
+    }
     rows_by_view = metrics_by_view(metrics)
     debug_rows, debug_failures, debug_warnings = check_view_metrics(families=families, rows_by_view=rows_by_view)
     stat_rows, stat_failures, stat_warnings = check_material_stats(report_paths(manifest))
+    contract_views = load_material_contract_debug_views()
+    contract_rows, contract_warnings = check_contract_debug_view_coverage(
+        contract_views=contract_views,
+        captured_views=captured_views,
+    )
     failures.extend(debug_failures)
     failures.extend(stat_failures)
     warnings.extend(debug_warnings)
     warnings.extend(stat_warnings)
+    warnings.extend(contract_warnings)
 
     summary = {
         "family_count": len(families),
         "required_debug_view_count": len(REQUIRED_DEBUG_VIEWS),
         "optional_debug_view_count": len(OPTIONAL_DEBUG_VIEWS),
+        "contract_required_debug_view_count": len(contract_views),
+        "contract_debug_view_debt_count": sum(1 for row in contract_rows if row["status"] != "covered"),
         "material_report_count": len(stat_rows),
         "sampled_materials_total": sum(int(row.get("sampled", 0) or 0) for row in stat_rows),
         "named_materials_total": sum(int(row.get("preset_named", 0) or 0) for row in stat_rows),
@@ -327,6 +396,7 @@ def build_report(manifest_path: Path) -> dict[str, Any]:
         "warnings": warnings,
         "summary": summary,
         "debug_view_rows": debug_rows,
+        "contract_debug_view_rows": contract_rows,
         "material_stat_rows": stat_rows,
     }
 
@@ -349,10 +419,29 @@ def write_markdown(report: dict[str, Any], path: Path) -> None:
         f"- class-authored transmission defaults: {summary.get('class_authored_default_transmission_total', 0)}",
         f"- unresolved roughness fallback: {summary.get('unresolved_default_roughness_fallback_total', 0)}",
         f"- unresolved transmission fallback: {summary.get('unresolved_default_transmission_fallback_total', 0)}",
+        f"- contract required debug views: {summary.get('contract_required_debug_view_count', 0)}",
+        f"- contract debug view debt: {summary.get('contract_debug_view_debt_count', 0)}",
+        "",
+        "## Contract Debug View Coverage",
+        "",
+        "| Contract View | Packet View | Status |",
+        "|---|---|---|",
+    ]
+    for row in report.get("contract_debug_view_rows", []):
+        lines.append(
+            "| {contract_view} | {packet_view} | {status} |".format(
+                contract_view=row.get("contract_view", ""),
+                packet_view=row.get("packet_view", ""),
+                status=row.get("status", ""),
+            )
+        )
+    lines.extend([
+        "",
+        "## Captured Debug Views",
         "",
         "| Family | View | Status | Mean Luma | Nonblack |",
         "|---|---|---|---:|---:|",
-    ]
+    ])
     for row in report.get("debug_view_rows", []):
         lines.append(
             "| {family} | {view} | {status} | {mean:.5f} | {nonblack:.5f} |".format(

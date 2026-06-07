@@ -665,10 +665,21 @@ SceneLocalEnvironmentV3 proxy-resource binding:
   passed across gallery, office, concert, and stadium with runtime rooms
   `gallery_partial`, `evening_enclosed_room`, `dark_stage_volume`, and
   `open_exterior_bowl`.
+- The room/light proxy contract is now generated into
+  `src\Graphics\Generated\SceneLocalProxyContracts.generated.h` by
+  `tools\generate_scene_local_environment_proxies.py`.
+- Runtime uses `Generated::FindSceneLocalProxyContract()` instead of a
+  handwritten duplicate mapping.
+- Generated-header packet
+  `build\captures\v3_scene_local_generated_proxy_contract_fresh_smoke_20260607`
+  passed with `54/54` runtime scene-contract proxy reports.
+- Cross-profile generated-header packet
+  `build\captures\v3_scene_local_generated_proxy_contract_cross_profile_20260607`
+  passed across gallery, office, concert, and stadium with `4/4` runtime
+  scene-contract proxy reports.
 - This is still not final environment generation. The next environment step is
   to convert flat BC1 proxy colors into filtered diffuse irradiance and
-  specular prefilter/probe-like resources, and to replace duplicated runtime
-  room/light mapping with manifest loading or generated code.
+  specular prefilter/probe-like resources.
 
 ## 2026-06-07 Master Refactor Before Goal Feature Completion
 

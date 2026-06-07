@@ -571,14 +571,25 @@ private:
     struct SceneLocalEnvironmentV3PayloadBindingInfo {
         std::shared_ptr<DX12Texture> albedo;
         std::shared_ptr<DX12Texture> normal;
+        std::shared_ptr<DX12Texture> irradianceProxy;
+        std::shared_ptr<DX12Texture> specularProxy;
+        std::shared_ptr<DX12Texture> visibleBackgroundProxy;
         std::string textureSetId = "none";
         std::string albedoPath;
         std::string normalPath;
+        std::string irradianceProxyPath;
+        std::string specularProxyPath;
+        std::string visibleBackgroundProxyPath;
         std::string bindingSource = "none";
         std::string fallbackReason = "none";
         bool resourceTableRequired = false;
         bool resourceTableBindable = false;
         uint32_t boundResourceCount = 0;
+        bool proxyResourceTableRequired = false;
+        bool proxyResourceTableBindable = false;
+        uint32_t boundProxyResourceCount = 0;
+        std::string proxyBindingSource = "none";
+        std::string proxyFallbackReason = "none";
     };
     [[nodiscard]] SceneLocalEnvironmentV3PayloadBindingInfo BuildSceneLocalEnvironmentV3PayloadBindingInfo(
         bool queueMissingUploads);

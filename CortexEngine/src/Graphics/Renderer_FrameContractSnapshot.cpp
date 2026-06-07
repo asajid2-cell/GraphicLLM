@@ -388,6 +388,16 @@ void Renderer::UpdateFrameContractSnapshot(Scene::ECS_Registry* registry,
         sceneLocalPayloadBinding.bindingSource;
     contract.environment.sceneLocalPayloadFallbackReason =
         sceneLocalPayloadBinding.fallbackReason;
+    contract.environment.sceneLocalProxyResourceTableRequired =
+        sceneLocalPayloadBinding.proxyResourceTableRequired;
+    contract.environment.sceneLocalProxyResourceTableBindable =
+        sceneLocalPayloadBinding.proxyResourceTableBindable;
+    contract.environment.sceneLocalProxyBoundResourceCount =
+        sceneLocalPayloadBinding.boundProxyResourceCount;
+    contract.environment.sceneLocalProxyBindingSource =
+        sceneLocalPayloadBinding.proxyBindingSource;
+    contract.environment.sceneLocalProxyFallbackReason =
+        sceneLocalPayloadBinding.proxyFallbackReason;
 
     contract.plannedFeatures = featurePlan.planned;
     contract.executedFeatures = featurePlan.active;

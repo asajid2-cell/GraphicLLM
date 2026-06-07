@@ -116,6 +116,11 @@ struct FrameContract {
         uint32_t sceneLocalPayloadBoundResourceCount = 0;
         std::string sceneLocalPayloadBindingSource = "none";
         std::string sceneLocalPayloadFallbackReason = "none";
+        bool sceneLocalProxyResourceTableRequired = false;
+        bool sceneLocalProxyResourceTableBindable = false;
+        uint32_t sceneLocalProxyBoundResourceCount = 0;
+        std::string sceneLocalProxyBindingSource = "none";
+        std::string sceneLocalProxyFallbackReason = "none";
     };
 
     struct GraphicsPresetInfo {

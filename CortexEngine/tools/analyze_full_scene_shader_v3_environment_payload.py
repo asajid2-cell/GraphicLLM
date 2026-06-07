@@ -79,6 +79,22 @@ def analyze_report(path: Path) -> dict[str, Any]:
         "v3_bound_resource_count": int(v3.get("scene_local_texture_payload_bound_resource_count", 0) or 0),
         "v3_binding_source": v3.get("scene_local_texture_payload_binding_source", "none"),
         "v3_fallback_reason": v3.get("scene_local_texture_payload_fallback_reason", "none"),
+        "proxy_resource_table_required": environment.get("scene_local_proxy_resource_table_required") is True,
+        "proxy_resource_table_bindable": environment.get("scene_local_proxy_resource_table_bindable") is True,
+        "bound_proxy_resource_count": int(environment.get("scene_local_proxy_bound_resource_count", 0) or 0),
+        "proxy_binding_source": environment.get("scene_local_proxy_binding_source", "none"),
+        "proxy_fallback_reason": environment.get("scene_local_proxy_fallback_reason", "none"),
+        "v3_proxy_resource_table_required": (
+            v3.get("scene_local_environment_proxy_resource_table_required") is True
+        ),
+        "v3_proxy_resource_table_bindable": (
+            v3.get("scene_local_environment_proxy_resource_table_bindable") is True
+        ),
+        "v3_bound_proxy_resource_count": int(
+            v3.get("scene_local_environment_proxy_bound_resource_count", 0) or 0
+        ),
+        "v3_proxy_binding_source": v3.get("scene_local_environment_proxy_binding_source", "none"),
+        "v3_proxy_fallback_reason": v3.get("scene_local_environment_proxy_fallback_reason", "none"),
         "failures": [],
     }
     if row["environment_ready"]:
@@ -141,6 +157,22 @@ def analyze_report(path: Path) -> dict[str, Any]:
             row["failures"].append("V3 binding source does not match environment value")
         if row["v3_fallback_reason"] != row["fallback_reason"]:
             row["failures"].append("V3 fallback reason does not match environment value")
+        if not row["proxy_resource_table_required"]:
+            row["failures"].append("payload ready without proxy resource table requirement")
+        if not row["proxy_resource_table_bindable"]:
+            row["failures"].append("payload ready without bindable proxy resource table")
+        if row["bound_proxy_resource_count"] <= 0:
+            row["failures"].append("payload ready without bound scene-local proxy resources")
+        if row["v3_proxy_resource_table_required"] != row["proxy_resource_table_required"]:
+            row["failures"].append("V3 proxy-resource-table-required flag does not match environment value")
+        if row["v3_proxy_resource_table_bindable"] != row["proxy_resource_table_bindable"]:
+            row["failures"].append("V3 proxy-resource-table-bindable flag does not match environment value")
+        if row["v3_bound_proxy_resource_count"] != row["bound_proxy_resource_count"]:
+            row["failures"].append("V3 bound proxy resource count does not match environment value")
+        if row["v3_proxy_binding_source"] != row["proxy_binding_source"]:
+            row["failures"].append("V3 proxy binding source does not match environment value")
+        if row["v3_proxy_fallback_reason"] != row["proxy_fallback_reason"]:
+            row["failures"].append("V3 proxy fallback reason does not match environment value")
     return row
 
 
@@ -155,8 +187,8 @@ def write_markdown(path: Path, result: dict[str, Any]) -> None:
         f"- profile-policy-consumed reports: `{result['profile_policy_consumed_report_count']}`",
         f"- failures: `{len(result['failures'])}`",
         "",
-        "| Family | Profile Policy | Shader Profile | Local Background | Texture Set | Textures | Albedo | Normal | Payload | Influence | Bound | Binding | Proxies |",
-        "|---|---|---|---:|---|---:|---:|---:|---|---:|---:|---|---|",
+        "| Family | Profile Policy | Shader Profile | Local Background | Texture Set | Textures | Albedo | Normal | Payload | Influence | Bound | Proxy Bound | Binding | Proxy Binding | Proxies |",
+        "|---|---|---|---:|---|---:|---:|---:|---|---:|---:|---:|---|---|---|",
     ]
     for row in result["rows"]:
         proxies = ",".join(
@@ -183,7 +215,9 @@ def write_markdown(path: Path, result: dict[str, Any]) -> None:
                     str(row["payload_ready"]).lower(),
                     f"{row['shader_influence']:.2f}",
                     str(row["bound_resource_count"]),
+                    str(row["bound_proxy_resource_count"]),
                     f"`{row['binding_source']}`",
+                    f"`{row['proxy_binding_source']}`",
                     proxies,
                 ]
             )
@@ -223,6 +257,8 @@ def main() -> int:
         "shader_influence_report_count": sum(1 for row in rows if row["shader_influence"] > 0.0),
         "resource_bindable_report_count": sum(1 for row in rows if row["resource_table_bindable"]),
         "bound_resource_report_count": sum(1 for row in rows if row["bound_resource_count"] > 0),
+        "proxy_resource_bindable_report_count": sum(1 for row in rows if row["proxy_resource_table_bindable"]),
+        "bound_proxy_resource_report_count": sum(1 for row in rows if row["bound_proxy_resource_count"] > 0),
         "profile_policy_consumed_report_count": sum(1 for row in rows if row["profile_policy_consumed"]),
         "rows": rows,
         "failures": failures,

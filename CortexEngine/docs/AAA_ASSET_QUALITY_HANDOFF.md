@@ -42,6 +42,77 @@ Current planning checkpoint:
 - Completion remains blocked until candidate beauty passes matrix packets and
   user review. One good screenshot or one fixed stress scene is not completion.
 
+Latest ReflectionV3 source resolver checkpoint:
+
+- Implemented bounded auto-source hysteresis in
+  `assets\shaders\FullSceneReflectionResolverV3.hlsl`.
+  - It only affects auto policy; forced `local`, `ssr`, `rt`, `environment`,
+    and `none` overrides remain explicit diagnostics.
+  - It holds the previous source only when previous history is reusable, the
+    same provider is still available at the pixel, and the current winner is
+    not decisively better.
+  - The hold strength is reported through the existing rejected-source alpha
+    lane together with history/material suppression.
+- Added `tools\analyze_reflection_v3_source_resolver.py`.
+  - It treats `reflection_source_id` as categorical evidence, not generic
+    luma.
+  - Red channel is measured as provider class, green as confidence, blue as
+    override policy.
+  - It reports mean source delta, max source-switch ratio, max active
+    source-switch ratio, dominant source, and warnings.
+- Wired the analyzer into
+  `tools\run_reflection_v3_motion_focus_packet.ps1`, emitting:
+  - `v3_reflection_source_resolver.json`
+  - `v3_reflection_source_resolver.md`
+- The focused runner now defaults to `-SourceOverride auto` because production
+  resolver evidence should test the actual auto policy. Forced SSR remains
+  available with `-SourceOverride ssr`.
+- Updated `tools\validate_full_scene_shader_pipeline_v3_plan.py` so the
+  reflection resolver shader, focused runner, and new source analyzer are part
+  of the checked V3 runtime surface.
+
+Validation for latest ReflectionV3 slice:
+
+```powershell
+python -m py_compile tools\analyze_reflection_v3_source_resolver.py tools\analyze_reflection_v3_material_stress.py tools\analyze_full_scene_shader_v3_lighting_motion.py tools\validate_full_scene_shader_pipeline_v3_plan.py
+$files=@('tools\run_reflection_v3_motion_focus_packet.ps1','tools\run_reflection_v3_material_stress_packet.ps1'); foreach($file in $files){$tokens=$null; $errors=$null; [System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path $file), [ref]$tokens, [ref]$errors) | Out-Null; if($errors.Count -gt 0){Write-Host $file; $errors | Format-List; exit 1}}
+python tools\validate_full_scene_shader_pipeline_v3_plan.py
+cmd.exe /d /c "call ""C:\Program Files\Microsoft Visual Studio\18\Community\Common7\Tools\VsDevCmd.bat"" -arch=x64 -host_arch=x64 >nul && set ""CORTEX_SKIP_ASSET_SYNC=1"" && ""C:\Program Files\Ninja\ninja.exe"" -C build CortexEngine -j 8"
+Copy-Item -LiteralPath assets\shaders\FullSceneReflectionResolverV3.hlsl -Destination build\bin\assets\shaders\FullSceneReflectionResolverV3.hlsl -Force
+Copy-Item -LiteralPath assets\final_art\full_scene_shader_pipeline_v3_contract.json -Destination build\bin\assets\final_art\full_scene_shader_pipeline_v3_contract.json -Force
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_reflection_v3_motion_focus_packet.ps1 -NoBuild -OutputRoot build\captures\v3_reflection_source_hysteresis_focus_20260607 -SourceOverride auto -SmokeFrames 18 -CaptureFrame 9 -CaptureSequenceCount 2 -MotionFrames 72 -MotionLookAmplitude 0.025 -MotionLookCycles 6.0
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_reflection_v3_motion_focus_packet.ps1 -NoBuild -OutputRoot build\captures\v3_reflection_source_hysteresis_forced_ssr_focus_20260607 -SourceOverride ssr -SmokeFrames 18 -CaptureFrame 9 -CaptureSequenceCount 2 -MotionFrames 72 -MotionLookAmplitude 0.025 -MotionLookCycles 6.0
+```
+
+Evidence:
+
+- Native `CortexEngine` target remained buildable; the known trailing
+  `vswhere.exe` warning printed after Ninja success.
+- Auto resolver packet:
+  `build\captures\v3_reflection_source_hysteresis_focus_20260607`
+  passed end to end.
+  - Generic reflection motion analyzer: `13` view sequences, `0` warnings,
+    `0` failures.
+  - Source resolver analyzer: `1` family, `0` warnings, `0` failures.
+  - Source row: dominant source `local`, active source `1.00000`, mean source
+    delta `0.000151`, max source switch `0.000442`, max active source switch
+    `0.000442`, mean confidence delta `0.002472`.
+- Forced SSR packet:
+  `build\captures\v3_reflection_source_hysteresis_forced_ssr_focus_20260607`
+  passed the wrapper but intentionally produced source-resolver warnings:
+  max switch `0.101157`, max active switch `0.261804`.
+  Treat this as useful remaining stress evidence for SSR holes/source churn, not
+  as production auto-policy failure.
+
+Current next work:
+
+1. Use the forced-SSR warning packet to diagnose whether the churn is SSR holes,
+   history rejection, or source fallback around specific pixels.
+2. Extend the source analyzer to consume resolver/rejection channels beyond RGB
+   if a raw buffer export exists or can be added.
+3. Promote auto source-resolver evidence from one stress family into a bounded
+   cross-family reflection packet after model-scene capture/report separation.
+
 - Added the authoritative
   `2026-06-07 Full Scene Shader Refactor Blueprint` section to
   `docs\FULL_SCENE_SHADER_AAA_REFACTOR_PLAN.md`.

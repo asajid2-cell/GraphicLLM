@@ -23,8 +23,11 @@ V3_ENVIRONMENT_PAYLOAD_ANALYZER_PATH = ROOT / "tools" / "analyze_full_scene_shad
 V3_ENVIRONMENT_PROFILE_ANALYZER_PATH = ROOT / "tools" / "analyze_full_scene_shader_v3_environment_profiles.py"
 V3_SHADOW_ATTRIBUTION_ANALYZER_PATH = ROOT / "tools" / "analyze_full_scene_shader_v3_shadow_attribution.py"
 V3_SHADOW_FOCUS_RUNNER_PATH = ROOT / "tools" / "run_lighting_v3_shadow_motion_focus_packet.ps1"
+V3_REFLECTION_SOURCE_RESOLVER_ANALYZER_PATH = ROOT / "tools" / "analyze_reflection_v3_source_resolver.py"
+V3_REFLECTION_FOCUS_RUNNER_PATH = ROOT / "tools" / "run_reflection_v3_motion_focus_packet.ps1"
 SCENE_LOCAL_ENVIRONMENT_V3_SHADER_PATH = ROOT / "assets" / "shaders" / "SceneLocalEnvironmentV3.hlsl"
 DEFERRED_LIGHTING_SHADER_PATH = ROOT / "assets" / "shaders" / "DeferredLighting.hlsl"
+FULL_SCENE_REFLECTION_RESOLVER_V3_SHADER_PATH = ROOT / "assets" / "shaders" / "FullSceneReflectionResolverV3.hlsl"
 
 
 REQUIRED_PLAN_TOKENS = [
@@ -189,6 +192,16 @@ def main() -> int:
         f"Missing V3 shadow focus runner: {V3_SHADOW_FOCUS_RUNNER_PATH}",
     )
     require(
+        V3_REFLECTION_SOURCE_RESOLVER_ANALYZER_PATH.exists(),
+        errors,
+        f"Missing ReflectionV3 source resolver analyzer: {V3_REFLECTION_SOURCE_RESOLVER_ANALYZER_PATH}",
+    )
+    require(
+        V3_REFLECTION_FOCUS_RUNNER_PATH.exists(),
+        errors,
+        f"Missing ReflectionV3 focus runner: {V3_REFLECTION_FOCUS_RUNNER_PATH}",
+    )
+    require(
         SCENE_LOCAL_ENVIRONMENT_V3_SHADER_PATH.exists(),
         errors,
         f"Missing SceneLocalEnvironmentV3 shader: {SCENE_LOCAL_ENVIRONMENT_V3_SHADER_PATH}",
@@ -197,6 +210,11 @@ def main() -> int:
         DEFERRED_LIGHTING_SHADER_PATH.exists(),
         errors,
         f"Missing DeferredLighting shader: {DEFERRED_LIGHTING_SHADER_PATH}",
+    )
+    require(
+        FULL_SCENE_REFLECTION_RESOLVER_V3_SHADER_PATH.exists(),
+        errors,
+        f"Missing FullSceneReflectionResolverV3 shader: {FULL_SCENE_REFLECTION_RESOLVER_V3_SHADER_PATH}",
     )
     if errors:
         for error in errors:
@@ -219,8 +237,11 @@ def main() -> int:
     environment_profile_source = V3_ENVIRONMENT_PROFILE_ANALYZER_PATH.read_text(encoding="utf-8")
     shadow_attribution_source = V3_SHADOW_ATTRIBUTION_ANALYZER_PATH.read_text(encoding="utf-8")
     shadow_focus_runner_source = V3_SHADOW_FOCUS_RUNNER_PATH.read_text(encoding="utf-8")
+    reflection_source_resolver_source = V3_REFLECTION_SOURCE_RESOLVER_ANALYZER_PATH.read_text(encoding="utf-8")
+    reflection_focus_runner_source = V3_REFLECTION_FOCUS_RUNNER_PATH.read_text(encoding="utf-8")
     scene_local_environment_v3_shader = SCENE_LOCAL_ENVIRONMENT_V3_SHADER_PATH.read_text(encoding="utf-8")
     deferred_lighting_shader = DEFERRED_LIGHTING_SHADER_PATH.read_text(encoding="utf-8")
+    full_scene_reflection_resolver_v3_shader = FULL_SCENE_REFLECTION_RESOLVER_V3_SHADER_PATH.read_text(encoding="utf-8")
     runtime_surface = "\n".join(
         [
             frame_contract_source,
@@ -237,8 +258,11 @@ def main() -> int:
             environment_profile_source,
             shadow_attribution_source,
             shadow_focus_runner_source,
+            reflection_source_resolver_source,
+            reflection_focus_runner_source,
             scene_local_environment_v3_shader,
             deferred_lighting_shader,
+            full_scene_reflection_resolver_v3_shader,
         ]
     )
 
@@ -721,6 +745,11 @@ def main() -> int:
         "reflection_history_v3_rejection_owned",
         "reflection_temporal_delta_scene_local_bound",
         "reflection_temporal_delta_history_bound",
+        "analyze_reflection_v3_source_resolver.py",
+        "source_switch_ratio",
+        "active_source_switch_ratio",
+        "hysteresisMargin",
+        "hysteresisHold",
         "SceneLocalEnvironmentV3",
         "ambient_lighting_owned",
         "reflection_background_owned",

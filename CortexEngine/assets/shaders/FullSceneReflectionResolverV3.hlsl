@@ -208,6 +208,49 @@ PSOutput PSMain(VSOutput input) {
                              ((forceEnvironment && envActive > 0.0f) ||
                               (!forceLocal && !forceSSR && !forceRT && envActive > 0.0f));
 
+    // Auto mode uses bounded source hysteresis. It only holds a previous source
+    // when the previous source is still available at this pixel and the current
+    // winner is not decisively better. This prevents smooth/metallic surfaces
+    // from flickering between SSR/RT/local/environment during small camera
+    // jitters while still allowing a real provider improvement to take over.
+    float preHysteresisConfidence =
+        chooseSSR ? ssrAdmissionConfidence :
+        (chooseRT ? rtAdmissionConfidence :
+         (chooseLocal ? localConfidence :
+          (chooseEnvironment ? envConfidence : 0.0f)));
+    float preHysteresisSourceClass =
+        chooseSSR ? 0.50f :
+        (chooseRT ? 0.75f :
+         (chooseLocal ? 0.25f :
+          (chooseEnvironment ? 1.00f : 0.0f)));
+    bool previousWasLocal = abs(previousSourceClass - 0.25f) < 0.08f;
+    bool previousWasSSR = abs(previousSourceClass - 0.50f) < 0.08f;
+    bool previousWasRT = abs(previousSourceClass - 0.75f) < 0.08f;
+    bool previousWasEnvironment = abs(previousSourceClass - 1.00f) < 0.08f;
+    float hysteresisStrength = saturate(historyReusable * (1.0f - 0.65f * historyDebt));
+    float hysteresisMargin = 0.08f + 0.20f * hysteresisStrength;
+    bool hysteresisAllowed = autoPolicy && previousSourceAvailable > 0.0f && hysteresisStrength > 0.18f;
+    bool holdLocal = hysteresisAllowed && previousWasLocal && localActive > 0.0f &&
+                     localConfidence + hysteresisMargin >= preHysteresisConfidence;
+    bool holdSSR = hysteresisAllowed && previousWasSSR && ssrActive > 0.0f &&
+                   ssrAdmissionConfidence + hysteresisMargin >= preHysteresisConfidence;
+    bool holdRT = hysteresisAllowed && previousWasRT && rtActive > 0.0f &&
+                  rtAdmissionConfidence + hysteresisMargin >= preHysteresisConfidence;
+    bool holdEnvironment = hysteresisAllowed && previousWasEnvironment && envActive > 0.0f &&
+                           envConfidence + hysteresisMargin >= preHysteresisConfidence;
+    float heldSourceClass =
+        holdLocal ? 0.25f :
+        (holdSSR ? 0.50f :
+         (holdRT ? 0.75f :
+          (holdEnvironment ? 1.00f : preHysteresisSourceClass)));
+    float hysteresisHold = (heldSourceClass != preHysteresisSourceClass) ? hysteresisStrength : 0.0f;
+    if (hysteresisHold > 0.0f) {
+        chooseSSR = holdSSR;
+        chooseRT = holdRT;
+        chooseLocal = holdLocal;
+        chooseEnvironment = holdEnvironment;
+    }
+
     float sourceCode = chooseSSR ? 2.0f : (chooseRT ? 3.0f : (chooseLocal ? 1.0f : (chooseEnvironment ? 4.0f : 0.0f)));
     float3 radiance = chooseSSR ? ssrRadiance : (chooseRT ? rtRadiance : (chooseLocal ? localRadiance : (chooseEnvironment ? envRadiance : 0.0f.xxx)));
     float confidence = chooseSSR ? (forceSSR ? ssrForcedConfidence : ssrAdmissionConfidence) :
@@ -246,7 +289,7 @@ PSOutput PSMain(VSOutput input) {
     output.rejectedSourceMask = float4(localRejected,
                                        ssrRejected,
                                        max(rtRejected, environmentRejected),
-                                       max(historySuppressedSource, materialSuppressedSource));
+                                       max(hysteresisHold, max(historySuppressedSource, materialSuppressedSource)));
     output.sourceSuppression = float4(historySuppressedSource,
                                       materialSuppressedSource,
                                       roughness,

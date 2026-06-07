@@ -552,36 +552,38 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
         if (wantsSceneLocalEnvironmentV3ThisFrame) {
             const SceneLocalEnvironmentV3PayloadBindingInfo payloadBinding =
                 BuildSceneLocalEnvironmentV3PayloadBindingInfo(true);
-            SceneLocalEnvironmentV3Context environmentContext{};
-            environmentContext.sceneLocalEnvironment = sceneLocalEnvironmentHandle;
-            environmentContext.ambientLighting = ambientLightingHandle;
-            environmentContext.visibleBackground = visibleBackgroundHandle;
-            environmentContext.reflectionBackground = reflectionBackgroundHandle;
-            environmentContext.atmosphere = atmosphereHandle;
-            environmentContext.device = m_services.device ? m_services.device->GetDevice() : nullptr;
-            environmentContext.commandList = m_commandResources.graphicsList.Get();
-            environmentContext.rootSignature = m_pipelineState.rootSignature.get();
-            environmentContext.pipeline = m_pipelineState.sceneLocalEnvironmentV3.get();
-            environmentContext.descriptorManager = m_services.descriptorManager.get();
-            environmentContext.frameConstants = m_constantBuffers.currentFrameGPU;
-            environmentContext.payloadAlbedo = payloadBinding.albedo;
-            environmentContext.payloadNormal = payloadBinding.normal;
-            environmentContext.irradianceProxy = payloadBinding.irradianceProxy;
-            environmentContext.specularProxy = payloadBinding.specularProxy;
-            environmentContext.visibleBackgroundProxy = payloadBinding.visibleBackgroundProxy;
-            environmentContext.outputRTVs = {
+            FullSceneShaderV3GraphBuilder::SceneLocalEnvironmentCommon environmentCommon{};
+            environmentCommon.device = m_services.device ? m_services.device->GetDevice() : nullptr;
+            environmentCommon.commandList = m_commandResources.graphicsList.Get();
+            environmentCommon.rootSignature = m_pipelineState.rootSignature.get();
+            environmentCommon.pipeline = m_pipelineState.sceneLocalEnvironmentV3.get();
+            environmentCommon.descriptorManager = m_services.descriptorManager.get();
+            environmentCommon.frameConstants = m_constantBuffers.currentFrameGPU;
+            environmentCommon.width = GetInternalRenderWidth();
+            environmentCommon.height = GetInternalRenderHeight();
+            environmentCommon.failed = &bloomStageFailed;
+            environmentCommon.stage = &postProcessGraphStageError;
+
+            FullSceneShaderV3GraphBuilder::SceneLocalEnvironmentSubmission environmentSubmission{};
+            environmentSubmission.sceneLocalEnvironment = sceneLocalEnvironmentHandle;
+            environmentSubmission.ambientLighting = ambientLightingHandle;
+            environmentSubmission.visibleBackground = visibleBackgroundHandle;
+            environmentSubmission.reflectionBackground = reflectionBackgroundHandle;
+            environmentSubmission.atmosphere = atmosphereHandle;
+            environmentSubmission.payloadAlbedo = payloadBinding.albedo;
+            environmentSubmission.payloadNormal = payloadBinding.normal;
+            environmentSubmission.irradianceProxy = payloadBinding.irradianceProxy;
+            environmentSubmission.specularProxy = payloadBinding.specularProxy;
+            environmentSubmission.visibleBackgroundProxy = payloadBinding.visibleBackgroundProxy;
+            environmentSubmission.outputRTVs = {
                 m_mainTargets.environmentV3.descriptors.sceneLocalEnvironmentRTV.cpu,
                 m_mainTargets.environmentV3.descriptors.ambientLightingRTV.cpu,
                 m_mainTargets.environmentV3.descriptors.visibleBackgroundRTV.cpu,
                 m_mainTargets.environmentV3.descriptors.reflectionBackgroundRTV.cpu,
                 m_mainTargets.environmentV3.descriptors.atmosphereRTV.cpu,
             };
-            environmentContext.width = GetInternalRenderWidth();
-            environmentContext.height = GetInternalRenderHeight();
-            environmentContext.ran = &ranSceneLocalEnvironmentV3;
-            environmentContext.failed = &bloomStageFailed;
-            environmentContext.stage = &postProcessGraphStageError;
-            if (!fullSceneShaderV3.SubmitSceneLocalEnvironment(environmentContext)) {
+            environmentSubmission.ran = &ranSceneLocalEnvironmentV3;
+            if (!fullSceneShaderV3.SubmitSceneLocalEnvironment(environmentCommon, environmentSubmission)) {
                 bloomStageFailed = true;
             }
         }

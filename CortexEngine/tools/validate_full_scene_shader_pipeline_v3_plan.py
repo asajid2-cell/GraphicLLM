@@ -363,6 +363,8 @@ def main() -> int:
         "FullSceneShaderV3GraphBuilder",
         "DisplayCommon",
         "DisplaySubmission",
+        "SceneLocalEnvironmentCommon",
+        "SceneLocalEnvironmentSubmission",
         "SubmitSceneLocalEnvironment",
         "SubmitReflectionResolver",
         "SubmitReflectionHistory",
@@ -419,6 +421,26 @@ def main() -> int:
         "SubmitDisplay(displayCommon" in render_graph_end_frame_source,
         errors,
         "Renderer_RenderGraphEndFrame.cpp must submit V3 displays through graph-builder common display API",
+    )
+    require(
+        "SceneLocalEnvironmentV3Context" not in render_graph_end_frame_source,
+        errors,
+        "Renderer_RenderGraphEndFrame.cpp must not construct SceneLocalEnvironmentV3Context directly",
+    )
+    require(
+        "SceneLocalEnvironmentCommon environmentCommon" in render_graph_end_frame_source,
+        errors,
+        "Renderer_RenderGraphEndFrame.cpp must use shared V3 environment common state",
+    )
+    require(
+        "SceneLocalEnvironmentSubmission environmentSubmission" in render_graph_end_frame_source,
+        errors,
+        "Renderer_RenderGraphEndFrame.cpp must use V3 environment submission data",
+    )
+    require(
+        "SubmitSceneLocalEnvironment(environmentCommon, environmentSubmission)" in render_graph_end_frame_source,
+        errors,
+        "Renderer_RenderGraphEndFrame.cpp must submit environment through graph-builder environment API",
     )
     for token in [
         "AddSceneLocalEnvironmentV3Pass(",

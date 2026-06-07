@@ -109,6 +109,72 @@ Current next work:
    `ReflectionV3` provider resolver hardening before any strong
    `CinematicPostV3` tuning.
 
+Latest cross-profile payload checkpoint:
+
+- Added explicit scene-local payload source aliases without duplicating DDS
+  assets:
+  - `home_kitchen_lantern` -> `assets/textures/rtshowcase`
+  - `home_office_evening` -> `assets/textures/rtshowcase`
+  - `school_classroom_day` -> `assets/textures/rtshowcase`
+  - `basketball_gym_day` -> `assets/textures/scene_local/basketball_gym_day`
+  - `neon_streamer_concert` -> `assets/textures/rtshowcase`
+  - `red_light_room` -> `assets/textures/rtshowcase`
+  - `stadium_night_match` -> `assets/textures/rtshowcase`
+- The alias helper is used by both shader-constant/binding discovery and
+  frame-contract payload scanning.
+- The V3 static validator now requires the alias helper token so this path is
+  part of the checked runtime surface.
+
+Validation for cross-profile checkpoint:
+
+```powershell
+python -m py_compile tools\analyze_full_scene_shader_v3_environment_payload.py tools\analyze_full_scene_shader_v3_environment_profiles.py tools\validate_full_scene_shader_pipeline_v3_plan.py
+python tools\validate_full_scene_shader_pipeline_v3_plan.py
+git -c submodule.recurse=false diff --check -- src\Graphics\Renderer_FramePostConstants.cpp src\Graphics\Renderer_FrameContractSnapshot.cpp tools\validate_full_scene_shader_pipeline_v3_plan.py
+cmd.exe /d /c "call ""C:\Program Files\Microsoft Visual Studio\18\Community\Common7\Tools\VsDevCmd.bat"" -arch=x64 -host_arch=x64 >nul && set ""CORTEX_SKIP_ASSET_SYNC=1"" && ""C:\Program Files\Ninja\ninja.exe"" -C build CortexEngine -j 8"
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_scene_local_cinematic_renderer_v1_packets.ps1 -NoBuild -OutputRoot build\captures\v3_environment_payload_resource_binding_cross_profile_20260607 -FamilyFilter kitchen,gym,concert,red_room,stadium -ViewFilter scene_local_environment -SmokeFrames 18 -CaptureFrame 10 -CaptureSequenceCount 1 -SkipOwnerAnalysis -SkipMaterialAnalysis -SkipStabilityAnalysis -SkipVisualQualityAnalysis
+python tools\analyze_full_scene_shader_v3_environment_payload.py --manifest build\captures\v3_environment_payload_resource_binding_cross_profile_20260607\manifest.json --output-json build\captures\v3_environment_payload_resource_binding_cross_profile_20260607\v3_environment_payload_cross_profile.json --output-md build\captures\v3_environment_payload_resource_binding_cross_profile_20260607\v3_environment_payload_cross_profile.md --min-payload-ready 3
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_scene_local_cinematic_renderer_v1_packets.ps1 -NoBuild -OutputRoot build\captures\v3_environment_payload_resource_binding_office_probe_20260607 -FamilyFilter office -ViewFilter scene_local_environment -SmokeFrames 18 -CaptureFrame 10 -CaptureSequenceCount 1 -SkipOwnerAnalysis -SkipMaterialAnalysis -SkipStabilityAnalysis -SkipVisualQualityAnalysis
+python tools\analyze_full_scene_shader_v3_environment_payload.py --manifest build\captures\v3_environment_payload_resource_binding_office_probe_20260607\manifest.json --output-json build\captures\v3_environment_payload_resource_binding_office_probe_20260607\v3_environment_payload_office.json --output-md build\captures\v3_environment_payload_resource_binding_office_probe_20260607\v3_environment_payload_office.md --min-payload-ready 1
+python tools\analyze_full_scene_shader_v3_environment_profiles.py --manifest build\captures\v3_environment_payload_resource_binding_gallery_20260607\manifest.json --manifest build\captures\v3_environment_payload_resource_binding_office_probe_20260607\manifest.json --manifest build\captures\v3_environment_payload_resource_binding_cross_profile_20260607\manifest.json --output-json build\captures\v3_environment_payload_resource_binding_cross_profile_20260607\v3_environment_profiles_gallery_office_stage_exterior.json --output-md build\captures\v3_environment_payload_resource_binding_cross_profile_20260607\v3_environment_profiles_gallery_office_stage_exterior.md --allow-missing-reports --min-ready-reports 4 --min-distinct-modes 4 --min-distinct-profiles 4 --require-profile gallery_neutral=1 --require-profile enclosed_room=2 --require-profile stage=3 --require-profile open_exterior=4
+```
+
+Evidence:
+
+- Native build passed after the alias change.
+- Cross-profile payload packet:
+  `build\captures\v3_environment_payload_resource_binding_cross_profile_20260607`.
+  The packet wrapper returned nonzero because kitchen, gym, and red room still
+  hit the known model-scene capture/device instability before the environment
+  pass executed.
+- Despite those exits, frame reports were written and payload analysis passed:
+  `5` reports, `5` texture-set-present, `5` payload-ready,
+  `5` resource-bindable, and `0` payload-analysis failures.
+- Clean environment-ready profile proof uses:
+  - gallery from
+    `build\captures\v3_environment_payload_resource_binding_gallery_20260607`
+  - office from
+    `build\captures\v3_environment_payload_resource_binding_office_probe_20260607`
+  - concert/stadium rows from
+    `build\captures\v3_environment_payload_resource_binding_cross_profile_20260607`
+- Cross-profile analyzer passed:
+  `57` environment-ready reports, distinct shader profiles
+  `enclosed_room`, `gallery_neutral`, `open_exterior`, and `stage`; modes
+  `1.0`, `2.0`, `3.0`, and `4.0`.
+- Office payload proof passed with one report:
+  family `home_office_evening`, shader profile `enclosed_room`, payload-ready
+  true, resource-bindable true, `2` bound resources, binding source
+  `cached_scene_local_payload_pair`.
+
+Current next work after this checkpoint:
+
+1. Separate model-scene report evidence from visual capture success so
+   kitchen/gym/red-room crashes do not block diagnostics.
+2. Continue `LightingShadowV3` high-contrast source attribution and
+   `ReflectionV3` provider resolver hardening.
+3. Later replace alias payload packs with proper per-family texture/proxy
+   generation for true scene-local irradiance/specular/background resources.
+
 Authoritative plan:
 
 - `docs\FULL_SCENE_SHADER_AAA_REFACTOR_PLAN.md`

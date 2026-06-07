@@ -39,6 +39,26 @@ std::string SceneLocalTextureSetIdForFamily(const std::string& family) {
     return id.empty() ? "none" : id;
 }
 
+void AppendSceneLocalPayloadAliasPaths(const std::string& setId,
+                                       std::vector<std::filesystem::path>& paths) {
+    auto addAlias = [&paths](const char* path) {
+        paths.emplace_back(path);
+        paths.emplace_back(std::filesystem::path("../../") / path);
+    };
+
+    if (setId == "rt_showcase_gallery" ||
+        setId == "home_kitchen_lantern" ||
+        setId == "home_office_evening" ||
+        setId == "school_classroom_day" ||
+        setId == "neon_streamer_concert" ||
+        setId == "red_light_room" ||
+        setId == "stadium_night_match") {
+        addAlias("assets/textures/rtshowcase");
+    } else if (setId == "basketball_gym_day") {
+        addAlias("assets/textures/scene_local/basketball_gym_day");
+    }
+}
+
 void PopulateSceneLocalTexturePayload(FrameContract::EnvironmentInfo& environment,
                                       const FrameContract::SceneVisualInfo& sceneVisual) {
     environment.sceneLocalTextureSetId = SceneLocalTextureSetIdForFamily(sceneVisual.family);
@@ -63,10 +83,7 @@ void PopulateSceneLocalTexturePayload(FrameContract::EnvironmentInfo& environmen
         std::filesystem::path(environment.sceneLocalTextureSetPath),
         std::filesystem::path("../../assets/textures/scene_local") / environment.sceneLocalTextureSetId,
     };
-    if (environment.sceneLocalTextureSetId == "rt_showcase_gallery") {
-        candidateTextureSetPaths.emplace_back("assets/textures/rtshowcase");
-        candidateTextureSetPaths.emplace_back("../../assets/textures/rtshowcase");
-    }
+    AppendSceneLocalPayloadAliasPaths(environment.sceneLocalTextureSetId, candidateTextureSetPaths);
     std::error_code ec;
     std::filesystem::path textureSetPath;
     for (const auto& candidate : candidateTextureSetPaths) {

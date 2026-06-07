@@ -3178,3 +3178,41 @@ Integrated rerun:
   CompositeV3 diagnostics, and review-packet promotion decision.
 - More rendered sweeps are now possible, but capture size still needs active
   monitoring.
+
+### SceneLocalEnvironmentV3 Provenance Contract - 2026-06-07
+
+Implemented:
+
+- `SceneLocalEnvironmentV3` now exposes environment provenance in the V3 frame
+  report:
+  `scene_local_environment_policy`,
+  `scene_local_visible_background_source`,
+  `scene_local_reflection_background_source`,
+  `scene_local_ambient_source`,
+  `scene_local_atmosphere_source`, and
+  `scene_local_environment_source_count`.
+- The environment V3 domain now requires `10` channels:
+  mode, policy, ownership bits, and per-layer source ownership for ambient,
+  visible background, reflection background, and atmosphere.
+- The V3 JSON contract lists these as required environment policy channels.
+- The placeholder analyzer and plan validator both gate the new provenance
+  fields.
+
+Validated evidence:
+
+- `build/captures/v3_scene_local_environment_provenance_full_stress_20260607`
+  passed V2 evidence, V3 placeholder artifacts, scene profile, material
+  payload, CompositeV3 diagnostics, and review-packet promotion decision.
+- Environment readiness remained complete:
+  `scene_local_environment_ready_report_count=41/41`.
+- Sample beauty report had `scene_local_environment_channel_count=10`,
+  source count `4`, and concrete source ownership:
+  `authorized_visible_hdri`, `local_reflection_probe_radiance`,
+  `scene_profile_lighting_balance`, and `environment_matched_fog`.
+
+Next refactor direction:
+
+- Use this provenance to move from procedural/tint environment buffers toward
+  texture-backed scene-local environment payloads: authored room visible
+  background, local irradiance/specular proxies, and atmosphere parameters per
+  scene profile.

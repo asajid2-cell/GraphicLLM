@@ -280,6 +280,13 @@
         "reflection_background",
         "atmosphere"
       ],
+      "required_policy_channels": [
+        "scene_local_environment_policy",
+        "visible_background_source",
+        "reflection_background_source",
+        "ambient_source",
+        "atmosphere_source"
+      ],
       "required_debug_views": [
         "environment_mode",
         "ambient_lighting",

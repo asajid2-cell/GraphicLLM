@@ -464,11 +464,23 @@ def analyze_report(
                 failures.append("environment domain must expose environment_mode debug view")
             if environment_domain.get("default_beauty_affects") is not False:
                 failures.append("environment domain must not affect default beauty yet")
-            if environment_domain.get("ready_channel_count", 0) < 5:
+            if environment_domain.get("ready_channel_count", 0) < 10:
                 failures.append("environment domain ready without all required channels")
             mode = v3.get("scene_local_environment_mode")
             if mode not in {"enclosed_room", "open_exterior", "stage", "neutral_lab"}:
                 failures.append(f"environment domain ready with invalid mode: {mode}")
+            for key in [
+                "scene_local_environment_policy",
+                "scene_local_visible_background_source",
+                "scene_local_reflection_background_source",
+                "scene_local_ambient_source",
+                "scene_local_atmosphere_source",
+            ]:
+                value = v3.get(key)
+                if not isinstance(value, str) or value.strip().lower() in {"", "unknown", "none", "default"}:
+                    failures.append(f"environment domain ready with missing {key}")
+            if int(v3.get("scene_local_environment_source_count", 0) or 0) < 4:
+                failures.append("environment domain ready without all source provenance channels")
         for resource in [
             "scene_local_environment",
             "ambient_lighting",
@@ -881,6 +893,12 @@ def analyze_report(
         "lighting_split_resources_ready": v3.get("lighting_split_resources_ready"),
         "scene_local_environment_ready": v3.get("scene_local_environment_ready"),
         "scene_local_environment_mode": v3.get("scene_local_environment_mode"),
+        "scene_local_environment_policy": v3.get("scene_local_environment_policy"),
+        "scene_local_visible_background_source": v3.get("scene_local_visible_background_source"),
+        "scene_local_reflection_background_source": v3.get("scene_local_reflection_background_source"),
+        "scene_local_ambient_source": v3.get("scene_local_ambient_source"),
+        "scene_local_atmosphere_source": v3.get("scene_local_atmosphere_source"),
+        "scene_local_environment_source_count": v3.get("scene_local_environment_source_count"),
         "reflection_v3_ready": v3.get("reflection_v3_ready"),
         "reflection_radiance_ready": v3.get("reflection_radiance_ready"),
         "reflection_confidence_ready": v3.get("reflection_confidence_ready"),

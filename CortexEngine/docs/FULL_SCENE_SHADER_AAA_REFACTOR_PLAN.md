@@ -3168,8 +3168,13 @@ Follow-up correction:
 - Default beauty remains non-promotable until cross-family and motion evidence
   exists.
 
-Operational blocker:
+Integrated rerun:
 
-- A fresh integrated rerun was attempted, but `Z:` ran out of disk while
-  writing packet stdout. More rendered sweeps require capture cleanup or
-  archive first.
+- Deleted old generated `20260604` capture directories under `build/captures`
+  after path verification, increasing free space to about `33 GB`.
+- The fresh integrated packet
+  `build/captures/v3_candidate_scope_full_stress_20260607` passed end to end:
+  V2 evidence, V3 placeholder artifacts, scene profile, material payload,
+  CompositeV3 diagnostics, and review-packet promotion decision.
+- More rendered sweeps are now possible, but capture size still needs active
+  monitoring.

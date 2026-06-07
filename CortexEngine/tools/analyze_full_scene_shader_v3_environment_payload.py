@@ -28,11 +28,23 @@ def analyze_report(path: Path) -> dict[str, Any]:
     environment = contract.get("environment", {})
     v3 = contract.get("full_scene_shader_pipeline_v3", {})
     scene_visual = contract.get("scene_visual_contract", {})
+    policy_contract = v3.get("scene_profile_policy_contract", {})
+    if not isinstance(policy_contract, dict):
+        policy_contract = {}
     row = {
         "report": str(path),
         "family": scene_visual.get("family", "unknown"),
         "profile_id": scene_visual.get("profile_id", "unknown"),
         "environment_ready": v3.get("scene_local_environment_ready") is True,
+        "profile_policy_consumed": v3.get("scene_local_environment_consumes_scene_profile_policy") is True,
+        "profile_policy_contract_id": v3.get("scene_local_environment_profile_contract_id", "unknown"),
+        "profile_policy_environment": v3.get("scene_local_environment_profile_policy", "unknown"),
+        "profile_policy_enclosure_mode": v3.get("scene_local_environment_profile_enclosure_mode", "unknown"),
+        "profile_policy_reflection": v3.get("scene_local_environment_profile_reflection_policy", "unknown"),
+        "scene_profile_policy_contract_id": policy_contract.get("contract_id", "unknown"),
+        "scene_profile_policy_environment": policy_contract.get("environment_policy", "unknown"),
+        "scene_profile_policy_enclosure_mode": policy_contract.get("enclosure_mode", "unknown"),
+        "scene_profile_policy_reflection": policy_contract.get("reflection_policy", "unknown"),
         "texture_set_id": environment.get("scene_local_texture_set_id", "none"),
         "texture_set_path": environment.get("scene_local_texture_set_path", ""),
         "texture_set_present": environment.get("scene_local_texture_set_present") is True,
@@ -48,6 +60,17 @@ def analyze_report(path: Path) -> dict[str, Any]:
         "v3_texture_set_id": v3.get("scene_local_texture_set_id", "none"),
         "failures": [],
     }
+    if row["environment_ready"]:
+        if not row["profile_policy_consumed"]:
+            row["failures"].append("environment ready without consuming SceneProfileV3 policy")
+        if row["profile_policy_contract_id"] != row["scene_profile_policy_contract_id"]:
+            row["failures"].append("environment profile contract id does not match SceneProfileV3 policy")
+        if row["profile_policy_environment"] != row["scene_profile_policy_environment"]:
+            row["failures"].append("environment policy does not match SceneProfileV3 policy")
+        if row["profile_policy_enclosure_mode"] != row["scene_profile_policy_enclosure_mode"]:
+            row["failures"].append("environment enclosure mode does not match SceneProfileV3 policy")
+        if row["profile_policy_reflection"] != row["scene_profile_policy_reflection"]:
+            row["failures"].append("environment reflection policy does not match SceneProfileV3 policy")
     if row["payload_ready"]:
         if row["texture_count"] < 2:
             row["failures"].append("payload ready with fewer than two textures")
@@ -74,10 +97,11 @@ def write_markdown(path: Path, result: dict[str, Any]) -> None:
         f"- report count: `{result['report_count']}`",
         f"- texture-set-present reports: `{result['texture_set_present_report_count']}`",
         f"- payload-ready reports: `{result['payload_ready_report_count']}`",
+        f"- profile-policy-consumed reports: `{result['profile_policy_consumed_report_count']}`",
         f"- failures: `{len(result['failures'])}`",
         "",
-        "| Family | Texture Set | Textures | Albedo | Normal | Payload | Proxies |",
-        "|---|---|---:|---:|---:|---|---|",
+        "| Family | Profile Policy | Texture Set | Textures | Albedo | Normal | Payload | Proxies |",
+        "|---|---|---|---:|---:|---:|---|---|",
     ]
     for row in result["rows"]:
         proxies = ",".join(
@@ -94,6 +118,7 @@ def write_markdown(path: Path, result: dict[str, Any]) -> None:
             + " | ".join(
                 [
                     str(row["family"]),
+                    f"`{row['profile_policy_environment']}`",
                     f"`{row['texture_set_id']}`",
                     str(row["texture_count"]),
                     str(row["albedo_count"]),
@@ -135,6 +160,7 @@ def main() -> int:
         "report_count": len(rows),
         "texture_set_present_report_count": sum(1 for row in rows if row["texture_set_present"]),
         "payload_ready_report_count": payload_ready_count,
+        "profile_policy_consumed_report_count": sum(1 for row in rows if row["profile_policy_consumed"]),
         "rows": rows,
         "failures": failures,
     }

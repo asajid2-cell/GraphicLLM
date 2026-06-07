@@ -464,7 +464,7 @@ def analyze_report(
                 failures.append("environment domain must expose environment_mode debug view")
             if environment_domain.get("default_beauty_affects") is not False:
                 failures.append("environment domain must not affect default beauty yet")
-            if environment_domain.get("ready_channel_count", 0) < 10:
+            if environment_domain.get("ready_channel_count", 0) < 13:
                 failures.append("environment domain ready without all required channels")
             mode = v3.get("scene_local_environment_mode")
             if mode not in {"enclosed_room", "open_exterior", "stage", "neutral_lab"}:
@@ -481,6 +481,20 @@ def analyze_report(
                     failures.append(f"environment domain ready with missing {key}")
             if int(v3.get("scene_local_environment_source_count", 0) or 0) < 4:
                 failures.append("environment domain ready without all source provenance channels")
+            policy_contract = v3.get("scene_profile_policy_contract")
+            if not isinstance(policy_contract, dict):
+                failures.append("environment domain ready without scene_profile_policy_contract")
+            else:
+                if v3.get("scene_local_environment_consumes_scene_profile_policy") is not True:
+                    failures.append("environment domain ready without consuming SceneProfileV3 policy")
+                if v3.get("scene_local_environment_profile_contract_id") != policy_contract.get("contract_id"):
+                    failures.append("environment profile contract id does not match SceneProfileV3 policy")
+                if v3.get("scene_local_environment_profile_enclosure_mode") != policy_contract.get("enclosure_mode"):
+                    failures.append("environment profile enclosure mode does not match SceneProfileV3 policy")
+                if v3.get("scene_local_environment_profile_policy") != policy_contract.get("environment_policy"):
+                    failures.append("environment policy does not match SceneProfileV3 policy")
+                if v3.get("scene_local_environment_profile_reflection_policy") != policy_contract.get("reflection_policy"):
+                    failures.append("environment reflection policy does not match SceneProfileV3 policy")
         for resource in [
             "scene_local_environment",
             "ambient_lighting",

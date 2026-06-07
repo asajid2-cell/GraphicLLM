@@ -9228,3 +9228,61 @@ Current next work:
    least gallery, enclosed room, stage/red room, and exterior.
 3. Continue toward LightingShadowV3 source split and ReflectionV3 resolver
    hardening before any strong CinematicPostV3 tuning.
+
+### SceneLocalEnvironmentV3 Cross-Profile Analyzer - 2026-06-07
+
+Implemented:
+
+- Added `tools/analyze_full_scene_shader_v3_environment_profiles.py`.
+  - Reads one or more packet manifests and frame reports.
+  - Summarizes selected shader profile, mode, local-background strength,
+    profile id, enclosure mode, and environment policy.
+  - Fails when ready environment reports lack known shader profiles or valid
+    mode/strength ranges.
+  - Can require distinct profile/mode counts and named profile/mode pairs.
+  - Strict by default for missing reports, with explicit
+    `--allow-missing-reports` for diagnostic manifests from known renderer
+    crash paths.
+- Wired the analyzer into `tools/validate_full_scene_shader_pipeline_v3_plan.py`
+  so it is part of the V3 runtime/validation surface.
+
+Validation:
+
+```powershell
+python -m py_compile tools\analyze_full_scene_shader_v3_environment_profiles.py tools\validate_full_scene_shader_pipeline_v3_plan.py
+python tools\validate_full_scene_shader_pipeline_v3_plan.py
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_scene_local_cinematic_renderer_v1_packets.ps1 -NoBuild -OutputRoot build\captures\v3_environment_profiles_model_family_probe_20260607 -FamilyFilter kitchen,gym,concert,red_room,stadium -ViewFilter scene_local_environment -SmokeFrames 4 -CaptureFrame 2 -CaptureSequenceCount 1 -SkipOwnerAnalysis -SkipMaterialAnalysis -SkipStabilityAnalysis -SkipVisualQualityAnalysis
+python tools\analyze_full_scene_shader_v3_environment_profiles.py --manifest build\captures\v3_scene_local_environment_shader_profile_stress_20260607\manifest.json --manifest build\captures\v3_environment_profiles_model_family_probe_20260607\manifest.json --output-json build\captures\v3_environment_profiles_model_family_probe_20260607\v3_environment_profiles_cross_probe.json --output-md build\captures\v3_environment_profiles_model_family_probe_20260607\v3_environment_profiles_cross_probe.md --allow-missing-reports --min-ready-reports 3 --min-distinct-modes 3 --min-distinct-profiles 3 --require-profile gallery_neutral=1 --require-profile enclosed_room=2 --require-profile stage=3
+```
+
+Evidence:
+
+- The model-family diagnostic packet returned nonzero due known model-scene
+  crash/hang behavior:
+  - kitchen exit `2173`, no report
+  - gym exit `1`, shutdown report present
+  - concert exit `0`
+  - red room exit `1`, shutdown report present
+  - stadium exit `0`
+- Cross-profile analyzer output:
+  `build\captures\v3_environment_profiles_model_family_probe_20260607\v3_environment_profiles_cross_probe.json/md`.
+  - reports: `58`
+  - environment-ready reports: `57`
+  - distinct shader profiles:
+    `enclosed_room`, `gallery_neutral`, `open_exterior`, `stage`
+  - distinct shader modes: `1.0`, `2.0`, `3.0`, `4.0`
+  - failures: `0`
+- This proves the SceneLocalEnvironmentV3 profile selector is not limited to
+  the gallery stress case. It also preserves the unresolved model-authored
+  kitchen crash as separate stability debt instead of hiding it.
+
+Current next work:
+
+1. Import/add texture payload sets for gallery, enclosed-room, stage, and
+   exterior families, then make shader selection use payload-backed radiance
+   rather than profile palette placeholders.
+2. Make the model-scene diagnostic path cleaner by separating "report evidence"
+   packets from "visual capture success" packets where DX12 device removal is
+   already known.
+3. Start LightingShadowV3 high-contrast source-split work after the environment
+   payload/resource path has at least one texture-backed non-gallery proof.

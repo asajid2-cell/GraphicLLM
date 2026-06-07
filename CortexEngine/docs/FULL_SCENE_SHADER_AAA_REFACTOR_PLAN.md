@@ -4,6 +4,277 @@ Status: planning ledger.
 
 Default beauty stays unchanged until a separate promotion gate passes.
 
+## 2026-06-07 Full Scene Shader Master Refactor Plan
+
+The next goal feature should be treated as a renderer architecture shift, not
+as one more visual effect. The target is a candidate-only full scene shader
+path that can eventually look like a high-end realtime renderer because every
+visible term is owned, inspectable, stable under motion, and promoted through
+evidence.
+
+The core decision:
+
+```text
+default renderer:
+  remains stable release path
+
+candidate renderer:
+  owns a new full-scene shader stack
+  proves each layer with resources, reports, debug views, and packets
+  becomes default only after cross-family user acceptance
+```
+
+### Visual Quality Target
+
+The engine should move toward these image properties:
+
+- rich PBR material response instead of flat proxy shading.
+- stable glossy and metallic surfaces under mouse motion.
+- local indoor/stage/exterior environment lighting without visible or
+  reflected IBL leakage.
+- direct, indirect, emissive, and shadow terms that can be art-directed
+  without fighting hidden fallback paths.
+- cinematic HDR composition with controlled exposure, bloom, tone mapping,
+  color grade, and bypass views.
+- final pixels that can be explained from named render resources.
+
+This is intentionally not "make post stronger." Post is the last stage. If
+materials, shadows, environment, and reflections are wrong, post is only
+allowed to reveal that debt, not hide it.
+
+### Required Refactor Shape
+
+The candidate path should be built as a typed resource graph:
+
+```text
+SceneProfileV3
+  -> scene family, enclosure, lighting rig, atmosphere profile,
+     reflection policy, exposure policy
+
+VisibilityV3
+  -> depth, motion, object ID, material ID, surface ID
+
+MaterialPayloadV3
+  -> base color, world normal, roughness, metallic, specular, AO,
+     emissive, opacity, transmission, clearcoat, sheen, anisotropy,
+     material class, surface class, missing-channel mask
+
+SceneLocalEnvironmentV3
+  -> visible background, diffuse irradiance, specular prefilter,
+     reflection background, atmosphere, ownership mask
+
+LightingShadowV3
+  -> direct light, unshadowed direct light, shadow visibility,
+     shadow loss, indirect diffuse, emissive indirect, energy budget
+
+ReflectionV3
+  -> radiance, confidence, source ID, rejected-source mask,
+     temporal delta, provider source signals, history validity,
+     source suppression
+
+TransparencyMediaV3
+  -> water, glass, transparent accumulation, decals, volumetric
+     inscatter, volumetric transmittance
+
+CompositeV3
+  -> candidate HDR, overbright mask, underlit mask, invalid energy,
+     contribution/debug views, legacy rescue usage
+
+CinematicPostV3
+  -> exposure meter, bloom extract, bloom resolve, tone mapped output,
+     color grade delta, final candidate LDR
+```
+
+Every arrow above must exist as a render-graph read/write edge or a declared
+frame contract field. If a layer cannot be inspected in a debug view, it is not
+ready to affect candidate beauty.
+
+### Refactor Principles
+
+1. Candidate-only until proven.
+   Default beauty must not be mutated while the candidate stack is incomplete.
+   This keeps release stability separate from experimental quality work.
+
+2. No anonymous fallback.
+   Legacy `hdr_color`, old IBLs, and fallback material defaults can exist only
+   as named rescue/reference lanes. Their usage must be measured as promotion
+   debt.
+
+3. Source-aware visual effects.
+   Reflections, shadows, environment, indirect light, water, and glass need to
+   expose where their signal came from and why alternatives were rejected.
+
+4. Stability before strength.
+   Do not increase reflection weight, bloom, contrast, shadow softness, or
+   color grading until the raw resource is stable under mouse jitter and camera
+   sweep.
+
+5. Scene-local by default.
+   Indoor rooms, stages, gyms, and galleries need local environments. Outdoor
+   panoramas may light the scene, but they must not leak as visible/reflected
+   imagery unless the scene profile allows it.
+
+6. Focused packets for iteration, full packets for promotion.
+   Small packets reproduce one bug class cheaply. Full cross-family packets are
+   only for promotion decisions.
+
+### Implementation Phases
+
+Phase 0: contract freeze.
+
+- Freeze canonical resource names in the JSON contract, C++ frame context,
+  frame report, debug view registry, packet scripts, and analyzers.
+- Add candidate promotion gates for missing, stale, blank, legacy-owned, and
+  uninspected resources.
+- Add explicit `legacy_rescue_usage` reporting for candidate composite.
+
+Exit gate:
+
+- packet analyzers can fail cleanly when any required V3 layer is missing.
+- default beauty is untouched.
+
+Phase 1: SceneProfileV3.
+
+- Add a compact scene profile object that describes enclosure, lighting intent,
+  reflection policy, environment policy, post policy, and family tags.
+- Use it to choose local environment, light rig, exposure constraints, and
+  reflection provider priorities.
+
+Exit gate:
+
+- gallery, kitchen, gym, concert, red room, stadium, and exterior profiles
+  produce different declared lighting/environment/reflection policies without
+  changing renderer code.
+
+Phase 2: MaterialPayloadV3 hardening.
+
+- Move all PBR material reads behind a concrete payload boundary.
+- Normalize ranges and expose missing texture/provider channels.
+- Require point/pixel-exact reads for categorical IDs and classes.
+- Add material closeup packets for metal, glass, water, tile, wood, plastic,
+  cloth, emissive, painted wall, and skin-like/subsurface placeholders.
+
+Exit gate:
+
+- material payload debug views explain the final material response.
+- missing-channel debt is visible and does not silently become a pretty default.
+
+Phase 3: SceneLocalEnvironmentV3.
+
+- Produce visible background, diffuse irradiance, specular prefilter,
+  reflection background, atmosphere, and ownership mask as real resources.
+- Support enclosed-room, stage, neutral lab, city/night, daylight interior, and
+  outdoor profiles.
+- Keep IBL blur as a tunable artistic input, not a correctness fix.
+
+Exit gate:
+
+- old-office IBL stress case remains enabled.
+- enclosed scenes no longer sharply reflect unrelated panorama imagery.
+- environment debug views explain visible, lighting, and reflection inputs.
+
+Phase 4: LightingShadowV3.
+
+- Rebuild direct, unshadowed, shadow visibility, shadow loss, indirect,
+  emissive indirect, and energy-budget resources.
+- Split shadow terms by source where practical: shadow map, contact, RT, and
+  screen-space.
+- Validate with locked exposure first.
+
+Exit gate:
+
+- floor/wall darkening can be attributed to a named shadow or lighting term.
+- shadow and lighting packets pass mouse jitter and camera sweep before mood
+  tuning begins.
+
+Phase 5: ReflectionV3 source fusion.
+
+- Keep local probe, SSR, RT/ray query, planar/hero probe, and environment
+  fallback separate until the resolver admits them.
+- Use confidence, history validity, source-ID hysteresis, disocclusion checks,
+  and rejection counters.
+- Smooth/metallic surfaces are the main acceptance case.
+
+Exit gate:
+
+- source IDs and confidence do not pop under mouse jitter.
+- raw provider signals remain inspectable even when rejected.
+
+Phase 6: TransparencyMediaV3.
+
+- Route water, glass, decals, transparent objects, particles, and volumetrics
+  through owned resources instead of opaque fallback paths.
+- Add ordering and energy diagnostics to avoid double lighting.
+
+Exit gate:
+
+- glass and water closeups are stable under motion.
+- transparent/media resources are visible before composite.
+
+Phase 7: CompositeV3.
+
+- Assemble candidate HDR from V3 material, lighting, environment, reflection,
+  transparency, emissive, atmosphere, and decals.
+- Keep legacy `hdr_color` only as a measured reference/rescue input.
+- Emit overbright, underlit, invalid-energy, contribution, and rescue-usage
+  debug views.
+
+Exit gate:
+
+- candidate HDR remains nonblank and explainable with legacy rescue disabled
+  or near zero for the target packet.
+
+Phase 8: CinematicPostV3.
+
+- Implement locked/manual exposure, bounded auto exposure, bloom
+  extract/resolve, glare, tone map, color grade, sharpening, vignette, optional
+  DOF, and final candidate LDR.
+- Provide bypass modes for raw HDR, no bloom, no grade, and final output.
+
+Exit gate:
+
+- post can be disabled layer by layer without hiding upstream instability.
+- bloom comes from real HDR/emissive masks.
+
+Phase 9: promotion matrix.
+
+- Run focused packets for reflection, shadows, material, environment,
+  transparency, composite, and post.
+- Then run full matrix:
+  gallery, kitchen, office, gym, classroom, concert, red room, stadium,
+  bathroom, bedroom, workshop, store, street, exterior water/vegetation.
+- Required motion rows:
+  static, mouse jitter, camera sweep, close-surface orbit, reflective-object
+  orbit, and high-contrast light sweep.
+
+Exit gate:
+
+- metrics pass.
+- contact sheets pass human review.
+- default and candidate comparison is documented.
+- user accepts promotion.
+
+### Near-Term Work Order
+
+The next implementation sequence should be:
+
+1. Finish the current `SceneLocalEnvironmentV3` producer/resource slice and
+   commit it as infrastructure, not as visual promotion.
+2. Add `SceneProfileV3` as the policy input that drives environment, lighting,
+   reflection, and post choices.
+3. Add environment-focused packets for old-office IBL, enclosed kitchen,
+   concert stage, and exterior water/vegetation.
+4. Convert `FullSceneCompositeV3` legacy HDR rescue into a measured
+   contribution/debug lane.
+5. Add candidate HDR contribution views so we can see material, direct,
+   indirect, reflection, environment, transparency, emissive, and rescue terms.
+6. Only then start stronger cinematic post.
+
+This order is deliberate: it gives the renderer a brain and a resource spine
+before we chase final beauty. The goal feature should complete when the
+candidate path can honestly show how it made the image, where it still used
+legacy rescue, and why it is stable enough to review.
+
 ## 2026-06-06 Goal Feature Refactor Decision
 
 The next goal feature is not a single shader, post effect, or IBL setting. It

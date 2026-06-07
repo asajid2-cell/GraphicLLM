@@ -3,6 +3,72 @@
 This is the living handoff for the AAA asset-quality goal.
 Read this after compaction before continuing.
 
+## 2026-06-07 Full Scene Shader Master Refactor Planning Update
+
+User direction:
+
+- Move toward full-scene shaders for breathtaking Unreal-style visuals.
+- Plan the entire refactor before completing the goal feature.
+- Do not treat stronger post, IBL blur, scene changes, or local screenshot
+  tuning as the root solution.
+
+Plan location:
+
+- `docs/FULL_SCENE_SHADER_AAA_REFACTOR_PLAN.md`
+- New section:
+  `2026-06-07 Full Scene Shader Master Refactor Plan`
+
+Current architectural decision:
+
+- Keep default beauty unchanged.
+- Build an opt-in `FullSceneCandidateBeautyV3` path.
+- The candidate path must be assembled from named, inspectable V3 resources:
+  `SceneProfileV3`, `VisibilityV3`, `MaterialPayloadV3`,
+  `SceneLocalEnvironmentV3`, `LightingShadowV3`, `ReflectionV3`,
+  `TransparencyMediaV3`, `CompositeV3`, and `CinematicPostV3`.
+- Legacy `hdr_color`, old IBLs, and fallback material defaults may remain only
+  as named rescue/reference lanes and must count as promotion debt.
+
+Refactor principles:
+
+- Candidate-only until proven.
+- No anonymous fallback.
+- Source-aware visual effects.
+- Stability before strength.
+- Scene-local environment ownership by default.
+- Focused packets for iteration, full packets for promotion.
+
+Planned implementation phases:
+
+1. Contract freeze and promotion gates.
+2. `SceneProfileV3` policy object.
+3. `MaterialPayloadV3` hardening.
+4. `SceneLocalEnvironmentV3` texture-backed split.
+5. `LightingShadowV3`.
+6. `ReflectionV3` source fusion.
+7. `TransparencyMediaV3`.
+8. `CompositeV3`.
+9. `CinematicPostV3`.
+10. Cross-family promotion matrix.
+
+Near-term work order:
+
+1. Finish the current uncommitted `SceneLocalEnvironmentV3` producer/resource
+   slice and commit it as infrastructure, not visual promotion.
+2. Add `SceneProfileV3` as the policy input that drives environment, lighting,
+   reflection, and post choices.
+3. Add environment-focused packets for old-office IBL, enclosed kitchen,
+   concert stage, and exterior water/vegetation.
+4. Convert `FullSceneCompositeV3` legacy HDR rescue into a measured
+   contribution/debug lane.
+5. Add candidate HDR contribution views for material, direct, indirect,
+   reflection, environment, transparency, emissive, and rescue terms.
+6. Start stronger cinematic post only after the resource spine and stability
+   gates are in place.
+
+Do not mark the goal complete from this plan. The next concrete checkpoint is
+a pushed `SceneLocalEnvironmentV3` infrastructure commit plus packet evidence.
+
 ## Goal
 
 Move beyond stable blockout scenes into a reusable asset-quality architecture

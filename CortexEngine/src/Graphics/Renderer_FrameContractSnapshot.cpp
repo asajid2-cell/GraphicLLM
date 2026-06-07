@@ -398,6 +398,16 @@ void Renderer::UpdateFrameContractSnapshot(Scene::ECS_Registry* registry,
         sceneLocalPayloadBinding.proxyBindingSource;
     contract.environment.sceneLocalProxyFallbackReason =
         sceneLocalPayloadBinding.proxyFallbackReason;
+    contract.environment.sceneLocalProxyDerivationMethod =
+        sceneLocalPayloadBinding.proxyDerivationMethod;
+    contract.environment.sceneLocalProxyRoomShell =
+        sceneLocalPayloadBinding.proxyRoomShell;
+    contract.environment.sceneLocalProxyRoomOcclusion =
+        sceneLocalPayloadBinding.proxyRoomOcclusion;
+    contract.environment.sceneLocalProxyLightRig =
+        sceneLocalPayloadBinding.proxyLightRig;
+    contract.environment.sceneLocalProxyLightAccentStrength =
+        sceneLocalPayloadBinding.proxyLightAccentStrength;
 
     contract.plannedFeatures = featurePlan.planned;
     contract.executedFeatures = featurePlan.active;

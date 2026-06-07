@@ -121,6 +121,11 @@ struct FrameContract {
         uint32_t sceneLocalProxyBoundResourceCount = 0;
         std::string sceneLocalProxyBindingSource = "none";
         std::string sceneLocalProxyFallbackReason = "none";
+        std::string sceneLocalProxyDerivationMethod = "none";
+        std::string sceneLocalProxyRoomShell = "none";
+        float sceneLocalProxyRoomOcclusion = 0.0f;
+        std::string sceneLocalProxyLightRig = "none";
+        float sceneLocalProxyLightAccentStrength = 0.0f;
     };
 
     struct GraphicsPresetInfo {

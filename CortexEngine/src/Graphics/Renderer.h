@@ -590,6 +590,11 @@ private:
         uint32_t boundProxyResourceCount = 0;
         std::string proxyBindingSource = "none";
         std::string proxyFallbackReason = "none";
+        std::string proxyDerivationMethod = "none";
+        std::string proxyRoomShell = "none";
+        float proxyRoomOcclusion = 0.0f;
+        std::string proxyLightRig = "none";
+        float proxyLightAccentStrength = 0.0f;
     };
     [[nodiscard]] SceneLocalEnvironmentV3PayloadBindingInfo BuildSceneLocalEnvironmentV3PayloadBindingInfo(
         bool queueMissingUploads);

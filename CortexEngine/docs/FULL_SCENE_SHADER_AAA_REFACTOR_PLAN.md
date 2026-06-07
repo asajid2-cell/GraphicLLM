@@ -652,11 +652,23 @@ SceneLocalEnvironmentV3 proxy-resource binding:
   passed environment payload/profile analysis across gallery, office, concert,
   and stadium with `4/4` scene-contract proxy reports and profile coverage for
   gallery, enclosed room, stage, and open exterior.
+- Runtime proxy-contract reporting now exists. Frame reports expose the proxy
+  derivation method, room shell, room occlusion, light rig, and light accent
+  strength in both the nested environment contract and the V3 report.
+- The environment-payload analyzer now compares those runtime fields against
+  `assets\textures\scene_local_proxy\proxy_manifest.json`.
+- Fresh runtime proxy-contract packet
+  `build\captures\v3_scene_local_runtime_proxy_contract_fresh_smoke_20260607`
+  passed with `54/54` runtime scene-contract proxy reports.
+- Cross-profile runtime proxy-contract packet
+  `build\captures\v3_scene_local_runtime_proxy_contract_cross_profile_20260607`
+  passed across gallery, office, concert, and stadium with runtime rooms
+  `gallery_partial`, `evening_enclosed_room`, `dark_stage_volume`, and
+  `open_exterior_bowl`.
 - This is still not final environment generation. The next environment step is
   to convert flat BC1 proxy colors into filtered diffuse irradiance and
-  specular prefilter/probe-like resources, and to feed room/light contract
-  fields into renderer frame reports directly instead of only the offline
-  manifest.
+  specular prefilter/probe-like resources, and to replace duplicated runtime
+  room/light mapping with manifest loading or generated code.
 
 ## 2026-06-07 Master Refactor Before Goal Feature Completion
 

@@ -718,20 +718,23 @@ def analyze_report(
     candidate_displayed = v3.get("candidate_beauty_displayed") is True
     if candidate_requested:
         candidate_producer = v3.get("candidate_beauty_producer")
-        candidate_pass_name = "CinematicPostV3" if candidate_producer == "CinematicPostV3" else "FullSceneCandidateBeautyV3"
+        candidate_pass_name = "CinematicPostV3"
         candidate_pass = find_frame_pass(report, candidate_pass_name)
         candidate_resource = find_frame_resource(report, "candidate_ldr_cinematic_output")
         if not isinstance(candidate_domain, dict):
             failures.append("candidate_beauty_requested=true but candidate_beauty domain is missing")
         else:
-            if candidate_domain.get("producer") not in {"CinematicPostV3", "FullSceneCandidateBeautyV3"}:
-                failures.append("candidate beauty must be produced by CinematicPostV3 or FullSceneCandidateBeautyV3")
+            if candidate_domain.get("producer") != "CinematicPostV3":
+                failures.append("candidate beauty must be produced by CinematicPostV3")
             if candidate_domain.get("output_resource") != "candidate_ldr_cinematic_output":
                 failures.append("candidate beauty must output candidate_ldr_cinematic_output")
             if candidate_domain.get("debug_view") != "candidate_beauty_v3":
                 failures.append("candidate beauty must expose candidate_beauty_v3 debug view")
             if candidate_domain.get("default_beauty_affects") is not False:
                 failures.append("candidate beauty must not affect default beauty")
+            channels = set(candidate_domain.get("channels", []))
+            if candidate_ready and "legacy_hdr_bridge_rejected" not in channels:
+                failures.append("candidate beauty ready requires legacy_hdr_bridge_rejected channel")
         if not isinstance(candidate_resource, dict) or candidate_resource.get("valid") is not True:
             failures.append("candidate beauty requested without valid candidate_ldr_cinematic_output resource")
         elif candidate_resource.get("size_matches_contract") is not True:
@@ -741,9 +744,10 @@ def analyze_report(
         else:
             if candidate_pass.get("executed") is not True:
                 failures.append(f"{candidate_pass_name} pass did not execute")
-            expected_input = "candidate_hdr_scene_color" if candidate_pass_name == "CinematicPostV3" else "hdr_color"
-            if expected_input not in candidate_pass.get("reads", []):
-                failures.append(f"{candidate_pass_name} pass does not read {expected_input}")
+            if "candidate_hdr_scene_color" not in candidate_pass.get("reads", []):
+                failures.append("CinematicPostV3 pass does not read candidate_hdr_scene_color")
+            if "hdr_color" in candidate_pass.get("reads", []):
+                failures.append("CinematicPostV3 candidate path must not read legacy hdr_color")
             if "candidate_ldr_cinematic_output" not in candidate_pass.get("writes", []):
                 failures.append(f"{candidate_pass_name} pass does not write candidate_ldr_cinematic_output")
         if candidate_ready:
@@ -753,10 +757,13 @@ def analyze_report(
             ]:
                 if v3.get(dependency) is not True:
                     failures.append(f"candidate_beauty_ready=true before {dependency}")
-            if v3.get("candidate_beauty_producer") not in {"CinematicPostV3", "FullSceneCandidateBeautyV3"}:
+            if v3.get("candidate_beauty_producer") != "CinematicPostV3":
                 failures.append("candidate_beauty_ready=true with wrong producer")
             if v3.get("candidate_beauty_output") != "candidate_ldr_cinematic_output":
                 failures.append("candidate_beauty_ready=true with wrong output")
+        legacy_bridge_pass = find_frame_pass(report, "FullSceneCandidateBeautyV3")
+        if candidate_ready and isinstance(legacy_bridge_pass, dict) and legacy_bridge_pass.get("executed") is True:
+            failures.append("candidate_beauty_ready=true while FullSceneCandidateBeautyV3 legacy bridge executed")
     if candidate_displayed:
         display_pass = find_frame_pass(report, "FullSceneCandidateBeautyV3Display")
         if not isinstance(display_pass, dict):

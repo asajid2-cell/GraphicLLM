@@ -1605,3 +1605,41 @@ Remaining limitation:
 - It is still candidate-only and not a default-beauty promotion.
 - The neutral floor is a temporary bounded scene-local fallback, not the final
   texture-backed `SceneLocalEnvironmentV3`.
+
+### Candidate Beauty Strict Gate Scaffold - 2026-06-06
+
+Implemented:
+
+- `candidate_beauty` is now validated as a required V3 domain.
+- The V3 contract rejects `hdr_color` and `ldr_cinematic_output` as ready
+  candidate-beauty inputs.
+- `candidate_beauty_ready` now requires the real path:
+  `CinematicPostV3(candidate_hdr_scene_color -> candidate_ldr_cinematic_output)`.
+- The placeholder analyzer and promotion gate fail candidate-ready rows that
+  come from the legacy `FullSceneCandidateBeautyV3` bridge.
+
+Evidence:
+
+- packet:
+  `build/captures/v3_candidate_beauty_strict_gate_static_gallery_20260606`.
+- packet status: `review_packet_passed`.
+- `v3_signal.json`:
+  - rows `32`, failures `0`, warnings `0`.
+  - candidate requested reports `4`.
+  - candidate ready reports `4`.
+  - candidate producers: `CinematicPostV3`, `none`.
+- `v3_stability.json`:
+  - `default_beauty_affects_any=false`.
+  - composite ready reports `32`.
+  - cinematic post ready reports `32`.
+- `promotion_decision.json`:
+  - `default_beauty_promotable=false`.
+  - failures `0`.
+  - warnings are limited to subset coverage: missing non-gallery families,
+    missing motion modes, and sequence count below promotion evidence.
+
+Remaining limitation:
+
+- This is a strict candidate-path gate, not a final visual-quality change.
+- Cross-family and motion evidence remain required before candidate/default
+  promotion.

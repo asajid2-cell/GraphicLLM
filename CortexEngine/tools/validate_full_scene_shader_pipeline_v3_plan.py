@@ -61,6 +61,7 @@ REQUIRED_DOMAINS = [
     "environment",
     "composite",
     "cinematic_post",
+    "candidate_beauty",
     "validation",
 ]
 
@@ -195,6 +196,26 @@ def main() -> int:
         "default_beauty_unchanged_until_promotion",
     ]:
         require(gate in validation_gates, errors, f"V3 validation missing gate: {gate}")
+
+    candidate_beauty_contract = domains.get("candidate_beauty", {})
+    require(
+        candidate_beauty_contract.get("producer") == "CinematicPostV3",
+        errors,
+        "V3 candidate_beauty contract must be produced by CinematicPostV3",
+    )
+    candidate_inputs = set(candidate_beauty_contract.get("required_inputs", []))
+    require(
+        "candidate_hdr_scene_color" in candidate_inputs,
+        errors,
+        "V3 candidate_beauty contract must require candidate_hdr_scene_color",
+    )
+    rejected_candidate_inputs = set(candidate_beauty_contract.get("rejected_ready_inputs", []))
+    for resource in ["hdr_color", "ldr_cinematic_output"]:
+        require(
+            resource in rejected_candidate_inputs,
+            errors,
+            f"V3 candidate_beauty contract must reject ready input: {resource}",
+        )
 
     reflection_contract = domains.get("reflection", {})
     reflection_resolver_inputs = set(reflection_contract.get("required_resolver_inputs", []))
@@ -383,6 +404,8 @@ def main() -> int:
         "CinematicPostV3Adapter",
         "candidate_ldr_cinematic_output",
         "candidate_ldr_cinematic_output_owned_by_cinematic_post_v3",
+        "legacy_hdr_bridge_rejected",
+        "legacy_hdr_bridge_present",
         "ldr_cinematic_output_owned",
         "exposure_meter_owned",
         "bloom_extract_owned",

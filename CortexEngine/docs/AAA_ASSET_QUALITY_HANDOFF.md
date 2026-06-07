@@ -3,6 +3,119 @@
 This is the living handoff for the AAA asset-quality goal.
 Read this after compaction before continuing.
 
+## 2026-06-07 LightingV3 Energy and Shadow Attribution Slice
+
+Purpose:
+
+- Move LightingV3 from a five-buffer split to a seven-buffer ownership
+  contract.
+- Make lighting instability explainable from actual LightingV3 producer terms,
+  not inferred from final color or legacy debug views.
+- Keep this candidate/debug infrastructure only; default beauty remains
+  unchanged.
+
+Implemented:
+
+- `FullSceneLightingV3` now writes seven MRT resources:
+  - `direct_lighting`.
+  - `direct_lighting_unshadowed`.
+  - `shadow_visibility`.
+  - `shadow_loss`.
+  - `indirect_lighting`.
+  - `lighting_energy_budget`.
+  - `shadow_source_attribution`.
+- `lighting_energy_budget` encodes:
+  - red: unshadowed direct-light luma budget.
+  - green: shadowed direct-light luma budget.
+  - blue: indirect/ambient luma budget.
+  - alpha: shadow-loss ratio against total direct+indirect luma.
+- `shadow_source_attribution` encodes:
+  - red: primary sun-shadow occlusion.
+  - green: total direct-light shadow-loss ratio.
+  - blue: shadow map enabled.
+  - alpha: PCSS enabled.
+- Added persistent resources, RTV/SRV descriptors, render-graph imports,
+  writes, frame-report resource inventory, pass memory accounting, and strict
+  LightingV3 readiness for the two new outputs.
+- Added debug views:
+  - `90` `FullSceneLightingV3EnergyBudget`.
+  - `91` `FullSceneLightingV3ShadowSourceAttribution`.
+- Added packet aliases:
+  - `v3_lighting_energy_budget`.
+  - `v3_shadow_source_attribution`.
+- Updated V3 contract JSON, plan validator, placeholder analyzer, lighting
+  motion view list, packet defaults, and debug-mode max to `91`.
+
+Validation:
+
+```powershell
+python -m py_compile tools\analyze_full_scene_shader_v3_lighting_motion.py tools\analyze_full_scene_shader_v3_placeholders.py tools\check_full_scene_shader_pipeline_v2_frame_report.py tools\validate_full_scene_shader_pipeline_v3_plan.py
+$files = @('tools\run_scene_local_cinematic_renderer_v1_packets.ps1','tools\run_full_scene_shader_pipeline_v3_packet.ps1','tools\run_full_scene_shader_pipeline_v3_lighting_motion_matrix.ps1','tools\run_scene_local_cinematic_renderer_v1_contract_tests.ps1')
+foreach ($file in $files) {
+  $tokens = $null
+  $errors = $null
+  [System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path $file), [ref]$tokens, [ref]$errors) | Out-Null
+  if ($errors.Count -gt 0) { $errors | Format-List; exit 1 }
+}
+python tools\validate_full_scene_shader_pipeline_v3_plan.py
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_scene_local_cinematic_renderer_v1_contract_tests.ps1
+git -c submodule.recurse=false diff --check -- <focused LightingV3 files>
+cmd.exe /d /c "call ""C:\Program Files\Microsoft Visual Studio\18\Community\Common7\Tools\VsDevCmd.bat"" -arch=x64 -host_arch=x64 >nul && set ""CORTEX_SKIP_ASSET_SYNC=1"" && ""C:\Program Files\Ninja\ninja.exe"" -C build CortexEngine -j 8"
+Copy-Item -LiteralPath assets\shaders\DeferredLighting.hlsl -Destination build\bin\assets\shaders\DeferredLighting.hlsl -Force
+Copy-Item -LiteralPath assets\final_art\full_scene_shader_pipeline_v3_contract.json -Destination build\bin\assets\final_art\full_scene_shader_pipeline_v3_contract.json -Force
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_scene_local_cinematic_renderer_v1_packets.ps1 -NoBuild -SkipOwnerAnalysis -SkipMaterialAnalysis -SkipStabilityAnalysis -SkipVisualQualityAnalysis -StressSceneOnly -StressSceneFilter rt_showcase:reflection_closeup -ViewFilter v3_direct_lighting,v3_direct_lighting_unshadowed,v3_shadow_visibility,v3_shadow_loss,v3_indirect_lighting,v3_lighting_energy_budget,v3_shadow_source_attribution -SmokeFrames 14 -CaptureFrame 7 -CaptureSequenceCount 1 -OutputRoot build\captures\v3_lighting_energy_shadow_attribution_v3_only_20260607_rerun
+python tools\analyze_full_scene_shader_debug_view_metrics.py --manifest build\captures\v3_lighting_energy_shadow_attribution_v3_only_20260607_rerun\manifest.json --output-json build\captures\v3_lighting_energy_shadow_attribution_v3_only_20260607_rerun\debug_view_metrics.json --output-md build\captures\v3_lighting_energy_shadow_attribution_v3_only_20260607_rerun\debug_view_metrics.md
+python tools\analyze_full_scene_shader_v3_placeholders.py --input build\captures\v3_lighting_energy_shadow_attribution_v3_only_20260607_rerun --signal-output build\captures\v3_lighting_energy_shadow_attribution_v3_only_20260607_rerun\v3_signal.json --stability-output build\captures\v3_lighting_energy_shadow_attribution_v3_only_20260607_rerun\v3_stability.json --require-lighting-split-ready --require-lighting-split-draw-count 1
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_scene_local_cinematic_renderer_v1_packets.ps1 -NoBuild -SkipOwnerAnalysis -SkipMaterialAnalysis -SkipStabilityAnalysis -SkipVisualQualityAnalysis -StressSceneOnly -StressSceneFilter rt_showcase:reflection_closeup -ViewFilter direct_light,direct_light_unshadowed,direct_light_shadow_loss,shadow_factor,ambient_ibl,v3_direct_lighting,v3_direct_lighting_unshadowed,v3_shadow_visibility,v3_shadow_loss,v3_indirect_lighting,v3_lighting_energy_budget,v3_shadow_source_attribution,candidate_hdr_scene_color,reflection_radiance,reflection_confidence,reflection_source_id -SmokeFrames 14 -CaptureFrame 7 -CaptureSequenceCount 1 -OutputRoot build\captures\v3_lighting_energy_shadow_attribution_signal_fullgate_20260607
+python tools\analyze_full_scene_shader_debug_view_metrics.py --manifest build\captures\v3_lighting_energy_shadow_attribution_signal_fullgate_20260607\manifest.json --output-json build\captures\v3_lighting_energy_shadow_attribution_signal_fullgate_20260607\debug_view_metrics.json --output-md build\captures\v3_lighting_energy_shadow_attribution_signal_fullgate_20260607\debug_view_metrics.md
+python tools\analyze_full_scene_shader_v3_placeholders.py --input build\captures\v3_lighting_energy_shadow_attribution_signal_fullgate_20260607 --signal-output build\captures\v3_lighting_energy_shadow_attribution_signal_fullgate_20260607\v3_signal.json --stability-output build\captures\v3_lighting_energy_shadow_attribution_signal_fullgate_20260607\v3_stability.json --require-lighting-signal-metrics
+```
+
+Evidence:
+
+- strict V3-only packet:
+  `build\captures\v3_lighting_energy_shadow_attribution_v3_only_20260607_rerun`.
+  - reports: `7`.
+  - `lighting_split_resources_ready=true`.
+  - `lighting_split_resource_count=7`.
+  - `FullSceneLightingV3.executed=true`.
+  - `FullSceneLightingV3.draw_count=1`.
+  - failures: `0`.
+  - warnings: `0`.
+- mixed signal packet:
+  `build\captures\v3_lighting_energy_shadow_attribution_signal_fullgate_20260607`.
+  - captured views: `16`.
+  - measured views: `16`.
+  - failures: `0`.
+  - lighting-signal metrics ready: `true`.
+  - `v3_lighting_energy_budget.mean_luma=0.101735`,
+    `nonblack_ratio=1.000000`.
+  - `v3_shadow_source_attribution.mean_luma=0.358283`,
+    `nonblack_ratio=1.000000`.
+  - `v3_shadow_loss.mean_luma=0.175342`.
+  - `v3_direct_lighting.mean_luma=0.431118`.
+  - `v3_direct_lighting_unshadowed.mean_luma=0.470973`.
+
+Notes:
+
+- The first mixed strict analyzer attempt failed because the runtime asset copy
+  still held the stale V3 contract JSON and because strict producer-readiness
+  was applied across legacy debug views where the split producer is not the
+  selected debug path. The corrected proof uses:
+  - V3-only packet for strict split readiness.
+  - mixed packet for signal sanity.
+- Native build succeeded. The known trailing `vswhere.exe` warning printed
+  after linking.
+
+Current next work:
+
+1. Add shadow-motion focused packets using `v3_lighting_energy_budget` and
+   `v3_shadow_source_attribution` under mouse jitter and light sweep.
+2. Start splitting shadow sources further if attribution shows instability:
+   directional shadow map, local spot shadow map, RT shadow mask, and PCSS
+   radius/softening should become separate named views before visual tuning.
+3. Do not promote default beauty from this slice.
+
 ## 2026-06-07 Full Scene Shader Master Refactor Planning Update
 
 User direction:

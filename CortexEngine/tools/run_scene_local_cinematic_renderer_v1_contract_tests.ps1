@@ -363,7 +363,7 @@ Assert-Contains "FrameContractJson.cpp" $frameContractJson "local_reflection_pro
 Assert-Contains "Renderer_FrameContractSnapshot.cpp" $frameContractSnapshot "localProbeRadianceEnabled"
 Assert-Contains "FrameContractValidation.cpp" $frameContractValidation "scene_visual_local_probe_radiance_disabled"
 Assert-Contains "FrameContractValidation.cpp" $frameContractValidation "scene_visual_local_probe_table_missing"
-Assert-Contains "Renderer_DebugSettings.cpp" $debugSettings "kMaxDebugViewMode = 89u"
+Assert-Contains "Renderer_DebugSettings.cpp" $debugSettings "kMaxDebugViewMode = 91u"
 Assert-Contains "Renderer_DebugSettings.cpp" $debugSettings "ReflectionOwner"
 Assert-Contains "Renderer_DebugSettings.cpp" $debugSettings "MaterialPolicy"
 Assert-Contains "SurfaceClassification.hlsli" $surfaceClassification "SurfaceNormalScaleCeiling"

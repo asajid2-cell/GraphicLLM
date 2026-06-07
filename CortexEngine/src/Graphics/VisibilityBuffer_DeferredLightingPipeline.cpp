@@ -236,7 +236,7 @@ Result<void> VisibilityBufferRenderer::CreateDeferredLightingPipeline() {
         splitPsoDesc.VS = {deferredVS.Value().data.data(), deferredVS.Value().data.size()};
         splitPsoDesc.PS = {splitPS.Value().data.data(), splitPS.Value().data.size()};
 
-        for (UINT i = 0; i < 5; ++i) {
+        for (UINT i = 0; i < 7; ++i) {
             splitPsoDesc.BlendState.RenderTarget[i].RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;
             splitPsoDesc.RTVFormats[i] = DXGI_FORMAT_R16G16B16A16_FLOAT;
         }
@@ -251,7 +251,7 @@ Result<void> VisibilityBufferRenderer::CreateDeferredLightingPipeline() {
 
         splitPsoDesc.InputLayout = {nullptr, 0};
         splitPsoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
-        splitPsoDesc.NumRenderTargets = 5;
+        splitPsoDesc.NumRenderTargets = 7;
         splitPsoDesc.SampleDesc.Count = 1;
 
         hr = device->CreateGraphicsPipelineState(&splitPsoDesc, IID_PPV_ARGS(&m_fullSceneLightingV3Pipeline));

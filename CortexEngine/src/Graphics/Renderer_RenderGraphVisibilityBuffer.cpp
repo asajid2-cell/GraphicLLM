@@ -24,6 +24,8 @@ DescriptorHandle SelectVBFullSceneLightingV3DebugSRV(const FullSceneLightingV3Ta
         case kVBDebugLightingV3ShadowVisibility: return descriptors.shadowVisibilitySRV;
         case kVBDebugLightingV3ShadowLoss: return descriptors.shadowLossSRV;
         case kVBDebugLightingV3Indirect: return descriptors.indirectLightingSRV;
+        case kVBDebugLightingV3EnergyBudget: return descriptors.lightingEnergyBudgetSRV;
+        case kVBDebugLightingV3ShadowAttribution: return descriptors.shadowSourceAttributionSRV;
         case kVBDebugLightingV3Direct:
         default: return descriptors.directLightingSRV;
     }
@@ -35,6 +37,8 @@ const char* SelectVBFullSceneLightingV3DebugResourceName(uint32_t debugView) {
         case kVBDebugLightingV3ShadowVisibility: return "shadow_visibility";
         case kVBDebugLightingV3ShadowLoss: return "shadow_loss";
         case kVBDebugLightingV3Indirect: return "indirect_lighting";
+        case kVBDebugLightingV3EnergyBudget: return "lighting_energy_budget";
+        case kVBDebugLightingV3ShadowAttribution: return "shadow_source_attribution";
         case kVBDebugLightingV3Direct:
         default: return "direct_lighting";
     }
@@ -92,7 +96,9 @@ Renderer::ExecuteVisibilityBufferInRenderGraph(Scene::ECS_Registry* registry) {
             m_mainTargets.lightingV3.resources.directLightingUnshadowed &&
             m_mainTargets.lightingV3.resources.shadowVisibility &&
             m_mainTargets.lightingV3.resources.shadowLoss &&
-            m_mainTargets.lightingV3.resources.indirectLighting;
+            m_mainTargets.lightingV3.resources.indirectLighting &&
+            m_mainTargets.lightingV3.resources.lightingEnergyBudget &&
+            m_mainTargets.lightingV3.resources.shadowSourceAttribution;
 
         m_services.renderGraph->BeginFrame();
         const VisibilityBufferGraphResources vbResources = ImportVisibilityBufferGraphResources(
@@ -113,6 +119,8 @@ Renderer::ExecuteVisibilityBufferInRenderGraph(Scene::ECS_Registry* registry) {
             m_mainTargets.lightingV3.resources.shadowVisibility.Get(),
             m_mainTargets.lightingV3.resources.shadowLoss.Get(),
             m_mainTargets.lightingV3.resources.indirectLighting.Get(),
+            m_mainTargets.lightingV3.resources.lightingEnergyBudget.Get(),
+            m_mainTargets.lightingV3.resources.shadowSourceAttribution.Get(),
             m_mainTargets.lightingV3.resources.state);
         const bool clusterGraphOwned =
             !debugPath &&
@@ -147,6 +155,8 @@ Renderer::ExecuteVisibilityBufferInRenderGraph(Scene::ECS_Registry* registry) {
         vbPassResources.shadowVisibility = vbResources.shadowVisibility;
         vbPassResources.shadowLoss = vbResources.shadowLoss;
         vbPassResources.indirectLighting = vbResources.indirectLighting;
+        vbPassResources.lightingEnergyBudget = vbResources.lightingEnergyBudget;
+        vbPassResources.shadowSourceAttribution = vbResources.shadowSourceAttribution;
         vbPassResources.debugSource = SelectVBGBufferDebugHandle(vbResources, vbDebugView);
         vbPassResources.lightingV3DebugSource = SelectVBFullSceneLightingV3DebugHandle(vbResources, vbDebugView);
 
@@ -259,6 +269,14 @@ Renderer::ExecuteVisibilityBufferInRenderGraph(Scene::ECS_Registry* registry) {
             m_mainTargets.lightingV3.resources.indirectLighting.Get();
         vbGraphContext.fullSceneLightingV3.targets.indirectLightingRTV =
             m_mainTargets.lightingV3.descriptors.indirectLightingRTV.cpu;
+        vbGraphContext.fullSceneLightingV3.targets.lightingEnergyBudget =
+            m_mainTargets.lightingV3.resources.lightingEnergyBudget.Get();
+        vbGraphContext.fullSceneLightingV3.targets.lightingEnergyBudgetRTV =
+            m_mainTargets.lightingV3.descriptors.lightingEnergyBudgetRTV.cpu;
+        vbGraphContext.fullSceneLightingV3.targets.shadowSourceAttribution =
+            m_mainTargets.lightingV3.resources.shadowSourceAttribution.Get();
+        vbGraphContext.fullSceneLightingV3.targets.shadowSourceAttributionRTV =
+            m_mainTargets.lightingV3.descriptors.shadowSourceAttributionRTV.cpu;
         vbGraphContext.fullSceneLightingV3.depthBuffer = m_depthResources.resources.buffer.Get();
         vbGraphContext.fullSceneLightingV3.depthSRV = m_depthResources.descriptors.srv;
         vbGraphContext.fullSceneLightingV3.envDiffuseResource = deferredInputs.envDiffuseResource;
@@ -371,7 +389,8 @@ Renderer::ExecuteVisibilityBufferInRenderGraph(Scene::ECS_Registry* registry) {
                                  "gbuffer_material_ext0", "gbuffer_material_ext1", "gbuffer_material_ext2",
                                  "brdf_lut", "cluster_ranges", "cluster_light_indices", "shadow_map"},
                                 {"direct_lighting", "direct_lighting_unshadowed", "shadow_visibility",
-                                 "shadow_loss", "indirect_lighting"},
+                                 "shadow_loss", "indirect_lighting", "lighting_energy_budget",
+                                 "shadow_source_attribution"},
                                 false, nullptr, true);
             }
             if (debugLightingV3) {

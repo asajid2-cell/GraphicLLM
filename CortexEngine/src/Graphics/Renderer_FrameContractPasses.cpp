@@ -80,6 +80,8 @@ void Renderer::RecordFramePass(const char* name,
         if (resource == "shadow_visibility") return resourceBytes(m_mainTargets.lightingV3.resources.shadowVisibility.Get());
         if (resource == "shadow_loss") return resourceBytes(m_mainTargets.lightingV3.resources.shadowLoss.Get());
         if (resource == "indirect_lighting") return resourceBytes(m_mainTargets.lightingV3.resources.indirectLighting.Get());
+        if (resource == "lighting_energy_budget") return resourceBytes(m_mainTargets.lightingV3.resources.lightingEnergyBudget.Get());
+        if (resource == "shadow_source_attribution") return resourceBytes(m_mainTargets.lightingV3.resources.shadowSourceAttribution.Get());
         if (resource == "reflection_radiance") return resourceBytes(m_mainTargets.reflectionV3.resources.radiance.Get());
         if (resource == "reflection_confidence") return resourceBytes(m_mainTargets.reflectionV3.resources.confidence.Get());
         if (resource == "reflection_source_id") return resourceBytes(m_mainTargets.reflectionV3.resources.sourceId.Get());
@@ -141,6 +143,7 @@ void Renderer::RecordFramePass(const char* name,
                 write == "reflection_history_v3_rejection" ||
                 write == "direct_lighting" || write == "direct_lighting_unshadowed" ||
                 write == "shadow_visibility" || write == "shadow_loss" || write == "indirect_lighting" ||
+                write == "lighting_energy_budget" || write == "shadow_source_attribution" ||
                 write == "gbuffer_normal_roughness" || write == "velocity" ||
                 write == "temporal_rejection_mask" || write == "taa_history" || write == "ssr_color") {
                 return std::string("render_resolution");

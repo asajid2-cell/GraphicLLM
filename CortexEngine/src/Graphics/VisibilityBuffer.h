@@ -297,6 +297,10 @@ public:
         D3D12_CPU_DESCRIPTOR_HANDLE shadowLossRTV{};
         ID3D12Resource* indirectLighting = nullptr;
         D3D12_CPU_DESCRIPTOR_HANDLE indirectLightingRTV{};
+        ID3D12Resource* lightingEnergyBudget = nullptr;
+        D3D12_CPU_DESCRIPTOR_HANDLE lightingEnergyBudgetRTV{};
+        ID3D12Resource* shadowSourceAttribution = nullptr;
+        D3D12_CPU_DESCRIPTOR_HANDLE shadowSourceAttributionRTV{};
     };
 
     Result<void> ApplyFullSceneLightingV3(

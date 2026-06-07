@@ -1245,6 +1245,9 @@ struct FullSceneShaderPipelineV3FrameContext {
         "direct_lighting",
         "indirect_lighting",
         "shadow_visibility",
+        "shadow_loss",
+        "lighting_energy_budget",
+        "shadow_source_attribution",
         "reflection_radiance",
         "reflection_confidence",
         "reflection_source_id",
@@ -1456,16 +1459,20 @@ inline FullSceneShaderPipelineV3FrameContext BuildFullSceneShaderPipelineV3Frame
         FullSceneShaderHasResource(contract, "direct_lighting_unshadowed") &&
         FullSceneShaderHasResource(contract, "shadow_visibility") &&
         FullSceneShaderHasResource(contract, "shadow_loss") &&
-        FullSceneShaderHasResource(contract, "indirect_lighting");
+        FullSceneShaderHasResource(contract, "indirect_lighting") &&
+        FullSceneShaderHasResource(contract, "lighting_energy_budget") &&
+        FullSceneShaderHasResource(contract, "shadow_source_attribution");
     context.lightingSplitResourcesReady =
         context.lightingSplitResourcesAllocated &&
         FullSceneShaderPassWritesResource(contract, "FullSceneLightingV3", "direct_lighting") &&
         FullSceneShaderPassWritesResource(contract, "FullSceneLightingV3", "direct_lighting_unshadowed") &&
         FullSceneShaderPassWritesResource(contract, "FullSceneLightingV3", "shadow_visibility") &&
         FullSceneShaderPassWritesResource(contract, "FullSceneLightingV3", "shadow_loss") &&
-        FullSceneShaderPassWritesResource(contract, "FullSceneLightingV3", "indirect_lighting");
+        FullSceneShaderPassWritesResource(contract, "FullSceneLightingV3", "indirect_lighting") &&
+        FullSceneShaderPassWritesResource(contract, "FullSceneLightingV3", "lighting_energy_budget") &&
+        FullSceneShaderPassWritesResource(contract, "FullSceneLightingV3", "shadow_source_attribution");
     context.lightingAdapterSignalCount = lightingAdapterReady ? 4u : 0u;
-    context.lightingSplitResourceCount = context.lightingSplitResourcesAllocated ? 5u : 0u;
+    context.lightingSplitResourceCount = context.lightingSplitResourcesAllocated ? 7u : 0u;
 
     FullSceneShaderPipelineV3DomainEvidence lightingDomain =
         MakeFullSceneShaderPipelineV3DomainEvidence(
@@ -1474,7 +1481,7 @@ inline FullSceneShaderPipelineV3FrameContext BuildFullSceneShaderPipelineV3Frame
             context.lightingSplitResourcesReady ? "lighting_split" : "hdr_color",
             "VB_DeferredDirectLight",
             context.lightingSplitResourcesReady
-                ? "FullSceneLightingV3 writes direct/unshadowed/shadow/indirect split lighting resources"
+                ? "FullSceneLightingV3 writes direct/unshadowed/shadow/indirect plus energy and attribution split lighting resources"
                 : lightingAdapterReady
                 ? "FullSceneLightingV3 adapter is backed by VBDeferredLighting -> hdr_color; split V3 lighting resources are pending"
                 : "FullSceneLightingV3 adapter is missing current deferred lighting ownership");
@@ -1489,6 +1496,8 @@ inline FullSceneShaderPipelineV3FrameContext BuildFullSceneShaderPipelineV3Frame
         "shadow_visibility",
         "shadow_loss",
         "indirect_lighting",
+        "lighting_energy_budget",
+        "shadow_source_attribution",
     };
     lightingDomain.debugViews = {
         "VB_DeferredDirectLight",
@@ -1496,6 +1505,8 @@ inline FullSceneShaderPipelineV3FrameContext BuildFullSceneShaderPipelineV3Frame
         "VB_DeferredDirectLightShadowLoss",
         "VB_DeferredShadowFactor",
         "VB_DeferredAmbientIBL",
+        "FullSceneLightingV3EnergyBudget",
+        "FullSceneLightingV3ShadowSourceAttribution",
     };
     lightingDomain.channels = {
         "direct_lighting_debug",
@@ -1503,10 +1514,12 @@ inline FullSceneShaderPipelineV3FrameContext BuildFullSceneShaderPipelineV3Frame
         "shadow_loss_debug",
         "shadow_factor_debug",
         "ambient_ibl_debug",
+        "lighting_energy_budget",
+        "shadow_source_attribution",
     };
     lightingDomain.backingResourceCount = 1u + context.lightingSplitResourceCount;
-    lightingDomain.requiredChannelCount = 5u;
-    lightingDomain.readyChannelCount = lightingAdapterReady ? 5u : 0u;
+    lightingDomain.requiredChannelCount = 7u;
+    lightingDomain.readyChannelCount = context.lightingSplitResourcesReady ? 7u : (lightingAdapterReady ? 5u : 0u);
     lightingDomain.missingRequiredChannelCount =
         lightingDomain.requiredChannelCount - lightingDomain.readyChannelCount;
 

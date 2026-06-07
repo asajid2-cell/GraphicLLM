@@ -13,6 +13,9 @@ REQUIRED_OUTPUTS = {
     "direct_lighting",
     "indirect_lighting",
     "shadow_visibility",
+    "shadow_loss",
+    "lighting_energy_budget",
+    "shadow_source_attribution",
     "reflection_radiance",
     "reflection_confidence",
     "reflection_source_id",
@@ -75,6 +78,8 @@ LIGHTING_SIGNAL_THRESHOLDS = {
     "v3_shadow_visibility": {"min_mean_luma": 0.02, "max_mean_luma": 0.98, "min_nonblack_ratio": 0.05},
     "v3_shadow_loss": {"min_mean_luma": 0.005, "min_nonblack_ratio": 0.01},
     "v3_indirect_lighting": {"min_mean_luma": 0.01, "min_nonblack_ratio": 0.05},
+    "v3_lighting_energy_budget": {"min_mean_luma": 0.001, "min_nonblack_ratio": 0.05},
+    "v3_shadow_source_attribution": {"min_mean_luma": 0.001, "min_nonblack_ratio": 0.05},
     "reflection_radiance": {"min_mean_luma": 0.001, "min_nonblack_ratio": 0.001},
     "reflection_confidence": {"min_mean_luma": 0.001, "min_nonblack_ratio": 0.001},
     "reflection_source_id": {"min_mean_luma": 0.001, "min_nonblack_ratio": 0.001},
@@ -423,6 +428,8 @@ def analyze_report(
                     "shadow_visibility",
                     "shadow_loss",
                     "indirect_lighting",
+                    "lighting_energy_budget",
+                    "shadow_source_attribution",
                 }
                 - writes
             )

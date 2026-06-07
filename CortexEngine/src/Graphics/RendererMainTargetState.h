@@ -66,6 +66,8 @@ struct FullSceneLightingV3TargetResources {
     ComPtr<ID3D12Resource> shadowVisibility;
     ComPtr<ID3D12Resource> shadowLoss;
     ComPtr<ID3D12Resource> indirectLighting;
+    ComPtr<ID3D12Resource> lightingEnergyBudget;
+    ComPtr<ID3D12Resource> shadowSourceAttribution;
     D3D12_RESOURCE_STATES state = D3D12_RESOURCE_STATE_COMMON;
 
     void Reset() {
@@ -74,6 +76,8 @@ struct FullSceneLightingV3TargetResources {
         shadowVisibility.Reset();
         shadowLoss.Reset();
         indirectLighting.Reset();
+        lightingEnergyBudget.Reset();
+        shadowSourceAttribution.Reset();
         state = D3D12_RESOURCE_STATE_COMMON;
     }
 };
@@ -89,6 +93,10 @@ struct FullSceneLightingV3TargetDescriptors {
     DescriptorHandle shadowLossSRV;
     DescriptorHandle indirectLightingRTV;
     DescriptorHandle indirectLightingSRV;
+    DescriptorHandle lightingEnergyBudgetRTV;
+    DescriptorHandle lightingEnergyBudgetSRV;
+    DescriptorHandle shadowSourceAttributionRTV;
+    DescriptorHandle shadowSourceAttributionSRV;
 
     void Reset() {
         directLightingRTV = {};
@@ -101,6 +109,10 @@ struct FullSceneLightingV3TargetDescriptors {
         shadowLossSRV = {};
         indirectLightingRTV = {};
         indirectLightingSRV = {};
+        lightingEnergyBudgetRTV = {};
+        lightingEnergyBudgetSRV = {};
+        shadowSourceAttributionRTV = {};
+        shadowSourceAttributionSRV = {};
     }
 };
 
@@ -1159,6 +1171,18 @@ struct FullSceneLightingV3TargetState {
                                      descriptors.indirectLightingRTV,
                                      descriptors.indirectLightingSRV);
         if (indirect.IsErr()) return indirect;
+
+        auto energyBudget = createTarget("lighting_energy_budget",
+                                         resources.lightingEnergyBudget,
+                                         descriptors.lightingEnergyBudgetRTV,
+                                         descriptors.lightingEnergyBudgetSRV);
+        if (energyBudget.IsErr()) return energyBudget;
+
+        auto shadowAttribution = createTarget("shadow_source_attribution",
+                                              resources.shadowSourceAttribution,
+                                              descriptors.shadowSourceAttributionRTV,
+                                              descriptors.shadowSourceAttributionSRV);
+        if (shadowAttribution.IsErr()) return shadowAttribution;
 
         resources.state = D3D12_RESOURCE_STATE_RENDER_TARGET;
         return Result<void>::Ok();

@@ -20,6 +20,9 @@
         "direct_lighting",
         "indirect_lighting",
         "shadow_visibility",
+        "shadow_loss",
+        "lighting_energy_budget",
+        "shadow_source_attribution",
         "reflection_radiance",
         "reflection_confidence",
         "reflection_source_id",
@@ -123,7 +126,9 @@
         "direct_lighting_unshadowed",
         "shadow_visibility",
         "shadow_loss",
-        "indirect_lighting"
+        "indirect_lighting",
+        "lighting_energy_budget",
+        "shadow_source_attribution"
       ],
       "current_adapter_debug_views": [
         "VB_DeferredDirectLight",
@@ -138,6 +143,8 @@
         "shadow_visibility",
         "shadow_loss",
         "indirect_light",
+        "lighting_energy_budget",
+        "shadow_source_attribution",
         "lighting_overbright",
         "lighting_underlit"
       ]

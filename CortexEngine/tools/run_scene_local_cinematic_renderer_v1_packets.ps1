@@ -76,6 +76,8 @@ $views = @(
     [pscustomobject]@{ Name = "v3_shadow_visibility"; DebugView = 64 },
     [pscustomobject]@{ Name = "v3_shadow_loss"; DebugView = 65 },
     [pscustomobject]@{ Name = "v3_indirect_lighting"; DebugView = 66 },
+    [pscustomobject]@{ Name = "v3_lighting_energy_budget"; DebugView = 90 },
+    [pscustomobject]@{ Name = "v3_shadow_source_attribution"; DebugView = 91 },
     [pscustomobject]@{ Name = "candidate_hdr_scene_color"; DebugView = 67; CandidateBeautyV3 = $true },
     [pscustomobject]@{ Name = "energy_clamp_policy"; DebugView = 80; CandidateBeautyV3 = $true },
     [pscustomobject]@{ Name = "overbright_diagnostics"; DebugView = 81; CandidateBeautyV3 = $true },

@@ -8,7 +8,7 @@
 namespace Cortex::Graphics {
 
 namespace {
-constexpr uint32_t kMaxDebugViewMode = 89u;
+constexpr uint32_t kMaxDebugViewMode = 91u;
 }
 
 int Renderer::GetDebugViewMode() const {
@@ -79,6 +79,7 @@ void Renderer::CycleDebugViewMode() {
     // 68-74, 79 = FullSceneReflectionV3 resolver outputs.
     // 75-78 = FullSceneReflectionHistoryV3 outputs.
     // 80-81, 88-89 = FullSceneCompositeV3 diagnostics.
+    // 90-91 = FullSceneLightingV3 attribution diagnostics.
     // 83-87 = SceneLocalEnvironmentV3 outputs.
     m_debugViewState.mode = (m_debugViewState.mode + 1) % (kMaxDebugViewMode + 1u);
     const char* label = nullptr;
@@ -173,6 +174,8 @@ void Renderer::CycleDebugViewMode() {
         case 87: label = "SceneLocalEnvironmentV3Atmosphere"; break;
         case 88: label = "FullSceneCompositeV3ContributionMap"; break;
         case 89: label = "FullSceneCompositeV3LegacyRescueUsage"; break;
+        case 90: label = "FullSceneLightingV3EnergyBudget"; break;
+        case 91: label = "FullSceneLightingV3ShadowSourceAttribution"; break;
         default: label = "Unknown"; break;
     }
     spdlog::info("Debug view mode: {}", label);

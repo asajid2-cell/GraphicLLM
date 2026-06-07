@@ -256,6 +256,10 @@ foundation that makes later visual work faster:
 4. Add an explicit "candidate path debt" section to frame JSON:
    material debt, environment debt, lighting debt, reflection debt, composite
    debt, and post debt.
+   This is now implemented as `candidate_path_debt` in the V3 runtime report.
+   It summarizes missing required channels per candidate domain, render-graph
+   missing producer resources, total missing required channels, not-ready domain
+   count, and whether legacy rescue is still a live resource.
 5. Run one focused packet and one cross-family report-only packet.
 
 This gives us the harness needed to make later shader work less hand-wavy.

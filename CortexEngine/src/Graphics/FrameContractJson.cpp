@@ -360,6 +360,37 @@ json FullSceneShaderPipelineV3ToJson(const FrameContract& contract) {
             {"missing_required_channel_count", domain.missingRequiredChannelCount}
         });
     }
+    auto domainMissing = [&context](const std::string& id) -> uint32_t {
+        auto it = std::find_if(
+            context.domains.begin(),
+            context.domains.end(),
+            [&id](const FullSceneShaderPipelineV3DomainEvidence& domain) {
+                return domain.id == id;
+            });
+        return it != context.domains.end() ? it->missingRequiredChannelCount : 0u;
+    };
+    uint32_t totalMissingRequiredChannels = 0;
+    uint32_t notReadyDomainCount = 0;
+    for (const auto& domain : context.domains) {
+        totalMissingRequiredChannels += domain.missingRequiredChannelCount;
+        if (!domain.ready) {
+            ++notReadyDomainCount;
+        }
+    }
+    const json candidatePathDebt = {
+        {"render_graph_missing_producer_count", context.renderGraphV3MissingProducerCount},
+        {"render_graph_missing_producer_resources", context.renderGraphV3MissingProducerResources},
+        {"material_missing_required_channels", domainMissing("material")},
+        {"lighting_missing_required_channels", domainMissing("lighting")},
+        {"environment_missing_required_channels", domainMissing("environment")},
+        {"reflection_missing_required_channels", domainMissing("reflection")},
+        {"composite_missing_required_channels", domainMissing("composite")},
+        {"cinematic_post_missing_required_channels", domainMissing("cinematic_post")},
+        {"candidate_beauty_missing_required_channels", domainMissing("candidate_beauty")},
+        {"total_missing_required_channels", totalMissingRequiredChannels},
+        {"not_ready_domain_count", notReadyDomainCount},
+        {"legacy_rescue_resource_ready", context.compositeLegacyRescueUsageReady}
+    };
 
     return {
         {"schema", context.schema},
@@ -384,6 +415,7 @@ json FullSceneShaderPipelineV3ToJson(const FrameContract& contract) {
         {"render_graph_v3_read_resources", context.renderGraphV3ReadResources},
         {"render_graph_v3_written_resources", context.renderGraphV3WrittenResources},
         {"render_graph_v3_missing_producer_resources", context.renderGraphV3MissingProducerResources},
+        {"candidate_path_debt", candidatePathDebt},
         {"scene_profile_ready", context.sceneProfileReady},
         {"scene_profile_policy_count", context.sceneProfilePolicyCount},
         {"scene_profile_policy_contract_ready", context.sceneProfilePolicyContractReady},

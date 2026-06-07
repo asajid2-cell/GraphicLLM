@@ -164,6 +164,45 @@ Latest RenderGraphV3 inventory checkpoint:
   - `local_reflection_radiance` is visible remaining provider debt for the next
     ReflectionV3/local-probe slice, not a hidden failure.
 
+Latest candidate-path debt checkpoint:
+
+- Added explicit `candidate_path_debt` to
+  `frame_contract.full_scene_shader_pipeline_v3`.
+- Debt is derived from existing V3 domain evidence and RenderGraphV3 inventory,
+  not maintained as independent state.
+- Debt fields:
+  - `render_graph_missing_producer_count`
+  - `render_graph_missing_producer_resources`
+  - `material_missing_required_channels`
+  - `lighting_missing_required_channels`
+  - `environment_missing_required_channels`
+  - `reflection_missing_required_channels`
+  - `composite_missing_required_channels`
+  - `cinematic_post_missing_required_channels`
+  - `candidate_beauty_missing_required_channels`
+  - `total_missing_required_channels`
+  - `not_ready_domain_count`
+  - `legacy_rescue_resource_ready`
+- `tools\analyze_full_scene_shader_v3_placeholders.py` now fails if
+  `candidate_path_debt` or required debt fields are missing.
+- `tools\validate_full_scene_shader_pipeline_v3_plan.py` and
+  `assets\final_art\full_scene_shader_pipeline_v3_contract.json` now require
+  the debt field list.
+- Fresh focused packet:
+  `build\captures\v3_candidate_path_debt_fresh_smoke_20260607`
+  passed end to end.
+- Sampled debt object from
+  `stress_rt_showcase_reflection_closeup\beauty\frame_report_shutdown.json`:
+  - `total_missing_required_channels=8`
+  - `not_ready_domain_count=4`
+  - `render_graph_missing_producer_count=1`
+  - `render_graph_missing_producer_resources=["local_reflection_radiance"]`
+  - `candidate_beauty_missing_required_channels=6`
+  - `composite_missing_required_channels=2`
+  - material, lighting, environment, reflection, and cinematic post missing
+    required channels are all `0`
+  - `legacy_rescue_resource_ready=false`
+
 Current planning checkpoint:
 
 - Latest implementation moved `SceneLocalEnvironmentV3` proxy generation from

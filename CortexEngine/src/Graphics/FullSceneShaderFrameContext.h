@@ -1397,6 +1397,7 @@ inline FullSceneShaderPipelineV3FrameContext BuildFullSceneShaderPipelineV3Frame
         "reflection_policy",
         "temporal_policy",
         "post_sensitivity",
+        "missing_channel_mask",
     };
     uint32_t readyMaterialResources = 0;
     for (const std::string& resource : materialBackingResources) {
@@ -1434,6 +1435,7 @@ inline FullSceneShaderPipelineV3FrameContext BuildFullSceneShaderPipelineV3Frame
         "VB_GBuffer_MaterialExt0",
         "VB_GBuffer_MaterialExt1",
         "VB_GBuffer_SurfaceClass",
+        "VB_MaterialMissingChannelMask",
         "VB_MaterialFamilyPolicy",
         "VB_ReflectionPolicy",
         "VB_TemporalPolicy",

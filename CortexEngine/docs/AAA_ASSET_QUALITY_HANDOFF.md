@@ -28,16 +28,17 @@ Current candidate-only state:
 - Focused reflection motion packets exist, and forced-SSR reflection-history
   warnings were resolved in the latest focused/full stress evidence.
 - Standard V3 packets cover material base color, normal, roughness, metallic,
-  and material class.
-- Remaining explicit material debt: `material_missing_channel_mask` is still
-  absent as a real debug resource or strict equivalent gate.
+  material class, and `material_missing_channel_mask`.
+- `material_missing_channel_mask` is now required by contract, included in
+  frame evidence as `VB_MaterialMissingChannelMask`, and quantified by the V3
+  material analyzer.
 - Focused shadow-motion packets exist; high-contrast light-sweep coverage is
   still missing.
 
 Current refactor queue:
 
 1. Contract reconciliation and promotion gate hardening.
-2. `MaterialPayloadV3` missing-channel ownership.
+2. `MaterialPayloadV3` missing-channel ownership. Current aggregate path done.
 3. `SceneProfileV3` policy owner.
 4. `SceneLocalEnvironmentV3` texture/resource ownership.
 5. `LightingShadowV3` high-contrast stress and source split.
@@ -47,22 +48,66 @@ Current refactor queue:
 9. `CinematicPostV3`.
 10. Cross-family promotion matrix.
 
-Next concrete implementation slice:
+Latest material ownership slice:
 
 ```text
 MaterialPayloadV3 missing-channel ownership
-  -> contract resource or equivalent strict frame-report gate
-  -> packet aliases and debug mode
-  -> analyzer failure when required material ownership is absent
+  -> contract channel
+  -> VB_MaterialMissingChannelMask frame evidence
+  -> packet alias/debug view
+  -> analyzer coverage and debt summary
   -> focused material packet evidence
 ```
 
-Why next:
+Implemented:
 
-- Stronger lighting, reflections, composite, and post all depend on honest
-  material payload ownership. If missing normals, roughness, emissive,
-  transparency, or other channels silently fall back, later beauty work will
-  tune around bad inputs.
+- `assets\final_art\full_scene_shader_pipeline_v3_contract.json` now includes
+  `missing_channel_mask` as a required material channel.
+- `src\Graphics\FullSceneShaderFrameContext.h` includes
+  `missing_channel_mask` in material channel inventory and
+  `VB_MaterialMissingChannelMask` in material-domain debug views.
+- `tools\analyze_full_scene_shader_v3_material_payload.py` now requires the
+  mask to be captured but treats a black mask as valid zero debt; it also
+  reports max mask luma and nonblack ratio.
+- Added `tools\run_material_payload_v3_focus_packet.ps1`.
+
+Validation:
+
+```powershell
+python -m py_compile tools\analyze_full_scene_shader_v3_material_payload.py tools\validate_full_scene_shader_pipeline_v3_plan.py
+$tokens=$null; $errors=$null; [System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path tools\run_material_payload_v3_focus_packet.ps1), [ref]$tokens, [ref]$errors) | Out-Null; if ($errors.Count -gt 0) { $errors | Format-List; exit 1 }
+python tools\validate_full_scene_shader_pipeline_v3_plan.py
+git -c submodule.recurse=false diff --check -- src\Graphics\FullSceneShaderFrameContext.h tools\analyze_full_scene_shader_v3_material_payload.py tools\run_material_payload_v3_focus_packet.ps1 assets\final_art\full_scene_shader_pipeline_v3_contract.json
+cmd.exe /d /c "call ""C:\Program Files\Microsoft Visual Studio\18\Community\Common7\Tools\VsDevCmd.bat"" -arch=x64 -host_arch=x64 >nul && set ""CORTEX_SKIP_ASSET_SYNC=1"" && ""C:\Program Files\Ninja\ninja.exe"" -C build CortexEngine -j 8"
+Copy-Item -LiteralPath assets\final_art\full_scene_shader_pipeline_v3_contract.json -Destination build\bin\assets\final_art\full_scene_shader_pipeline_v3_contract.json -Force
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_material_payload_v3_focus_packet.ps1 -NoBuild -OutputRoot build\captures\material_payload_missing_channel_focus_20260607_rerun -SmokeFrames 14 -CaptureFrame 7 -CaptureSequenceCount 1
+```
+
+Evidence:
+
+- packet: `build\captures\material_payload_missing_channel_focus_20260607_rerun`.
+- `ready=true`.
+- failures: `0`.
+- warnings: `0`.
+- contract debug-view debt: `0`.
+- `material_missing_channel_mask` coverage: `covered`.
+- missing-channel mask max mean luma: `0.815266`.
+- missing-channel mask max nonblack: `1.000000`.
+- frame report shows `material_attributes_channel_count=18`,
+  `missing_required_channel_count=0`, and `VB_MaterialMissingChannelMask` in
+  material-domain debug views.
+
+Next concrete implementation slice:
+
+```text
+SceneProfileV3 policy owner
+  -> declared profile object for scene family, enclosure, environment,
+     lighting, reflection, exposure, material expectations, post, and motion
+  -> frame-report profile evidence
+  -> profile-driven differences for neutral lab, gallery, kitchen, concert,
+     gym, red room, stadium, and exterior water
+  -> focused profile packet evidence
+```
 
 Goal status:
 

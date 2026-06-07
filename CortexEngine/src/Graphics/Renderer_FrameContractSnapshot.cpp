@@ -426,6 +426,8 @@ void Renderer::UpdateFrameContractSnapshot(Scene::ECS_Registry* registry,
     addResource("shadow_visibility", m_mainTargets.lightingV3.resources.shadowVisibility.Get(), contract.renderWidth, contract.renderHeight);
     addResource("shadow_loss", m_mainTargets.lightingV3.resources.shadowLoss.Get(), contract.renderWidth, contract.renderHeight);
     addResource("indirect_lighting", m_mainTargets.lightingV3.resources.indirectLighting.Get(), contract.renderWidth, contract.renderHeight);
+    addResource("lighting_energy_budget", m_mainTargets.lightingV3.resources.lightingEnergyBudget.Get(), contract.renderWidth, contract.renderHeight);
+    addResource("shadow_source_attribution", m_mainTargets.lightingV3.resources.shadowSourceAttribution.Get(), contract.renderWidth, contract.renderHeight);
     addResource("scene_local_environment", m_mainTargets.environmentV3.resources.sceneLocalEnvironment.Get(), contract.renderWidth, contract.renderHeight);
     addResource("ambient_lighting", m_mainTargets.environmentV3.resources.ambientLighting.Get(), contract.renderWidth, contract.renderHeight);
     addResource("visible_background", m_mainTargets.environmentV3.resources.visibleBackground.Get(), contract.renderWidth, contract.renderHeight);

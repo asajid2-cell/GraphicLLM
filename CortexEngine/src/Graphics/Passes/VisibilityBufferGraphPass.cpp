@@ -55,7 +55,9 @@ void RecordFailure(const StageFailureContext& failure, const char* stage, const 
            resources.directLightingUnshadowed.IsValid() &&
            resources.shadowVisibility.IsValid() &&
            resources.shadowLoss.IsValid() &&
-           resources.indirectLighting.IsValid();
+           resources.indirectLighting.IsValid() &&
+           resources.lightingEnergyBudget.IsValid() &&
+           resources.shadowSourceAttribution.IsValid();
 }
 
 [[nodiscard]] bool IsValid(const ClearContext& context) {
@@ -112,6 +114,8 @@ void RecordFailure(const StageFailureContext& failure, const char* stage, const 
            context.targets.shadowVisibility &&
            context.targets.shadowLoss &&
            context.targets.indirectLighting &&
+           context.targets.lightingEnergyBudget &&
+           context.targets.shadowSourceAttribution &&
            context.depthBuffer;
 }
 
@@ -693,6 +697,8 @@ bool AddStagedPath(RenderGraph& graph, const GraphContext& context) {
                     builder.Write(resources.shadowVisibility, RGResourceUsage::RenderTarget);
                     builder.Write(resources.shadowLoss, RGResourceUsage::RenderTarget);
                     builder.Write(resources.indirectLighting, RGResourceUsage::RenderTarget);
+                    builder.Write(resources.lightingEnergyBudget, RGResourceUsage::RenderTarget);
+                    builder.Write(resources.shadowSourceAttribution, RGResourceUsage::RenderTarget);
                 },
                 [context](ID3D12GraphicsCommandList*, const RenderGraph&) {
                     (void)ApplyFullSceneLightingV3(context.fullSceneLightingV3);

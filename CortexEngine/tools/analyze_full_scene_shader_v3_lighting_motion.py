@@ -18,6 +18,8 @@ V3_LIGHTING_VIEWS = [
     "v3_shadow_visibility",
     "v3_shadow_loss",
     "v3_indirect_lighting",
+    "v3_lighting_energy_budget",
+    "v3_shadow_source_attribution",
 ]
 
 CANDIDATE_COMPOSITE_VIEWS = [

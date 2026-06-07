@@ -28,6 +28,8 @@ inline constexpr uint32_t kVBDebugLightingV3DirectUnshadowed = 16;
 inline constexpr uint32_t kVBDebugLightingV3ShadowVisibility = 17;
 inline constexpr uint32_t kVBDebugLightingV3ShadowLoss = 18;
 inline constexpr uint32_t kVBDebugLightingV3Indirect = 19;
+inline constexpr uint32_t kVBDebugLightingV3EnergyBudget = 21;
+inline constexpr uint32_t kVBDebugLightingV3ShadowAttribution = 22;
 inline constexpr D3D12_RESOURCE_STATES kVBShaderResourceState =
     D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
 
@@ -36,7 +38,9 @@ inline bool IsVBGBufferDebugView(uint32_t debugView) {
 }
 
 inline bool IsVBFullSceneLightingV3DebugView(uint32_t debugView) {
-    return debugView >= kVBDebugLightingV3Direct && debugView <= kVBDebugLightingV3Indirect;
+    return (debugView >= kVBDebugLightingV3Direct && debugView <= kVBDebugLightingV3Indirect) ||
+           debugView == kVBDebugLightingV3EnergyBudget ||
+           debugView == kVBDebugLightingV3ShadowAttribution;
 }
 
 inline bool IsVBVisibilityIdentityDebugView(uint32_t debugView) {
@@ -97,6 +101,8 @@ struct VisibilityBufferGraphResources {
     RGResourceHandle shadowVisibility;
     RGResourceHandle shadowLoss;
     RGResourceHandle indirectLighting;
+    RGResourceHandle lightingEnergyBudget;
+    RGResourceHandle shadowSourceAttribution;
 };
 
 inline RGResourceHandle ImportOptionalResource(RenderGraph& graph,
@@ -127,6 +133,8 @@ inline VisibilityBufferGraphResources ImportVisibilityBufferGraphResources(
     ID3D12Resource* shadowVisibility = nullptr,
     ID3D12Resource* shadowLoss = nullptr,
     ID3D12Resource* indirectLighting = nullptr,
+    ID3D12Resource* lightingEnergyBudget = nullptr,
+    ID3D12Resource* shadowSourceAttribution = nullptr,
     D3D12_RESOURCE_STATES lightingSplitState = D3D12_RESOURCE_STATE_COMMON) {
     VisibilityBufferGraphResources resources{};
     resources.initialStates = visibilityBuffer.GetResourceStateSnapshot();
@@ -170,6 +178,10 @@ inline VisibilityBufferGraphResources ImportVisibilityBufferGraphResources(
         graph, shadowLoss, lightingSplitState, "FullSceneV3_ShadowLoss");
     resources.indirectLighting = ImportOptionalResource(
         graph, indirectLighting, lightingSplitState, "FullSceneV3_IndirectLighting");
+    resources.lightingEnergyBudget = ImportOptionalResource(
+        graph, lightingEnergyBudget, lightingSplitState, "FullSceneV3_LightingEnergyBudget");
+    resources.shadowSourceAttribution = ImportOptionalResource(
+        graph, shadowSourceAttribution, lightingSplitState, "FullSceneV3_ShadowSourceAttribution");
     return resources;
 }
 
@@ -209,6 +221,8 @@ inline RGResourceHandle SelectVBFullSceneLightingV3DebugHandle(const VisibilityB
         case kVBDebugLightingV3ShadowVisibility: return resources.shadowVisibility;
         case kVBDebugLightingV3ShadowLoss: return resources.shadowLoss;
         case kVBDebugLightingV3Indirect: return resources.indirectLighting;
+        case kVBDebugLightingV3EnergyBudget: return resources.lightingEnergyBudget;
+        case kVBDebugLightingV3ShadowAttribution: return resources.shadowSourceAttribution;
         case kVBDebugLightingV3Direct:
         default: return resources.directLighting;
     }

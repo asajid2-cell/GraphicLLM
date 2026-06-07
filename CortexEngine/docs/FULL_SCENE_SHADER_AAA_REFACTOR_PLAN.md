@@ -77,7 +77,7 @@ LightingShadowV3
   writes:
     direct_lighting, direct_lighting_unshadowed, shadow_visibility,
     shadow_loss, indirect_lighting, emissive_indirect,
-    lighting_energy_budget, shadow_source_id
+    lighting_energy_budget, shadow_source_attribution
 
 ReflectionV3
   reads:

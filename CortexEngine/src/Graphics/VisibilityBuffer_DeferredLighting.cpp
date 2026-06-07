@@ -486,7 +486,8 @@ Result<void> VisibilityBufferRenderer::ApplyFullSceneLightingV3(
         return Result<void>::Err("FullSceneLightingV3 split pipeline not initialized");
     }
     if (!targets.directLighting || !targets.directLightingUnshadowed ||
-        !targets.shadowVisibility || !targets.shadowLoss || !targets.indirectLighting) {
+        !targets.shadowVisibility || !targets.shadowLoss || !targets.indirectLighting ||
+        !targets.lightingEnergyBudget || !targets.shadowSourceAttribution) {
         return Result<void>::Err("FullSceneLightingV3 requires all split lighting targets");
     }
 
@@ -572,14 +573,16 @@ Result<void> VisibilityBufferRenderer::ApplyFullSceneLightingV3(
         cmdList->ResourceBarrier(barrierCount, barriers);
     }
 
-    D3D12_CPU_DESCRIPTOR_HANDLE rtvs[5] = {
+    D3D12_CPU_DESCRIPTOR_HANDLE rtvs[7] = {
         targets.directLightingRTV,
         targets.directLightingUnshadowedRTV,
         targets.shadowVisibilityRTV,
         targets.shadowLossRTV,
         targets.indirectLightingRTV,
+        targets.lightingEnergyBudgetRTV,
+        targets.shadowSourceAttributionRTV,
     };
-    cmdList->OMSetRenderTargets(5, rtvs, FALSE, nullptr);
+    cmdList->OMSetRenderTargets(7, rtvs, FALSE, nullptr);
 
     D3D12_VIEWPORT viewport = {0.0f, 0.0f, static_cast<float>(m_width), static_cast<float>(m_height), 0.0f, 1.0f};
     D3D12_RECT scissor = {0, 0, static_cast<LONG>(m_width), static_cast<LONG>(m_height)};

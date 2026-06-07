@@ -30,6 +30,8 @@ struct ResourceHandles {
     RGResourceHandle shadowVisibility;
     RGResourceHandle shadowLoss;
     RGResourceHandle indirectLighting;
+    RGResourceHandle lightingEnergyBudget;
+    RGResourceHandle shadowSourceAttribution;
     RGResourceHandle debugSource;
     RGResourceHandle lightingV3DebugSource;
 };

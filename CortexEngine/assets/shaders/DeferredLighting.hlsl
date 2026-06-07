@@ -1646,6 +1646,8 @@ struct FullSceneLightingV3Output {
     float4 shadowVisibility : SV_Target2;
     float4 shadowLoss : SV_Target3;
     float4 indirectLighting : SV_Target4;
+    float4 lightingEnergyBudget : SV_Target5;
+    float4 shadowSourceAttribution : SV_Target6;
 };
 
 FullSceneLightingV3Output PSMainV3LightingSplit(VSOutput input) {
@@ -1655,6 +1657,8 @@ FullSceneLightingV3Output PSMainV3LightingSplit(VSOutput input) {
     output.shadowVisibility = float4(1.0f.xxx, 1.0f);
     output.shadowLoss = float4(0.0f.xxx, 1.0f);
     output.indirectLighting = float4(0.0f.xxx, 1.0f);
+    output.lightingEnergyBudget = float4(0.0f.xxx, 1.0f);
+    output.shadowSourceAttribution = float4(0.0f.xxx, 1.0f);
 
     uint2 pixelCoord = uint2(input.position.xy);
     float2 screenSize = max(float2(g_ScreenAndCluster.xy), float2(1.0f, 1.0f));
@@ -2082,5 +2086,21 @@ FullSceneLightingV3Output PSMainV3LightingSplit(VSOutput input) {
     output.shadowVisibility = float4(shadow.xxx, 1.0f);
     output.shadowLoss = float4(max(directLightUnshadowed - directLight, 0.0f.xxx), 1.0f);
     output.indirectLighting = float4(max(ambient, 0.0f.xxx), 1.0f);
+    const float3 lumaWeights = float3(0.2126f, 0.7152f, 0.0722f);
+    float directUnshadowedLuma = max(dot(max(directLightUnshadowed, 0.0f.xxx), lumaWeights), 0.0f);
+    float directShadowedLuma = max(dot(max(directLight, 0.0f.xxx), lumaWeights), 0.0f);
+    float indirectLuma = max(dot(max(ambient, 0.0f.xxx), lumaWeights), 0.0f);
+    float shadowLossLuma = max(directUnshadowedLuma - directShadowedLuma, 0.0f);
+    float totalLightingLuma = max(directUnshadowedLuma + indirectLuma, 1e-4f);
+    output.lightingEnergyBudget = float4(
+        saturate(directUnshadowedLuma / 16.0f),
+        saturate(directShadowedLuma / 16.0f),
+        saturate(indirectLuma / 16.0f),
+        saturate(shadowLossLuma / totalLightingLuma));
+    output.shadowSourceAttribution = float4(
+        saturate(1.0f - shadow),
+        saturate(shadowLossLuma / max(directUnshadowedLuma, 1e-4f)),
+        (g_ShadowParams.z > 0.5f) ? 1.0f : 0.0f,
+        (g_ShadowParams.w > 0.5f) ? 1.0f : 0.0f);
     return output;
 }

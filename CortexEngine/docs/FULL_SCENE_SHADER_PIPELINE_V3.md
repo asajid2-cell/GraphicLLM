@@ -66,6 +66,8 @@ Geometry / Visibility
        -> indirect_lighting
        -> shadow_visibility
        -> shadow_loss
+       -> lighting_energy_budget
+       -> shadow_source_attribution
   -> FullSceneReflectionV3
        -> reflection_radiance
        -> reflection_confidence
@@ -317,6 +319,8 @@ direct_light_unshadowed,
 shadow_visibility,
 shadow_loss,
 indirect_light,
+lighting_energy_budget,
+shadow_source_attribution,
 reflection_radiance,
 reflection_confidence,
 reflection_source_id,
@@ -358,7 +362,8 @@ Already proven:
 - Material Resolve V3 exposes material attributes and debug views.
 - Lighting V3 can write concrete split MRT resources:
   `direct_lighting`, `direct_lighting_unshadowed`, `shadow_visibility`,
-  `shadow_loss`, and `indirect_lighting`.
+  `shadow_loss`, `indirect_lighting`, `lighting_energy_budget`, and
+  `shadow_source_attribution`.
 - Concrete split-buffer packet evidence exists for the static gallery path.
 - Default beauty is still V2/V1 fallback, not V3-promoted.
 
@@ -706,7 +711,7 @@ Current producer evidence:
 - pass evidence:
   `FullSceneLightingV3.executed=true`,
   `FullSceneLightingV3.draw_count=1`,
-  `FullSceneLightingV3.writes=direct_lighting,direct_lighting_unshadowed,shadow_visibility,shadow_loss,indirect_lighting`.
+  `FullSceneLightingV3.writes=direct_lighting,direct_lighting_unshadowed,shadow_visibility,shadow_loss,indirect_lighting,lighting_energy_budget,shadow_source_attribution`.
 - signal evidence:
   `direct_light.mean_luma=0.426794`,
   `direct_light_unshadowed.mean_luma=0.457842`,

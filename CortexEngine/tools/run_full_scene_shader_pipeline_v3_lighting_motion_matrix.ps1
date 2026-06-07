@@ -3,7 +3,7 @@ param(
     [string]$FamilyFilter = "gallery,kitchen,office,gym,concert,red_room,stadium",
     [string]$StressSceneFilter = "",
     [string]$MotionModes = "static,mouse_jitter,camera_sweep",
-    [string]$ViewFilter = "beauty,direct_light,direct_light_unshadowed,direct_light_shadow_loss,shadow_factor,ambient_ibl,v3_direct_lighting,v3_direct_lighting_unshadowed,v3_shadow_visibility,v3_shadow_loss,v3_indirect_lighting",
+    [string]$ViewFilter = "beauty,direct_light,direct_light_unshadowed,direct_light_shadow_loss,shadow_factor,ambient_ibl,v3_direct_lighting,v3_direct_lighting_unshadowed,v3_shadow_visibility,v3_shadow_loss,v3_indirect_lighting,v3_lighting_energy_budget,v3_shadow_source_attribution",
     [int]$SmokeFrames = 40,
     [int]$CaptureFrame = 20,
     [int]$CaptureSequenceCount = 2,

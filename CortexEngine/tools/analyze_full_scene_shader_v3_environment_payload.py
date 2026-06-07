@@ -173,6 +173,10 @@ def analyze_report(path: Path) -> dict[str, Any]:
             row["failures"].append("V3 proxy binding source does not match environment value")
         if row["v3_proxy_fallback_reason"] != row["proxy_fallback_reason"]:
             row["failures"].append("V3 proxy fallback reason does not match environment value")
+        if row["proxy_binding_source"] != "cached_explicit_scene_local_proxy_triple":
+            row["failures"].append(
+                f"payload ready without explicit generated/authored proxy binding: {row['proxy_binding_source']}"
+            )
     return row
 
 
@@ -259,6 +263,9 @@ def main() -> int:
         "bound_resource_report_count": sum(1 for row in rows if row["bound_resource_count"] > 0),
         "proxy_resource_bindable_report_count": sum(1 for row in rows if row["proxy_resource_table_bindable"]),
         "bound_proxy_resource_report_count": sum(1 for row in rows if row["bound_proxy_resource_count"] > 0),
+        "explicit_proxy_binding_report_count": sum(
+            1 for row in rows if row["proxy_binding_source"] == "cached_explicit_scene_local_proxy_triple"
+        ),
         "profile_policy_consumed_report_count": sum(1 for row in rows if row["profile_policy_consumed"]),
         "rows": rows,
         "failures": failures,

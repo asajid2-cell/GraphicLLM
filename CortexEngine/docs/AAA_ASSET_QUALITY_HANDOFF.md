@@ -566,6 +566,86 @@ Current next work after this checkpoint:
 3. Continue `LightingShadowV3` attribution and broader `ReflectionV3`
    auto-resolver coverage before strong `CinematicPostV3` tuning.
 
+Latest SceneLocalEnvironmentV3 explicit proxy asset checkpoint:
+
+- Added `tools\generate_scene_local_environment_proxies.py`.
+  - Generates deterministic 32x32 BC1 DDS proxy assets.
+  - Emits and mirrors runtime copies for:
+    `scene_local_irradiance_proxy.dds`,
+    `scene_local_specular_proxy.dds`, and
+    `scene_local_visible_background_proxy.dds`.
+  - Current generated sets:
+    `basketball_gym_day`, `home_kitchen_lantern`,
+    `home_office_evening`, `neon_streamer_concert`,
+    `red_light_room`, `rt_showcase_gallery`, `school_classroom_day`,
+    and `stadium_night_match`.
+- `Renderer::BuildSceneLocalEnvironmentV3PayloadBindingInfo()` now searches
+  `assets\textures\scene_local_proxy\<set_id>\` for explicit proxy assets
+  before falling back to payload-derived proxy textures.
+- Explicit triple binding reports source
+  `cached_explicit_scene_local_proxy_triple`.
+- Payload-derived proxy binding now reports
+  `cached_payload_derived_scene_local_proxy_triple`, which is treated as debt.
+- `tools\analyze_full_scene_shader_v3_environment_payload.py` and
+  `tools\analyze_full_scene_shader_v3_placeholders.py` now fail payload-ready
+  packets unless the proxy binding source is
+  `cached_explicit_scene_local_proxy_triple`.
+- The V3 static validator now includes the proxy generator and explicit/fallback
+  source tokens.
+
+Validation for explicit proxy assets:
+
+```powershell
+python tools\generate_scene_local_environment_proxies.py --overwrite --out build\captures\scene_local_environment_proxy_generation_20260607\proxy_generation_report.json
+python -m py_compile tools\generate_scene_local_environment_proxies.py tools\analyze_full_scene_shader_v3_environment_payload.py tools\analyze_full_scene_shader_v3_placeholders.py tools\validate_full_scene_shader_pipeline_v3_plan.py
+python tools\validate_full_scene_shader_pipeline_v3_plan.py
+git -c submodule.recurse=false diff --check -- tools\generate_scene_local_environment_proxies.py src\Graphics\Renderer_FramePostConstants.cpp tools\analyze_full_scene_shader_v3_environment_payload.py tools\analyze_full_scene_shader_v3_placeholders.py tools\validate_full_scene_shader_pipeline_v3_plan.py
+cmd.exe /d /c "call ""C:\Program Files\Microsoft Visual Studio\18\Community\Common7\Tools\VsDevCmd.bat"" -arch=x64 -host_arch=x64 >nul && set ""CORTEX_SKIP_ASSET_SYNC=1"" && ""C:\Program Files\Ninja\ninja.exe"" -C build CortexEngine -j 8"
+Copy-Item -LiteralPath assets\shaders\SceneLocalEnvironmentV3.hlsl -Destination build\bin\assets\shaders\SceneLocalEnvironmentV3.hlsl -Force
+Copy-Item -LiteralPath assets\final_art\full_scene_shader_pipeline_v3_contract.json -Destination build\bin\assets\final_art\full_scene_shader_pipeline_v3_contract.json -Force
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_full_scene_shader_pipeline_v3_packet.ps1 -NoBuild -SkipSceneAnalyzers -StressSceneOnly -StressSceneFilter rt_showcase:reflection_closeup -SmokeFrames 10 -CaptureFrame 5 -CaptureSequenceCount 1 -StabilityMotionMode static -OutputRoot build\captures\v3_scene_local_explicit_proxy_fresh_smoke_20260607
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_scene_local_cinematic_renderer_v1_packets.ps1 -NoBuild -OutputRoot build\captures\v3_scene_local_explicit_proxy_cross_profile_20260607 -FamilyFilter gallery,office,concert,stadium -ViewFilter scene_local_environment -SmokeFrames 10 -CaptureFrame 5 -CaptureSequenceCount 1 -SkipOwnerAnalysis -SkipMaterialAnalysis -SkipStabilityAnalysis -SkipVisualQualityAnalysis
+python tools\analyze_full_scene_shader_v3_environment_payload.py --manifest build\captures\v3_scene_local_explicit_proxy_cross_profile_20260607\manifest.json --output-json build\captures\v3_scene_local_explicit_proxy_cross_profile_20260607\v3_environment_payload_cross_profile.json --output-md build\captures\v3_scene_local_explicit_proxy_cross_profile_20260607\v3_environment_payload_cross_profile.md --min-payload-ready 3
+python tools\analyze_full_scene_shader_v3_environment_profiles.py --manifest build\captures\v3_scene_local_explicit_proxy_cross_profile_20260607\manifest.json --output-json build\captures\v3_scene_local_explicit_proxy_cross_profile_20260607\v3_environment_profiles_cross_profile.json --output-md build\captures\v3_scene_local_explicit_proxy_cross_profile_20260607\v3_environment_profiles_cross_profile.md --min-ready-reports 3 --min-distinct-modes 3 --min-distinct-profiles 3 --require-profile gallery_neutral=1 --require-profile enclosed_room=2 --require-profile stage=3 --require-profile open_exterior=4
+```
+
+Evidence:
+
+- Proxy generation report:
+  `build\captures\scene_local_environment_proxy_generation_20260607\proxy_generation_report.json`.
+- Native `CortexEngine` build passed. The known trailing `vswhere.exe` warning
+  still printed after successful link.
+- Fresh focused V3 packet:
+  `build\captures\v3_scene_local_explicit_proxy_fresh_smoke_20260607`.
+  - full V3 packet passed end to end
+  - `54` environment payload reports
+  - `54` payload-ready reports
+  - `54` explicit proxy binding reports
+  - first proxy source `cached_explicit_scene_local_proxy_triple`
+  - first proxy fallback reason `none`
+- Cross-profile packet:
+  `build\captures\v3_scene_local_explicit_proxy_cross_profile_20260607`.
+  - packet runner passed
+  - environment payload analyzer passed
+  - environment profile analyzer passed
+  - `4` reports, `4` payload-ready, `4` explicit proxy binding
+  - covered families:
+    `rt_showcase_gallery`, `home_office_evening`,
+    `neon_streamer_concert`, `stadium_night_match`
+  - all rows reported source `cached_explicit_scene_local_proxy_triple`
+  - shader profiles/modes covered:
+    `gallery_neutral=1.0`, `enclosed_room=2.0`, `stage=3.0`,
+    `open_exterior=4.0`
+
+Current next work after this checkpoint:
+
+1. Replace solid-color BC1 proxy placeholders with actual generated radiance
+   proxies derived from scene materials, room shell, lights, and camera policy.
+2. Expand explicit proxy proof to kitchen/gym/red-room after report/capture
+   separation is clean enough for those unstable model-scene paths.
+3. Continue `LightingShadowV3` and `ReflectionV3` matrix coverage before
+   tuning `CinematicPostV3`.
+
 Latest LightingShadowV3 source-attribution checkpoint:
 
 - `FullSceneLightingV3` now splits `shadow_source_attribution` by source:

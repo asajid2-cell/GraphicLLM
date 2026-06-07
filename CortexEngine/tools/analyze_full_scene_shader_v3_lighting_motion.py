@@ -36,6 +36,14 @@ CANDIDATE_COMPOSITE_VIEWS = [
     "reflection_history_v3_rejection",
 ]
 
+REFLECTION_DIAGNOSTIC_MOTION_VIEWS = {
+    "reflection_rejected_source_mask",
+    "reflection_temporal_delta",
+    "reflection_source_suppression",
+    "reflection_history_v3_validity",
+    "reflection_history_v3_rejection",
+}
+
 LEGACY_PAIRS = {
     "v3_direct_lighting": "direct_light",
     "v3_direct_lighting_unshadowed": "direct_light_unshadowed",
@@ -207,17 +215,31 @@ def build_family_rows(rows: list[dict[str, Any]], ratio_warning: float) -> tuple
                 continue
 
             candidate_delta = candidate_row["summary"]["mean_abs_luma_delta"]
+            beauty_ratio = candidate_delta / max(beauty_delta, 1e-6)
+            active_delta = candidate_row["summary"]["mean_active_delta_ratio"]
+            status = "ok"
+            if (
+                candidate_view in REFLECTION_DIAGNOSTIC_MOTION_VIEWS
+                and candidate_delta > 0.02
+                and beauty_ratio > 1.75
+            ):
+                status = "reflection_diagnostic_motion_warning"
+                family_status = "motion_warning"
+                warnings.append(
+                    f"{family}/{candidate_view}: reflection diagnostic motion delta "
+                    f"{candidate_delta:.6f} is {beauty_ratio:.2f}x beauty ({beauty_delta:.6f})"
+                )
             view_rows.append(
                 {
                     "view": candidate_view,
                     "legacy_view": "",
-                    "status": "ok",
+                    "status": status,
                     "v3_mean_abs_luma_delta": candidate_delta,
                     "legacy_mean_abs_luma_delta": 0.0,
                     "v3_over_legacy_ratio": 0.0,
                     "beauty_mean_abs_luma_delta": beauty_delta,
-                    "v3_over_beauty_ratio": candidate_delta / max(beauty_delta, 1e-6),
-                    "v3_active_delta_ratio": candidate_row["summary"]["mean_active_delta_ratio"],
+                    "v3_over_beauty_ratio": beauty_ratio,
+                    "v3_active_delta_ratio": active_delta,
                 }
             )
 
@@ -270,6 +292,8 @@ def build_report(
         "delta_threshold": delta_threshold,
         "min_sequence_count": min_sequence_count,
         "v3_over_legacy_warning_ratio": ratio_warning,
+        "reflection_diagnostic_motion_warning_ratio": 1.75,
+        "reflection_diagnostic_motion_min_delta": 0.02,
         "family_count": len(families),
         "view_row_count": len(rows),
         "failures": failures,

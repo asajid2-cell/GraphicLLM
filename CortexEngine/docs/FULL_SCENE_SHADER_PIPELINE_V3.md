@@ -1741,3 +1741,47 @@ Remaining limitation:
 - The unresolved fallback counters are explicit and gateable, but true
   provider-missing material cases still need cross-family exercise.
 - Rich texture-backed PBR resources remain the next material quality step.
+
+### ReflectionV3 Source Stability Gate - 2026-06-06
+
+Implemented:
+
+- `FullSceneReflectionResolverV3` now uses pixel-exact `Load()` for
+  pixel-aligned reflection source buffers instead of linear-filtered samples.
+- Reflection source rejection, suppression, and inactive diagnostics now use
+  continuous confidence/debt signals where possible.
+- `v3_lighting_motion` now warns on reflection diagnostic masks that move more
+  than `1.75x` beauty with delta above `0.02`.
+- `CMakeLists.txt` explicitly appends the V3 runtime shaders to
+  `CORTEX_ASSET_FILES` so future CMake regeneration can track shader-only
+  runtime asset sync.
+
+Evidence:
+
+- before packet:
+  `build/captures/v3_forced_ssr_reflection_pixel_loads_mouse_jitter_20260606`.
+- after packet:
+  `build/captures/v3_forced_ssr_reflection_continuous_masks_synced_mouse_jitter_20260606`.
+- after status:
+  - V3 packet passed.
+  - material payload passed.
+  - CompositeV3 diagnostics passed.
+  - promotion decision `review_packet_passed`.
+- forced-SSR mouse-jitter motion:
+  - `reflection_ssr_source_signal` remains ok: delta `0.021202`, `0.797x`
+    beauty.
+  - `reflection_source_suppression` improved from `0.060532` (`2.276x`
+    beauty, warning) to `0.014887` (`0.560x` beauty, ok).
+  - `reflection_temporal_delta` improved from `0.076251` to `0.068744`, but
+    remains a warning.
+
+Remaining limitation:
+
+- `reflection_rejected_source_mask`, `reflection_temporal_delta`,
+  `reflection_history_v3_validity`, and `reflection_history_v3_rejection` still
+  warn under forced-SSR mouse jitter.
+- The next reflection refactor should stabilize `FullSceneReflectionHistoryV3`
+  rather than loosening the warning gate.
+- This packet used a manual copy into `build/bin/assets/shaders` because the
+  current generated Ninja asset graph was stale and full `CortexAssets`
+  regeneration timed out in this session.

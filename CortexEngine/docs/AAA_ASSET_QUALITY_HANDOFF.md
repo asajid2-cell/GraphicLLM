@@ -7390,3 +7390,78 @@ Current limitation:
 - The next AAA material slice should attach richer material resources and
   texture-backed scalar maps, then run the same unresolved fallback gate across
   the full family and motion matrix.
+
+### ReflectionV3 Pixel-Exact Source Loads and Motion Warnings - 2026-06-06
+
+Implemented:
+
+- `FullSceneReflectionResolverV3.hlsl` now reads pixel-aligned source buffers
+  with `Load()` instead of linear-filtered `Sample()`:
+  - `local_reflection_radiance`.
+  - `ssr_color`.
+  - `rt_reflection`.
+  - reflection history source-id, validity, and rejection masks.
+- The resolver now emits continuous rejection/suppression/inactive debt for
+  source diagnostics instead of fully binary source masks.
+- `tools/analyze_full_scene_shader_v3_lighting_motion.py` now warns when
+  reflection diagnostic masks move more than `1.75x` beauty with delta above
+  `0.02`.
+- `CMakeLists.txt` now explicitly appends the V3 runtime shader files to
+  `CORTEX_ASSET_FILES` so future CMake regeneration tracks them for runtime
+  asset sync.
+
+Why:
+
+- Smooth/metal reflection stability cannot depend on linearly filtered source
+  IDs or binary rejection masks. That creates hard changes when camera motion
+  shifts a source by a fraction of a pixel.
+- The packet previously passed while reflection rejection/history masks moved
+  much more than beauty. The analyzer now exposes that debt directly.
+
+Validation:
+
+```powershell
+Copy-Item -LiteralPath assets\shaders\FullSceneReflectionResolverV3.hlsl -Destination build\bin\assets\shaders\FullSceneReflectionResolverV3.hlsl -Force
+$env:CORTEX_V3_REFLECTION_SOURCE_OVERRIDE='ssr'
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_full_scene_shader_pipeline_v3_packet.ps1 -NoBuild -SkipSceneAnalyzers -StressSceneOnly -StressSceneFilter rt_showcase:reflection_closeup -SmokeFrames 24 -CaptureFrame 12 -CaptureSequenceCount 2 -StabilityMotionMode mouse_jitter -OutputRoot build\captures\v3_forced_ssr_reflection_continuous_masks_synced_mouse_jitter_20260606
+python tools\build_full_scene_shader_v3_promotion_decision.py --packet-root build\captures\v3_forced_ssr_reflection_continuous_masks_synced_mouse_jitter_20260606 --output-json build\captures\v3_forced_ssr_reflection_continuous_masks_synced_mouse_jitter_20260606\promotion_decision.json --output-md build\captures\v3_forced_ssr_reflection_continuous_masks_synced_mouse_jitter_20260606\promotion_decision.md --allow-subset-review
+```
+
+Evidence:
+
+- before packet:
+  `build/captures/v3_forced_ssr_reflection_pixel_loads_mouse_jitter_20260606`.
+- after packet:
+  `build/captures/v3_forced_ssr_reflection_continuous_masks_synced_mouse_jitter_20260606`.
+- after packet status:
+  - V3 placeholder packet passed.
+  - material payload passed.
+  - CompositeV3 diagnostics passed.
+  - promotion decision `review_packet_passed`.
+- motion comparison:
+  - `reflection_ssr_source_signal`: stable, delta `0.021202`, `0.797x`
+    beauty.
+  - `reflection_source_suppression`: improved from delta `0.060532`
+    (`2.276x` beauty, warning) to `0.014887` (`0.560x` beauty, ok).
+  - `reflection_temporal_delta`: improved from `0.076251` to `0.068744`,
+    but still warning.
+  - remaining warnings:
+    `reflection_rejected_source_mask`, `reflection_temporal_delta`,
+    `reflection_history_v3_validity`, and
+    `reflection_history_v3_rejection`.
+
+Current limitation:
+
+- Reflection source suppression is now stable under the forced-SSR mouse-jitter
+  probe, but the history/rejection validity path is still too motion-sensitive.
+- Next reflection slice should stabilize `FullSceneReflectionHistoryV3`:
+  source-class transitions, depth/normal rejection, and history validity should
+  be bounded before ReflectionV3 source fusion is promoted further.
+- The asset sync stamp did not copy shader-only edits in this session because
+  earlier builds used `CORTEX_SKIP_ASSET_SYNC=1` and the generated Ninja file
+  did not list this V3 shader. Verification manually copied the shader into
+  `build/bin/assets/shaders`.
+- A CMake source fix was added for future regeneration, but the full
+  `CortexAssets` regeneration timed out on the large asset graph in this
+  session. Treat the manual shader copy as part of this packet's reproduction
+  until a normal configure/build refresh completes.

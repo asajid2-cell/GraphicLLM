@@ -52,6 +52,32 @@ LEGACY_PAIRS = {
     "v3_indirect_lighting": "ambient_ibl",
 }
 
+FOCUS_VIEW_SETS = {
+    "all": {
+        "lighting": V3_LIGHTING_VIEWS,
+        "candidate": CANDIDATE_COMPOSITE_VIEWS,
+        "legacy": list(LEGACY_PAIRS.values()),
+    },
+    "reflection": {
+        "lighting": [],
+        "candidate": [
+            "reflection_radiance",
+            "reflection_confidence",
+            "reflection_source_id",
+            "reflection_rejected_source_mask",
+            "reflection_temporal_delta",
+            "reflection_ssr_source_signal",
+            "reflection_rt_source_signal",
+            "reflection_source_suppression",
+            "reflection_history_v3_curr",
+            "reflection_history_v3_prev",
+            "reflection_history_v3_validity",
+            "reflection_history_v3_rejection",
+        ],
+        "legacy": [],
+    },
+}
+
 
 def _luma(pixel: tuple[int, int, int]) -> float:
     r, g, b = pixel
@@ -111,15 +137,23 @@ def build_view_rows(
     *,
     delta_threshold: float,
     min_sequence_count: int,
+    focus: str,
 ) -> tuple[list[dict[str, Any]], list[str]]:
     rows: list[dict[str, Any]] = []
     failures: list[str] = []
+    focus_views = FOCUS_VIEW_SETS[focus]
+    measured_views = (
+        set(focus_views["lighting"])
+        | set(focus_views["candidate"])
+        | set(focus_views["legacy"])
+        | {"beauty"}
+    )
 
     for result in manifest.get("results", []):
         if not isinstance(result, dict):
             continue
         view = str(result.get("view", ""))
-        if view not in set(V3_LIGHTING_VIEWS) | set(CANDIDATE_COMPOSITE_VIEWS) | set(LEGACY_PAIRS.values()) | {"beauty"}:
+        if view not in measured_views:
             continue
 
         sequence = [Path(path) for path in result.get("capture_sequence", []) if path]
@@ -157,11 +191,17 @@ def build_view_rows(
     return rows, failures
 
 
-def build_family_rows(rows: list[dict[str, Any]], ratio_warning: float) -> tuple[list[dict[str, Any]], list[str]]:
+def build_family_rows(
+    rows: list[dict[str, Any]],
+    ratio_warning: float,
+    *,
+    focus: str,
+) -> tuple[list[dict[str, Any]], list[str]]:
     warnings: list[str] = []
     by_family: dict[str, dict[str, dict[str, Any]]] = {}
     for row in rows:
         by_family.setdefault(row["family"], {})[row["view"]] = row
+    focus_views = FOCUS_VIEW_SETS[focus]
 
     family_rows: list[dict[str, Any]] = []
     for family in sorted(by_family):
@@ -170,7 +210,7 @@ def build_family_rows(rows: list[dict[str, Any]], ratio_warning: float) -> tuple
         view_rows: list[dict[str, Any]] = []
         beauty_delta = views.get("beauty", {}).get("summary", {}).get("mean_abs_luma_delta", 0.0)
 
-        for v3_view in V3_LIGHTING_VIEWS:
+        for v3_view in focus_views["lighting"]:
             v3_row = views.get(v3_view)
             legacy_view = LEGACY_PAIRS[v3_view]
             legacy_row = views.get(legacy_view)
@@ -207,7 +247,7 @@ def build_family_rows(rows: list[dict[str, Any]], ratio_warning: float) -> tuple
                 }
             )
 
-        for candidate_view in CANDIDATE_COMPOSITE_VIEWS:
+        for candidate_view in focus_views["candidate"]:
             candidate_row = views.get(candidate_view)
             if not candidate_row:
                 family_status = "missing_candidate_composite_view"
@@ -265,14 +305,16 @@ def build_report(
     delta_threshold: float,
     min_sequence_count: int,
     ratio_warning: float,
+    focus: str,
 ) -> dict[str, Any]:
     manifest = json.loads(manifest_path.read_text(encoding="utf-8-sig"))
     rows, failures = build_view_rows(
         manifest,
         delta_threshold=delta_threshold,
         min_sequence_count=min_sequence_count,
+        focus=focus,
     )
-    families, warnings = build_family_rows(rows, ratio_warning)
+    families, warnings = build_family_rows(rows, ratio_warning, focus=focus)
 
     required_families = {
         str(result.get("family", ""))
@@ -291,6 +333,9 @@ def build_report(
         "capture_sequence_count": manifest.get("capture_sequence_count", 0),
         "delta_threshold": delta_threshold,
         "min_sequence_count": min_sequence_count,
+        "focus": focus,
+        "required_lighting_views": FOCUS_VIEW_SETS[focus]["lighting"],
+        "required_candidate_views": FOCUS_VIEW_SETS[focus]["candidate"],
         "v3_over_legacy_warning_ratio": ratio_warning,
         "reflection_diagnostic_motion_warning_ratio": 1.75,
         "reflection_diagnostic_motion_min_delta": 0.02,
@@ -351,6 +396,7 @@ def main() -> int:
     parser.add_argument("--delta-threshold", type=float, default=0.02)
     parser.add_argument("--min-sequence-count", type=int, default=2)
     parser.add_argument("--v3-over-legacy-warning-ratio", type=float, default=1.50)
+    parser.add_argument("--focus", choices=sorted(FOCUS_VIEW_SETS), default="all")
     parser.add_argument("--fail-on-warning", action="store_true")
     args = parser.parse_args()
 
@@ -359,6 +405,7 @@ def main() -> int:
         delta_threshold=args.delta_threshold,
         min_sequence_count=args.min_sequence_count,
         ratio_warning=args.v3_over_legacy_warning_ratio,
+        focus=args.focus,
     )
     output_json = args.output_json or args.manifest.with_name("v3_lighting_motion.json")
     output_md = args.output_md or args.manifest.with_name("v3_lighting_motion.md")

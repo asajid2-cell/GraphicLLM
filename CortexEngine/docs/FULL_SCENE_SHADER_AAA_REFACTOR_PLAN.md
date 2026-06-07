@@ -2291,3 +2291,41 @@ This directly attacks the remaining smooth/metal jitter issue and also creates
 the pattern for focused shadow, material, and post packets. Once the focused
 harness can reproduce the issue cheaply, the shader fix can be validated
 without filling the disk or conflating it with unrelated scene quality.
+
+### Focused Reflection Motion Harness - 2026-06-07
+
+Implemented the first harness slice:
+
+- `tools/run_reflection_v3_motion_focus_packet.ps1`.
+- default stress target: `rt_showcase:reflection_closeup`.
+- default motion: `mouse_jitter`.
+- default source override: forced `ssr`.
+- default view set:
+  `beauty`, `reflection_radiance`, `reflection_confidence`,
+  `reflection_source_id`, `reflection_rejected_source_mask`,
+  `reflection_temporal_delta`, `reflection_ssr_source_signal`,
+  `reflection_rt_source_signal`, `reflection_source_suppression`,
+  `reflection_history_v3_curr`, `reflection_history_v3_prev`,
+  `reflection_history_v3_validity`, and
+  `reflection_history_v3_rejection`.
+- output artifacts:
+  `manifest.json`, `v3_reflection_motion_focus.json`,
+  `v3_reflection_motion_focus.md`, and
+  `v3_reflection_motion_focus_sheet.png`.
+
+Analyzer update:
+
+- `tools/analyze_full_scene_shader_v3_lighting_motion.py` now supports
+  `--focus reflection`.
+- Focused reflection mode gates only the reflection diagnostics plus beauty
+  baseline. It no longer pollutes narrow packets with missing V3 lighting or
+  unrelated composite-view warnings.
+
+Usage:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_reflection_v3_motion_focus_packet.ps1 -NoBuild -OutputRoot build\captures\v3_reflection_motion_focus_manual
+```
+
+This is a harness and root-cause tool. It is not a promotion packet. Full V3
+packets remain required before any candidate beauty promotion.

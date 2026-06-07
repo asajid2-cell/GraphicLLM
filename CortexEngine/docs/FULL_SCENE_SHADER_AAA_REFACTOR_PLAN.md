@@ -341,11 +341,20 @@ SceneLocalEnvironmentV3 proxy-resource binding:
   `tools\generate_scene_local_environment_proxies.py`. It generates small BC1
   DDS files under `assets\textures\scene_local_proxy\<set_id>\` for local
   irradiance, local specular, and visible-background proxy roles.
+- Proxy generation now uses `profile_payload_inventory_v1`: scene-profile base
+  colors are adjusted by scene-local payload inventory, including texture
+  count, albedo/normal count, and filename role signals for floor, wall, cube,
+  cylinder, and metal/brushed surfaces.
+- The generator writes
+  `assets\textures\scene_local_proxy\proxy_manifest.json` with base RGB,
+  derived RGB, payload inventory, role weights, and derivation method.
 - The renderer now prefers those explicit proxy assets and reports
   `cached_explicit_scene_local_proxy_triple`; payload-derived fallback reports
   `cached_payload_derived_scene_local_proxy_triple`.
 - The V3 placeholder and environment-payload analyzers now fail payload-ready
-  packets unless the explicit proxy source is used.
+  packets unless the explicit proxy source is used. The environment-payload
+  analyzer also requires a manifest entry with derivation method
+  `profile_payload_inventory_v1`.
 - Fresh evidence
   `build\captures\v3_scene_local_explicit_proxy_fresh_smoke_20260607` passed
   with `54/54` explicit proxy bindings.
@@ -353,9 +362,17 @@ SceneLocalEnvironmentV3 proxy-resource binding:
   `build\captures\v3_scene_local_explicit_proxy_cross_profile_20260607` passed
   with `4/4` explicit proxy bindings across gallery, office, concert, and
   stadium profile modes.
+- Fresh derived-proxy evidence
+  `build\captures\v3_scene_local_derived_proxy_fresh_smoke_20260607` passed
+  with `54/54` explicit proxy bindings and `54/54` derived proxy manifest
+  matches.
+- Cross-profile derived-proxy evidence
+  `build\captures\v3_scene_local_derived_proxy_cross_profile_20260607` passed
+  with `4/4` explicit proxy bindings and `4/4` derived proxy manifest matches.
 - This is still not final environment generation. The next environment step is
-  to replace solid-color BC1 proxy placeholders with radiance proxies derived
-  from scene materials, room shell, lights, and camera policy.
+  to add actual decoded material-color sampling, light-rig influence, room-shell
+  influence, and filtered radiance/probe generation instead of filename-role
+  inventory only.
 
 ## 2026-06-07 Master Refactor Before Goal Feature Completion
 

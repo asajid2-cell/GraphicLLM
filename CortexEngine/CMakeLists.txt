@@ -618,6 +618,12 @@ endif()
 file(GLOB_RECURSE CORTEX_ASSET_FILES
     "${CMAKE_SOURCE_DIR}/assets/*"
 )
+list(APPEND CORTEX_ASSET_FILES
+    "${CMAKE_SOURCE_DIR}/assets/shaders/FullSceneCompositeV3.hlsl"
+    "${CMAKE_SOURCE_DIR}/assets/shaders/FullSceneReflectionResolverV3.hlsl"
+    "${CMAKE_SOURCE_DIR}/assets/shaders/FullSceneReflectionHistoryV3.hlsl"
+    "${CMAKE_SOURCE_DIR}/assets/shaders/CandidateBeautyDisplay.hlsl"
+)
 list(FILTER CORTEX_ASSET_FILES EXCLUDE REGEX "\\.[Hh][Dd][Rr]$")
 list(FILTER CORTEX_ASSET_FILES EXCLUDE REGEX "\\.[Ee][Xx][Rr]$")
 list(FILTER CORTEX_ASSET_FILES EXCLUDE REGEX "\\.[Bb][Ll][Ee][Nn][Dd]$")

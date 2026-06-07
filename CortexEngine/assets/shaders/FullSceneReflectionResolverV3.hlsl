@@ -96,7 +96,10 @@ static float Luma(float3 color) {
 
 PSOutput PSMain(VSOutput input) {
     int2 pixelCoord = int2(input.position.xy);
-    float4 local = g_LocalReflectionRadiance.Sample(g_LinearClamp, input.texCoord);
+    // These source buffers are pixel-aligned render targets. Use exact loads so
+    // source IDs, confidence, and suppression masks do not shimmer from linear
+    // filtering as the camera jitters or the mouse moves.
+    float4 local = g_LocalReflectionRadiance.Load(int3(pixelCoord, 0));
     float3 localRadiance = max(local.rgb, 0.0f.xxx);
     float localConfidence = saturate(local.a);
     float localActive = step(0.001f, localConfidence + Luma(localRadiance));
@@ -131,7 +134,7 @@ PSOutput PSMain(VSOutput input) {
     float ssrMaterialWeight = max(saturate(0.24f + 0.76f * glossyMaterial), classSourceFloor);
     float rtMaterialWeight = max(saturate(0.32f + 0.68f * glossyMaterial), classSourceFloor);
 
-    float4 ssr = g_SSRReflection.Sample(g_LinearClamp, input.texCoord);
+    float4 ssr = g_SSRReflection.Load(int3(pixelCoord, 0));
     float3 ssrRadiance = max(ssr.rgb, 0.0f.xxx);
     float ssrRawConfidence = saturate(ssr.a);
     float ssrConfidence = smoothstep(0.55f, 0.86f, ssrRawConfidence);
@@ -142,7 +145,7 @@ PSOutput PSMain(VSOutput input) {
     float ssrForcedConfidence = max(ssrConfidence, saturate(ssrRawConfidence));
     float ssrActive = step(0.001f, ssrConfidence);
 
-    float4 rt = g_RTReflection.Sample(g_LinearClamp, input.texCoord);
+    float4 rt = g_RTReflection.Load(int3(pixelCoord, 0));
     float3 rtRadiance = max(rt.rgb, 0.0f.xxx);
     float rtRawConfidence = saturate(rt.a);
     float rtLuma = Luma(rtRadiance);
@@ -168,9 +171,9 @@ PSOutput PSMain(VSOutput input) {
     bool forceEnvironment = sourceOverride == 4u;
     bool forceNone = sourceOverride >= 255u;
 
-    float4 historyPrevSourceId = g_HistoryPrevSourceId.Sample(g_LinearClamp, input.texCoord);
-    float4 historyValidity = g_HistoryValidity.Sample(g_LinearClamp, input.texCoord);
-    float4 historyRejection = g_HistoryRejection.Sample(g_LinearClamp, input.texCoord);
+    float4 historyPrevSourceId = g_HistoryPrevSourceId.Load(int3(pixelCoord, 0));
+    float4 historyValidity = g_HistoryValidity.Load(int3(pixelCoord, 0));
+    float4 historyRejection = g_HistoryRejection.Load(int3(pixelCoord, 0));
     float previousSourceClass = saturate(max(historyPrevSourceId.r, historyValidity.g));
     float previousSourceAvailable = step(0.001f, previousSourceClass);
     float historyReusable = saturate(historyValidity.b);
@@ -226,18 +229,20 @@ PSOutput PSMain(VSOutput input) {
     // Rejection mask: R = scene-local radiance rejected/missing,
     // G = SSR rejected/missing, B = RT/environment rejected or missing,
     // A = auto SSR/RT suppressed by source-history hysteresis.
-    float localRejected = chooseLocal ? 0.0f : (1.0f - localActive);
-    float ssrRejected = chooseSSR ? 0.0f : (1.0f - ssrActive);
-    float rtRejected = chooseRT ? 0.0f : (1.0f - rtActive);
-    float environmentRejected = chooseEnvironment ? 0.0f : (1.0f - envActive);
-    float materialSuppressedSource =
-        (ssrRawActive > 0.0f && ssrActive <= 0.0f) || (rtRawActive > 0.0f && rtActive <= 0.0f)
-            ? 1.0f
-            : 0.0f;
-    float historySuppressedSource =
-        (ssrBaselineEligible && !ssrHistoryEligible) || (rtBaselineEligible && !rtHistoryEligible)
-            ? 1.0f
-            : 0.0f;
+    float localAvailability = saturate(localConfidence + Luma(localRadiance));
+    float ssrAvailability = saturate(max(ssrConfidence, ssrRawConfidence) * ssrRawActive);
+    float rtAvailability = saturate(max(rtConfidence, max(rtRawConfidence, saturate(rtLuma))) * rtRawActive);
+    float envAvailability = saturate(envConfidence + Luma(envRadiance));
+    float localRejected = chooseLocal ? 0.0f : saturate(1.0f - localAvailability);
+    float ssrRejected = chooseSSR ? 0.0f : saturate(1.0f - ssrAvailability);
+    float rtRejected = chooseRT ? 0.0f : saturate(1.0f - rtAvailability);
+    float environmentRejected = chooseEnvironment ? 0.0f : saturate(1.0f - envAvailability);
+    float materialSuppressedSource = max(
+        ssrRawActive > 0.0f ? saturate(ssrRawConfidence - ssrConfidence) : 0.0f,
+        rtRawActive > 0.0f ? saturate(max(rtRawConfidence, saturate(rtLuma)) - rtConfidence) : 0.0f);
+    float historySuppressedSource = max(
+        ssrBaselineEligible ? saturate(ssrConfidence - ssrAdmissionConfidence) : 0.0f,
+        rtBaselineEligible ? saturate(rtConfidence - rtAdmissionConfidence) : 0.0f);
     output.rejectedSourceMask = float4(localRejected,
                                        ssrRejected,
                                        max(rtRejected, environmentRejected),
@@ -259,7 +264,8 @@ PSOutput PSMain(VSOutput input) {
             ? 1.0f
             : 0.0f;
     float historyRequiredButMissing = (chooseSSR || chooseRT) ? (1.0f - step(0.5f, g_TAAParams.w)) : 0.0f;
-    output.temporalDelta = float4(1.0f - active, forcedButUnavailable, historyRequiredButMissing, 1.0f);
+    float inactiveContinuous = saturate(1.0f - saturate(confidence + Luma(radiance)));
+    output.temporalDelta = float4(inactiveContinuous, forcedButUnavailable, historyRequiredButMissing, 1.0f);
 
     // SSR source diagnostic: R = raw luma, G = raw SSR alpha/weight,
     // B = admitted confidence after resolver shaping / forced raw admission,

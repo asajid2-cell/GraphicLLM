@@ -568,6 +568,20 @@ private:
     [[nodiscard]] glm::vec4 BuildCinematicExposureParams() const;
     [[nodiscard]] glm::vec4 BuildSceneLocalEnvironmentV3ProfileParams() const;
     [[nodiscard]] glm::vec4 BuildSceneLocalEnvironmentV3PayloadParams() const;
+    struct SceneLocalEnvironmentV3PayloadBindingInfo {
+        std::shared_ptr<DX12Texture> albedo;
+        std::shared_ptr<DX12Texture> normal;
+        std::string textureSetId = "none";
+        std::string albedoPath;
+        std::string normalPath;
+        std::string bindingSource = "none";
+        std::string fallbackReason = "none";
+        bool resourceTableRequired = false;
+        bool resourceTableBindable = false;
+        uint32_t boundResourceCount = 0;
+    };
+    [[nodiscard]] SceneLocalEnvironmentV3PayloadBindingInfo BuildSceneLocalEnvironmentV3PayloadBindingInfo(
+        bool queueMissingUploads);
 #ifdef CORTEX_ENABLE_HYPER_EXPERIMENT
     Result<void> EnsureHyperGeometryScene(Scene::ECS_Registry* registry);
 #endif

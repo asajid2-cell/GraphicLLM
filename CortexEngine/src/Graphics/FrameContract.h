@@ -111,6 +111,11 @@ struct FrameContract {
         float sceneLocalPayloadTextureRichness = 0.0f;
         float sceneLocalPayloadProxyScore = 0.0f;
         float sceneLocalPayloadShaderInfluence = 0.0f;
+        bool sceneLocalPayloadResourceTableRequired = false;
+        bool sceneLocalPayloadResourceTableBindable = false;
+        uint32_t sceneLocalPayloadBoundResourceCount = 0;
+        std::string sceneLocalPayloadBindingSource = "none";
+        std::string sceneLocalPayloadFallbackReason = "none";
     };
 
     struct GraphicsPresetInfo {

@@ -464,7 +464,7 @@ def analyze_report(
                 failures.append("environment domain must expose environment_mode debug view")
             if environment_domain.get("default_beauty_affects") is not False:
                 failures.append("environment domain must not affect default beauty yet")
-            if environment_domain.get("ready_channel_count", 0) < 15:
+            if environment_domain.get("ready_channel_count", 0) < 18:
                 failures.append("environment domain ready without all required channels")
             mode = v3.get("scene_local_environment_mode")
             if mode not in {"enclosed_room", "open_exterior", "stage", "neutral_lab"}:
@@ -506,6 +506,13 @@ def analyze_report(
                 failures.append("environment shader profile mode is out of range")
             if local_background_strength < 0.0 or local_background_strength > 1.0:
                 failures.append("environment local background strength is out of range")
+            if v3.get("scene_local_texture_payload_ready") is True:
+                if v3.get("scene_local_texture_payload_resource_table_required") is not True:
+                    failures.append("payload-ready environment without required resource table")
+                if v3.get("scene_local_texture_payload_resource_table_bindable") is not True:
+                    failures.append("payload-ready environment without bindable resource table")
+                if int(v3.get("scene_local_texture_payload_bound_resource_count", 0) or 0) <= 0:
+                    failures.append("payload-ready environment without bound payload resources")
         for resource in [
             "scene_local_environment",
             "ambient_lighting",

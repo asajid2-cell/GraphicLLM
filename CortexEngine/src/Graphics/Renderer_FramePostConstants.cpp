@@ -84,6 +84,106 @@ struct SceneLocalPayloadScan {
     bool present = false;
 };
 
+struct SceneLocalPayloadTextureCandidates {
+    std::string textureSetId = "none";
+    std::string albedoPath;
+    std::string normalPath;
+    bool present = false;
+};
+
+std::string ToLowerAscii(std::string value) {
+    for (char& c : value) {
+        c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+    }
+    return value;
+}
+
+bool IsDdsPath(const std::filesystem::path& path) {
+    const std::string extension = path.extension().string();
+    return extension == ".dds" || extension == ".DDS";
+}
+
+int PayloadTexturePriority(const std::filesystem::path& path) {
+    const std::string filename = ToLowerAscii(path.filename().string());
+    if (filename.find("floor") != std::string::npos) {
+        return 0;
+    }
+    if (filename.find("wall") != std::string::npos) {
+        return 1;
+    }
+    if (filename.find("cube") != std::string::npos) {
+        return 2;
+    }
+    return 3;
+}
+
+SceneLocalPayloadTextureCandidates FindSceneLocalPayloadTextureCandidates(const std::string& family) {
+    SceneLocalPayloadTextureCandidates result{};
+    result.textureSetId = SceneLocalPayloadTextureSetIdForFamily(family);
+    if (result.textureSetId == "none") {
+        return result;
+    }
+
+    std::vector<std::filesystem::path> candidateTextureSetPaths = {
+        std::filesystem::path("assets/textures/scene_local") / result.textureSetId,
+        std::filesystem::path("../../assets/textures/scene_local") / result.textureSetId,
+    };
+    if (result.textureSetId == "rt_showcase_gallery") {
+        candidateTextureSetPaths.emplace_back("assets/textures/rtshowcase");
+        candidateTextureSetPaths.emplace_back("../../assets/textures/rtshowcase");
+    }
+
+    std::error_code ec;
+    std::filesystem::path textureSetPath;
+    for (const auto& candidate : candidateTextureSetPaths) {
+        ec.clear();
+        if (std::filesystem::exists(candidate, ec) && std::filesystem::is_directory(candidate, ec)) {
+            textureSetPath = candidate;
+            break;
+        }
+    }
+    if (textureSetPath.empty()) {
+        return result;
+    }
+
+    std::vector<std::filesystem::path> albedo;
+    std::vector<std::filesystem::path> normal;
+    for (const auto& entry : std::filesystem::directory_iterator(textureSetPath, ec)) {
+        if (ec) {
+            break;
+        }
+        if (!entry.is_regular_file(ec) || !IsDdsPath(entry.path())) {
+            continue;
+        }
+        const std::string filename = ToLowerAscii(entry.path().filename().string());
+        if (filename.find("albedo") != std::string::npos) {
+            albedo.push_back(entry.path());
+        } else if (filename.find("normal") != std::string::npos) {
+            normal.push_back(entry.path());
+        }
+    }
+
+    auto textureOrder = [](const std::filesystem::path& lhs, const std::filesystem::path& rhs) {
+        const int lhsPriority = PayloadTexturePriority(lhs);
+        const int rhsPriority = PayloadTexturePriority(rhs);
+        if (lhsPriority != rhsPriority) {
+            return lhsPriority < rhsPriority;
+        }
+        return lhs.generic_string() < rhs.generic_string();
+    };
+    std::sort(albedo.begin(), albedo.end(), textureOrder);
+    std::sort(normal.begin(), normal.end(), textureOrder);
+
+    result.present = !albedo.empty() || !normal.empty();
+    if (!albedo.empty()) {
+        result.albedoPath = albedo.front().generic_string();
+    }
+    if (!normal.empty()) {
+        result.normalPath = normal.front().generic_string();
+    }
+    return result;
+}
+
 SceneLocalPayloadScan ScanSceneLocalPayload(const std::string& family) {
     SceneLocalPayloadScan scan{};
     const std::string setId = SceneLocalPayloadTextureSetIdForFamily(family);
@@ -367,6 +467,57 @@ glm::vec4 Renderer::BuildSceneLocalEnvironmentV3PayloadParams() const {
                      textureRichness,
                      proxyScore,
                      shaderInfluence);
+}
+
+Renderer::SceneLocalEnvironmentV3PayloadBindingInfo
+Renderer::BuildSceneLocalEnvironmentV3PayloadBindingInfo(bool queueMissingUploads) {
+    SceneLocalEnvironmentV3PayloadBindingInfo info{};
+    if (!m_sceneVisualContract.active) {
+        info.fallbackReason = "scene_profile_inactive";
+        return info;
+    }
+
+    const SceneLocalPayloadTextureCandidates candidates =
+        FindSceneLocalPayloadTextureCandidates(m_sceneVisualContract.family);
+    info.textureSetId = candidates.textureSetId;
+    info.albedoPath = candidates.albedoPath;
+    info.normalPath = candidates.normalPath;
+    info.resourceTableRequired = candidates.present;
+    if (!candidates.present) {
+        info.fallbackReason = "scene_local_payload_set_missing";
+        return info;
+    }
+    if (candidates.albedoPath.empty() || candidates.normalPath.empty()) {
+        info.fallbackReason = "scene_local_payload_pair_incomplete";
+        return info;
+    }
+
+    if (TryGetCachedTexture(candidates.albedoPath, true, AssetRegistry::TextureKind::Generic, info.albedo) &&
+        info.albedo && info.albedo->GetResource()) {
+        ++info.boundResourceCount;
+    } else if (queueMissingUploads) {
+        (void)QueueTextureUploadFromFile(candidates.albedoPath, true, AssetRegistry::TextureKind::Generic);
+    }
+
+    if (TryGetCachedTexture(candidates.normalPath, false, AssetRegistry::TextureKind::Generic, info.normal) &&
+        info.normal && info.normal->GetResource()) {
+        ++info.boundResourceCount;
+    } else if (queueMissingUploads) {
+        (void)QueueTextureUploadFromFile(candidates.normalPath, false, AssetRegistry::TextureKind::Generic);
+    }
+
+    info.resourceTableBindable = info.boundResourceCount > 0;
+    if (info.boundResourceCount >= 2u) {
+        info.bindingSource = "cached_scene_local_payload_pair";
+        info.fallbackReason = "none";
+    } else if (info.boundResourceCount == 1u) {
+        info.bindingSource = "partial_cached_scene_local_payload";
+        info.fallbackReason = "one_payload_texture_not_resident";
+    } else {
+        info.bindingSource = "null_payload_descriptors";
+        info.fallbackReason = "payload_textures_not_resident";
+    }
+    return info;
 }
 
 void Renderer::PopulateFrameDebugAndPostConstants(FrameConstants& frameData,

@@ -317,7 +317,12 @@
         "scene_local_visible_background_proxy_ready",
         "scene_local_payload_texture_richness",
         "scene_local_payload_proxy_score",
-        "scene_local_payload_shader_influence"
+        "scene_local_payload_shader_influence",
+        "scene_local_payload_resource_table_required",
+        "scene_local_payload_resource_table_bindable",
+        "scene_local_payload_bound_resource_count",
+        "scene_local_payload_binding_source",
+        "scene_local_payload_fallback_reason"
       ],
       "required_debug_views": [
         "environment_mode",

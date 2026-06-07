@@ -61,6 +61,10 @@ cbuffer FrameConstants : register(b1)
     float4   g_LocalProbeParams;
 };
 
+Texture2D<float4> g_SceneLocalPayloadAlbedo : register(t0);
+Texture2D<float4> g_SceneLocalPayloadNormal : register(t1);
+SamplerState g_LinearWrapSampler : register(s0);
+
 struct VSOutput {
     float4 position : SV_Position;
     float2 texCoord : TEXCOORD0;
@@ -108,6 +112,17 @@ PSOutput PSMain(VSOutput input) {
     const float payloadReady = step(0.5f, g_FogExtraParams.y);
     const float payloadTextureRichness = saturate(g_FogExtraParams.z);
     const float payloadInfluence = saturate(g_FogExtraParams.w) * payloadReady;
+    const float2 payloadUv = input.texCoord * float2(2.0f, 1.35f);
+    const float3 payloadAlbedoSample =
+        max(g_SceneLocalPayloadAlbedo.SampleLevel(g_LinearWrapSampler, payloadUv, 0.0f).rgb, 0.0f.xxx);
+    const float3 payloadNormalSample =
+        max(g_SceneLocalPayloadNormal.SampleLevel(g_LinearWrapSampler, payloadUv, 0.0f).rgb, 0.0f.xxx);
+    const float payloadAlbedoSignal = step(0.002f, Luma(payloadAlbedoSample));
+    const float payloadNormalDetail =
+        payloadAlbedoSignal * saturate(length(payloadNormalSample.rg * 2.0f - 1.0f) * 0.45f);
+    const float payloadResourceInfluence =
+        saturate(payloadInfluence * payloadAlbedoSignal * (0.45f + 0.30f * payloadNormalDetail));
+    const float3 payloadSampleTint = SafeNormalizeColor(payloadAlbedoSample + 0.015f.xxx);
 
     const float3 skyCool = float3(0.20f, 0.31f, 0.48f);
     const float3 galleryNeutral = float3(0.18f, 0.175f, 0.16f);
@@ -120,9 +135,15 @@ PSOutput PSMain(VSOutput input) {
     localPalette = lerp(localPalette, lerp(stageMagenta, stageCyan, input.texCoord.x), isStage);
     localPalette = lerp(localPalette, exteriorSky, isExterior);
     const float3 payloadRadianceTint =
-        lerp(localPalette * 1.08f, ambientTint * 0.64f + localPalette * 0.58f, payloadTextureRichness);
+        lerp(lerp(localPalette * 1.08f,
+                  ambientTint * 0.64f + localPalette * 0.58f,
+                  payloadTextureRichness),
+             payloadSampleTint,
+             payloadResourceInfluence);
     const float3 payloadVisibleTint =
-        lerp(localPalette, payloadRadianceTint, saturate(0.45f + 0.35f * payloadTextureRichness));
+        lerp(lerp(localPalette, payloadRadianceTint, saturate(0.45f + 0.35f * payloadTextureRichness)),
+             payloadSampleTint,
+             payloadResourceInfluence * 0.75f);
     const float payloadLocalWeight = saturate(payloadInfluence * (0.55f + 0.30f * payloadTextureRichness));
 
     const float externalBackgroundWeight =

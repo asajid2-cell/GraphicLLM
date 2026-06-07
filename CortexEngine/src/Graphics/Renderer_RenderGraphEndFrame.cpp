@@ -61,11 +61,14 @@ struct SceneLocalEnvironmentV3Context {
     RGResourceHandle visibleBackground;
     RGResourceHandle reflectionBackground;
     RGResourceHandle atmosphere;
+    ID3D12Device* device = nullptr;
     ID3D12GraphicsCommandList* commandList = nullptr;
     DX12RootSignature* rootSignature = nullptr;
     DX12Pipeline* pipeline = nullptr;
     DescriptorHeapManager* descriptorManager = nullptr;
     D3D12_GPU_VIRTUAL_ADDRESS frameConstants = 0;
+    std::shared_ptr<DX12Texture> payloadAlbedo;
+    std::shared_ptr<DX12Texture> payloadNormal;
     std::array<D3D12_CPU_DESCRIPTOR_HANDLE, 5> outputRTVs{};
     uint32_t width = 0;
     uint32_t height = 0;
@@ -194,6 +197,7 @@ void FailFullSceneReflectionHistoryV3Copy(const FullSceneReflectionHistoryV3Copy
         !context.visibleBackground.IsValid() ||
         !context.reflectionBackground.IsValid() ||
         !context.atmosphere.IsValid() ||
+        !context.device ||
         !context.commandList ||
         !context.rootSignature ||
         !context.pipeline ||
@@ -223,6 +227,42 @@ void FailFullSceneReflectionHistoryV3Copy(const FullSceneReflectionHistoryV3Copy
             builder.Write(context.atmosphere, RGResourceUsage::RenderTarget);
         },
         [context](ID3D12GraphicsCommandList*, const RenderGraph&) {
+            auto payloadTableResult = context.descriptorManager->AllocateTransientCBV_SRV_UAVRange(2);
+            if (payloadTableResult.IsErr()) {
+                FailSceneLocalEnvironmentV3(context, "scene_local_environment_v3_payload_descriptor");
+                return;
+            }
+            const DescriptorHandle payloadAlbedoSRV = payloadTableResult.Value();
+            const DescriptorHandle payloadNormalSRV =
+                context.descriptorManager->GetCBV_SRV_UAVHandle(payloadAlbedoSRV.index + 1u);
+            if (!payloadAlbedoSRV.IsValid() || !payloadNormalSRV.IsValid()) {
+                FailSceneLocalEnvironmentV3(context, "scene_local_environment_v3_payload_descriptor_slot");
+                return;
+            }
+
+            if (!DescriptorTable::WriteTexture2DSRV(
+                    context.device,
+                    payloadAlbedoSRV,
+                    context.payloadAlbedo && context.payloadAlbedo->GetResource()
+                        ? context.payloadAlbedo->GetResource()
+                        : nullptr,
+                    context.payloadAlbedo ? context.payloadAlbedo->GetFormat() : DXGI_FORMAT_R8G8B8A8_UNORM,
+                    context.payloadAlbedo ? context.payloadAlbedo->GetMipLevels() : 1u)) {
+                FailSceneLocalEnvironmentV3(context, "scene_local_environment_v3_payload_albedo_srv");
+                return;
+            }
+            if (!DescriptorTable::WriteTexture2DSRV(
+                    context.device,
+                    payloadNormalSRV,
+                    context.payloadNormal && context.payloadNormal->GetResource()
+                        ? context.payloadNormal->GetResource()
+                        : nullptr,
+                    context.payloadNormal ? context.payloadNormal->GetFormat() : DXGI_FORMAT_R8G8B8A8_UNORM,
+                    context.payloadNormal ? context.payloadNormal->GetMipLevels() : 1u)) {
+                FailSceneLocalEnvironmentV3(context, "scene_local_environment_v3_payload_normal_srv");
+                return;
+            }
+
             context.commandList->OMSetRenderTargets(
                 static_cast<UINT>(context.outputRTVs.size()),
                 context.outputRTVs.data(),
@@ -239,6 +279,7 @@ void FailFullSceneReflectionHistoryV3Copy(const FullSceneReflectionHistoryV3Copy
                 return;
             }
             context.commandList->SetPipelineState(context.pipeline->GetPipelineState());
+            context.commandList->SetGraphicsRootDescriptorTable(3, payloadAlbedoSRV.gpu);
             FullscreenPass::DrawTriangle(context.commandList);
             if (context.ran) {
                 *context.ran = true;
@@ -1396,17 +1437,22 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
         }
 
         if (wantsSceneLocalEnvironmentV3ThisFrame) {
+            const SceneLocalEnvironmentV3PayloadBindingInfo payloadBinding =
+                BuildSceneLocalEnvironmentV3PayloadBindingInfo(true);
             SceneLocalEnvironmentV3Context environmentContext{};
             environmentContext.sceneLocalEnvironment = sceneLocalEnvironmentHandle;
             environmentContext.ambientLighting = ambientLightingHandle;
             environmentContext.visibleBackground = visibleBackgroundHandle;
             environmentContext.reflectionBackground = reflectionBackgroundHandle;
             environmentContext.atmosphere = atmosphereHandle;
+            environmentContext.device = m_services.device ? m_services.device->GetDevice() : nullptr;
             environmentContext.commandList = m_commandResources.graphicsList.Get();
             environmentContext.rootSignature = m_pipelineState.rootSignature.get();
             environmentContext.pipeline = m_pipelineState.sceneLocalEnvironmentV3.get();
             environmentContext.descriptorManager = m_services.descriptorManager.get();
             environmentContext.frameConstants = m_constantBuffers.currentFrameGPU;
+            environmentContext.payloadAlbedo = payloadBinding.albedo;
+            environmentContext.payloadNormal = payloadBinding.normal;
             environmentContext.outputRTVs = {
                 m_mainTargets.environmentV3.descriptors.sceneLocalEnvironmentRTV.cpu,
                 m_mainTargets.environmentV3.descriptors.ambientLightingRTV.cpu,

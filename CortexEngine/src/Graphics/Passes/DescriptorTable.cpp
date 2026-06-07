@@ -84,13 +84,25 @@ Result<void> AllocateAndWriteNullSRVTable(ID3D12Device* device,
         return Result<void>::Err(std::string("Renderer is not initialized for ") + label + " descriptors");
     }
 
+    if (table.empty()) {
+        return Result<void>::Ok();
+    }
+
+    auto tableResult = descriptorManager->AllocateCBV_SRV_UAVRange(static_cast<uint32_t>(table.size()));
+    if (tableResult.IsErr()) {
+        return Result<void>::Err(std::string("Failed to allocate ") + label +
+                                 " descriptor table: " + tableResult.Error());
+    }
+
+    const DescriptorHandle base = tableResult.Value();
     for (size_t i = 0; i < table.size(); ++i) {
-        auto handleResult = descriptorManager->AllocateCBV_SRV_UAV();
-        if (handleResult.IsErr()) {
-            return Result<void>::Err(std::string("Failed to allocate ") + label +
-                                     " descriptor: " + handleResult.Error());
+        table[i] = descriptorManager->GetCBV_SRV_UAVHandle(base.index + static_cast<uint32_t>(i));
+        if (!table[i].IsValid()) {
+            return Result<void>::Err(std::string(label) + " descriptor table produced an invalid slot");
         }
-        table[i] = handleResult.Value();
+        if (i > 0 && table[i].index != table[i - 1].index + 1) {
+            return Result<void>::Err(std::string(label) + " descriptor table is not contiguous");
+        }
         WriteTexture2DSRV(device, table[i], nullptr, format, mipLevels);
     }
     return Result<void>::Ok();
@@ -103,13 +115,25 @@ Result<void> AllocateHandleSet(DescriptorHeapManager* descriptorManager,
         return Result<void>::Err(std::string("Renderer is not initialized for ") + label + " descriptors");
     }
 
-    for (auto& handle : handles) {
-        auto handleResult = descriptorManager->AllocateCBV_SRV_UAV();
-        if (handleResult.IsErr()) {
-            return Result<void>::Err(std::string("Failed to allocate ") + label +
-                                     " descriptor: " + handleResult.Error());
+    if (handles.empty()) {
+        return Result<void>::Ok();
+    }
+
+    auto tableResult = descriptorManager->AllocateCBV_SRV_UAVRange(static_cast<uint32_t>(handles.size()));
+    if (tableResult.IsErr()) {
+        return Result<void>::Err(std::string("Failed to allocate ") + label +
+                                 " descriptor set: " + tableResult.Error());
+    }
+
+    const DescriptorHandle base = tableResult.Value();
+    for (size_t i = 0; i < handles.size(); ++i) {
+        handles[i] = descriptorManager->GetCBV_SRV_UAVHandle(base.index + static_cast<uint32_t>(i));
+        if (!handles[i].IsValid()) {
+            return Result<void>::Err(std::string(label) + " descriptor set produced an invalid slot");
         }
-        handle = handleResult.Value();
+        if (i > 0 && handles[i].index != handles[i - 1].index + 1) {
+            return Result<void>::Err(std::string(label) + " descriptor set is not contiguous");
+        }
     }
     return Result<void>::Ok();
 }

@@ -11,13 +11,21 @@
 #include "Utils/GLTFLoader.h"
 #include "Graphics/RendererControlApplier.h"
 #include "Graphics/Renderer.h"
+#include "Graphics/RendererSceneProfile.h"
 #include "Scene/ParticleEffectLibrary.h"
 
 #include <cmath>
+#include <algorithm>
+#include <array>
+#include <cctype>
 #include <cstdlib>
 #include <filesystem>
+#include <fstream>
+#include <optional>
+#include <unordered_map>
 
 #include <glm/geometric.hpp>
+#include <nlohmann/json.hpp>
 
 namespace Cortex {
 
@@ -41,6 +49,9 @@ namespace {
                            const char* tag,
                            std::string_view effectId,
                            const glm::vec3& position) {
+        if (std::getenv("CORTEX_DISABLE_SCENE_PARTICLES")) {
+            return;
+        }
         entt::entity e = registry.CreateEntity();
         registry.AddComponent<Scene::TagComponent>(e, tag);
         auto& t = registry.AddComponent<Scene::TransformComponent>(e);
@@ -89,6 +100,108 @@ namespace {
         return nullptr;
     }
 
+    std::shared_ptr<Scene::MeshData> LoadPretrainedGeneratedMesh(const char* relativeGltf) {
+        namespace fs = std::filesystem;
+        const fs::path rel = fs::path("assets") / "generated" / "pretrained_assets" / relativeGltf;
+        std::vector<fs::path> candidates;
+
+        fs::path cwd;
+        try {
+            cwd = fs::current_path();
+        } catch (...) {
+            cwd = fs::path(".");
+        }
+
+        candidates.push_back(cwd / rel);
+        candidates.push_back(cwd / ".." / rel);
+        candidates.push_back(cwd / ".." / ".." / rel);
+        candidates.push_back(cwd / ".." / ".." / ".." / "CortexEngine" / rel);
+
+        for (const auto& candidate : candidates) {
+            std::error_code ec;
+            if (!fs::exists(candidate, ec)) {
+                continue;
+            }
+            auto result = Utils::LoadGLTFMesh(candidate.string());
+            if (result.IsOk()) {
+                spdlog::info("Loaded pretrained generated mesh '{}'", candidate.string());
+                return result.Value();
+            }
+            spdlog::warn("Failed to load pretrained generated mesh '{}': {}", candidate.string(), result.Error());
+        }
+
+        spdlog::warn("Pretrained generated mesh not found: {}", relativeGltf);
+        return nullptr;
+    }
+
+    std::shared_ptr<Scene::MeshData> LoadGeneratedFixtureMesh(const char* relativeGltf) {
+        namespace fs = std::filesystem;
+        const fs::path rel = fs::path("assets") / "generated" / "final_art_fidelity_meshes" / relativeGltf;
+        std::vector<fs::path> candidates;
+
+        fs::path cwd;
+        try {
+            cwd = fs::current_path();
+        } catch (...) {
+            cwd = fs::path(".");
+        }
+
+        candidates.push_back(cwd / rel);
+        candidates.push_back(cwd / ".." / rel);
+        candidates.push_back(cwd / ".." / ".." / rel);
+        candidates.push_back(cwd / ".." / ".." / ".." / "CortexEngine" / rel);
+
+        for (const auto& candidate : candidates) {
+            std::error_code ec;
+            if (!fs::exists(candidate, ec)) {
+                continue;
+            }
+            auto result = Utils::LoadGLTFMesh(candidate.string());
+            if (result.IsOk()) {
+                spdlog::info("Loaded generated fixture mesh '{}'", candidate.string());
+                return result.Value();
+            }
+            spdlog::warn("Failed to load generated fixture mesh '{}': {}", candidate.string(), result.Error());
+        }
+
+        spdlog::warn("Generated fixture mesh not found: {}", relativeGltf);
+        return nullptr;
+    }
+
+    std::shared_ptr<Scene::MeshData> LoadProjectRelativeMesh(const char* relativePath) {
+        namespace fs = std::filesystem;
+        const fs::path rel = fs::path(relativePath ? relativePath : "");
+        std::vector<fs::path> candidates;
+
+        fs::path cwd;
+        try {
+            cwd = fs::current_path();
+        } catch (...) {
+            cwd = fs::path(".");
+        }
+
+        candidates.push_back(cwd / rel);
+        candidates.push_back(cwd / ".." / rel);
+        candidates.push_back(cwd / ".." / ".." / rel);
+        candidates.push_back(cwd / ".." / ".." / ".." / "CortexEngine" / rel);
+
+        for (const auto& candidate : candidates) {
+            std::error_code ec;
+            if (!fs::exists(candidate, ec)) {
+                continue;
+            }
+            auto result = Utils::LoadGLTFMesh(candidate.string());
+            if (result.IsOk()) {
+                spdlog::info("Loaded project-relative mesh '{}'", candidate.string());
+                return result.Value();
+            }
+            spdlog::warn("Failed to load project-relative mesh '{}': {}", candidate.string(), result.Error());
+        }
+
+        spdlog::warn("Project-relative mesh not found: {}", relativePath ? relativePath : "");
+        return nullptr;
+    }
+
     struct AssetLedMaterialSettings {
         glm::vec4 color{1.0f};
         float metallic = 0.0f;
@@ -103,6 +216,11 @@ namespace {
         Scene::RenderableComponent::AlphaMode alphaMode = Scene::RenderableComponent::AlphaMode::Opaque;
         Scene::RenderableComponent::RenderLayer layer = Scene::RenderableComponent::RenderLayer::Opaque;
         const char* preset = "masonry";
+        std::string albedoTexture;
+        std::string normalTexture;
+        std::string roughnessTexture;
+        std::string metallicTexture;
+        std::string occlusionTexture;
     };
 
     struct AssetLedTextureSet {
@@ -110,6 +228,314 @@ namespace {
         const char* normal = nullptr;
         const char* arm = nullptr;
     };
+
+    struct RuntimeLayoutTransform {
+        glm::vec3 position{0.0f};
+        glm::vec3 scale{1.0f};
+        glm::vec3 rotation{0.0f};
+    };
+
+    struct PretrainedRuntimeLayout {
+        bool loaded = false;
+        glm::vec3 cameraPosition{-1.12f, 0.84f, 0.15f};
+        glm::vec3 cameraTarget{-0.34f, 0.71f, 0.88f};
+        float cameraFov = 25.0f;
+        std::unordered_map<std::string, RuntimeLayoutTransform> byRole;
+        std::unordered_map<std::string, RuntimeLayoutTransform> overrides;
+        std::optional<RuntimeLayoutTransform> tabletopVignette;
+    };
+
+    bool ReadJsonVec3(const nlohmann::json& value, glm::vec3& out) {
+        if (!value.is_array() || value.size() < 3) {
+            return false;
+        }
+        out = glm::vec3(value[0].get<float>(), value[1].get<float>(), value[2].get<float>());
+        return true;
+    }
+
+    RuntimeLayoutTransform TransformFromJson(const nlohmann::json& transform) {
+        RuntimeLayoutTransform out;
+        if (transform.contains("position")) {
+            ReadJsonVec3(transform["position"], out.position);
+        }
+        if (transform.contains("scale")) {
+            ReadJsonVec3(transform["scale"], out.scale);
+        }
+        if (transform.contains("rotation_degrees")) {
+            glm::vec3 degrees{0.0f};
+            if (ReadJsonVec3(transform["rotation_degrees"], degrees)) {
+                out.rotation = glm::radians(degrees);
+            }
+        }
+        return out;
+    }
+
+    std::optional<std::filesystem::path> FindRuntimeAssetFile(const std::filesystem::path& relativePath) {
+        namespace fs = std::filesystem;
+        std::vector<fs::path> candidates;
+        fs::path cwd;
+        try {
+            cwd = fs::current_path();
+        } catch (...) {
+            cwd = fs::path(".");
+        }
+        candidates.push_back(cwd / relativePath);
+        candidates.push_back(cwd / ".." / relativePath);
+        candidates.push_back(cwd / ".." / ".." / relativePath);
+        candidates.push_back(cwd / ".." / ".." / ".." / "CortexEngine" / relativePath);
+        std::optional<fs::path> newest;
+        fs::file_time_type newestTime{};
+        for (const auto& candidate : candidates) {
+            std::error_code ec;
+            if (fs::exists(candidate, ec)) {
+                const auto writeTime = fs::last_write_time(candidate, ec);
+                if (!ec && (!newest || writeTime > newestTime)) {
+                    newest = candidate;
+                    newestTime = writeTime;
+                }
+            }
+        }
+        return newest;
+    }
+
+    PretrainedRuntimeLayout LoadPretrainedRuntimeLayout() {
+        PretrainedRuntimeLayout layout;
+        const auto path = FindRuntimeAssetFile(
+            std::filesystem::path("assets") / "scenes" / "pretrained_generated" /
+            "pretrained_rain_tabletop_shap_e_v1" / "scene_seed.json");
+        if (!path) {
+            spdlog::warn("Pretrained runtime layout seed not found; using baked fallback transforms.");
+            return layout;
+        }
+
+        try {
+            std::ifstream file(*path);
+            const auto root = nlohmann::json::parse(file);
+            if (root.contains("camera")) {
+                const auto& camera = root["camera"];
+                if (camera.contains("position")) { ReadJsonVec3(camera["position"], layout.cameraPosition); }
+                if (camera.contains("target")) { ReadJsonVec3(camera["target"], layout.cameraTarget); }
+                layout.cameraFov = camera.value("fov", layout.cameraFov);
+            }
+            for (const auto& asset : root.value("assets", nlohmann::json::array())) {
+                if (!asset.contains("role") || !asset.contains("transform")) {
+                    continue;
+                }
+                layout.byRole[asset["role"].get<std::string>()] = TransformFromJson(asset["transform"]);
+            }
+            if (root.contains("runtime_overrides") &&
+                root["runtime_overrides"].contains("tabletop_vignette_screen") &&
+                root["runtime_overrides"]["tabletop_vignette_screen"].contains("transform")) {
+                layout.tabletopVignette = TransformFromJson(root["runtime_overrides"]["tabletop_vignette_screen"]["transform"]);
+            }
+            if (root.contains("runtime_overrides") && root["runtime_overrides"].is_object()) {
+                for (auto it = root["runtime_overrides"].begin(); it != root["runtime_overrides"].end(); ++it) {
+                    if (it.value().contains("transform")) {
+                        layout.overrides[it.key()] = TransformFromJson(it.value()["transform"]);
+                    }
+                }
+            }
+            layout.loaded = true;
+            spdlog::info("Loaded pretrained runtime layout '{}'", path->string());
+        } catch (const std::exception& ex) {
+            spdlog::warn("Failed to load pretrained runtime layout '{}': {}", path->string(), ex.what());
+        }
+        return layout;
+    }
+
+    RuntimeLayoutTransform GetLayoutTransform(const PretrainedRuntimeLayout& layout,
+                                              const char* role,
+                                              const glm::vec3& fallbackPosition,
+                                              const glm::vec3& fallbackScale,
+                                              const glm::vec3& fallbackRotation) {
+        const auto it = layout.byRole.find(role ? role : "");
+        if (it != layout.byRole.end()) {
+            return it->second;
+        }
+        return RuntimeLayoutTransform{fallbackPosition, fallbackScale, fallbackRotation};
+    }
+
+    RuntimeLayoutTransform GetRuntimeOverride(const PretrainedRuntimeLayout& layout,
+                                              const char* id,
+                                              const glm::vec3& fallbackPosition,
+                                              const glm::vec3& fallbackScale,
+                                              const glm::vec3& fallbackRotation) {
+        const auto it = layout.overrides.find(id ? id : "");
+        if (it != layout.overrides.end()) {
+            return it->second;
+        }
+        return RuntimeLayoutTransform{fallbackPosition, fallbackScale, fallbackRotation};
+    }
+
+    std::string ToLowerAscii(std::string value) {
+        std::transform(value.begin(), value.end(), value.begin(),
+                       [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+        return value;
+    }
+
+    glm::vec4 ReadJsonVec4Or(const nlohmann::json& value, const glm::vec4& fallback) {
+        if (!value.is_array() || value.size() < 4) {
+            return fallback;
+        }
+        return glm::vec4(value[0].get<float>(), value[1].get<float>(), value[2].get<float>(), value[3].get<float>());
+    }
+
+    glm::vec3 ReadJsonVec3Or(const nlohmann::json& value, const glm::vec3& fallback) {
+        glm::vec3 out = fallback;
+        if (ReadJsonVec3(value, out)) {
+            return out;
+        }
+        return fallback;
+    }
+
+    AssetLedMaterialSettings ModelAuthoredMaterialFromJson(const nlohmann::json& root,
+                                                           const std::string& materialId) {
+        AssetLedMaterialSettings material;
+        if (!root.contains("materials") || !root["materials"].contains(materialId)) {
+            material.color = glm::vec4(0.42f, 0.42f, 0.44f, 1.0f);
+            material.preset = "masonry";
+            return material;
+        }
+
+        const auto& data = root["materials"][materialId];
+        material.color = data.contains("color")
+            ? ReadJsonVec4Or(data["color"], material.color)
+            : material.color;
+        material.metallic = data.value("metallic", material.metallic);
+        material.roughness = data.value("roughness", material.roughness);
+        material.transmission = data.value("transmission", material.transmission);
+        material.ior = data.value("ior", material.ior);
+        material.emissive = data.contains("emissive")
+            ? ReadJsonVec3Or(data["emissive"], material.emissive)
+            : material.emissive;
+        material.emissiveStrength = data.value("emissive_strength", material.emissiveStrength);
+        material.wetness = data.value("wetness", material.wetness);
+        material.proceduralMask = data.value("procedural_mask", material.proceduralMask);
+        material.albedoTexture = data.value("albedo_texture", std::string{});
+        material.normalTexture = data.value("normal_texture", std::string{});
+        material.roughnessTexture = data.value("roughness_texture", std::string{});
+        material.metallicTexture = data.value("metallic_texture", std::string{});
+        material.occlusionTexture = data.value("occlusion_texture", std::string{});
+        material.doubleSided = data.value("double_sided", material.transmission > 0.0f || material.color.a < 0.99f);
+        if (ToLowerAscii(data.value("alpha", std::string{})) == "blend" || material.color.a < 0.99f) {
+            material.alphaMode = Scene::RenderableComponent::AlphaMode::Blend;
+        } else if (ToLowerAscii(data.value("alpha", std::string{})) == "mask") {
+            material.alphaMode = Scene::RenderableComponent::AlphaMode::Mask;
+        }
+        if (ToLowerAscii(data.value("layer", std::string{})) == "overlay") {
+            material.layer = Scene::RenderableComponent::RenderLayer::Overlay;
+        }
+
+        static std::unordered_map<std::string, std::string> presetStorage;
+        const std::string preset = data.value("preset", std::string("masonry"));
+        presetStorage[materialId] = preset;
+        material.preset = presetStorage[materialId].c_str();
+        return material;
+    }
+
+    std::shared_ptr<Scene::MeshData> CreateModelAuthoredPrimitiveMesh(const std::string& primitive) {
+        const std::string shape = ToLowerAscii(primitive);
+        if (shape == "plane") {
+            return Utils::MeshGenerator::CreatePlane();
+        }
+        if (shape == "quad") {
+            return Utils::MeshGenerator::CreateQuad();
+        }
+        if (shape == "sphere") {
+            return Utils::MeshGenerator::CreateSphere(0.5f, 32);
+        }
+        if (shape == "cylinder") {
+            return Utils::MeshGenerator::CreateCylinder(0.5f, 1.0f, 32);
+        }
+        if (shape == "cone") {
+            return Utils::MeshGenerator::CreateCone(0.5f, 1.0f, 32);
+        }
+        if (shape == "torus") {
+            return Utils::MeshGenerator::CreateTorus(0.5f, 0.16f, 32, 16);
+        }
+        if (shape == "disk") {
+            return Utils::MeshGenerator::CreateDisk(0.5f, 32);
+        }
+        return Utils::MeshGenerator::CreateCube();
+    }
+
+    std::shared_ptr<Scene::MeshData> LoadModelAuthoredObjectMesh(const nlohmann::json& object) {
+        const std::string kind = ToLowerAscii(object.value("kind", std::string("primitive")));
+        if (kind == "primitive") {
+            return CreateModelAuthoredPrimitiveMesh(object.value("primitive", std::string("cube")));
+        }
+
+        std::string runtimeAsset = object.value("runtime_asset", std::string{});
+        std::replace(runtimeAsset.begin(), runtimeAsset.end(), '\\', '/');
+        const std::string generatedPrefix = "assets/generated/pretrained_assets/";
+        const std::string generatedFixturePrefix = "assets/generated/final_art_fidelity_meshes/";
+        const std::string naturalisticPrefix = "assets/models/naturalistic_showcase/";
+        const std::string kenneyPrefix = "assets/models/kenney_furniture_kit/";
+
+        if (runtimeAsset.rfind(generatedPrefix, 0) == 0) {
+            const std::string relative = runtimeAsset.substr(generatedPrefix.size());
+            return LoadPretrainedGeneratedMesh(relative.c_str());
+        }
+        if (runtimeAsset.rfind(generatedFixturePrefix, 0) == 0) {
+            const std::string relative = runtimeAsset.substr(generatedFixturePrefix.size());
+            return LoadGeneratedFixtureMesh(relative.c_str());
+        }
+        if (runtimeAsset.rfind(naturalisticPrefix, 0) == 0) {
+            const std::string relative = runtimeAsset.substr(naturalisticPrefix.size());
+            return LoadNaturalisticShowcaseMesh(relative.c_str());
+        }
+        if (runtimeAsset.rfind(kenneyPrefix, 0) == 0) {
+            return LoadProjectRelativeMesh(runtimeAsset.c_str());
+        }
+        if (kind == "pretrained_mesh") {
+            return LoadPretrainedGeneratedMesh(runtimeAsset.c_str());
+        }
+        if (kind == "generated_mesh") {
+            return LoadGeneratedFixtureMesh(runtimeAsset.c_str());
+        }
+        if (kind == "naturalistic_asset") {
+            return LoadNaturalisticShowcaseMesh(runtimeAsset.c_str());
+        }
+        if (kind == "kenney_asset") {
+            return LoadProjectRelativeMesh(runtimeAsset.c_str());
+        }
+        return nullptr;
+    }
+
+    std::optional<std::filesystem::path> FindModelAuthoredSceneSeed() {
+        namespace fs = std::filesystem;
+        if (const char* env = std::getenv("CORTEX_MODEL_AUTHORED_SCENE_SEED")) {
+            if (env[0] != '\0') {
+                const fs::path requested(env);
+                if (requested.is_absolute()) {
+                    std::error_code ec;
+                    if (fs::exists(requested, ec)) {
+                        return requested;
+                    }
+                } else if (auto found = FindRuntimeAssetFile(requested)) {
+                    return found;
+                }
+            }
+        }
+        return FindRuntimeAssetFile(fs::path("assets") / "scenes" / "model_authored" / "latest_scene" / "scene_seed.json");
+    }
+
+    std::optional<nlohmann::json> LoadModelAuthoredSceneSeed(std::filesystem::path& outPath) {
+        const auto path = FindModelAuthoredSceneSeed();
+        if (!path) {
+            spdlog::warn("Model-authored scene seed not found. Run tools/author_model_scene.py first.");
+            return std::nullopt;
+        }
+        try {
+            std::ifstream file(*path);
+            auto root = nlohmann::json::parse(file);
+            outPath = *path;
+            return root;
+        } catch (const std::exception& ex) {
+            spdlog::warn("Failed to parse model-authored scene seed '{}': {}", path->string(), ex.what());
+            return std::nullopt;
+        }
+    }
 
     AssetLedTextureSet GetNaturalisticAssetTextureSet(const char* assetId) {
         const std::string id = assetId ? assetId : "";
@@ -244,6 +670,21 @@ namespace {
         r.alphaMode = material.alphaMode;
         r.renderLayer = material.layer;
         r.presetName = material.preset;
+        if (!material.albedoTexture.empty()) {
+            r.textures.albedoPath = material.albedoTexture;
+        }
+        if (!material.normalTexture.empty()) {
+            r.textures.normalPath = material.normalTexture;
+        }
+        if (!material.roughnessTexture.empty()) {
+            r.textures.roughnessPath = material.roughnessTexture;
+        }
+        if (!material.metallicTexture.empty()) {
+            r.textures.metallicPath = material.metallicTexture;
+        }
+        if (!material.occlusionTexture.empty()) {
+            r.textures.occlusionPath = material.occlusionTexture;
+        }
         return e;
     }
 
@@ -279,6 +720,39 @@ namespace {
         ConfigureShowcaseCameraClip(cam, farPlane);
         cam.isActive = true;
         return camEntity;
+    }
+
+    bool IsModelAuthoredEnclosedInterior(const std::string& sceneFamily) {
+        return sceneFamily == "home_kitchen_lantern" ||
+               sceneFamily == "home_office_evening" ||
+               sceneFamily == "school_classroom_day" ||
+               sceneFamily == "stadium_night_match" ||
+               sceneFamily == "basketball_gym_day" ||
+               sceneFamily == "red_light_room" ||
+               sceneFamily == "neon_streamer_concert";
+    }
+
+    void ApplyModelAuthoredLighting(Renderer* renderer, const std::string& sceneFamily) {
+        if (!renderer) {
+            return;
+        }
+
+        const bool enclosedInterior = IsModelAuthoredEnclosedInterior(sceneFamily);
+        auto profile = Graphics::BuildSceneLocalCinematicProfile(sceneFamily);
+        profile.lighting.source = "model_authored_seed";
+        Graphics::ApplySceneCinematicProfile(*renderer, profile);
+
+        if (enclosedInterior) {
+            // Enclosed model-authored rooms must not inherit a distinctive HDRI.
+            // Even with IBL disabled, keeping a named sky/city environment active
+            // makes reflection regressions visually ambiguous and can leak through
+            // fallback shader paths. Use a neutral procedural descriptor and rely
+            // on authored sun/local scene lights instead.
+            renderer->SetBackgroundPresentation(false, 0.0f, 1.0f);
+            renderer->SetEnvironmentPreset("neutral_procedural");
+            renderer->SetIBLEnabled(false);
+            renderer->SetIBLIntensity(0.0f, 0.0f);
+        }
     }
 
     void AddAssetLedPointLight(Scene::ECS_Registry& registry,
@@ -322,6 +796,186 @@ namespace {
         l.innerConeDegrees = 26.0f;
         l.outerConeDegrees = 48.0f;
         l.castsShadows = castsShadows;
+    }
+
+    size_t AddSceneProfileReflectionProbes(Scene::ECS_Registry& registry,
+                                           const Graphics::SceneCinematicProfile& profile) {
+        if (!profile.reflections.localProbeEnabled) {
+            return 0;
+        }
+
+        size_t builtProbes = 0;
+        for (const auto& probeSpec : profile.reflectionProbes) {
+            if (!probeSpec.enabled) {
+                continue;
+            }
+
+            entt::entity entity = registry.CreateEntity();
+            registry.AddComponent<Scene::TagComponent>(entity, probeSpec.id);
+            auto& transform = registry.AddComponent<TransformComponent>(entity);
+            transform.position = probeSpec.center;
+
+            Scene::ReflectionProbeComponent probe{};
+            probe.extents = glm::max(glm::vec3(0.01f), probeSpec.extents);
+            probe.blendDistance = std::max(0.0f, probeSpec.blendDistance);
+            probe.environmentIndex = probeSpec.environmentIndex;
+            probe.enabled = 1;
+            registry.AddComponent<Scene::ReflectionProbeComponent>(entity, probe);
+            ++builtProbes;
+        }
+        return builtProbes;
+    }
+
+    size_t AddSceneProfileLights(Scene::ECS_Registry& registry,
+                                 const Graphics::SceneCinematicProfile& profile,
+                                 const glm::vec3& cameraTarget) {
+        auto semanticClassId = [](const std::string& semanticClass) -> uint32_t {
+            if (semanticClass.find("softbox") != std::string::npos ||
+                semanticClass.find("window") != std::string::npos ||
+                semanticClass.find("ceiling_panel") != std::string::npos ||
+                semanticClass.find("high_bay") != std::string::npos ||
+                semanticClass.find("flood_bank") != std::string::npos) {
+                return 1u;
+            }
+            if (semanticClass.find("neon") != std::string::npos ||
+                semanticClass.find("strip") != std::string::npos ||
+                semanticClass.find("screen_panel") != std::string::npos) {
+                return 2u;
+            }
+            if (semanticClass.find("stage") != std::string::npos ||
+                semanticClass.find("spot") != std::string::npos ||
+                semanticClass.find("rim") != std::string::npos ||
+                semanticClass.find("wash") != std::string::npos) {
+                return 3u;
+            }
+            if (semanticClass.find("practical") != std::string::npos ||
+                semanticClass.find("candle") != std::string::npos ||
+                semanticClass.find("lamp") != std::string::npos) {
+                return 4u;
+            }
+            return 0u;
+        };
+
+        auto lightLookRotation = [](const glm::vec3& forwardInput) {
+            glm::vec3 forward = glm::dot(forwardInput, forwardInput) > 1e-6f
+                ? glm::normalize(forwardInput)
+                : glm::vec3(0.0f, 0.0f, 1.0f);
+            glm::vec3 up(0.0f, 1.0f, 0.0f);
+            if (std::abs(glm::dot(forward, up)) > 0.98f) {
+                up = glm::vec3(0.0f, 0.0f, 1.0f);
+            }
+            return glm::quatLookAtLH(forward, up);
+        };
+
+        size_t builtLights = 0;
+        for (const auto& lightSpec : profile.lightFixtures) {
+            if (!lightSpec.enabled) {
+                continue;
+            }
+
+            entt::entity entity = registry.CreateEntity();
+            registry.AddComponent<Scene::TagComponent>(entity, lightSpec.id);
+
+            auto& transform = registry.AddComponent<TransformComponent>(entity);
+            transform.position = lightSpec.position;
+
+            auto& light = registry.AddComponent<Scene::LightComponent>(entity);
+            if (lightSpec.type == "spot" || lightSpec.type == "area_rect") {
+                const glm::vec3 toTarget = lightSpec.target - lightSpec.position;
+                const glm::vec3 fallbackTarget = cameraTarget - lightSpec.position;
+                const glm::vec3 forward = glm::dot(toTarget, toTarget) > 1e-6f
+                    ? glm::normalize(toTarget)
+                    : (glm::dot(fallbackTarget, fallbackTarget) > 1e-6f
+                        ? glm::normalize(fallbackTarget)
+                        : glm::vec3(0.0f, -1.0f, 0.0f));
+                transform.rotation = lightLookRotation(forward);
+                if (lightSpec.type == "area_rect") {
+                    light.type = Scene::LightType::AreaRect;
+                    light.areaSize = glm::max(lightSpec.areaSize, glm::vec2(0.01f));
+                    light.twoSided = lightSpec.twoSided;
+                } else {
+                    light.type = Scene::LightType::Spot;
+                    light.innerConeDegrees = lightSpec.innerConeDegrees;
+                    light.outerConeDegrees = lightSpec.outerConeDegrees;
+                }
+            } else {
+                light.type = Scene::LightType::Point;
+            }
+            light.color = lightSpec.color;
+            light.intensity = lightSpec.intensity;
+            light.range = lightSpec.range;
+            light.castsShadows = lightSpec.castsShadows;
+            light.semanticClassId = semanticClassId(lightSpec.semanticClass);
+            ++builtLights;
+        }
+
+        if (builtLights == 0) {
+            AddAssetLedPointLight(registry,
+                                  "ModelAuthored_WarmAccent",
+                                  cameraTarget + glm::vec3(-0.55f, 0.40f, -0.10f),
+                                  glm::vec3(1.0f, 0.46f, 0.18f),
+                                  (profile.family == "neon_alley_material_market" ? 18.0f : 9.0f) *
+                                      profile.lightingBalance.localFixtureScale,
+                                  4.0f);
+            builtLights = 1;
+        }
+        return builtLights;
+    }
+
+    size_t AddModelAuthoredSeedLights(Scene::ECS_Registry& registry,
+                                      const nlohmann::json& root,
+                                      float lightingBalanceScale = 1.0f) {
+        size_t builtLights = 0;
+        const auto lightsIt = root.find("lights");
+        if (lightsIt == root.end() || !lightsIt->is_array()) {
+            return 0;
+        }
+
+        for (const auto& light : *lightsIt) {
+            if (!light.is_object()) {
+                continue;
+            }
+
+            const std::string id = light.value("id", std::string("seed_light"));
+            const std::string type = ToLowerAscii(light.value("type", std::string("point")));
+            const glm::vec3 position = ReadJsonVec3Or(light.value("position", nlohmann::json::array()), glm::vec3(0.0f, 1.5f, 0.0f));
+            const glm::vec3 color = ReadJsonVec3Or(light.value("color", nlohmann::json::array()), glm::vec3(1.0f, 0.85f, 0.65f));
+            const float intensity =
+                glm::clamp(light.value("intensity", 4.0f), 0.0f, 60.0f) *
+                glm::clamp(lightingBalanceScale, 0.0f, 2.0f);
+            const float range = glm::clamp(light.value("range", 4.0f), 0.1f, 24.0f);
+            const bool castsShadows = light.value("casts_shadows", false);
+            const std::string tag = std::string("ModelAuthoredSeedLight_") + id;
+
+            entt::entity entity = registry.CreateEntity();
+            registry.AddComponent<Scene::TagComponent>(entity, tag);
+            auto& transform = registry.AddComponent<TransformComponent>(entity);
+            transform.position = position;
+
+            auto& component = registry.AddComponent<Scene::LightComponent>(entity);
+            component.color = color;
+            component.intensity = intensity;
+            component.range = range;
+            component.castsShadows = castsShadows;
+
+            if (type == "spot") {
+                const glm::vec3 target = ReadJsonVec3Or(light.value("target", nlohmann::json::array()), position + glm::vec3(0.0f, -1.0f, 0.0f));
+                glm::vec3 direction = target - position;
+                if (glm::length(direction) < 0.0001f) {
+                    direction = glm::vec3(0.0f, -1.0f, 0.0f);
+                }
+                transform.rotation = glm::quatLookAtLH(glm::normalize(direction), glm::vec3(0.0f, 1.0f, 0.0f));
+                component.type = Scene::LightType::Spot;
+                component.innerConeDegrees = glm::clamp(light.value("inner_cone_degrees", 24.0f), 1.0f, 80.0f);
+                component.outerConeDegrees = glm::clamp(light.value("outer_cone_degrees", 48.0f), component.innerConeDegrees + 1.0f, 120.0f);
+            } else {
+                component.type = Scene::LightType::Point;
+            }
+
+            ++builtLights;
+        }
+
+        return builtLights;
     }
 }
 
@@ -435,6 +1089,9 @@ void Engine::RebuildScene(ScenePreset preset) {
     case ScenePreset::ForestCreekShrine:
         BuildForestCreekShrineScene();
         break;
+    case ScenePreset::ModelAuthoredScene:
+        BuildModelAuthoredScene();
+        break;
     case ScenePreset::EffectsShowcase:
         BuildEffectsShowcaseScene();
         break;
@@ -465,6 +1122,7 @@ void Engine::RebuildScene(ScenePreset preset) {
     case ScenePreset::DesertRelicGallery:presetName = "Desert Relic Gallery"; break;
     case ScenePreset::NeonAlleyMaterialMarket:presetName = "Neon Alley Material Market"; break;
     case ScenePreset::ForestCreekShrine: presetName = "Forest Creek Shrine"; break;
+    case ScenePreset::ModelAuthoredScene: presetName = "Model Authored Scene"; break;
     case ScenePreset::EffectsShowcase:   presetName = "Effects Showcase"; break;
     case ScenePreset::GodRays:           presetName = "God Rays Atrium"; break;
     case ScenePreset::TemporalValidation:presetName = "Temporal Validation Lab"; break;
@@ -1745,6 +2403,20 @@ void Engine::BuildOutdoorSunsetBeachScene() {
     auto* renderer = m_renderer.get();
     if (renderer) {
         Graphics::ApplyGlassWaterCourtyardSceneControls(*renderer);
+        renderer->SetEnvironmentPreset("neutral_procedural");
+        renderer->SetIBLEnabled(false);
+        renderer->SetIBLIntensity(0.0f, 0.0f);
+        renderer->SetBackgroundPresentation(true, 0.94f, 0.0f);
+        renderer->SetAmbientLighting(glm::vec3(0.092f, 0.122f, 0.104f), 1.0f);
+        renderer->SetExposure(0.92f);
+        renderer->SetBloomIntensity(0.08f);
+        renderer->SetColorGrade(0.32f, 0.02f);
+        renderer->SetWaterParams(-0.02f, 0.046f, 9.8f, 0.42f, 0.88f, 0.30f, 0.020f, 0.44f);
+        renderer->SetWaterOptics(0.050f, 1.48f);
+        renderer->SetFogParams(0.020f, 0.0f, 0.45f);
+        renderer->SetGodRayIntensity(0.34f);
+        renderer->SetShadowBias(0.0035f);
+        renderer->SetShadowPCFRadius(3.25f);
     }
 
     auto sandPlane = Utils::MeshGenerator::CreatePlane(26.0f, 18.0f);
@@ -1754,11 +2426,15 @@ void Engine::BuildOutdoorSunsetBeachScene() {
     auto trunkMesh = Utils::MeshGenerator::CreateCylinder(0.18f, 3.2f, 18);
     auto coneMesh = Utils::MeshGenerator::CreateCone(0.5f, 1.0f, 32);
     auto leafMesh = Utils::MeshGenerator::CreateQuad(1.0f, 1.0f);
+    auto lilyPadMesh = Utils::MeshGenerator::CreateDisk(0.5f, 48);
     auto scannedBoulderMesh = LoadNaturalisticShowcaseMesh("boulder_01/boulder_01_1k.gltf");
     auto scannedTrunkMesh = LoadNaturalisticShowcaseMesh("dead_tree_trunk/dead_tree_trunk_1k.gltf");
     auto scannedBranchesMesh = LoadNaturalisticShowcaseMesh("dry_branches_medium_01/dry_branches_medium_01_1k.gltf");
     auto scannedFernMesh = LoadNaturalisticShowcaseMesh("fern_02/fern_02_1k.gltf");
     auto scannedGrassMesh = LoadNaturalisticShowcaseMesh("grass_bermuda_01/grass_bermuda_01_1k.gltf");
+    auto scannedStumpMesh = LoadNaturalisticShowcaseMesh("tree_stump_01/tree_stump_01_1k.gltf");
+    auto scannedMossRockMesh = LoadNaturalisticShowcaseMesh("rock_moss_set_01/rock_moss_set_01_1k.gltf");
+    auto scannedBushMesh = LoadNaturalisticShowcaseMesh("wild_rooibos_bush/wild_rooibos_bush_1k.gltf");
 
     if (renderer) {
         auto uploadMesh = [&](const std::shared_ptr<Scene::MeshData>& mesh, const char* label) {
@@ -1782,11 +2458,15 @@ void Engine::BuildOutdoorSunsetBeachScene() {
             !uploadMesh(trunkMesh, "trunk") ||
             !uploadMesh(coneMesh, "cone") ||
             !uploadMesh(leafMesh, "leaf") ||
+            !uploadMesh(lilyPadMesh, "lily pad disk") ||
             !uploadMesh(scannedBoulderMesh, "naturalistic boulder_01") ||
             !uploadMesh(scannedTrunkMesh, "naturalistic dead_tree_trunk") ||
             !uploadMesh(scannedBranchesMesh, "naturalistic dry_branches_medium_01") ||
             !uploadMesh(scannedFernMesh, "naturalistic fern_02") ||
-            !uploadMesh(scannedGrassMesh, "naturalistic grass_bermuda_01")) {
+            !uploadMesh(scannedGrassMesh, "naturalistic grass_bermuda_01") ||
+            !uploadMesh(scannedStumpMesh, "naturalistic tree_stump_01") ||
+            !uploadMesh(scannedMossRockMesh, "naturalistic rock_moss_set_01") ||
+            !uploadMesh(scannedBushMesh, "naturalistic wild_rooibos_bush")) {
             return;
         }
     }
@@ -1795,12 +2475,12 @@ void Engine::BuildOutdoorSunsetBeachScene() {
         entt::entity camEntity = m_registry->CreateEntity();
         m_registry->AddComponent<Scene::TagComponent>(camEntity, "MainCamera");
         auto& t = m_registry->AddComponent<TransformComponent>(camEntity);
-        t.position = glm::vec3(-5.55f, 1.25f, -5.80f);
-        const glm::vec3 target(-3.20f, 0.45f, -1.40f);
+        t.position = glm::vec3(-4.35f, 0.92f, -2.78f);
+        const glm::vec3 target(0.55f, 0.22f, 2.05f);
         t.rotation = glm::quatLookAtLH(glm::normalize(target - t.position), glm::vec3(0.0f, 1.0f, 0.0f));
 
         auto& cam = m_registry->AddComponent<Scene::CameraComponent>(camEntity);
-        cam.fov = 38.0f;
+        cam.fov = 39.0f;
         ConfigureShowcaseCameraClip(cam, 180.0f);
         cam.isActive = true;
         m_activeCameraEntity = camEntity;
@@ -1832,16 +2512,36 @@ void Engine::BuildOutdoorSunsetBeachScene() {
         return e;
     };
 
+    auto addOrganicPatch = [&](const std::string& tag,
+                               const glm::vec3& position,
+                               const glm::vec3& scale,
+                               float yaw,
+                               const glm::vec4& color,
+                               float roughness,
+                               const char* preset) -> entt::entity {
+        auto patchMesh = (lilyPadMesh && lilyPadMesh->gpuBuffers) ? lilyPadMesh : cubeMesh;
+        const bool diskPatch = (patchMesh == lilyPadMesh);
+        const glm::vec3 patchScale = diskPatch ? glm::vec3(scale.x, 1.0f, scale.z) : scale;
+        auto e = addRenderable(tag, patchMesh, position, patchScale,
+                               glm::vec3(0.0f, yaw, 0.0f),
+                               color, 0.0f, roughness, preset);
+        auto& r = m_registry->GetComponent<Scene::RenderableComponent>(e);
+        r.doubleSided = true;
+        return e;
+    };
+
     if (sandPlane && sandPlane->gpuBuffers) {
         auto sand = addRenderable("OutdoorBeach_SandShelf", sandPlane,
                                   glm::vec3(0.0f, 0.0f, -2.55f),
                                   glm::vec3(1.0f),
                                   glm::vec3(0.0f),
-                                  glm::vec4(0.58f, 0.48f, 0.32f, 1.0f),
-                                  0.0f, 0.90f, "matte");
+                                  glm::vec4(0.43f, 0.36f, 0.24f, 1.0f),
+                                  0.0f, 0.88f, "sand");
         auto& r = m_registry->GetComponent<Scene::RenderableComponent>(sand);
         r.doubleSided = true;
-        r.normalScale = 0.18f;
+        r.normalScale = 0.0f;
+        r.wetnessFactor = 0.10f;
+        r.proceduralMaskStrength = 0.0f;
     }
 
     if (waterPlane && waterPlane->gpuBuffers) {
@@ -1849,14 +2549,17 @@ void Engine::BuildOutdoorSunsetBeachScene() {
                                    glm::vec3(0.0f, -0.035f, 4.45f),
                                    glm::vec3(1.0f),
                                    glm::vec3(0.0f),
-                                   glm::vec4(0.03f, 0.28f, 0.78f, 0.94f),
-                                   0.0f, 0.035f, "water");
+                                   glm::vec4(0.025f, 0.22f, 0.18f, 0.94f),
+                                   0.0f, 0.045f, "water");
         Scene::WaterSurfaceComponent tide{};
-        tide.absorption = 0.36f;
-        tide.foamStrength = 1.0f;
-        tide.viscosity = 0.10f;
-        tide.shallowTint = glm::vec3(0.13f, 0.58f, 0.88f);
-        tide.deepTint = glm::vec3(0.004f, 0.08f, 0.25f);
+        tide.absorption = 0.56f;
+        tide.foamStrength = 0.68f;
+        tide.viscosity = 0.16f;
+        tide.bodyThickness = 0.44f;
+        tide.meniscusStrength = 0.38f;
+        tide.flowSpeed = 0.46f;
+        tide.shallowTint = glm::vec3(0.15f, 0.38f, 0.25f);
+        tide.deepTint = glm::vec3(0.014f, 0.080f, 0.074f);
         m_registry->AddComponent<Scene::WaterSurfaceComponent>(water, tide);
     }
 
@@ -1865,35 +2568,121 @@ void Engine::BuildOutdoorSunsetBeachScene() {
                                  glm::vec3(0.0f, 6.0f, 7.85f),
                                  glm::vec3(500.0f, 18.0f, 1.0f),
                                  glm::vec3(0.0f),
-                                 glm::vec4(0.28f, 0.40f, 0.56f, 1.0f),
+                                 glm::vec4(0.20f, 0.30f, 0.40f, 1.0f),
                                  0.0f, 0.92f, "emissive_panel");
         auto& skyR = m_registry->GetComponent<Scene::RenderableComponent>(sky);
         skyR.doubleSided = true;
-        skyR.emissiveColor = glm::vec3(0.18f, 0.28f, 0.42f);
-        skyR.emissiveStrength = 0.08f;
+        skyR.renderLayer = Scene::RenderableComponent::RenderLayer::Overlay;
+        skyR.visible = false;
+        skyR.emissiveColor = glm::vec3(0.10f, 0.17f, 0.25f);
+        skyR.emissiveStrength = 0.045f;
 
         auto horizon = addRenderable("OutdoorBeach_OceanHorizon", leafMesh,
                                      glm::vec3(0.0f, 0.82f, 7.78f),
                                      glm::vec3(500.0f, 1.42f, 1.0f),
                                      glm::vec3(0.0f),
-                                     glm::vec4(0.04f, 0.24f, 0.43f, 1.0f),
+                                     glm::vec4(0.04f, 0.17f, 0.20f, 1.0f),
                                      0.0f, 0.34f, "emissive_panel");
         auto& horizonR = m_registry->GetComponent<Scene::RenderableComponent>(horizon);
         horizonR.doubleSided = true;
-        horizonR.emissiveColor = glm::vec3(0.035f, 0.18f, 0.32f);
-        horizonR.emissiveStrength = 0.18f;
+        horizonR.renderLayer = Scene::RenderableComponent::RenderLayer::Overlay;
+        horizonR.visible = false;
+        horizonR.emissiveColor = glm::vec3(0.035f, 0.13f, 0.15f);
+        horizonR.emissiveStrength = 0.12f;
 
         auto haze = addRenderable("OutdoorBeach_WarmHorizonHaze", leafMesh,
-                                  glm::vec3(0.0f, 1.68f, 7.74f),
-                                  glm::vec3(500.0f, 0.42f, 1.0f),
+                                  glm::vec3(-3.20f, 1.47f, 7.74f),
+                                  glm::vec3(5.20f, 0.22f, 1.0f),
                                   glm::vec3(0.0f),
-                                  glm::vec4(0.76f, 0.46f, 0.28f, 1.0f),
+                                  glm::vec4(0.36f, 0.20f, 0.12f, 1.0f),
                                   0.0f, 0.82f, "emissive_panel");
         auto& hazeR = m_registry->GetComponent<Scene::RenderableComponent>(haze);
         hazeR.doubleSided = true;
-        hazeR.emissiveColor = glm::vec3(0.74f, 0.38f, 0.18f);
-        hazeR.emissiveStrength = 0.10f;
+        hazeR.renderLayer = Scene::RenderableComponent::RenderLayer::Overlay;
+        hazeR.visible = false;
+        hazeR.emissiveColor = glm::vec3(0.20f, 0.095f, 0.045f);
+        hazeR.emissiveStrength = 0.035f;
 
+        auto sunGlow = addRenderable("OutdoorBeach_LocalSunGlow", leafMesh,
+                                     glm::vec3(-3.35f, 1.44f, 7.70f),
+                                     glm::vec3(0.95f, 0.40f, 1.0f),
+                                     glm::vec3(0.0f),
+                                     glm::vec4(1.0f, 0.48f, 0.20f, 1.0f),
+                                     0.0f, 0.78f, "emissive_panel");
+        auto& sunGlowR = m_registry->GetComponent<Scene::RenderableComponent>(sunGlow);
+        sunGlowR.doubleSided = true;
+        sunGlowR.renderLayer = Scene::RenderableComponent::RenderLayer::Overlay;
+        sunGlowR.visible = false;
+        sunGlowR.emissiveColor = glm::vec3(0.85f, 0.32f, 0.12f);
+        sunGlowR.emissiveStrength = 0.18f;
+
+        auto sunCore = addRenderable("OutdoorBeach_LocalSunCore", leafMesh,
+                                     glm::vec3(-3.18f, 1.47f, 7.68f),
+                                     glm::vec3(0.22f, 0.13f, 1.0f),
+                                     glm::vec3(0.0f),
+                                     glm::vec4(1.0f, 0.72f, 0.34f, 1.0f),
+                                     0.0f, 0.42f, "emissive_panel");
+        auto& sunCoreR = m_registry->GetComponent<Scene::RenderableComponent>(sunCore);
+        sunCoreR.doubleSided = true;
+        sunCoreR.renderLayer = Scene::RenderableComponent::RenderLayer::Overlay;
+        sunCoreR.visible = false;
+        sunCoreR.emissiveColor = glm::vec3(1.0f, 0.58f, 0.23f);
+        sunCoreR.emissiveStrength = 0.42f;
+
+        const struct FloatingPad {
+            glm::vec3 position;
+            glm::vec3 scale;
+            float yaw;
+            glm::vec4 color;
+        } pads[] = {
+            {glm::vec3(-4.95f, 0.064f, 1.58f), glm::vec3(0.62f, 0.30f, 1.0f), -0.28f, glm::vec4(0.13f, 0.31f, 0.10f, 1.0f)},
+            {glm::vec3(-4.20f, 0.066f, 1.96f), glm::vec3(0.44f, 0.22f, 1.0f),  0.22f, glm::vec4(0.18f, 0.38f, 0.13f, 1.0f)},
+            {glm::vec3(-3.18f, 0.066f, 2.42f), glm::vec3(0.56f, 0.27f, 1.0f), -0.64f, glm::vec4(0.11f, 0.28f, 0.10f, 1.0f)},
+            {glm::vec3(-1.58f, 0.065f, 2.02f), glm::vec3(0.48f, 0.23f, 1.0f),  0.48f, glm::vec4(0.16f, 0.34f, 0.12f, 1.0f)},
+            {glm::vec3(-0.40f, 0.064f, 2.76f), glm::vec3(0.72f, 0.34f, 1.0f), -0.18f, glm::vec4(0.12f, 0.30f, 0.11f, 1.0f)},
+            {glm::vec3( 0.88f, 0.066f, 2.20f), glm::vec3(0.42f, 0.21f, 1.0f),  0.62f, glm::vec4(0.20f, 0.40f, 0.14f, 1.0f)},
+            {glm::vec3( 2.24f, 0.065f, 2.96f), glm::vec3(0.62f, 0.30f, 1.0f),  0.10f, glm::vec4(0.10f, 0.27f, 0.10f, 1.0f)},
+            {glm::vec3( 3.30f, 0.066f, 2.18f), glm::vec3(0.50f, 0.24f, 1.0f), -0.42f, glm::vec4(0.18f, 0.36f, 0.13f, 1.0f)},
+            {glm::vec3( 4.38f, 0.064f, 3.22f), glm::vec3(0.58f, 0.27f, 1.0f),  0.34f, glm::vec4(0.12f, 0.29f, 0.11f, 1.0f)}
+        };
+        auto padMesh = (lilyPadMesh && lilyPadMesh->gpuBuffers) ? lilyPadMesh : leafMesh;
+        for (int i = 0; i < static_cast<int>(std::size(pads)); ++i) {
+            const glm::vec3 padScale = (padMesh == lilyPadMesh)
+                ? glm::vec3(pads[i].scale.x, 1.0f, pads[i].scale.y)
+                : pads[i].scale;
+            const glm::vec3 padEuler = (padMesh == lilyPadMesh)
+                ? glm::vec3(0.0f, pads[i].yaw, 0.0f)
+                : glm::vec3(-glm::half_pi<float>(), pads[i].yaw, 0.0f);
+            auto pad = addRenderable("OutdoorBeach_LilyPad_" + std::to_string(i), padMesh,
+                                     pads[i].position,
+                                     padScale,
+                                     padEuler,
+                                     pads[i].color,
+                                     0.0f, 0.66f, "foliage");
+            auto& padR = m_registry->GetComponent<Scene::RenderableComponent>(pad);
+            padR.doubleSided = true;
+            padR.normalScale = 0.08f;
+            padR.proceduralMaskStrength = 0.18f;
+            padR.subsurfaceWrap = 0.22f;
+        }
+
+        const glm::vec3 flowerCenters[] = {
+            glm::vec3(-4.18f, 0.103f, 1.98f),
+            glm::vec3(-0.42f, 0.103f, 2.76f),
+            glm::vec3(3.32f, 0.103f, 2.18f)
+        };
+        for (int i = 0; i < 3; ++i) {
+            auto flower = addRenderable("OutdoorBeach_WaterFlower_" + std::to_string(i), leafMesh,
+                                        flowerCenters[i],
+                                        glm::vec3(0.13f, 0.045f, 1.0f),
+                                        glm::vec3(-glm::half_pi<float>(), glm::radians(35.0f * static_cast<float>(i)), 0.0f),
+                                        glm::vec4(0.78f, 0.28f, 0.82f, 1.0f),
+                                        0.0f, 0.48f, "matte");
+            auto& flowerR = m_registry->GetComponent<Scene::RenderableComponent>(flower);
+            flowerR.doubleSided = true;
+            flowerR.emissiveColor = glm::vec3(0.06f, 0.01f, 0.05f);
+            flowerR.emissiveStrength = 1.0f;
+        }
     }
 
     if (cubeMesh && cubeMesh->gpuBuffers) {
@@ -1908,13 +2697,14 @@ void Engine::BuildOutdoorSunsetBeachScene() {
             {glm::vec3( 6.8f, 0.035f, 1.10f), glm::vec3(2.3f, 0.016f, 0.045f),  0.10f}
         };
         for (int i = 0; i < 4; ++i) {
-            auto foam = addRenderable("OutdoorBeach_ShoreFoam_" + std::to_string(i), cubeMesh,
-                                      foamStrips[i].position,
-                                      foamStrips[i].scale,
-                                      glm::vec3(0.0f, foamStrips[i].yaw, 0.0f),
-                                      glm::vec4(0.86f, 0.93f, 0.88f, 1.0f),
-                                      0.0f, 0.38f, "matte");
-            m_registry->GetComponent<Scene::RenderableComponent>(foam).doubleSided = true;
+            auto foam = addOrganicPatch("OutdoorBeach_ShoreFoam_" + std::to_string(i),
+                                        foamStrips[i].position,
+                                        foamStrips[i].scale,
+                                        foamStrips[i].yaw,
+                                        glm::vec4(0.86f, 0.93f, 0.88f, 1.0f),
+                                        0.38f, "matte");
+            auto& foamR = m_registry->GetComponent<Scene::RenderableComponent>(foam);
+            foamR.proceduralMaskStrength = 0.08f;
         }
 
         const struct BeachLog {
@@ -1947,13 +2737,14 @@ void Engine::BuildOutdoorSunsetBeachScene() {
             {glm::vec3( 5.4f, 0.040f, 0.30f), glm::vec3(1.45f, 0.014f, 0.026f),  0.10f, glm::vec4(0.72f, 0.88f, 0.94f, 1.0f)}
         };
         for (int i = 0; i < 5; ++i) {
-            auto line = addRenderable("OutdoorBeach_SurfLine_" + std::to_string(i), cubeMesh,
-                                      surfLines[i].position,
-                                      surfLines[i].scale,
-                                      glm::vec3(0.0f, surfLines[i].yaw, 0.0f),
-                                      surfLines[i].color,
-                                      0.0f, 0.44f, "matte");
-            m_registry->GetComponent<Scene::RenderableComponent>(line).doubleSided = true;
+            auto line = addOrganicPatch("OutdoorBeach_SurfLine_" + std::to_string(i),
+                                        surfLines[i].position,
+                                        surfLines[i].scale,
+                                        surfLines[i].yaw,
+                                        surfLines[i].color,
+                                        0.44f, "matte");
+            auto& lineR = m_registry->GetComponent<Scene::RenderableComponent>(line);
+            lineR.proceduralMaskStrength = 0.08f;
         }
 
         const struct WetSandPatch {
@@ -1961,26 +2752,141 @@ void Engine::BuildOutdoorSunsetBeachScene() {
             glm::vec3 scale;
             float yaw;
         } wetSand[] = {
-            {glm::vec3(-4.6f, 0.024f, 0.34f), glm::vec3(2.6f, 0.018f, 0.42f), -0.05f},
-            {glm::vec3(-0.2f, 0.023f, 0.22f), glm::vec3(3.2f, 0.018f, 0.38f), 0.03f},
-            {glm::vec3(4.2f, 0.024f, 0.40f), glm::vec3(2.9f, 0.018f, 0.44f), -0.04f}
+            {glm::vec3(-4.6f, 0.024f, 0.34f), glm::vec3(3.0f, 0.018f, 0.56f), -0.05f},
+            {glm::vec3(-0.2f, 0.023f, 0.22f), glm::vec3(3.7f, 0.018f, 0.52f), 0.03f},
+            {glm::vec3(4.2f, 0.024f, 0.40f), glm::vec3(3.3f, 0.018f, 0.58f), -0.04f}
         };
         for (int i = 0; i < 3; ++i) {
-            auto patch = addRenderable("OutdoorBeach_WetSandPatch_" + std::to_string(i), cubeMesh,
-                                       wetSand[i].position,
-                                       wetSand[i].scale,
-                                       glm::vec3(0.0f, wetSand[i].yaw, 0.0f),
-                                       glm::vec4(0.34f, 0.30f, 0.24f, 1.0f),
-                                       0.0f, 0.42f, "wet_stone");
+            auto patch = addOrganicPatch("OutdoorBeach_WetSandPatch_" + std::to_string(i),
+                                         wetSand[i].position,
+                                         wetSand[i].scale,
+                                         wetSand[i].yaw,
+                                         glm::vec4(0.31f, 0.28f, 0.21f, 1.0f),
+                                         0.68f, "sand");
             auto& patchR = m_registry->GetComponent<Scene::RenderableComponent>(patch);
-            patchR.wetnessFactor = 0.58f;
-            patchR.doubleSided = true;
+            patchR.wetnessFactor = 0.74f;
+            patchR.proceduralMaskStrength = 0.10f;
+            patchR.normalScale = 0.0f;
+        }
+
+        const struct MarshMat {
+            glm::vec3 position;
+            glm::vec3 scale;
+            float yaw;
+            glm::vec4 color;
+        } marshMats[] = {
+            {glm::vec3(-6.20f, 0.046f, 0.42f), glm::vec3(1.35f, 0.022f, 0.16f), -0.22f, glm::vec4(0.09f, 0.20f, 0.075f, 1.0f)},
+            {glm::vec3(-4.40f, 0.047f, 0.18f), glm::vec3(0.90f, 0.020f, 0.13f),  0.18f, glm::vec4(0.12f, 0.26f, 0.09f, 1.0f)},
+            {glm::vec3(-2.10f, 0.045f, 0.36f), glm::vec3(1.10f, 0.021f, 0.15f), -0.08f, glm::vec4(0.08f, 0.18f, 0.07f, 1.0f)},
+            {glm::vec3( 1.00f, 0.046f, 0.26f), glm::vec3(1.25f, 0.022f, 0.15f),  0.12f, glm::vec4(0.11f, 0.24f, 0.08f, 1.0f)},
+            {glm::vec3( 4.70f, 0.047f, 0.50f), glm::vec3(1.45f, 0.022f, 0.17f), -0.14f, glm::vec4(0.09f, 0.19f, 0.075f, 1.0f)},
+            {glm::vec3(-3.60f, 0.050f, 1.32f), glm::vec3(1.48f, 0.024f, 0.20f),  0.28f, glm::vec4(0.10f, 0.24f, 0.085f, 1.0f)},
+            {glm::vec3(-0.82f, 0.050f, 1.86f), glm::vec3(1.68f, 0.024f, 0.22f), -0.18f, glm::vec4(0.12f, 0.27f, 0.095f, 1.0f)},
+            {glm::vec3( 2.22f, 0.050f, 2.40f), glm::vec3(1.42f, 0.024f, 0.20f),  0.22f, glm::vec4(0.09f, 0.22f, 0.080f, 1.0f)},
+            {glm::vec3( 4.92f, 0.050f, 3.08f), glm::vec3(1.80f, 0.024f, 0.24f), -0.12f, glm::vec4(0.11f, 0.25f, 0.090f, 1.0f)}
+        };
+        for (int i = 0; i < static_cast<int>(std::size(marshMats)); ++i) {
+            auto mat = addOrganicPatch("OutdoorBeach_WaterlineMarshMat_" + std::to_string(i),
+                                       marshMats[i].position,
+                                       marshMats[i].scale,
+                                       marshMats[i].yaw,
+                                       marshMats[i].color,
+                                       0.78f, "foliage");
+            auto& r = m_registry->GetComponent<Scene::RenderableComponent>(mat);
+            r.proceduralMaskStrength = 0.18f;
+            r.subsurfaceWrap = 0.30f;
+        }
+
+        const struct DistantStructure {
+            const char* tag;
+            glm::vec3 position;
+            glm::vec3 scale;
+            float yaw;
+            glm::vec4 color;
+        } distantStructures[] = {
+            {"OutdoorBeach_DistantLeftPierDeck", glm::vec3(-8.25f, 0.94f, 7.28f), glm::vec3(1.70f, 0.12f, 0.42f), 0.10f, glm::vec4(0.16f, 0.105f, 0.070f, 1.0f)},
+            {"OutdoorBeach_DistantLeftPierRoof", glm::vec3(-8.25f, 1.52f, 7.28f), glm::vec3(1.90f, 0.16f, 0.50f), 0.10f, glm::vec4(0.11f, 0.075f, 0.055f, 1.0f)},
+            {"OutdoorBeach_DistantRightBoathouse", glm::vec3(8.30f, 1.18f, 7.08f), glm::vec3(1.55f, 0.70f, 0.48f), -0.16f, glm::vec4(0.13f, 0.095f, 0.065f, 1.0f)},
+            {"OutdoorBeach_DistantRightRoof", glm::vec3(8.30f, 1.72f, 7.08f), glm::vec3(1.78f, 0.16f, 0.55f), -0.16f, glm::vec4(0.09f, 0.065f, 0.050f, 1.0f)}
+        };
+        for (const auto& s : distantStructures) {
+            auto e = addRenderable(s.tag, cubeMesh, s.position, s.scale,
+                                   glm::vec3(0.0f, s.yaw, 0.0f),
+                                   s.color, 0.0f, 0.72f, "wood");
+            auto& r = m_registry->GetComponent<Scene::RenderableComponent>(e);
+            r.doubleSided = true;
+            r.proceduralMaskStrength = 0.12f;
+        }
+
+        const struct FarBankPiece {
+            const char* tag;
+            glm::vec3 position;
+            glm::vec3 scale;
+            float yaw;
+            glm::vec4 color;
+            const char* preset;
+        } farBank[] = {
+            {"OutdoorBeach_FarBank_MudShelf_Left", glm::vec3(-5.80f, 0.070f, 5.55f), glm::vec3(2.40f, 0.050f, 0.34f), 0.08f, glm::vec4(0.19f, 0.18f, 0.135f, 1.0f), "wet_stone"},
+            {"OutdoorBeach_FarBank_MudShelf_Center", glm::vec3(-1.55f, 0.068f, 5.68f), glm::vec3(2.85f, 0.052f, 0.36f), -0.05f, glm::vec4(0.17f, 0.18f, 0.125f, 1.0f), "wet_stone"},
+            {"OutdoorBeach_FarBank_MudShelf_Right", glm::vec3(3.25f, 0.070f, 5.62f), glm::vec3(2.65f, 0.050f, 0.35f), 0.06f, glm::vec4(0.18f, 0.19f, 0.130f, 1.0f), "wet_stone"},
+            {"OutdoorBeach_FarBank_ReedBelt_Left", glm::vec3(-4.90f, 0.185f, 5.24f), glm::vec3(2.20f, 0.110f, 0.060f), -0.04f, glm::vec4(0.11f, 0.25f, 0.095f, 1.0f), "foliage"},
+            {"OutdoorBeach_FarBank_ReedBelt_Center", glm::vec3(-0.90f, 0.195f, 5.35f), glm::vec3(2.50f, 0.120f, 0.060f), 0.03f, glm::vec4(0.13f, 0.28f, 0.100f, 1.0f), "foliage"},
+            {"OutdoorBeach_FarBank_ReedBelt_Right", glm::vec3(3.60f, 0.190f, 5.30f), glm::vec3(2.10f, 0.115f, 0.060f), -0.06f, glm::vec4(0.10f, 0.24f, 0.090f, 1.0f), "foliage"}
+        };
+        for (const auto& piece : farBank) {
+            auto e = addOrganicPatch(piece.tag,
+                                     piece.position,
+                                     piece.scale,
+                                     piece.yaw,
+                                     piece.color,
+                                     0.70f, piece.preset);
+            auto& r = m_registry->GetComponent<Scene::RenderableComponent>(e);
+            r.wetnessFactor = std::string(piece.preset) == "wet_stone" ? 0.48f : 0.08f;
+            r.proceduralMaskStrength = 0.14f;
+            if (std::string(piece.preset) == "foliage") {
+                r.subsurfaceWrap = 0.36f;
+            }
+        }
+
+        const struct DistantTreeTrunk {
+            glm::vec3 position;
+            glm::vec3 scale;
+            float lean;
+            float yaw;
+        } treeTrunks[] = {
+            {glm::vec3(-5.70f, 0.68f, 5.70f), glm::vec3(0.070f, 0.70f, 0.070f), -0.10f, 0.20f},
+            {glm::vec3(-3.90f, 0.76f, 5.90f), glm::vec3(0.060f, 0.78f, 0.060f),  0.08f, -0.25f},
+            {glm::vec3(-1.35f, 0.66f, 5.62f), glm::vec3(0.065f, 0.66f, 0.065f), -0.04f, 0.46f},
+            {glm::vec3( 1.85f, 0.74f, 5.84f), glm::vec3(0.060f, 0.76f, 0.060f),  0.10f, -0.18f},
+            {glm::vec3( 4.30f, 0.70f, 5.68f), glm::vec3(0.070f, 0.72f, 0.070f), -0.08f, 0.34f}
+        };
+        for (int i = 0; i < static_cast<int>(std::size(treeTrunks)); ++i) {
+            auto trunk = addRenderable("OutdoorBeach_FarBankTreeTrunk_" + std::to_string(i), cubeMesh,
+                                       treeTrunks[i].position,
+                                       treeTrunks[i].scale,
+                                       glm::vec3(treeTrunks[i].lean, treeTrunks[i].yaw, 0.0f),
+                                       glm::vec4(0.145f, 0.095f, 0.060f, 1.0f),
+                                       0.0f, 0.72f, "wood");
+            m_registry->GetComponent<Scene::RenderableComponent>(trunk).visible = false;
+        }
+
+        const glm::vec3 distantPostBases[] = {
+            {-9.50f, 0.50f, 7.05f}, {-8.80f, 0.48f, 7.36f}, {-7.48f, 0.46f, 7.20f},
+            { 7.10f, 0.48f, 6.95f}, { 8.02f, 0.50f, 7.30f}, { 9.18f, 0.47f, 7.02f}
+        };
+        for (int i = 0; i < static_cast<int>(std::size(distantPostBases)); ++i) {
+            addRenderable("OutdoorBeach_DistantPierPost_" + std::to_string(i), cubeMesh,
+                          distantPostBases[i],
+                          glm::vec3(0.055f, 0.52f, 0.055f),
+                          glm::vec3(0.0f, 0.0f, (i % 2 == 0) ? 0.035f : -0.025f),
+                          glm::vec4(0.10f, 0.070f, 0.050f, 1.0f),
+                          0.0f, 0.78f, "wood");
         }
 
         for (int i = 0; i < 11; ++i) {
             const float x = -7.15f + static_cast<float>(i) * 0.54f;
             addRenderable("OutdoorBeach_DuneFence_Post_" + std::to_string(i), cubeMesh,
-                          glm::vec3(x, 0.27f, -3.95f + 0.04f * static_cast<float>(i % 2)),
+                          glm::vec3(x - 4.6f, 0.27f, -7.20f + 0.04f * static_cast<float>(i % 2)),
                           glm::vec3(0.052f, 0.31f, 0.052f),
                           glm::vec3(0.0f, 0.10f, 0.04f),
                           glm::vec4(0.34f, 0.20f, 0.10f, 1.0f),
@@ -1988,11 +2894,73 @@ void Engine::BuildOutdoorSunsetBeachScene() {
         }
         for (int i = 0; i < 2; ++i) {
             addRenderable("OutdoorBeach_DuneFence_Rail_" + std::to_string(i), cubeMesh,
-                          glm::vec3(-4.55f, 0.25f + 0.13f * static_cast<float>(i), -3.95f),
+                          glm::vec3(-9.15f, 0.25f + 0.13f * static_cast<float>(i), -7.20f),
                           glm::vec3(3.10f, 0.034f, 0.046f),
                           glm::vec3(0.0f, 0.03f, 0.0f),
                           glm::vec4(0.40f, 0.25f, 0.13f, 1.0f),
                           0.0f, 0.66f, "wood");
+        }
+
+        const struct WetPlank {
+            const char* tag;
+            glm::vec3 position;
+            glm::vec3 scale;
+            float yaw;
+            glm::vec4 color;
+        } planks[] = {
+            {"OutdoorBeach_WetDock_Plank_0", glm::vec3(3.85f, 0.115f, 0.62f), glm::vec3(1.95f, 0.045f, 0.18f), -0.34f, glm::vec4(0.29f, 0.18f, 0.105f, 1.0f)},
+            {"OutdoorBeach_WetDock_Plank_1", glm::vec3(4.22f, 0.145f, 1.12f), glm::vec3(1.62f, 0.044f, 0.16f), -0.30f, glm::vec4(0.36f, 0.23f, 0.13f, 1.0f)},
+            {"OutdoorBeach_WetDock_Plank_2", glm::vec3(4.64f, 0.122f, 1.70f), glm::vec3(1.52f, 0.043f, 0.15f), -0.26f, glm::vec4(0.24f, 0.16f, 0.095f, 1.0f)},
+            {"OutdoorBeach_WetDock_Plank_3", glm::vec3(5.02f, 0.118f, 2.28f), glm::vec3(1.28f, 0.042f, 0.14f), -0.22f, glm::vec4(0.42f, 0.28f, 0.15f, 1.0f)},
+            {"OutdoorBeach_WetDock_BrokenSlat", glm::vec3(3.25f, 0.082f, 0.08f), glm::vec3(0.86f, 0.030f, 0.095f), 0.20f, glm::vec4(0.31f, 0.20f, 0.11f, 1.0f)}
+        };
+        for (const auto& plank : planks) {
+            auto e = addRenderable(plank.tag, cubeMesh, plank.position, plank.scale,
+                                   glm::vec3(0.0f, plank.yaw, 0.0f),
+                                   plank.color, 0.0f, 0.42f, "wood");
+            auto& r = m_registry->GetComponent<Scene::RenderableComponent>(e);
+            r.wetnessFactor = 0.48f;
+            r.proceduralMaskStrength = 0.26f;
+        }
+
+        for (int i = 0; i < 4; ++i) {
+            const float x = 3.30f + static_cast<float>(i) * 0.78f;
+            const float z = 0.30f + static_cast<float>(i) * 0.54f;
+            auto post = addRenderable("OutdoorBeach_WetDock_Post_" + std::to_string(i), cubeMesh,
+                                      glm::vec3(x, 0.37f, z),
+                                      glm::vec3(0.09f, 0.48f, 0.09f),
+                                      glm::vec3(0.02f, -0.18f, 0.05f),
+                                      glm::vec4(0.24f, 0.15f, 0.085f, 1.0f),
+                                      0.0f, 0.46f, "wood");
+            auto& postR = m_registry->GetComponent<Scene::RenderableComponent>(post);
+            postR.wetnessFactor = 0.56f;
+            postR.proceduralMaskStrength = 0.22f;
+        }
+
+        const struct Reed {
+            glm::vec3 position;
+            glm::vec3 scale;
+            float yaw;
+            float lean;
+            glm::vec4 color;
+        } reeds[] = {
+            {glm::vec3(-6.80f, 0.30f, 0.98f), glm::vec3(0.024f, 0.62f, 0.022f), -0.20f,  0.16f, glm::vec4(0.25f, 0.31f, 0.13f, 1.0f)},
+            {glm::vec3(-6.54f, 0.24f, 1.18f), glm::vec3(0.020f, 0.50f, 0.020f),  0.14f, -0.10f, glm::vec4(0.17f, 0.28f, 0.12f, 1.0f)},
+            {glm::vec3(-5.92f, 0.28f, 1.34f), glm::vec3(0.023f, 0.58f, 0.022f),  0.36f,  0.12f, glm::vec4(0.32f, 0.35f, 0.15f, 1.0f)},
+            {glm::vec3(-0.55f, 0.26f, 0.90f), glm::vec3(0.022f, 0.54f, 0.020f), -0.08f, -0.14f, glm::vec4(0.20f, 0.29f, 0.12f, 1.0f)},
+            {glm::vec3( 0.05f, 0.31f, 1.04f), glm::vec3(0.026f, 0.66f, 0.023f),  0.26f,  0.10f, glm::vec4(0.27f, 0.34f, 0.14f, 1.0f)},
+            {glm::vec3( 4.56f, 0.26f, 1.24f), glm::vec3(0.022f, 0.54f, 0.020f), -0.38f,  0.13f, glm::vec4(0.19f, 0.27f, 0.12f, 1.0f)},
+            {glm::vec3( 5.08f, 0.34f, 1.54f), glm::vec3(0.027f, 0.70f, 0.024f),  0.18f, -0.12f, glm::vec4(0.33f, 0.36f, 0.15f, 1.0f)},
+            {glm::vec3( 5.68f, 0.28f, 1.76f), glm::vec3(0.022f, 0.58f, 0.020f),  0.42f,  0.16f, glm::vec4(0.22f, 0.30f, 0.12f, 1.0f)}
+        };
+        for (int i = 0; i < static_cast<int>(std::size(reeds)); ++i) {
+            auto reed = addRenderable("OutdoorBeach_WaterlineReed_" + std::to_string(i), cubeMesh,
+                                      reeds[i].position,
+                                      reeds[i].scale,
+                                      glm::vec3(reeds[i].lean, reeds[i].yaw, 0.0f),
+                                      reeds[i].color,
+                                      0.0f, 0.76f, "wood");
+            m_registry->GetComponent<Scene::RenderableComponent>(reed).doubleSided = true;
         }
 
         const struct BeachProp {
@@ -2004,12 +2972,12 @@ void Engine::BuildOutdoorSunsetBeachScene() {
             const char* preset;
             float roughness;
         } props[] = {
-            {"OutdoorBeach_Towel_Base", glm::vec3(-3.65f, 0.055f, -2.35f), glm::vec3(1.12f, 0.025f, 0.48f), -0.18f, glm::vec4(0.86f, 0.28f, 0.20f, 1.0f), "matte", 0.72f},
-            {"OutdoorBeach_Towel_StripeA", glm::vec3(-3.92f, 0.082f, -2.30f), glm::vec3(0.08f, 0.012f, 0.50f), -0.18f, glm::vec4(0.98f, 0.88f, 0.54f, 1.0f), "matte", 0.60f},
-            {"OutdoorBeach_Towel_StripeB", glm::vec3(-3.38f, 0.083f, -2.40f), glm::vec3(0.08f, 0.012f, 0.50f), -0.18f, glm::vec4(0.98f, 0.88f, 0.54f, 1.0f), "matte", 0.60f},
-            {"OutdoorBeach_LoungeSeat", glm::vec3(-1.35f, 0.22f, -2.15f), glm::vec3(0.92f, 0.08f, 0.34f), 0.22f, glm::vec4(0.78f, 0.58f, 0.36f, 1.0f), "wood", 0.58f},
-            {"OutdoorBeach_LoungeBack", glm::vec3(-0.95f, 0.45f, -2.26f), glm::vec3(0.10f, 0.46f, 0.34f), 0.22f, glm::vec4(0.66f, 0.43f, 0.23f, 1.0f), "wood", 0.55f},
-            {"OutdoorBeach_UmbrellaPole", glm::vec3(-3.05f, 0.82f, -2.25f), glm::vec3(0.10f, 0.50f, 0.10f), 0.0f, glm::vec4(0.36f, 0.24f, 0.16f, 1.0f), "wood", 0.48f}
+            {"OutdoorBeach_Towel_Base", glm::vec3(-9.10f, 0.055f, -5.35f), glm::vec3(1.12f, 0.025f, 0.48f), -0.18f, glm::vec4(0.86f, 0.28f, 0.20f, 1.0f), "matte", 0.72f},
+            {"OutdoorBeach_Towel_StripeA", glm::vec3(-9.37f, 0.082f, -5.30f), glm::vec3(0.08f, 0.012f, 0.50f), -0.18f, glm::vec4(0.98f, 0.88f, 0.54f, 1.0f), "matte", 0.60f},
+            {"OutdoorBeach_Towel_StripeB", glm::vec3(-8.83f, 0.083f, -5.40f), glm::vec3(0.08f, 0.012f, 0.50f), -0.18f, glm::vec4(0.98f, 0.88f, 0.54f, 1.0f), "matte", 0.60f},
+            {"OutdoorBeach_LoungeSeat", glm::vec3(-7.85f, 0.22f, -5.10f), glm::vec3(0.92f, 0.08f, 0.34f), 0.22f, glm::vec4(0.78f, 0.58f, 0.36f, 1.0f), "wood", 0.58f},
+            {"OutdoorBeach_LoungeBack", glm::vec3(-7.45f, 0.45f, -5.21f), glm::vec3(0.10f, 0.46f, 0.34f), 0.22f, glm::vec4(0.66f, 0.43f, 0.23f, 1.0f), "wood", 0.55f},
+            {"OutdoorBeach_UmbrellaPole", glm::vec3(-8.55f, 0.82f, -5.20f), glm::vec3(0.10f, 0.50f, 0.10f), 0.0f, glm::vec4(0.36f, 0.24f, 0.16f, 1.0f), "wood", 0.48f}
         };
         for (const auto& prop : props) {
             addRenderable(prop.tag, cubeMesh,
@@ -2023,7 +2991,7 @@ void Engine::BuildOutdoorSunsetBeachScene() {
 
     if (coneMesh && coneMesh->gpuBuffers) {
         auto canopy = addRenderable("OutdoorBeach_UmbrellaCanopy", coneMesh,
-                                    glm::vec3(-3.05f, 1.52f, -2.25f),
+                                    glm::vec3(-8.55f, 1.52f, -5.20f),
                                     glm::vec3(1.65f, 0.48f, 1.65f),
                                     glm::vec3(0.0f, glm::radians(28.0f), glm::radians(180.0f)),
                                     glm::vec4(0.95f, 0.30f, 0.20f, 1.0f),
@@ -2033,7 +3001,7 @@ void Engine::BuildOutdoorSunsetBeachScene() {
         for (int i = 0; i < 6; ++i) {
             const float yaw = glm::radians(60.0f * static_cast<float>(i));
             auto rib = addRenderable("OutdoorBeach_UmbrellaRib_" + std::to_string(i), cubeMesh,
-                                     glm::vec3(-3.05f + std::sin(yaw) * 0.34f, 1.33f, -2.25f + std::cos(yaw) * 0.34f),
+                                     glm::vec3(-8.55f + std::sin(yaw) * 0.34f, 1.33f, -5.20f + std::cos(yaw) * 0.34f),
                                      glm::vec3(0.035f, 0.035f, 0.78f),
                                      glm::vec3(0.0f, yaw, glm::radians(-12.0f)),
                                      glm::vec4(0.98f, 0.86f, 0.58f, 1.0f),
@@ -2083,6 +3051,37 @@ void Engine::BuildOutdoorSunsetBeachScene() {
                           glm::vec3(0.0f, 0.37f * static_cast<float>(i), 0.0f),
                           rocks[i].color,
                           0.0f, 0.68f, "stone");
+        }
+
+        const struct WaterLeafDisk {
+            glm::vec3 position;
+            glm::vec3 scale;
+            glm::vec4 color;
+            float yaw;
+        } leafDisks[] = {
+            {glm::vec3(-4.85f, 0.088f, 1.46f), glm::vec3(0.50f, 0.030f, 0.24f), glm::vec4(0.10f, 0.27f, 0.09f, 1.0f), 0.18f},
+            {glm::vec3(-3.72f, 0.090f, 1.88f), glm::vec3(0.38f, 0.026f, 0.20f), glm::vec4(0.16f, 0.35f, 0.12f, 1.0f), -0.32f},
+            {glm::vec3(-2.18f, 0.091f, 2.22f), glm::vec3(0.56f, 0.032f, 0.28f), glm::vec4(0.09f, 0.25f, 0.08f, 1.0f), 0.46f},
+            {glm::vec3(-0.58f, 0.090f, 2.70f), glm::vec3(0.64f, 0.034f, 0.30f), glm::vec4(0.13f, 0.31f, 0.10f, 1.0f), -0.18f},
+            {glm::vec3( 1.34f, 0.090f, 2.18f), glm::vec3(0.42f, 0.028f, 0.22f), glm::vec4(0.18f, 0.38f, 0.13f, 1.0f), 0.62f},
+            {glm::vec3( 2.76f, 0.091f, 2.92f), glm::vec3(0.58f, 0.032f, 0.28f), glm::vec4(0.11f, 0.28f, 0.09f, 1.0f), -0.40f}
+        };
+        for (int i = 0; i < static_cast<int>(std::size(leafDisks)); ++i) {
+            const auto diskMesh = (lilyPadMesh && lilyPadMesh->gpuBuffers) ? lilyPadMesh : sphereMesh;
+            const glm::vec3 diskScale = (diskMesh == lilyPadMesh)
+                ? glm::vec3(leafDisks[i].scale.x, 1.0f, leafDisks[i].scale.z)
+                : leafDisks[i].scale;
+            auto disk = addRenderable("OutdoorBeach_LilyPadDisk_" + std::to_string(i), diskMesh,
+                                      leafDisks[i].position,
+                                      diskScale,
+                                      glm::vec3(0.0f, leafDisks[i].yaw, 0.0f),
+                                      leafDisks[i].color,
+                                      0.0f, 0.66f, "foliage");
+            auto& r = m_registry->GetComponent<Scene::RenderableComponent>(disk);
+            r.normalScale = 0.08f;
+            r.proceduralMaskStrength = 0.20f;
+            r.subsurfaceWrap = 0.22f;
+            r.doubleSided = true;
         }
 
     }
@@ -2159,18 +3158,24 @@ void Engine::BuildOutdoorSunsetBeachScene() {
         } grass[] = {
             {glm::vec3(-6.9f, 0.05f, -3.75f), glm::vec3(5.2f), 0.12f},
             {glm::vec3( 5.75f, 0.05f, -3.55f), glm::vec3(4.8f), -0.44f},
-            {glm::vec3( 7.65f, 0.05f, -2.75f), glm::vec3(3.8f), 0.52f}
+            {glm::vec3( 7.65f, 0.05f, -2.75f), glm::vec3(3.8f), 0.52f},
+            {glm::vec3(-3.72f, 0.055f, 0.42f), glm::vec3(2.35f), -0.18f},
+            {glm::vec3(-1.35f, 0.055f, 1.24f), glm::vec3(2.10f), 0.36f},
+            {glm::vec3( 1.85f, 0.055f, 1.84f), glm::vec3(2.55f), -0.62f},
+            {glm::vec3( 3.42f, 0.055f, 2.92f), glm::vec3(2.20f), 0.24f}
         };
-        for (int i = 0; i < 3; ++i) {
+        for (int i = 0; i < static_cast<int>(std::size(grass)); ++i) {
             auto grassEntity = addRenderable("OutdoorBeach_ScannedGrass_" + std::to_string(i), scannedGrassMesh,
                                              grass[i].position,
                                              grass[i].scale,
                                              glm::vec3(0.0f, grass[i].yaw, 0.0f),
                                              glm::vec4(0.16f, 0.34f, 0.12f, 1.0f),
-                                             0.0f, 0.62f, "wood");
+                                             0.0f, 0.62f, "foliage");
             auto& r = m_registry->GetComponent<Scene::RenderableComponent>(grassEntity);
-            ApplyNaturalisticAssetTextures(r, "grass_bermuda_01");
             r.doubleSided = true;
+            r.subsurfaceWrap = 0.42f;
+            r.emissiveColor = glm::vec3(0.025f, 0.055f, 0.018f);
+            r.emissiveStrength = 0.08f;
         }
     }
 
@@ -2181,18 +3186,108 @@ void Engine::BuildOutdoorSunsetBeachScene() {
             float yaw;
         } ferns[] = {
             {glm::vec3(-7.45f, 0.07f, -3.10f), glm::vec3(0.78f), 0.38f},
-            {glm::vec3( 6.65f, 0.07f, -2.62f), glm::vec3(0.68f), -0.28f}
+            {glm::vec3( 6.65f, 0.07f, -2.62f), glm::vec3(0.68f), -0.28f},
+            {glm::vec3(-3.10f, 0.075f, 0.72f), glm::vec3(0.56f), -0.18f},
+            {glm::vec3( 0.62f, 0.075f, 1.72f), glm::vec3(0.50f), 0.44f},
+            {glm::vec3( 2.55f, 0.075f, 2.68f), glm::vec3(0.62f), -0.58f}
         };
-        for (int i = 0; i < 2; ++i) {
+        for (int i = 0; i < static_cast<int>(std::size(ferns)); ++i) {
             auto fern = addRenderable("OutdoorBeach_ScannedFern_" + std::to_string(i), scannedFernMesh,
                                       ferns[i].position,
                                       ferns[i].scale,
                                       glm::vec3(0.0f, ferns[i].yaw, 0.0f),
                                       glm::vec4(0.10f, 0.30f, 0.13f, 1.0f),
-                                      0.0f, 0.58f, "wood");
+                                      0.0f, 0.58f, "foliage");
             auto& r = m_registry->GetComponent<Scene::RenderableComponent>(fern);
-            ApplyNaturalisticAssetTextures(r, "fern_02");
             r.doubleSided = true;
+            r.subsurfaceWrap = 0.42f;
+            r.emissiveColor = glm::vec3(0.020f, 0.060f, 0.024f);
+            r.emissiveStrength = 0.10f;
+        }
+    }
+
+    if (scannedMossRockMesh && scannedMossRockMesh->gpuBuffers) {
+        const struct MossRockBank {
+            glm::vec3 position;
+            glm::vec3 scale;
+            float yaw;
+        } mossBanks[] = {
+            {glm::vec3(-6.25f, 0.06f, 0.22f), glm::vec3(0.28f), 0.42f},
+            {glm::vec3( 5.92f, 0.06f, 0.38f), glm::vec3(0.24f), -0.30f},
+            {glm::vec3( 7.18f, 0.07f, -0.82f), glm::vec3(0.20f), 0.80f},
+            {glm::vec3(-4.10f, 0.055f, 0.18f), glm::vec3(0.18f), 0.18f},
+            {glm::vec3(-0.85f, 0.055f, 0.86f), glm::vec3(0.16f), -0.42f},
+            {glm::vec3( 2.25f, 0.055f, 1.52f), glm::vec3(0.18f), 0.62f}
+        };
+        for (int i = 0; i < static_cast<int>(std::size(mossBanks)); ++i) {
+            auto e = addRenderable("OutdoorBeach_ScannedMossRockBank_" + std::to_string(i), scannedMossRockMesh,
+                                   mossBanks[i].position,
+                                   mossBanks[i].scale,
+                                   glm::vec3(0.0f, mossBanks[i].yaw, 0.0f),
+                                   glm::vec4(0.22f, 0.26f, 0.16f, 1.0f),
+                                   0.0f, 0.72f, "wet_stone");
+            auto& r = m_registry->GetComponent<Scene::RenderableComponent>(e);
+            ApplyNaturalisticAssetTextures(r, "rock_moss_set_01");
+            r.wetnessFactor = 0.42f;
+        }
+    }
+
+    if (scannedStumpMesh && scannedStumpMesh->gpuBuffers) {
+        const struct StumpAnchor {
+            glm::vec3 position;
+            glm::vec3 scale;
+            float yaw;
+        } stumps[] = {
+            {glm::vec3(-7.25f, 0.08f, -2.25f), glm::vec3(0.46f), -0.36f},
+            {glm::vec3( 7.42f, 0.08f, -1.85f), glm::vec3(0.34f), 0.48f},
+            {glm::vec3(-2.62f, 0.075f, 0.28f), glm::vec3(0.24f), 0.22f},
+            {glm::vec3( 3.12f, 0.075f, 2.18f), glm::vec3(0.22f), -0.34f}
+        };
+        for (int i = 0; i < static_cast<int>(std::size(stumps)); ++i) {
+            auto e = addRenderable("OutdoorBeach_ScannedStumpAnchor_" + std::to_string(i), scannedStumpMesh,
+                                   stumps[i].position,
+                                   stumps[i].scale,
+                                   glm::vec3(0.0f, stumps[i].yaw, 0.0f),
+                                   glm::vec4(0.28f, 0.17f, 0.09f, 1.0f),
+                                   0.0f, 0.78f, "wood");
+            auto& r = m_registry->GetComponent<Scene::RenderableComponent>(e);
+            ApplyNaturalisticAssetTextures(r, "tree_stump_01");
+            r.wetnessFactor = 0.28f;
+            r.proceduralMaskStrength = 0.12f;
+        }
+    }
+
+    if (scannedBushMesh && scannedBushMesh->gpuBuffers) {
+        const struct BushMass {
+            glm::vec3 position;
+            glm::vec3 scale;
+            float yaw;
+        } bushes[] = {
+            {glm::vec3(-6.90f, 0.07f, -1.52f), glm::vec3(0.68f), 0.32f},
+            {glm::vec3(-5.95f, 0.06f, -2.28f), glm::vec3(0.52f), -0.48f},
+            {glm::vec3( 6.55f, 0.07f, -1.42f), glm::vec3(0.58f), 0.18f},
+            {glm::vec3( 7.62f, 0.06f, -2.30f), glm::vec3(0.50f), -0.72f},
+            {glm::vec3(-3.70f, 0.065f, 0.82f), glm::vec3(0.42f), -0.10f},
+            {glm::vec3(-0.35f, 0.065f, 1.58f), glm::vec3(0.44f), 0.34f},
+            {glm::vec3( 2.86f, 0.065f, 2.42f), glm::vec3(0.48f), -0.56f},
+            {glm::vec3(-5.10f, 0.075f, 5.28f), glm::vec3(0.58f), 0.18f},
+            {glm::vec3(-3.10f, 0.075f, 5.52f), glm::vec3(0.50f), -0.32f},
+            {glm::vec3(-0.35f, 0.075f, 5.36f), glm::vec3(0.54f), 0.42f},
+            {glm::vec3( 2.20f, 0.075f, 5.48f), glm::vec3(0.52f), -0.18f},
+            {glm::vec3( 4.45f, 0.075f, 5.26f), glm::vec3(0.60f), 0.36f}
+        };
+        for (int i = 0; i < static_cast<int>(std::size(bushes)); ++i) {
+            auto e = addRenderable("OutdoorBeach_ScannedBushMass_" + std::to_string(i), scannedBushMesh,
+                                   bushes[i].position,
+                                   bushes[i].scale,
+                                   glm::vec3(0.0f, bushes[i].yaw, 0.0f),
+                                   glm::vec4(0.11f, 0.28f, 0.12f, 1.0f),
+                                   0.0f, 0.60f, "foliage");
+            auto& r = m_registry->GetComponent<Scene::RenderableComponent>(e);
+            r.doubleSided = true;
+            r.subsurfaceWrap = 0.46f;
+            r.emissiveColor = glm::vec3(0.020f, 0.058f, 0.020f);
+            r.emissiveStrength = 0.08f;
         }
     }
 
@@ -2232,8 +3327,10 @@ void Engine::BuildOutdoorSunsetBeachScene() {
                                           glm::vec3(length, 0.34f, 1.0f),
                                           glm::vec3(glm::radians(67.0f), yaw, glm::radians((i % 2 == 0) ? -11.0f : 9.0f)),
                                           glm::vec4(0.06f, 0.32f, 0.12f, 1.0f),
-                                          0.0f, 0.52f, "wood");
-                m_registry->GetComponent<Scene::RenderableComponent>(leaf).doubleSided = true;
+                                          0.0f, 0.52f, "foliage");
+                auto& leafR = m_registry->GetComponent<Scene::RenderableComponent>(leaf);
+                leafR.doubleSided = true;
+                leafR.subsurfaceWrap = 0.24f;
             }
 
             if (sphereMesh && sphereMesh->gpuBuffers) {
@@ -2290,13 +3387,13 @@ void Engine::BuildOutdoorSunsetBeachScene() {
 
     addLight("OutdoorBeach_LowSunKey", Scene::LightType::Spot,
              glm::vec3(-7.5f, 4.0f, -6.8f), glm::vec3(0.72f, -0.48f, 0.64f),
-             glm::vec3(1.0f, 0.58f, 0.30f), 7.2f, 32.0f);
+             glm::vec3(1.0f, 0.54f, 0.23f), 6.6f, 34.0f);
     addLight("OutdoorBeach_SkyFill", Scene::LightType::AreaRect,
              glm::vec3(4.5f, 5.0f, -5.0f), glm::vec3(-0.55f, -0.75f, 0.35f),
-             glm::vec3(0.45f, 0.64f, 1.0f), 2.2f, 24.0f);
+             glm::vec3(0.38f, 0.54f, 0.72f), 2.85f, 28.0f);
     addLight("OutdoorBeach_WaterGlint", Scene::LightType::Point,
              glm::vec3(0.0f, 0.75f, 2.8f), glm::vec3(0.0f),
-             glm::vec3(0.95f, 0.78f, 0.48f), 1.4f, 10.0f);
+             glm::vec3(1.0f, 0.72f, 0.38f), 1.85f, 12.5f);
 
     if (cubeMesh && cubeMesh->gpuBuffers) {
         const struct AuthoredShorePiece {
@@ -2313,8 +3410,8 @@ void Engine::BuildOutdoorSunsetBeachScene() {
             {"OutdoorBeach_AuthoredCove_WetEdge_Right", glm::vec3(3.85f, 0.031f, 0.80f), glm::vec3(3.15f, 0.020f, 0.22f), -0.11f, glm::vec4(0.42f, 0.39f, 0.31f, 1.0f), "wet_stone", 0.36f},
             {"OutdoorBeach_Headland_Left", glm::vec3(-10.35f, 0.22f, 6.35f), glm::vec3(2.10f, 0.44f, 1.05f), 0.12f, glm::vec4(0.22f, 0.21f, 0.18f, 1.0f), "stone", 0.70f},
             {"OutdoorBeach_Headland_Right", glm::vec3(10.50f, 0.18f, 6.70f), glm::vec3(2.45f, 0.36f, 0.90f), -0.16f, glm::vec4(0.24f, 0.22f, 0.18f, 1.0f), "stone", 0.72f},
-            {"OutdoorBeach_SandShelf_ForegroundBreakup_A", glm::vec3(-2.80f, 0.040f, -4.85f), glm::vec3(1.65f, 0.025f, 0.22f), 0.28f, glm::vec4(0.66f, 0.55f, 0.36f, 1.0f), "matte", 0.88f},
-            {"OutdoorBeach_SandShelf_ForegroundBreakup_B", glm::vec3(2.35f, 0.041f, -4.55f), glm::vec3(1.25f, 0.025f, 0.18f), -0.20f, glm::vec4(0.63f, 0.52f, 0.34f, 1.0f), "matte", 0.88f}
+            {"OutdoorBeach_SandShelf_ForegroundBreakup_A", glm::vec3(-2.80f, 0.040f, -4.85f), glm::vec3(1.65f, 0.025f, 0.22f), 0.28f, glm::vec4(0.58f, 0.48f, 0.31f, 1.0f), "sand", 0.88f},
+            {"OutdoorBeach_SandShelf_ForegroundBreakup_B", glm::vec3(2.35f, 0.041f, -4.55f), glm::vec3(1.25f, 0.025f, 0.18f), -0.20f, glm::vec4(0.55f, 0.45f, 0.30f, 1.0f), "sand", 0.88f}
         };
         for (const auto& piece : shorePieces) {
             auto e = addRenderable(piece.tag, cubeMesh, piece.position, piece.scale,
@@ -2324,6 +3421,10 @@ void Engine::BuildOutdoorSunsetBeachScene() {
             r.doubleSided = true;
             if (std::string(piece.preset) == "wet_stone") {
                 r.wetnessFactor = 0.62f;
+            } else if (std::string(piece.preset) == "sand") {
+                r.proceduralMaskStrength = 0.06f;
+                r.wetnessFactor = 0.18f;
+                r.normalScale = 0.0f;
             }
         }
     }
@@ -2341,8 +3442,41 @@ void Engine::BuildOutdoorSunsetBeachScene() {
             {"OutdoorBeach_NaturalDuneClump_RightB", glm::vec3(7.74f, 0.10f, -2.72f), glm::vec3(0.52f, 0.14f, 0.30f), glm::vec4(0.54f, 0.45f, 0.29f, 1.0f)}
         };
         for (const auto& clump : clumps) {
-            addRenderable(clump.tag, sphereMesh, clump.position, clump.scale, glm::vec3(0.0f),
-                          clump.color, 0.0f, 0.90f, "matte");
+            auto e = addRenderable(clump.tag, sphereMesh, clump.position, clump.scale, glm::vec3(0.0f),
+                                   clump.color, 0.0f, 0.90f, "sand");
+            auto& r = m_registry->GetComponent<Scene::RenderableComponent>(e);
+            r.proceduralMaskStrength = 0.06f;
+            r.normalScale = 0.0f;
+        }
+
+        const struct FarCanopy {
+            glm::vec3 position;
+            glm::vec3 scale;
+            float yaw;
+            glm::vec4 color;
+        } canopies[] = {
+            {glm::vec3(-5.82f, 1.26f, 5.72f), glm::vec3(0.92f, 0.44f, 0.58f), 0.22f, glm::vec4(0.075f, 0.185f, 0.085f, 1.0f)},
+            {glm::vec3(-4.72f, 1.14f, 5.55f), glm::vec3(0.70f, 0.34f, 0.46f), -0.32f, glm::vec4(0.10f, 0.225f, 0.095f, 1.0f)},
+            {glm::vec3(-3.78f, 1.38f, 5.90f), glm::vec3(0.82f, 0.44f, 0.52f), 0.48f, glm::vec4(0.065f, 0.160f, 0.080f, 1.0f)},
+            {glm::vec3(-1.28f, 1.18f, 5.62f), glm::vec3(0.80f, 0.36f, 0.50f), -0.14f, glm::vec4(0.095f, 0.205f, 0.085f, 1.0f)},
+            {glm::vec3( 0.25f, 1.05f, 5.42f), glm::vec3(0.62f, 0.30f, 0.40f), 0.34f, glm::vec4(0.12f, 0.245f, 0.100f, 1.0f)},
+            {glm::vec3( 1.88f, 1.34f, 5.84f), glm::vec3(0.78f, 0.42f, 0.50f), -0.42f, glm::vec4(0.075f, 0.175f, 0.080f, 1.0f)},
+            {glm::vec3( 3.15f, 1.10f, 5.48f), glm::vec3(0.70f, 0.34f, 0.46f), 0.18f, glm::vec4(0.105f, 0.225f, 0.090f, 1.0f)},
+            {glm::vec3( 4.36f, 1.24f, 5.68f), glm::vec3(0.90f, 0.42f, 0.56f), -0.26f, glm::vec4(0.070f, 0.170f, 0.080f, 1.0f)}
+        };
+        for (int i = 0; i < static_cast<int>(std::size(canopies)); ++i) {
+            auto canopy = addRenderable("OutdoorBeach_FarBankCanopy_" + std::to_string(i), sphereMesh,
+                                        canopies[i].position,
+                                        canopies[i].scale,
+                                        glm::vec3(0.0f, canopies[i].yaw, 0.0f),
+                                        canopies[i].color,
+                                        0.0f, 0.64f, "foliage");
+            auto& r = m_registry->GetComponent<Scene::RenderableComponent>(canopy);
+            r.doubleSided = true;
+            r.subsurfaceWrap = 0.34f;
+            r.visible = false;
+            r.emissiveColor = glm::vec3(0.014f, 0.036f, 0.014f);
+            r.emissiveStrength = 0.06f;
         }
     }
 }
@@ -3073,9 +4207,10 @@ void Engine::BuildRTShowcaseScene() {
     spdlog::info("Building hero scene: RT Showcase Gallery");
 
     auto* renderer = m_renderer.get();
+    const bool conservative = (m_qualityMode != EngineConfig::QualityMode::Default);
+    const auto sceneProfile = Graphics::BuildGalleryCinematicProfile(conservative);
 
     if (renderer) {
-        const bool conservative = (m_qualityMode != EngineConfig::QualityMode::Default);
         Graphics::ApplyRTShowcaseSceneControls(*renderer, conservative);
     }
 
@@ -3151,6 +4286,10 @@ void Engine::BuildRTShowcaseScene() {
         const char* value = std::getenv("CORTEX_RT_REFLECTION_OVERBRIGHT_STRESS");
         return value && value[0] != '\0' && value[0] != '0';
     }();
+    const bool stableLargePlanes = [] {
+        const char* value = std::getenv("CORTEX_RT_SHOWCASE_NOISY_LARGE_PLANES");
+        return !(value && value[0] != '\0' && value[0] != '0');
+    }();
 
     if (floorPlane && floorPlane->gpuBuffers) {
         // Floor
@@ -3165,15 +4304,20 @@ void Engine::BuildRTShowcaseScene() {
         r.metallic = 0.0f;
         r.roughness = 0.92f;
         r.ao = 1.0f;
-        r.normalScale = 0.12f;
+        // These large bright grazing planes dominate the interactive default
+        // view. Keep texture identity, but reduce high-frequency normal
+        // response so mouse-look does not read as material flicker.
+        r.normalScale = 0.06f;
         r.specularFactor = 0.15f;
         r.presetName = "wood_floor";
         r.doubleSided = true;
         // Phase 2: RT showcase floor uses pre-compressed BC7/BC5 textures when
         // available. The loader will fall back to placeholders if these DDS
         // assets are missing.
-        r.textures.albedoPath = "assets/textures/rtshowcase/rt_gallery_floor_albedo.dds";
-        r.textures.normalPath = "assets/textures/rtshowcase/rt_gallery_floor_normal_bc5.dds";
+        if (!stableLargePlanes) {
+            r.textures.albedoPath = "assets/textures/rtshowcase/rt_gallery_floor_albedo.dds";
+            r.textures.normalPath = "assets/textures/rtshowcase/rt_gallery_floor_normal_bc5.dds";
+        }
     }
 
     if (floorPlane && floorPlane->gpuBuffers) {
@@ -3227,10 +4371,13 @@ void Engine::BuildRTShowcaseScene() {
         r.metallic = 0.0f;
         r.roughness = 0.85f;
         r.ao = 1.0f;
+        r.normalScale = 0.10f;
         r.presetName = "brick";
         r.doubleSided = true;
-        r.textures.albedoPath = "assets/textures/rtshowcase/rt_gallery_leftwall_albedo.dds";
-        r.textures.normalPath = "assets/textures/rtshowcase/rt_gallery_leftwall_normal_bc5.dds";
+        if (!stableLargePlanes) {
+            r.textures.albedoPath = "assets/textures/rtshowcase/rt_gallery_leftwall_albedo.dds";
+            r.textures.normalPath = "assets/textures/rtshowcase/rt_gallery_leftwall_normal_bc5.dds";
+        }
 
         // Mirror panels on the left wall
         if (quadPanel && quadPanel->gpuBuffers) {
@@ -3280,10 +4427,13 @@ void Engine::BuildRTShowcaseScene() {
         r.metallic = 0.0f;
         r.roughness = 0.7f;
         r.ao = 1.0f;
+        r.normalScale = 0.10f;
         r.presetName = "backdrop";
         r.doubleSided = true;
-        r.textures.albedoPath = "assets/textures/rtshowcase/rt_gallery_rightwall_albedo.dds";
-        r.textures.normalPath = "assets/textures/rtshowcase/rt_gallery_rightwall_normal_bc5.dds";
+        if (!stableLargePlanes) {
+            r.textures.albedoPath = "assets/textures/rtshowcase/rt_gallery_rightwall_albedo.dds";
+            r.textures.normalPath = "assets/textures/rtshowcase/rt_gallery_rightwall_normal_bc5.dds";
+        }
         if (overbrightReflectionStress) {
             r.albedoColor = glm::vec4(1.0f, 0.76f, 0.42f, 1.0f);
             r.roughness = 0.32f;
@@ -3333,35 +4483,10 @@ void Engine::BuildRTShowcaseScene() {
         light.castsShadows = false;
     }
 
-    // Local reflection probes exercise VB deferred local IBL selection. They
-    // intentionally overlap the hero gallery so debug view 42 shows the
-    // probe/global blend gradient instead of a binary on/off mask.
-    {
-        entt::entity e = m_registry->CreateEntity();
-        m_registry->AddComponent<Scene::TagComponent>(e, "RTGallery_LocalProbe_Left");
-        auto& t = m_registry->AddComponent<TransformComponent>(e);
-        t.position = glm::vec3(galleryX - 5.0f, 1.7f, -0.1f);
-
-        Scene::ReflectionProbeComponent probe{};
-        probe.extents = glm::vec3(5.5f, 2.4f, 3.2f);
-        probe.blendDistance = 2.25f;
-        probe.environmentIndex = 0;
-        probe.enabled = 1;
-        m_registry->AddComponent<Scene::ReflectionProbeComponent>(e, probe);
-    }
-    {
-        entt::entity e = m_registry->CreateEntity();
-        m_registry->AddComponent<Scene::TagComponent>(e, "RTGallery_LocalProbe_Right");
-        auto& t = m_registry->AddComponent<TransformComponent>(e);
-        t.position = glm::vec3(galleryX + 4.5f, 1.7f, -0.1f);
-
-        Scene::ReflectionProbeComponent probe{};
-        probe.extents = glm::vec3(5.5f, 2.4f, 3.2f);
-        probe.blendDistance = 2.25f;
-        probe.environmentIndex = 0;
-        probe.enabled = 1;
-        m_registry->AddComponent<Scene::ReflectionProbeComponent>(e, probe);
-    }
+    // Profile-owned local reflection probes exercise VB deferred local IBL
+    // selection. They intentionally overlap the hero gallery so debug view 42
+    // shows the probe/global blend gradient instead of a binary on/off mask.
+    const size_t profileReflectionProbes = AddSceneProfileReflectionProbes(*m_registry, sceneProfile);
 
     // Row of primitives down the gallery
     if (sphereMesh && sphereMesh->gpuBuffers && cubeMesh && cubeMesh->gpuBuffers && torusMesh && torusMesh->gpuBuffers) {
@@ -3547,78 +4672,141 @@ void Engine::BuildRTShowcaseScene() {
         sr.presetName = "chrome";
     }
 
-    // Gallery lights: warm key, cool rim
-    {
-        entt::entity e = m_registry->CreateEntity();
-        m_registry->AddComponent<Scene::TagComponent>(e, "RTGallery_Softbox");
-        auto& t = m_registry->AddComponent<Scene::TransformComponent>(e);
-        t.position = glm::vec3(galleryX, 3.35f, -1.0f);
-        glm::vec3 dir(0.0f, -1.0f, 0.25f);
-        t.rotation = glm::quatLookAtLH(glm::normalize(dir), glm::vec3(0.0f, 1.0f, 0.0f));
+    if (cubeMesh && cubeMesh->gpuBuffers) {
+        auto addGalleryDetailBlock = [&](const char* tag,
+                                         const glm::vec3& position,
+                                         const glm::vec3& scale,
+                                         const glm::vec4& color,
+                                         float metallic,
+                                         float roughness,
+                                         const char* preset) {
+            entt::entity e = m_registry->CreateEntity();
+            m_registry->AddComponent<Scene::TagComponent>(e, tag);
+            auto& t = m_registry->AddComponent<TransformComponent>(e);
+            t.position = position;
+            t.scale = scale;
 
-        auto& l = m_registry->AddComponent<Scene::LightComponent>(e);
-        l.type = Scene::LightType::AreaRect;
-        l.color = glm::vec3(1.0f, 0.93f, 0.82f);
-        l.intensity = 3.8f;
-        l.range = 18.0f;
-        l.areaSize = glm::vec2(5.5f, 2.2f);
-        l.twoSided = false;
-        l.castsShadows = false;
+            auto& r = m_registry->AddComponent<Scene::RenderableComponent>(e);
+            r.mesh = cubeMesh;
+            r.albedoColor = color;
+            r.metallic = metallic;
+            r.roughness = roughness;
+            r.ao = 1.0f;
+            r.presetName = preset;
+            r.doubleSided = false;
+        };
+
+        const glm::vec4 brushedRail(0.50f, 0.52f, 0.56f, 1.0f);
+        const glm::vec4 darkReveal(0.11f, 0.105f, 0.10f, 1.0f);
+        const glm::vec4 warmWood(0.50f, 0.33f, 0.18f, 1.0f);
+        const glm::vec4 tileInsert(0.56f, 0.66f, 0.74f, 1.0f);
+
+        addGalleryDetailBlock("RTGallery_Detail_BackBaseRail",
+                              glm::vec3(galleryX, 0.10f, 2.92f),
+                              glm::vec3(8.8f, 0.08f, 0.05f),
+                              brushedRail,
+                              1.0f,
+                              0.32f,
+                              "brushed_metal");
+        addGalleryDetailBlock("RTGallery_Detail_BackTopRail",
+                              glm::vec3(galleryX, 3.46f, 2.90f),
+                              glm::vec3(8.6f, 0.055f, 0.045f),
+                              brushedRail,
+                              1.0f,
+                              0.36f,
+                              "brushed_metal");
+        addGalleryDetailBlock("RTGallery_Detail_BackShadowReveal",
+                              glm::vec3(galleryX, 2.24f, 2.88f),
+                              glm::vec3(6.8f, 0.035f, 0.035f),
+                              darkReveal,
+                              0.0f,
+                              0.68f,
+                              "rubber");
+
+        const float floorZs[] = {-5.20f, -4.20f, -3.20f, -2.20f, -1.20f, -0.20f, 0.80f, 1.80f};
+        for (int i = 0; i < 8; ++i) {
+            addGalleryDetailBlock(("RTGallery_Detail_FloorCrossInlay_" + std::to_string(i)).c_str(),
+                                  glm::vec3(galleryX, 0.024f, floorZs[i]),
+                                  glm::vec3(8.2f, 0.018f, 0.026f),
+                                  (i % 2 == 0) ? brushedRail : darkReveal,
+                                  (i % 2 == 0) ? 1.0f : 0.0f,
+                                  (i % 2 == 0) ? 0.38f : 0.72f,
+                                  (i % 2 == 0) ? "brushed_metal" : "rubber");
+        }
+
+        const float floorXs[] = {-18.6f, -16.8f, -15.0f, -13.2f, -11.4f, -9.6f};
+        for (int i = 0; i < 6; ++i) {
+            addGalleryDetailBlock(("RTGallery_Detail_FloorLongInlay_" + std::to_string(i)).c_str(),
+                                  glm::vec3(floorXs[i], 0.026f, -1.70f),
+                                  glm::vec3(0.022f, 0.018f, 6.6f),
+                                  (i % 2 == 0) ? darkReveal : tileInsert,
+                                  0.0f,
+                                  (i % 2 == 0) ? 0.70f : 0.42f,
+                                  (i % 2 == 0) ? "rubber" : "ceramic_tile");
+        }
+
+        const struct GalleryBevel {
+            const char* tag;
+            glm::vec3 position;
+            glm::vec3 scale;
+        } bevels[] = {
+            {"RTGallery_Detail_DragonPlinthFrontBevel", glm::vec3(galleryX, 0.82f, 0.38f), glm::vec3(1.72f, 0.045f, 0.045f)},
+            {"RTGallery_Detail_DragonPlinthBackBevel", glm::vec3(galleryX, 0.82f, 2.02f), glm::vec3(1.72f, 0.045f, 0.045f)},
+            {"RTGallery_Detail_DragonPlinthLeftBevel", glm::vec3(galleryX - 0.82f, 0.82f, 1.20f), glm::vec3(0.045f, 0.045f, 1.72f)},
+            {"RTGallery_Detail_DragonPlinthRightBevel", glm::vec3(galleryX + 0.82f, 0.82f, 1.20f), glm::vec3(0.045f, 0.045f, 1.72f)},
+            {"RTGallery_Detail_SpherePlinthFrontBevel", glm::vec3(galleryX + 4.0f, 0.52f, 0.88f), glm::vec3(0.92f, 0.035f, 0.035f)},
+            {"RTGallery_Detail_SpherePlinthBackBevel", glm::vec3(galleryX + 4.0f, 0.52f, 1.72f), glm::vec3(0.92f, 0.035f, 0.035f)}
+        };
+        for (const auto& bevel : bevels) {
+            addGalleryDetailBlock(bevel.tag,
+                                  bevel.position,
+                                  bevel.scale,
+                                  darkReveal,
+                                  0.0f,
+                                  0.64f,
+                                  "rubber");
+        }
+
+        if (quadPanel && quadPanel->gpuBuffers) {
+            const struct GalleryPanel {
+                const char* tag;
+                glm::vec3 position;
+                glm::vec3 scale;
+                glm::vec4 color;
+                const char* preset;
+                glm::vec3 emissive;
+                float emissiveStrength;
+            } panels[] = {
+                {"RTGallery_Detail_RearPanel_WarmStudy", glm::vec3(galleryX - 3.35f, 1.78f, 2.86f), glm::vec3(0.78f, 0.46f, 1.0f), glm::vec4(0.82f, 0.50f, 0.22f, 1.0f), "painted_wall", glm::vec3(0.0f), 0.0f},
+                {"RTGallery_Detail_RearPanel_CoolStudy", glm::vec3(galleryX + 3.35f, 1.82f, 2.86f), glm::vec3(0.78f, 0.46f, 1.0f), glm::vec4(0.24f, 0.48f, 0.82f, 1.0f), "painted_wall", glm::vec3(0.0f), 0.0f},
+                {"RTGallery_Detail_RearSignalPanel", glm::vec3(galleryX, 2.88f, 2.85f), glm::vec3(1.35f, 0.18f, 1.0f), glm::vec4(0.20f, 0.62f, 0.90f, 1.0f), "screen_panel", glm::vec3(0.06f, 0.22f, 0.38f), 0.72f}
+            };
+            for (const auto& panel : panels) {
+                entt::entity panelEntity = m_registry->CreateEntity();
+                m_registry->AddComponent<Scene::TagComponent>(panelEntity, panel.tag);
+                auto& panelT = m_registry->AddComponent<TransformComponent>(panelEntity);
+                panelT.position = panel.position;
+                panelT.scale = panel.scale;
+
+                auto& panelR = m_registry->AddComponent<Scene::RenderableComponent>(panelEntity);
+                panelR.mesh = quadPanel;
+                panelR.albedoColor = panel.color;
+                panelR.metallic = 0.0f;
+                panelR.roughness = 0.46f;
+                panelR.ao = 1.0f;
+                panelR.presetName = panel.preset;
+                panelR.doubleSided = true;
+                panelR.emissiveColor = panel.emissive;
+                panelR.emissiveStrength = panel.emissiveStrength;
+            }
+        }
     }
 
-    {
-        entt::entity e = m_registry->CreateEntity();
-        m_registry->AddComponent<Scene::TagComponent>(e, "RTGallery_KeyLight");
-        auto& t = m_registry->AddComponent<Scene::TransformComponent>(e);
-        t.position = glm::vec3(galleryX + 3.0f, 3.5f, -3.0f);
-        glm::vec3 dir(-0.4f, -0.8f, 0.6f);
-        t.rotation = glm::quatLookAtLH(glm::normalize(dir), glm::vec3(0.0f, 1.0f, 0.0f));
-
-        auto& l = m_registry->AddComponent<Scene::LightComponent>(e);
-        l.type = Scene::LightType::Spot;
-        l.color = glm::vec3(1.0f, 0.95f, 0.85f);
-        l.intensity = 6.2f;
-        l.range = 30.0f;
-        l.innerConeDegrees = 22.0f;
-        l.outerConeDegrees = 40.0f;
-        l.castsShadows = true;
-    }
-
-    {
-        entt::entity e = m_registry->CreateEntity();
-        m_registry->AddComponent<Scene::TagComponent>(e, "RTGallery_FillLight");
-        auto& t = m_registry->AddComponent<Scene::TransformComponent>(e);
-        t.position = glm::vec3(galleryX + 1.5f, 2.3f, -4.6f);
-        glm::vec3 dir(-0.2f, -0.25f, 1.0f);
-        t.rotation = glm::quatLookAtLH(glm::normalize(dir), glm::vec3(0.0f, 1.0f, 0.0f));
-
-        auto& l = m_registry->AddComponent<Scene::LightComponent>(e);
-        l.type = Scene::LightType::AreaRect;
-        l.color = glm::vec3(0.78f, 0.86f, 1.0f);
-        l.intensity = 2.3f;
-        l.range = 16.0f;
-        l.areaSize = glm::vec2(6.0f, 3.0f);
-        l.twoSided = false;
-        l.castsShadows = false;
-    }
-
-    {
-        entt::entity e = m_registry->CreateEntity();
-        m_registry->AddComponent<Scene::TagComponent>(e, "RTGallery_RimLight");
-        auto& t = m_registry->AddComponent<Scene::TransformComponent>(e);
-        t.position = glm::vec3(galleryX - 6.0f, 3.0f, 3.0f);
-        glm::vec3 dir(0.2f, -0.6f, -1.0f);
-        t.rotation = glm::quatLookAtLH(glm::normalize(dir), glm::vec3(0.0f, 1.0f, 0.0f));
-
-        auto& l = m_registry->AddComponent<Scene::LightComponent>(e);
-        l.type = Scene::LightType::Spot;
-        l.color = glm::vec3(0.8f, 0.9f, 1.0f);
-        l.intensity = 3.2f;
-        l.range = 25.0f;
-        l.innerConeDegrees = 24.0f;
-        l.outerConeDegrees = 42.0f;
-        l.castsShadows = false;
-    }
+    const size_t profileLights =
+        AddSceneProfileLights(*m_registry, sceneProfile, glm::vec3(galleryX, 1.05f, 0.25f));
+    spdlog::info("RT Showcase profile assets: profile_lights={} reflection_probes={}",
+                 profileLights,
+                 profileReflectionProbes);
 
     // Dragon fire emitter near the gallery dragon's mouth. This uses the
     // shared CPU-driven particle system and renders as small emissive
@@ -3651,8 +4839,11 @@ void Engine::BuildRTShowcaseScene() {
         entt::entity rim = m_registry->CreateEntity();
         m_registry->AddComponent<Scene::TagComponent>(rim, "Courtyard_PoolRim");
         auto& rt = m_registry->AddComponent<Scene::TransformComponent>(rim);
-        // Avoid coplanar z-fighting with Courtyard_Floor.
-        rt.position = glm::vec3(0.0f, 0.002f, courtyardZ);
+        // Keep the deck definitively above Courtyard_Floor. The old 0.002f
+        // offset was below the practical grazing-depth separation for the
+        // forced-VB path and produced dark/light ownership changes when the
+        // camera was jiggled across the white platform.
+        rt.position = glm::vec3(0.0f, 0.035f, courtyardZ);
 
         auto& rr = m_registry->AddComponent<Scene::RenderableComponent>(rim);
         rr.mesh = poolPlane;
@@ -3667,7 +4858,7 @@ void Engine::BuildRTShowcaseScene() {
         entt::entity water = m_registry->CreateEntity();
         m_registry->AddComponent<Scene::TagComponent>(water, "Courtyard_WaterSurface");
         auto& wt = m_registry->AddComponent<Scene::TransformComponent>(water);
-        wt.position = glm::vec3(0.0f, -0.02f, courtyardZ);
+        wt.position = glm::vec3(0.0f, 0.045f, courtyardZ);
 
         auto& wr = m_registry->AddComponent<Scene::RenderableComponent>(water);
         wr.mesh = poolPlane;
@@ -4496,8 +5687,27 @@ void Engine::BuildDragonStudioScene() {
         spdlog::warn("Studio floor mesh is unavailable; 'StudioFloor' entity will be skipped.");
     }
 
-    // Pool rim + water share the same underlying plane geometry.
-    auto poolMesh = Utils::MeshGenerator::CreatePlane(10.0f, 10.0f);
+    // Reusable box geometry for raised architectural pieces. Keep this near
+    // the pool construction so thin coplanar floor overlays do not creep back
+    // into the hero scene.
+    auto cubeMesh = Utils::MeshGenerator::CreateCube();
+    if (renderer) {
+        auto uploadResult = renderer->UploadMesh(cubeMesh);
+        if (uploadResult.IsErr()) {
+            spdlog::warn("Failed to upload cube mesh: {}", uploadResult.Error());
+            cubeMesh.reset();
+        }
+        if (renderer->IsDeviceRemoved()) {
+            spdlog::error("DX12 device was removed while uploading cube mesh; remaining Dragon studio geometry will be skipped.");
+            return;
+        }
+    }
+
+    // Water surface only. The old scene used one nearly coplanar full-size
+    // white plane over the studio floor as a "rim"; camera rotation/TAA jitter
+    // exposed that as dark/light flicker. The rim is now raised box coping
+    // below, and the water plane is physically separated from the floor.
+    auto poolMesh = Utils::MeshGenerator::CreatePlane(6.6f, 5.2f);
     if (renderer) {
         auto uploadResult = renderer->UploadMesh(poolMesh);
         if (uploadResult.IsErr()) {
@@ -4510,28 +5720,48 @@ void Engine::BuildDragonStudioScene() {
         }
     }
 
+    if (cubeMesh && cubeMesh->gpuBuffers) {
+        struct PoolCopingPiece {
+            const char* tag;
+            glm::vec3 position;
+            glm::vec3 scale;
+        };
+
+        constexpr float copingY = 0.065f;
+        const std::array<PoolCopingPiece, 4> copingPieces{{
+            {"PoolCoping_North", glm::vec3(0.0f, copingY, poolZ + 2.82f), glm::vec3(7.55f, 0.12f, 0.36f)},
+            {"PoolCoping_South", glm::vec3(0.0f, copingY, poolZ - 2.82f), glm::vec3(7.55f, 0.12f, 0.36f)},
+            {"PoolCoping_West",  glm::vec3(-3.78f, copingY, poolZ),        glm::vec3(0.36f, 0.12f, 5.28f)},
+            {"PoolCoping_East",  glm::vec3( 3.78f, copingY, poolZ),        glm::vec3(0.36f, 0.12f, 5.28f)}
+        }};
+
+        for (const auto& piece : copingPieces) {
+            entt::entity rimEntity = m_registry->CreateEntity();
+            m_registry->AddComponent<Scene::TagComponent>(rimEntity, piece.tag);
+            auto& rimXform = m_registry->AddComponent<Scene::TransformComponent>(rimEntity);
+            rimXform.position = piece.position;
+            rimXform.scale = piece.scale;
+
+            auto& rimRenderable = m_registry->AddComponent<Scene::RenderableComponent>(rimEntity);
+            rimRenderable.mesh = cubeMesh;
+            rimRenderable.albedoColor = glm::vec4(0.86f, 0.86f, 0.84f, 1.0f);
+            rimRenderable.metallic = 0.0f;
+            rimRenderable.roughness = 0.78f;
+            rimRenderable.ao = 1.0f;
+            rimRenderable.presetName = "concrete";
+        }
+    } else {
+        spdlog::warn("Cube mesh is unavailable; raised pool coping will be skipped.");
+    }
+
     if (poolMesh && poolMesh->gpuBuffers) {
-        // Pool rim: bright concrete ring around the water.
-        entt::entity rimEntity = m_registry->CreateEntity();
-        m_registry->AddComponent<Scene::TagComponent>(rimEntity, "PoolRim");
-        auto& rimXform = m_registry->AddComponent<Scene::TransformComponent>(rimEntity);
-        // Avoid coplanar z-fighting with the studio floor plane.
-        rimXform.position = glm::vec3(0.0f, 0.002f, poolZ);
-        rimXform.scale = glm::vec3(1.0f);
-
-        auto& rimRenderable = m_registry->AddComponent<Scene::RenderableComponent>(rimEntity);
-        rimRenderable.mesh = poolMesh;
-        rimRenderable.albedoColor = glm::vec4(0.9f, 0.9f, 0.9f, 1.0f);
-        rimRenderable.metallic = 0.0f;
-        rimRenderable.roughness = 0.8f;
-        rimRenderable.ao = 1.0f;
-        rimRenderable.presetName = "concrete";
-
-        // Water surface slightly below the rim so the edge reads clearly.
+        // Water surface is above the studio floor and below the raised coping
+        // top. This avoids both floor/water fighting and rim/water fighting
+        // under camera rotation.
         entt::entity waterEntity = m_registry->CreateEntity();
         m_registry->AddComponent<Scene::TagComponent>(waterEntity, "WaterSurface");
         auto& waterXform = m_registry->AddComponent<Scene::TransformComponent>(waterEntity);
-        waterXform.position = glm::vec3(0.0f, -0.02f, poolZ);
+        waterXform.position = glm::vec3(0.0f, 0.028f, poolZ);
         waterXform.scale = glm::vec3(1.0f);
 
         auto& waterRenderable = m_registry->AddComponent<Scene::RenderableComponent>(waterEntity);
@@ -4543,7 +5773,7 @@ void Engine::BuildDragonStudioScene() {
         waterRenderable.presetName = "water";
         m_registry->AddComponent<Scene::WaterSurfaceComponent>(waterEntity, Scene::WaterSurfaceComponent{0.0f});
     } else {
-        spdlog::warn("Pool mesh is unavailable; 'PoolRim' and 'WaterSurface' entities will be skipped.");
+        spdlog::warn("Pool mesh is unavailable; 'WaterSurface' entity will be skipped.");
     }
 
     // Backdrop wall behind the pool to catch shadows and reflections.
@@ -4645,19 +5875,6 @@ void Engine::BuildDragonStudioScene() {
     }
 
     // Colored cube on the near rim for GI/reflection contrast.
-    auto cubeMesh = Utils::MeshGenerator::CreateCube();
-    if (renderer) {
-        auto uploadResult = renderer->UploadMesh(cubeMesh);
-        if (uploadResult.IsErr()) {
-            spdlog::warn("Failed to upload cube mesh: {}", uploadResult.Error());
-            cubeMesh.reset();
-        }
-        if (renderer->IsDeviceRemoved()) {
-            spdlog::error("DX12 device was removed while uploading cube mesh; remaining Dragon studio geometry will be skipped.");
-            return;
-        }
-    }
-
     if (cubeMesh && cubeMesh->gpuBuffers) {
         entt::entity cubeEntity = m_registry->CreateEntity();
         m_registry->AddComponent<Scene::TagComponent>(cubeEntity, "ColorCube");
@@ -4885,15 +6102,15 @@ void Engine::BuildRainGlassPavilionScene() {
     if (renderer) {
         renderer->SetLightingRigContract("rain_pavilion_night", "scene_preset", false);
         renderer->SetWorldShaderPaletteContract("rain_pavilion_night", "rain_pavilion_night");
-        renderer->SetEnvironmentPreset("studio");
+        renderer->SetEnvironmentPreset("neutral_procedural");
         renderer->SetIBLEnabled(true);
-        renderer->SetIBLIntensity(1.12f, 1.30f);
+        renderer->SetIBLIntensity(0.76f, 0.58f);
         renderer->SetBackgroundPresentation(false, 0.90f, 0.14f);
         renderer->SetSunDirection(glm::normalize(glm::vec3(-0.18f, 0.72f, 0.50f)));
         renderer->SetSunColor(glm::vec3(0.42f, 0.62f, 1.0f));
-        renderer->SetSunIntensity(3.8f);
-        renderer->SetExposure(1.72f);
-        renderer->SetBloomIntensity(0.26f);
+        renderer->SetSunIntensity(4.4f);
+        renderer->SetExposure(2.08f);
+        renderer->SetBloomIntensity(0.30f);
         renderer->SetTAAEnabled(true);
         renderer->SetFXAAEnabled(true);
         renderer->SetSSREnabled(true);
@@ -4914,6 +6131,11 @@ void Engine::BuildRainGlassPavilionScene() {
     auto tableMesh = LoadNaturalisticShowcaseMesh("WoodenTable_01/WoodenTable_01_1k.gltf");
     auto bushMesh = LoadNaturalisticShowcaseMesh("wild_rooibos_bush/wild_rooibos_bush_1k.gltf");
     auto fernMesh = LoadNaturalisticShowcaseMesh("fern_02/fern_02_1k.gltf");
+    auto pretrainedLanternMesh = LoadPretrainedGeneratedMesh("openai_shap_e_text300m/rain_glass_pavilion/rain_tabletop_lantern_cluster/rain_glass_pavilion_rain_tabletop_lantern_cluster_openai_shap_e_text300m.gltf");
+    auto pretrainedTableDressingMesh = LoadPretrainedGeneratedMesh("openai_shap_e_text300m/rain_glass_pavilion/rain_glass_table_dressing/rain_glass_pavilion_rain_glass_table_dressing_openai_shap_e_text300m.gltf");
+    auto pretrainedPuddleMesh = LoadPretrainedGeneratedMesh("openai_shap_e_text300m/rain_glass_pavilion/rain_puddle_floor_patch/rain_glass_pavilion_rain_puddle_floor_patch_openai_shap_e_text300m.gltf");
+    auto pretrainedWindowPanelMesh = LoadPretrainedGeneratedMesh("openai_shap_e_text300m/rain_glass_pavilion/rain_streak_window_panel/rain_glass_pavilion_rain_streak_window_panel_openai_shap_e_text300m.gltf");
+    const auto pretrainedLayout = LoadPretrainedRuntimeLayout();
     if (!UploadAssetLedMesh(renderer, planeMesh, "plane") ||
         !UploadAssetLedMesh(renderer, cubeMesh, "cube") ||
         !UploadAssetLedMesh(renderer, cylinderMesh, "cylinder") ||
@@ -4922,23 +6144,31 @@ void Engine::BuildRainGlassPavilionScene() {
         !UploadAssetLedMesh(renderer, lanternMesh, "Lantern_01") ||
         !UploadAssetLedMesh(renderer, tableMesh, "WoodenTable_01") ||
         !UploadAssetLedMesh(renderer, bushMesh, "wild_rooibos_bush") ||
-        !UploadAssetLedMesh(renderer, fernMesh, "fern_02")) {
+        !UploadAssetLedMesh(renderer, fernMesh, "fern_02") ||
+        !UploadAssetLedMesh(renderer, pretrainedLanternMesh, "pretrained_rain_tabletop_lantern_cluster") ||
+        !UploadAssetLedMesh(renderer, pretrainedTableDressingMesh, "pretrained_rain_glass_table_dressing") ||
+        !UploadAssetLedMesh(renderer, pretrainedPuddleMesh, "pretrained_rain_puddle_floor_patch") ||
+        !UploadAssetLedMesh(renderer, pretrainedWindowPanelMesh, "pretrained_rain_streak_window_panel")) {
         return;
     }
 
     m_activeCameraEntity = AddAssetLedCamera(*m_registry,
-        glm::vec3(-1.28f, 0.92f, 0.10f), glm::vec3(-0.44f, 0.70f, 0.84f), 28.0f, 120.0f);
+        pretrainedLayout.cameraPosition, pretrainedLayout.cameraTarget, pretrainedLayout.cameraFov, 120.0f);
 
-    const AssetLedMaterialSettings wetTile{glm::vec4(0.24f, 0.26f, 0.30f, 1.0f), 0.0f, 0.30f, 0.0f, 1.5f, glm::vec3(0.0f), 1.0f, 0.82f, 0.34f, false, Scene::RenderableComponent::AlphaMode::Opaque, Scene::RenderableComponent::RenderLayer::Opaque, "wet_masonry"};
+    const AssetLedMaterialSettings wetTile{glm::vec4(0.24f, 0.26f, 0.30f, 1.0f), 0.0f, 0.46f, 0.0f, 1.5f, glm::vec3(0.0f), 1.0f, 0.42f, 0.18f, false, Scene::RenderableComponent::AlphaMode::Opaque, Scene::RenderableComponent::RenderLayer::Opaque, "wet_masonry"};
     const AssetLedMaterialSettings gardenMat{glm::vec4(0.11f, 0.15f, 0.13f, 1.0f), 0.0f, 0.74f, 0.0f, 1.5f, glm::vec3(0.0f), 1.0f, 0.24f, 0.46f, false, Scene::RenderableComponent::AlphaMode::Opaque, Scene::RenderableComponent::RenderLayer::Opaque, "moss_vegetation"};
     const AssetLedMaterialSettings vegetation{glm::vec4(0.12f, 0.24f, 0.16f, 1.0f), 0.0f, 0.64f, 0.0f, 1.5f, glm::vec3(0.0f), 1.0f, 0.16f, 0.32f, true, Scene::RenderableComponent::AlphaMode::Opaque, Scene::RenderableComponent::RenderLayer::Opaque, "moss_vegetation"};
-    const AssetLedMaterialSettings glass{glm::vec4(0.18f, 0.30f, 0.42f, 0.18f), 0.0f, 0.045f, 0.72f, 1.45f, glm::vec3(0.0f), 1.0f, 0.12f, 0.05f, true, Scene::RenderableComponent::AlphaMode::Blend, Scene::RenderableComponent::RenderLayer::Opaque, "glass"};
-    const AssetLedMaterialSettings frameMetal{glm::vec4(0.58f, 0.64f, 0.68f, 1.0f), 1.0f, 0.16f, 0.0f, 1.5f, glm::vec3(0.0f), 1.0f, 0.38f, 0.06f, false, Scene::RenderableComponent::AlphaMode::Opaque, Scene::RenderableComponent::RenderLayer::Opaque, "oxidized_metal"};
-    const AssetLedMaterialSettings chrome{glm::vec4(0.78f, 0.84f, 0.90f, 1.0f), 1.0f, 0.08f, 0.0f, 1.5f, glm::vec3(0.0f), 1.0f, 0.50f, 0.10f, false, Scene::RenderableComponent::AlphaMode::Opaque, Scene::RenderableComponent::RenderLayer::Opaque, "chrome"};
-    const AssetLedMaterialSettings wetWood{glm::vec4(0.36f, 0.25f, 0.17f, 1.0f), 0.0f, 0.44f, 0.0f, 1.5f, glm::vec3(0.0f), 1.0f, 0.46f, 0.20f, false, Scene::RenderableComponent::AlphaMode::Opaque, Scene::RenderableComponent::RenderLayer::Opaque, "wet_masonry"};
-    const AssetLedMaterialSettings warmLight{glm::vec4(1.0f, 0.68f, 0.36f, 1.0f), 0.0f, 0.20f, 0.0f, 1.5f, glm::vec3(1.0f, 0.58f, 0.26f), 3.0f, 0.0f, 0.06f, false, Scene::RenderableComponent::AlphaMode::Opaque, Scene::RenderableComponent::RenderLayer::Opaque, "emissive"};
+    const AssetLedMaterialSettings glass{glm::vec4(0.18f, 0.30f, 0.42f, 0.14f), 0.0f, 0.20f, 0.72f, 1.45f, glm::vec3(0.0f), 1.0f, 0.04f, 0.02f, true, Scene::RenderableComponent::AlphaMode::Blend, Scene::RenderableComponent::RenderLayer::Opaque, "glass"};
+    const AssetLedMaterialSettings frameMetal{glm::vec4(0.58f, 0.64f, 0.68f, 1.0f), 1.0f, 0.28f, 0.0f, 1.5f, glm::vec3(0.0f), 1.0f, 0.22f, 0.04f, false, Scene::RenderableComponent::AlphaMode::Opaque, Scene::RenderableComponent::RenderLayer::Opaque, "oxidized_metal"};
+    const AssetLedMaterialSettings chrome{glm::vec4(0.72f, 0.78f, 0.84f, 1.0f), 0.82f, 0.24f, 0.0f, 1.5f, glm::vec3(0.0f), 1.0f, 0.16f, 0.04f, false, Scene::RenderableComponent::AlphaMode::Opaque, Scene::RenderableComponent::RenderLayer::Opaque, "chrome"};
+    const AssetLedMaterialSettings wetWood{glm::vec4(0.44f, 0.31f, 0.22f, 1.0f), 0.0f, 0.54f, 0.0f, 1.5f, glm::vec3(0.0f), 1.0f, 0.18f, 0.08f, false, Scene::RenderableComponent::AlphaMode::Opaque, Scene::RenderableComponent::RenderLayer::Opaque, "wet_masonry"};
+    const AssetLedMaterialSettings warmLight{glm::vec4(1.0f, 0.70f, 0.40f, 1.0f), 0.0f, 0.18f, 0.0f, 1.5f, glm::vec3(1.0f, 0.58f, 0.26f), 4.2f, 0.0f, 0.05f, false, Scene::RenderableComponent::AlphaMode::Opaque, Scene::RenderableComponent::RenderLayer::Opaque, "emissive"};
     const AssetLedMaterialSettings warmMat{glm::vec4(0.24f, 0.16f, 0.10f, 1.0f), 0.0f, 0.54f, 0.0f, 1.5f, glm::vec3(0.0f), 1.0f, 0.14f, 0.26f, false, Scene::RenderableComponent::AlphaMode::Opaque, Scene::RenderableComponent::RenderLayer::Opaque, "wood"};
     const AssetLedMaterialSettings tabletopWarmAccent{glm::vec4(0.70f, 0.28f, 0.10f, 1.0f), 0.0f, 0.38f, 0.0f, 1.5f, glm::vec3(0.0f), 1.0f, 0.08f, 0.16f, false, Scene::RenderableComponent::AlphaMode::Opaque, Scene::RenderableComponent::RenderLayer::Opaque, "ceramic"};
+    const AssetLedMaterialSettings pretrainedBrass{glm::vec4(0.72f, 0.48f, 0.24f, 1.0f), 0.58f, 0.42f, 0.0f, 1.5f, glm::vec3(0.0f), 1.0f, 0.10f, 0.04f, false, Scene::RenderableComponent::AlphaMode::Opaque, Scene::RenderableComponent::RenderLayer::Opaque, "brushed_metal"};
+    const AssetLedMaterialSettings pretrainedGlassAccent{glm::vec4(0.62f, 0.82f, 0.94f, 0.38f), 0.0f, 0.22f, 0.38f, 1.45f, glm::vec3(0.0f), 1.0f, 0.12f, 0.04f, true, Scene::RenderableComponent::AlphaMode::Blend, Scene::RenderableComponent::RenderLayer::Opaque, "glass"};
+    const AssetLedMaterialSettings pretrainedWetPatch{glm::vec4(0.18f, 0.28f, 0.34f, 0.52f), 0.0f, 0.22f, 0.34f, 1.333f, glm::vec3(0.0f), 1.0f, 0.36f, 0.04f, true, Scene::RenderableComponent::AlphaMode::Blend, Scene::RenderableComponent::RenderLayer::Opaque, "water"};
+    const AssetLedMaterialSettings tabletopVignette{glm::vec4(0.12f, 0.14f, 0.15f, 1.0f), 0.0f, 0.52f, 0.0f, 1.5f, glm::vec3(0.0f), 1.0f, 0.28f, 0.22f, false, Scene::RenderableComponent::AlphaMode::Opaque, Scene::RenderableComponent::RenderLayer::Opaque, "wet_masonry"};
 
     AddAssetLedRenderable(*m_registry, "RainPavilion_TiledFloor", cubeMesh, glm::vec3(0.0f, -0.04f, 0.0f), glm::vec3(7.0f, 0.08f, 5.2f), glm::vec3(0.0f), wetTile);
     AddAssetLedRenderable(*m_registry, "RainPavilion_ExtendedWetTerrace", cubeMesh, glm::vec3(0.0f, -0.08f, 1.6f), glm::vec3(11.0f, 0.08f, 6.4f), glm::vec3(0.0f), wetTile);
@@ -4998,14 +6228,36 @@ void Engine::BuildRainGlassPavilionScene() {
     if (tableMesh && tableMesh->gpuBuffers) {
         AddAssetLedNaturalisticRenderable(*m_registry, "RainPavilion_GroundedInteriorTable", "WoodenTable_01", tableMesh, glm::vec3(-0.10f, 0.33f, 1.10f), glm::vec3(0.62f), glm::vec3(0.0f, glm::radians(-12.0f), 0.0f), wetWood);
     }
-    AddAssetLedRenderable(*m_registry, "RainPavilion_TableWarmTray", cubeMesh, glm::vec3(-0.38f, 0.675f, 0.86f), glm::vec3(0.28f, 0.010f, 0.095f), glm::vec3(0.0f, glm::radians(-12.0f), 0.0f), tabletopWarmAccent);
-    AddAssetLedRenderable(*m_registry, "RainPavilion_TableGlassPane", planeMesh, glm::vec3(-0.34f, 0.690f, 0.90f), glm::vec3(0.44f, 1.0f, 0.22f), glm::vec3(0.0f, glm::radians(-12.0f), 0.0f), glass);
-    AddAssetLedRenderable(*m_registry, "RainPavilion_TableWarmCup", cylinderMesh, glm::vec3(-0.22f, 0.715f, 1.02f), glm::vec3(0.050f, 0.42f, 0.050f), glm::vec3(0.0f), tabletopWarmAccent);
+    const auto trayTransform = GetRuntimeOverride(pretrainedLayout, "table_warm_tray", glm::vec3(-0.38f, 0.675f, 0.86f), glm::vec3(0.22f, 0.008f, 0.075f), glm::vec3(0.0f, glm::radians(-12.0f), 0.0f));
+    const auto glassPaneTransform = GetRuntimeOverride(pretrainedLayout, "table_glass_pane", glm::vec3(-0.34f, 0.690f, 0.90f), glm::vec3(0.44f, 1.0f, 0.22f), glm::vec3(0.0f, glm::radians(-12.0f), 0.0f));
+    const auto cupTransform = GetRuntimeOverride(pretrainedLayout, "table_warm_cup", glm::vec3(-0.22f, 0.715f, 1.02f), glm::vec3(0.038f, 0.30f, 0.038f), glm::vec3(0.0f));
+    AddAssetLedRenderable(*m_registry, "RainPavilion_TableWarmTray", cubeMesh, trayTransform.position, trayTransform.scale, trayTransform.rotation, wetWood);
+    AddAssetLedRenderable(*m_registry, "RainPavilion_TableGlassPane", planeMesh, glassPaneTransform.position, glassPaneTransform.scale, glassPaneTransform.rotation, glass);
+    AddAssetLedRenderable(*m_registry, "RainPavilion_TableWarmCup", cylinderMesh, cupTransform.position, cupTransform.scale, cupTransform.rotation, warmMat);
     AddAssetLedRenderable(*m_registry, "RainPavilion_TableChromeRod", cylinderMesh, glm::vec3(-0.52f, 0.702f, 0.94f), glm::vec3(0.022f, 0.86f, 0.022f), glm::vec3(glm::radians(90.0f), 0.0f, glm::radians(-12.0f)), chrome);
+    const auto vignetteTransform = pretrainedLayout.tabletopVignette.value_or(
+        RuntimeLayoutTransform{glm::vec3(0.12f, 0.98f, 1.46f), glm::vec3(3.80f, 1.32f, 0.055f), glm::vec3(0.0f, glm::radians(-5.0f), 0.0f)});
+    AddAssetLedRenderable(*m_registry, "RainPavilion_TabletopVignetteScreen", cubeMesh, vignetteTransform.position, vignetteTransform.scale, vignetteTransform.rotation, tabletopVignette);
     if (sphereMesh && sphereMesh->gpuBuffers) {
         AddAssetLedRenderable(*m_registry, "RainPavilion_TableChromeOrb", sphereMesh, glm::vec3(-0.60f, 0.725f, 0.78f), glm::vec3(0.055f), glm::vec3(0.0f), chrome);
         AddAssetLedRenderable(*m_registry, "RainPavilion_TableGlassBead", sphereMesh, glm::vec3(-0.10f, 0.720f, 0.74f), glm::vec3(0.050f), glm::vec3(0.0f), glass);
         AddAssetLedRenderable(*m_registry, "RainPavilion_TableSmallChromeBead", sphereMesh, glm::vec3(-0.34f, 0.708f, 0.66f), glm::vec3(0.034f), glm::vec3(0.0f), chrome);
+    }
+    if (pretrainedLanternMesh && pretrainedLanternMesh->gpuBuffers) {
+        const auto transform = GetLayoutTransform(pretrainedLayout, "warm_fixture", glm::vec3(-0.54f, 0.705f, 0.82f), glm::vec3(0.48f), glm::vec3(0.0f, glm::radians(24.0f), 0.0f));
+        AddAssetLedRenderable(*m_registry, "RainPavilion_PretrainedLanternCluster", pretrainedLanternMesh, transform.position, transform.scale, transform.rotation, pretrainedBrass);
+    }
+    if (pretrainedTableDressingMesh && pretrainedTableDressingMesh->gpuBuffers) {
+        const auto transform = GetLayoutTransform(pretrainedLayout, "glass_accent", glm::vec3(0.06f, 0.710f, 1.05f), glm::vec3(0.50f), glm::vec3(0.0f, glm::radians(-14.0f), 0.0f));
+        AddAssetLedRenderable(*m_registry, "RainPavilion_PretrainedGlassTableDressing", pretrainedTableDressingMesh, transform.position, transform.scale, transform.rotation, pretrainedGlassAccent);
+    }
+    if (pretrainedPuddleMesh && pretrainedPuddleMesh->gpuBuffers) {
+        const auto transform = GetLayoutTransform(pretrainedLayout, "wet_contact", glm::vec3(-0.34f, 0.704f, 0.86f), glm::vec3(10.0f, 1.0f, 10.0f), glm::vec3(0.0f, glm::radians(8.0f), 0.0f));
+        AddAssetLedRenderable(*m_registry, "RainPavilion_PretrainedPuddleFloorPatch", pretrainedPuddleMesh, transform.position, transform.scale, transform.rotation, pretrainedWetPatch);
+    }
+    if (pretrainedWindowPanelMesh && pretrainedWindowPanelMesh->gpuBuffers) {
+        const auto transform = GetLayoutTransform(pretrainedLayout, "foreground_frame", glm::vec3(0.52f, 0.718f, 1.38f), glm::vec3(0.58f, 0.78f, 0.18f), glm::vec3(0.0f, glm::radians(-12.0f), 0.0f));
+        AddAssetLedRenderable(*m_registry, "RainPavilion_PretrainedRainStreakPanel", pretrainedWindowPanelMesh, transform.position, transform.scale, transform.rotation, pretrainedGlassAccent);
     }
     if (bushMesh && bushMesh->gpuBuffers) {
         AddAssetLedNaturalisticRenderable(*m_registry, "RainPavilion_GardenBush", "wild_rooibos_bush", bushMesh, glm::vec3(-2.05f, 0.32f, 2.92f), glm::vec3(0.72f), glm::vec3(0.0f, glm::radians(12.0f), 0.0f), vegetation);
@@ -5018,9 +6270,10 @@ void Engine::BuildRainGlassPavilionScene() {
     }
     AddParticleEffect(*m_registry, "RainPavilion_RainColumn", "rain", glm::vec3(1.35f, 2.7f, 1.55f));
     AddParticleEffect(*m_registry, "RainPavilion_Mist", "mist", glm::vec3(3.0f, 0.32f, 1.95f));
-    AddAssetLedPointLight(*m_registry, "RainPavilion_WarmInteriorLight", glm::vec3(0.0f, 1.55f, 1.55f), glm::vec3(1.0f, 0.62f, 0.34f), 5.2f, 5.5f);
-    AddAssetLedPointLight(*m_registry, "RainPavilion_TabletopFillLight", glm::vec3(-0.55f, 1.05f, 0.80f), glm::vec3(1.0f, 0.70f, 0.45f), 2.4f, 2.8f);
-    AddAssetLedSpotLight(*m_registry, "RainPavilion_BlueRainKey", glm::vec3(-3.0f, 4.2f, -3.0f), glm::vec3(0.0f, 0.4f, 0.1f), glm::vec3(0.42f, 0.62f, 1.0f), 6.4f, 15.0f, false);
+    AddAssetLedPointLight(*m_registry, "RainPavilion_WarmInteriorLight", glm::vec3(0.0f, 1.55f, 1.55f), glm::vec3(1.0f, 0.62f, 0.34f), 6.2f, 6.0f);
+    AddAssetLedPointLight(*m_registry, "RainPavilion_TabletopFillLight", glm::vec3(-0.55f, 1.05f, 0.80f), glm::vec3(1.0f, 0.72f, 0.48f), 4.1f, 3.4f);
+    AddAssetLedPointLight(*m_registry, "RainPavilion_CameraSoftFill", glm::vec3(-1.25f, 1.25f, -0.55f), glm::vec3(0.62f, 0.72f, 1.0f), 2.6f, 4.6f);
+    AddAssetLedSpotLight(*m_registry, "RainPavilion_BlueRainKey", glm::vec3(-3.0f, 4.2f, -3.0f), glm::vec3(0.0f, 0.4f, 0.1f), glm::vec3(0.42f, 0.62f, 1.0f), 7.2f, 15.0f, false);
 }
 
 void Engine::BuildDesertRelicGalleryScene() {
@@ -5282,6 +6535,144 @@ void Engine::BuildNeonAlleyMaterialMarketScene() {
     AddAssetLedPointLight(*m_registry, "NeonMarket_CameraFillLight", glm::vec3(-0.15f, 1.35f, -1.85f), glm::vec3(0.42f, 0.58f, 0.78f), 1.8f, 5.0f);
 }
 
+void Engine::BuildModelAuthoredScene() {
+    std::filesystem::path seedPath;
+    const auto seed = LoadModelAuthoredSceneSeed(seedPath);
+    if (!seed) {
+        BuildRainGlassPavilionScene();
+        return;
+    }
+
+    const auto& root = *seed;
+    const std::string seedId = root.value("id", std::string("model_authored_scene"));
+    const std::string sceneFamily = root.value("scene_family", std::string("unknown"));
+    ApplyModelAuthoredLighting(m_renderer.get(), sceneFamily);
+    const auto sceneProfile = Graphics::BuildSceneLocalCinematicProfile(sceneFamily);
+    const float modelAuthoredFixtureScale = glm::clamp(sceneProfile.lightingBalance.localFixtureScale, 0.0f, 2.0f);
+
+    glm::vec3 cameraPosition{-1.4f, 0.9f, -1.8f};
+    glm::vec3 cameraTarget{0.0f, 0.55f, 0.3f};
+    float cameraFov = 30.0f;
+    if (root.contains("camera")) {
+        const auto& camera = root["camera"];
+        if (camera.contains("position")) { cameraPosition = ReadJsonVec3Or(camera["position"], cameraPosition); }
+        if (camera.contains("target")) { cameraTarget = ReadJsonVec3Or(camera["target"], cameraTarget); }
+        cameraFov = camera.value("fov", cameraFov);
+    }
+
+    m_activeCameraEntity = AddAssetLedCamera(*m_registry, cameraPosition, cameraTarget, cameraFov, 90.0f);
+    AddAssetLedSpotLight(*m_registry,
+                         "ModelAuthored_KeyLight",
+                         cameraPosition + glm::vec3(0.15f, 0.50f, -0.20f),
+                         cameraTarget,
+                         glm::vec3(1.0f, 0.80f, 0.58f),
+                         28.0f * modelAuthoredFixtureScale,
+                         8.0f,
+                         true);
+    AddAssetLedPointLight(*m_registry,
+                          "ModelAuthored_CoolFill",
+                          cameraTarget + glm::vec3(1.20f, 0.70f, 0.65f),
+                          glm::vec3(0.30f, 0.55f, 1.0f),
+                          7.0f * modelAuthoredFixtureScale,
+                          5.5f);
+
+    std::unordered_map<std::string, std::shared_ptr<Scene::MeshData>> meshCache;
+    size_t requestedObjects = 0;
+    size_t builtObjects = 0;
+    size_t primitiveObjects = 0;
+    size_t assetObjects = 0;
+    size_t seedLights = 0;
+
+    for (const auto& object : root.value("objects", nlohmann::json::array())) {
+        ++requestedObjects;
+        if (!object.contains("id") || !object.contains("transform")) {
+            spdlog::warn("Skipping model-authored object without id/transform in seed '{}'", seedId);
+            continue;
+        }
+        if (object.value("validation_only", false) || object.value("renderable", true) == false) {
+            continue;
+        }
+
+        const std::string id = object.value("id", std::string("unnamed"));
+        const std::string kind = ToLowerAscii(object.value("kind", std::string("primitive")));
+        const std::string cacheKey = kind == "primitive"
+            ? std::string("primitive:") + object.value("primitive", std::string("cube"))
+            : std::string("asset:") + object.value("runtime_asset", std::string{});
+
+        auto meshIt = meshCache.find(cacheKey);
+        if (meshIt == meshCache.end()) {
+            auto mesh = LoadModelAuthoredObjectMesh(object);
+            if (mesh && !UploadAssetLedMesh(m_renderer.get(), mesh, id.c_str())) {
+                mesh.reset();
+            }
+            meshIt = meshCache.emplace(cacheKey, mesh).first;
+        }
+
+        const auto& mesh = meshIt->second;
+        if (!mesh) {
+            spdlog::warn("Skipping model-authored object '{}' because mesh could not be created or loaded", id);
+            continue;
+        }
+
+        const RuntimeLayoutTransform transform = TransformFromJson(object["transform"]);
+        const std::string materialId = object.value("material", std::string{});
+        const AssetLedMaterialSettings material = ModelAuthoredMaterialFromJson(root, materialId);
+        const std::string tag = std::string("ModelAuthored_") + id;
+        entt::entity entity = AddAssetLedRenderable(*m_registry,
+                                                    tag.c_str(),
+                                                    mesh,
+                                                    transform.position,
+                                                    transform.scale,
+                                                    transform.rotation,
+                                                    material);
+
+        if (kind == "naturalistic_asset") {
+            std::string runtimeAsset = object.value("runtime_asset", std::string{});
+            std::replace(runtimeAsset.begin(), runtimeAsset.end(), '\\', '/');
+            const std::string prefix = "assets/models/naturalistic_showcase/";
+            if (runtimeAsset.rfind(prefix, 0) == 0) {
+                const std::string relative = runtimeAsset.substr(prefix.size());
+                const size_t slash = relative.find('/');
+                const std::string assetId = slash == std::string::npos ? relative : relative.substr(0, slash);
+                if (m_registry->HasComponent<Scene::RenderableComponent>(entity)) {
+                    ApplyNaturalisticAssetTextures(m_registry->GetComponent<Scene::RenderableComponent>(entity), assetId.c_str());
+                }
+            }
+        }
+
+        if (kind == "primitive") {
+            ++primitiveObjects;
+        } else {
+            ++assetObjects;
+        }
+        ++builtObjects;
+    }
+
+    if (builtObjects == 0) {
+        spdlog::warn("Model-authored seed '{}' produced no renderable objects; falling back to RainGlassPavilion", seedId);
+        BuildRainGlassPavilionScene();
+        return;
+    }
+
+    seedLights = AddModelAuthoredSeedLights(*m_registry,
+                                            root,
+                                            sceneProfile.lightingBalance.localFixtureScale);
+    const size_t profileLights = AddSceneProfileLights(*m_registry, sceneProfile, cameraTarget);
+    const size_t reflectionProbes = AddSceneProfileReflectionProbes(*m_registry, sceneProfile);
+
+    SetFocusTarget(seedId);
+    spdlog::info("Loaded model-authored scene seed '{}' family={} requested_objects={} built_objects={} primitives={} assets={} seed_lights={} profile_lights={} reflection_probes={}",
+                 seedPath.string(),
+                 sceneFamily,
+                 requestedObjects,
+                 builtObjects,
+                 primitiveObjects,
+                 assetObjects,
+                 seedLights,
+                 profileLights,
+                 reflectionProbes);
+}
+
 void Engine::BuildForestCreekShrineScene() {
     spdlog::info("Building asset-led scene: Forest Creek Shrine");
 
@@ -5458,6 +6849,9 @@ void Engine::SetCameraToSceneDefault(Scene::TransformComponent& transform) {
     } else if (m_currentScenePreset == ScenePreset::ForestCreekShrine) {
         pos = glm::vec3(-1.05f, 0.34f, -1.78f);
         target = glm::vec3(-0.62f, 0.06f, -0.86f);
+    } else if (m_currentScenePreset == ScenePreset::ModelAuthoredScene) {
+        pos = glm::vec3(-1.12f, 0.84f, 0.15f);
+        target = glm::vec3(-0.34f, 0.71f, 0.88f);
     } else if (m_currentScenePreset == ScenePreset::TemporalValidation) {
         pos = glm::vec3(0.0f, 2.3f, -6.4f);
         target = glm::vec3(0.0f, 1.0f, 0.1f);

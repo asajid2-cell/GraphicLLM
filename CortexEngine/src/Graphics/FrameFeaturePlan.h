@@ -16,6 +16,12 @@ struct RuntimeFrameDebugSwitches {
     bool disableSSAO = false;
     bool disableBloom = false;
     bool disableTAA = false;
+    bool disableShadows = false;
+    bool disableRayTracing = false;
+    bool disableRTReflections = false;
+    bool disableRTGI = false;
+    bool disableFog = false;
+    bool disableParticles = false;
     bool logVRAM = false;
     bool forceMinimalFrame = false;
     bool useRenderGraphShadows = true;

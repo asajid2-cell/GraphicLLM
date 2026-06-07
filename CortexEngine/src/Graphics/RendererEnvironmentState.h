@@ -45,6 +45,8 @@ struct EnvironmentLightingState {
     //   t5 = RT diffuse GI buffer (optional, DXR)
     //   t6 = RT diffuse GI history buffer (optional, DXR)
     std::array<DescriptorHandle, 7> shadowAndEnvDescriptors{};
+    std::array<uint64_t, 7> shadowAndEnvDescriptorSignature{};
+    bool shadowAndEnvDescriptorsReady = false;
 
     std::vector<EnvironmentMaps> maps;
     std::vector<PendingEnvironment> pending;
@@ -58,6 +60,9 @@ struct EnvironmentLightingState {
     float backgroundExposure = 1.0f;
     float backgroundBlur = 0.0f;
     float rotationDegrees = 0.0f;
+    bool localProbeRadianceEnabled = false;
+    float localProbeDiffuseIntensity = 0.0f;
+    float localProbeSpecularIntensity = 0.0f;
     bool selectionFallbackUsed = false;
     std::string requestedEnvironment;
     std::string fallbackReason;
@@ -97,6 +102,13 @@ struct EnvironmentLightingState {
         return selectionFallbackUsed || name == "Placeholder" || name == "procedural_sky";
     }
 
+    [[nodiscard]] bool ShouldBindImageBasedLightingTextures() const {
+        return enabled &&
+               (diffuseIntensity > 0.001f ||
+                specularIntensity > 0.001f ||
+                backgroundExposure > 0.001f);
+    }
+
     [[nodiscard]] uint32_t ResidentCount() const {
         return static_cast<uint32_t>(maps.size());
     }
@@ -111,6 +123,7 @@ struct EnvironmentDescriptorTableInputs {
     DescriptorHandle rtShadowMaskSRV{};
     DescriptorHandle rtShadowHistorySRV{};
     DescriptorHandle rtGISRV{};
+    DescriptorHandle rtGIHistorySRV{};
     std::shared_ptr<DX12Texture> shadowFallback;
     std::shared_ptr<DX12Texture> diffuseFallback;
     std::shared_ptr<DX12Texture> specularFallback;
@@ -128,12 +141,20 @@ struct EnvironmentDescriptorState {
             return Result<void>::Err("Renderer is not initialized for " + context);
         }
 
-        for (int i = 0; i < 7; ++i) {
-            auto handleResult = descriptorManager->AllocateCBV_SRV_UAV();
-            if (handleResult.IsErr()) {
-                return Result<void>::Err("Failed to allocate SRV table for " + context + ": " + handleResult.Error());
+        auto tableResult = descriptorManager->AllocateCBV_SRV_UAVRange(static_cast<uint32_t>(descriptorTable.size()));
+        if (tableResult.IsErr()) {
+            return Result<void>::Err("Failed to allocate SRV table for " + context + ": " + tableResult.Error());
+        }
+
+        const DescriptorHandle base = tableResult.Value();
+        for (uint32_t i = 0; i < descriptorTable.size(); ++i) {
+            descriptorTable[i] = descriptorManager->GetCBV_SRV_UAVHandle(base.index + i);
+            if (!descriptorTable[i].IsValid()) {
+                return Result<void>::Err("Environment SRV table produced an invalid descriptor slot");
             }
-            descriptorTable[i] = handleResult.Value();
+            if (i > 0 && descriptorTable[i].index != descriptorTable[i - 1].index + 1) {
+                return Result<void>::Err("Environment SRV table is not contiguous");
+            }
         }
         return Result<void>::Ok();
     }
@@ -227,10 +248,65 @@ struct EnvironmentDescriptorState {
 
     static void WriteShadowAndEnvironmentTable(
         ID3D12Device* device,
+        DescriptorHeapManager* descriptorManager,
         EnvironmentLightingState& environment,
         const EnvironmentDescriptorTableInputs& inputs) {
         if (!device || !environment.shadowAndEnvDescriptors[0].IsValid()) {
             return;
+        }
+
+        auto descriptorSignature = [](const DescriptorHandle& handle) -> uint64_t {
+            return handle.IsValid() ? (0x8000000000000000ull | static_cast<uint64_t>(handle.index)) : 0ull;
+        };
+        auto textureSignature = [](const std::shared_ptr<DX12Texture>& texture) -> uint64_t {
+            return (texture && texture->GetResource())
+                ? static_cast<uint64_t>(reinterpret_cast<uintptr_t>(texture->GetResource()))
+                : 0ull;
+        };
+
+        std::shared_ptr<DX12Texture> shadowFallbackSrc;
+        if (!inputs.shadowMapSRV.IsValid() && inputs.shadowFallback && inputs.shadowFallback->GetResource()) {
+            shadowFallbackSrc = inputs.shadowFallback;
+        }
+
+        std::shared_ptr<DX12Texture> diffuseSrc;
+        std::shared_ptr<DX12Texture> specularSrc;
+        if (environment.ShouldBindImageBasedLightingTextures()) {
+            if (EnvironmentMaps* env = environment.ActiveEnvironment()) {
+                if (env->diffuseIrradiance && env->diffuseIrradiance->GetResource()) {
+                    diffuseSrc = env->diffuseIrradiance;
+                }
+                if (env->specularPrefiltered && env->specularPrefiltered->GetResource()) {
+                    specularSrc = env->specularPrefiltered;
+                }
+            }
+
+            if (!diffuseSrc && inputs.diffuseFallback && inputs.diffuseFallback->GetResource()) {
+                diffuseSrc = inputs.diffuseFallback;
+            }
+            if (!specularSrc && inputs.specularFallback && inputs.specularFallback->GetResource()) {
+                specularSrc = inputs.specularFallback;
+            }
+        }
+
+        std::array<uint64_t, 7> newSignature{};
+        newSignature[0] = inputs.shadowMapSRV.IsValid()
+            ? descriptorSignature(inputs.shadowMapSRV)
+            : textureSignature(shadowFallbackSrc);
+        newSignature[1] = textureSignature(diffuseSrc);
+        newSignature[2] = textureSignature(specularSrc);
+        newSignature[3] = descriptorSignature(inputs.rtShadowMaskSRV);
+        newSignature[4] = descriptorSignature(inputs.rtShadowHistorySRV);
+        newSignature[5] = descriptorSignature(inputs.rtGISRV);
+        newSignature[6] = descriptorSignature(inputs.rtGIHistorySRV);
+
+        if (environment.shadowAndEnvDescriptorsReady &&
+            environment.shadowAndEnvDescriptorSignature == newSignature) {
+            return;
+        }
+
+        if (environment.shadowAndEnvDescriptorsReady && descriptorManager) {
+            descriptorManager->SynchronizeForShaderVisibleDescriptorOverwrite("shadow/environment descriptor table refresh");
         }
 
         if (inputs.shadowMapSRV.IsValid()) {
@@ -239,26 +315,8 @@ struct EnvironmentDescriptorState {
                 environment.shadowAndEnvDescriptors[0].cpu,
                 inputs.shadowMapSRV.cpu,
                 D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-        } else if (!WriteTexture2DSRV(device, inputs.shadowFallback, environment.shadowAndEnvDescriptors[0].cpu)) {
+        } else if (!WriteTexture2DSRV(device, shadowFallbackSrc, environment.shadowAndEnvDescriptors[0].cpu)) {
             WriteNullTexture2DSRV(device, DXGI_FORMAT_R8G8B8A8_UNORM, environment.shadowAndEnvDescriptors[0].cpu);
-        }
-
-        std::shared_ptr<DX12Texture> diffuseSrc;
-        std::shared_ptr<DX12Texture> specularSrc;
-        if (EnvironmentMaps* env = environment.ActiveEnvironment()) {
-            if (env->diffuseIrradiance && env->diffuseIrradiance->GetResource()) {
-                diffuseSrc = env->diffuseIrradiance;
-            }
-            if (env->specularPrefiltered && env->specularPrefiltered->GetResource()) {
-                specularSrc = env->specularPrefiltered;
-            }
-        }
-
-        if (!diffuseSrc && inputs.diffuseFallback && inputs.diffuseFallback->GetResource()) {
-            diffuseSrc = inputs.diffuseFallback;
-        }
-        if (!specularSrc && inputs.specularFallback && inputs.specularFallback->GetResource()) {
-            specularSrc = inputs.specularFallback;
         }
 
         if (!WriteTexture2DSRV(device, diffuseSrc, environment.shadowAndEnvDescriptors[1].cpu)) {
@@ -274,6 +332,8 @@ struct EnvironmentDescriptorState {
                 environment.shadowAndEnvDescriptors[3].cpu,
                 inputs.rtShadowMaskSRV.cpu,
                 D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+        } else {
+            WriteNullTexture2DSRV(device, DXGI_FORMAT_R8G8B8A8_UNORM, environment.shadowAndEnvDescriptors[3].cpu);
         }
         if (inputs.rtShadowHistorySRV.IsValid()) {
             device->CopyDescriptorsSimple(
@@ -281,6 +341,8 @@ struct EnvironmentDescriptorState {
                 environment.shadowAndEnvDescriptors[4].cpu,
                 inputs.rtShadowHistorySRV.cpu,
                 D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+        } else {
+            WriteNullTexture2DSRV(device, DXGI_FORMAT_R8G8B8A8_UNORM, environment.shadowAndEnvDescriptors[4].cpu);
         }
         if (inputs.rtGISRV.IsValid()) {
             device->CopyDescriptorsSimple(
@@ -288,7 +350,21 @@ struct EnvironmentDescriptorState {
                 environment.shadowAndEnvDescriptors[5].cpu,
                 inputs.rtGISRV.cpu,
                 D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+        } else {
+            WriteNullTexture2DSRV(device, DXGI_FORMAT_R8G8B8A8_UNORM, environment.shadowAndEnvDescriptors[5].cpu);
         }
+        if (inputs.rtGIHistorySRV.IsValid()) {
+            device->CopyDescriptorsSimple(
+                1,
+                environment.shadowAndEnvDescriptors[6].cpu,
+                inputs.rtGIHistorySRV.cpu,
+                D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+        } else {
+            WriteNullTexture2DSRV(device, DXGI_FORMAT_R8G8B8A8_UNORM, environment.shadowAndEnvDescriptors[6].cpu);
+        }
+
+        environment.shadowAndEnvDescriptorSignature = newSignature;
+        environment.shadowAndEnvDescriptorsReady = true;
     }
 };
 

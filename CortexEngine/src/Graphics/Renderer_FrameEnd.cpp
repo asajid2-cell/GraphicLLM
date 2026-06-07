@@ -6,6 +6,7 @@
 #include "Graphics/Passes/EndFrameShaderResourcePass.h"
 #include "Graphics/Passes/ReadbackBuffer.h"
 #include "Graphics/Passes/RTHistoryCopyPass.h"
+#include <fmt/format.h>
 #include <spdlog/spdlog.h>
 #include <algorithm>
 #include <array>
@@ -61,6 +62,20 @@ uint64_t GetVisualValidationMinFrame() {
         return kDefaultMinFrame;
     }
     return std::max<uint64_t>(1, static_cast<uint64_t>(parsed));
+}
+
+uint64_t GetVisualValidationSequenceCount() {
+    const char* env = std::getenv("CORTEX_VISUAL_VALIDATION_SEQUENCE_COUNT");
+    if (!env || !*env) {
+        return 0;
+    }
+
+    char* end = nullptr;
+    const unsigned long long parsed = std::strtoull(env, &end, 10);
+    if (end == env) {
+        return 0;
+    }
+    return static_cast<uint64_t>(parsed);
 }
 
 void WriteBackBufferBMP(const std::filesystem::path& path,
@@ -232,10 +247,20 @@ void Renderer::EndFrame() {
     // swap-chain buffer may remain in PRESENT state for the entire frame.
     BackBufferPresentPass::VisualCaptureResult visualCapture{};
     std::filesystem::path visualCapturePath;
+    const bool visualValidationRequested = std::getenv("CORTEX_CAPTURE_VISUAL_VALIDATION") != nullptr;
+    const uint64_t visualValidationMinFrame = GetVisualValidationMinFrame();
+    const uint64_t visualValidationSequenceCount = GetVisualValidationSequenceCount();
+    const bool captureVisualValidationSequence = visualValidationSequenceCount > 0;
+    const bool frameInVisualValidationSequence =
+        captureVisualValidationSequence &&
+        m_frameLifecycle.renderFrameCounter >= visualValidationMinFrame &&
+        m_frameLifecycle.renderFrameCounter < visualValidationMinFrame + visualValidationSequenceCount;
     const bool captureVisualValidation =
-        std::getenv("CORTEX_CAPTURE_VISUAL_VALIDATION") != nullptr &&
-        m_frameLifecycle.renderFrameCounter >= GetVisualValidationMinFrame() &&
-        !m_frameLifecycle.visualValidationCaptured &&
+        visualValidationRequested &&
+        (captureVisualValidationSequence
+             ? frameInVisualValidationSequence
+             : (m_frameLifecycle.renderFrameCounter >= visualValidationMinFrame &&
+                !m_frameLifecycle.visualValidationCaptured)) &&
         m_frameLifecycle.backBufferUsedAsRTThisFrame &&
         m_services.window &&
         m_services.window->GetCurrentBackBuffer() &&
@@ -244,7 +269,13 @@ void Renderer::EndFrame() {
 
     if (m_frameLifecycle.backBufferUsedAsRTThisFrame) {
         if (captureVisualValidation) {
-            visualCapturePath = GetRendererLogDirectory() / "visual_validation_rt_showcase.bmp";
+            if (captureVisualValidationSequence) {
+                visualCapturePath = GetRendererLogDirectory() /
+                    fmt::format("visual_validation_frame_{:04}.bmp",
+                                static_cast<unsigned long long>(m_frameLifecycle.renderFrameCounter));
+            } else {
+                visualCapturePath = GetRendererLogDirectory() / "visual_validation_rt_showcase.bmp";
+            }
         }
         BackBufferPresentPass::PresentContext presentContext{};
         presentContext.device = m_services.device ? m_services.device->GetDevice() : nullptr;
@@ -275,7 +306,10 @@ void Renderer::EndFrame() {
             visualCapture.footprint,
             visualCapture.width,
             visualCapture.height);
-        m_frameLifecycle.visualValidationCaptured = true;
+        if (!captureVisualValidationSequence ||
+            m_frameLifecycle.renderFrameCounter + 1 >= visualValidationMinFrame + visualValidationSequenceCount) {
+            m_frameLifecycle.visualValidationCaptured = true;
+        }
     }
 
     // Present

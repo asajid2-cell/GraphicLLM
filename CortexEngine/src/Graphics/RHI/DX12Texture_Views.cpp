@@ -2,6 +2,7 @@
 #include "DX12Device.h"
 #include "DX12CommandQueue.h"
 #include <spdlog/spdlog.h>
+#include <cstdint>
 #include <vector>
 #include <cstdio>
 
@@ -42,6 +43,12 @@ Result<void> DX12Texture::CreateBindlessSRV(BindlessResourceManager* bindlessMan
         return Result<void>::Err("Texture resource not initialized");
     }
 
+    const uint64_t resourceSignature = static_cast<uint64_t>(reinterpret_cast<uintptr_t>(m_resource.Get()));
+    if (m_bindlessIndex != kInvalidBindlessIndex &&
+        m_bindlessResourceSignature == resourceSignature) {
+        return Result<void>::Ok();
+    }
+
     // Build SRV description
     D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
     srvDesc.Format = m_format;
@@ -64,6 +71,7 @@ Result<void> DX12Texture::CreateBindlessSRV(BindlessResourceManager* bindlessMan
     }
 
     m_bindlessIndex = indexResult.Value();
+    m_bindlessResourceSignature = resourceSignature;
     return Result<void>::Ok();
 }
 

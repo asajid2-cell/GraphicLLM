@@ -76,7 +76,7 @@ struct EngineConfig {
     // default (currently the RT showcase gallery). Accepted values include
     // "dragon", "rt_showcase", "ibl_gallery", "material_lab",
     // "material_gallery", "glass_water_courtyard", "outdoor_sunset_beach",
-    // "liquid_gallery",
+    // "liquid_gallery", "model_authored_scene",
     // "effects_showcase", "temporal_validation", and "cornell".
     std::string initialScenePreset;
     std::string initialEnvironmentPreset;
@@ -171,6 +171,7 @@ private:
         DesertRelicGallery = 14,
         NeonAlleyMaterialMarket = 15,
         ForestCreekShrine = 16,
+        ModelAuthoredScene = 17,
     };
 
     void ProcessInput();
@@ -196,6 +197,7 @@ private:
     void BuildDesertRelicGalleryScene();
     void BuildNeonAlleyMaterialMarketScene();
     void BuildForestCreekShrineScene();
+    void BuildModelAuthoredScene();
     void BuildGodRaysScene();
     void BuildTemporalValidationScene();
 
@@ -267,6 +269,11 @@ private:
     uint64_t m_totalFrameCount = 0;
     float m_fpsTimer = 0.0f;
     float m_avgFrameTimeMs = 0.0f;
+    uint64_t m_perfGovernorLastTextureUploadActivityFrame = 0;
+    uint64_t m_perfGovernorLastScaleChangeFrame = 0;
+    uint64_t m_perfGovernorObservedTextureUploadSubmitted = 0;
+    uint64_t m_perfGovernorObservedTextureUploadCompleted = 0;
+    uint64_t m_perfGovernorObservedTextureUploadFailed = 0;
     float m_qualityGovernorTimer = 0.0f;
     float m_frameReportTimer = 0.0f;
     uint64_t m_maxFrames = 0;
@@ -282,10 +289,20 @@ private:
     float m_cameraMotionSideAmplitude = 0.0f;
     float m_cameraMotionForwardAmplitude = 0.0f;
     float m_cameraMotionLookAmplitude = 0.0f;
+    float m_cameraMotionLookCycles = 0.0f;
+    float m_cameraMotionLiftAmplitude = 0.08f;
     glm::vec3 m_cameraMotionBasePosition{0.0f};
     glm::vec3 m_cameraMotionBaseForward{0.0f, 0.0f, 1.0f};
     glm::vec3 m_cameraMotionBaseRight{1.0f, 0.0f, 0.0f};
     glm::vec3 m_cameraMotionBaseUp{0.0f, 1.0f, 0.0f};
+    bool m_cameraMouseJitterAutomationEnabled = false;
+    bool m_cameraMouseJitterAutomationApplied = false;
+    uint64_t m_cameraMouseJitterAutomationFrames = 0;
+    float m_cameraMouseJitterYawAmplitude = 0.0f;
+    float m_cameraMouseJitterPitchAmplitude = 0.0f;
+    float m_cameraMouseJitterCycles = 0.0f;
+    float m_cameraMouseJitterPreviousYawOffset = 0.0f;
+    float m_cameraMouseJitterPreviousPitchOffset = 0.0f;
     bool m_startupArchitectCommandSubmitted = false;
     std::string m_startupArchitectCommandJson;
 
@@ -337,10 +354,10 @@ private:
 
     // Toggle for drawing world-origin debug axes (XYZ tripod). When false,
     // the origin axes are suppressed so the view can be captured cleanly.
-    bool m_showOriginAxes = true;
+    bool m_showOriginAxes = false;
 
     // Translation gizmo interaction state
-    bool m_showGizmos = true;  // Toggle with H key
+    bool m_showGizmos = false;  // Toggle with H key
     GizmoAxis m_gizmoHoveredAxis = GizmoAxis::None;
     GizmoAxis m_gizmoActiveAxis  = GizmoAxis::None;
     GizmoMode m_gizmoMode        = GizmoMode::Translate;

@@ -168,6 +168,95 @@ Next:
 3. Add environment-focused packets for old-office IBL, enclosed kitchen,
    concert stage, and exterior water/vegetation.
 
+## 2026-06-07 SceneProfileV3 Policy Slice
+
+Purpose:
+
+- Move the renderer toward a reusable scene-authored policy layer instead of
+  scattered global toggles.
+- Let scene family/intent choose environment, lighting, reflection, temporal,
+  post, material palette, water, fixture lights, and local probe policy.
+- Keep this as infrastructure; it is not candidate-beauty promotion.
+
+Implemented:
+
+- Added `RendererSceneProfile.h/.cpp`.
+- Added profile structs:
+  `SceneEnvironmentProfile`, `SceneLightingProfile`,
+  `SceneLightingBalanceProfile`, `SceneReflectionProfile`,
+  `SceneReflectionProbeProfile`, `SceneLightFixtureProfile`,
+  `SceneTemporalProfile`, `ScenePostProfile`, `SceneMaterialProfile`,
+  `SceneWaterProfile`, and `SceneCinematicProfile`.
+- Added profile builders:
+  - `BuildSceneLocalCinematicProfile(sceneFamily)`.
+  - `BuildGalleryCinematicProfile(conservativeMode)`.
+- Added profile application:
+  `ApplySceneCinematicProfile(Renderer&, const SceneCinematicProfile&)`.
+- RT Showcase now uses the gallery cinematic profile instead of manually
+  applying one-off controls.
+- Model-authored runtime scenes build/apply a scene-local cinematic profile
+  from the seed `scene_family`.
+- Added model-authored scene preset support and camera preservation so authored
+  scene seeds can be evaluated in runtime.
+- Added profile-driven fixture lights and local reflection probe placement for
+  scene families such as kitchen, office, classroom, gym, concert, red room,
+  stadium, and gallery.
+- Added local reflection probe radiance control and procedural/no-IBL
+  environment handling so enclosed profiles can use scene-local lighting
+  without sharp unrelated panorama leakage.
+- Added descriptor-table stability support required by the profile/environment
+  path:
+  - contiguous persistent CBV/SRV/UAV range allocation.
+  - safe shader-visible descriptor overwrite synchronization.
+  - shadow/environment descriptor table signatures to avoid redundant
+    overwrites.
+  - bindless resources now publish into the renderer's global shader-visible
+    heap instead of a separate heap.
+- Added diagnostic/env override switches for disabling shadows, RT, RT
+  reflections, RT GI, fog, particles, SSR, SSAO, TAA, FXAA, IBL, startup
+  environment loads, and RT-showcase tuning values.
+- Added camera automation controls for mouse jitter and richer camera sweeps.
+- Added shadow-cascade stabilization by anchoring cascades to camera position
+  instead of camera forward, reducing mouse-look shadow shimmer.
+
+Validation:
+
+```powershell
+cmd.exe /d /c "call ""C:\Program Files\Microsoft Visual Studio\18\Community\Common7\Tools\VsDevCmd.bat"" -arch=x64 -host_arch=x64 >nul && set ""CORTEX_SKIP_ASSET_SYNC=1"" && ""C:\Program Files\Ninja\ninja.exe"" -C build CortexEngine -j 8"
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_scene_local_cinematic_renderer_v1_contract_tests.ps1
+git -c submodule.recurse=false diff --check -- <focused SceneProfileV3 files>
+```
+
+Evidence:
+
+- Native target build returned `ninja: no work to do` after the previous
+  successful local compile; the generated Ninja graph includes
+  `src/Graphics/RendererSceneProfile.cpp`.
+- The existing trailing `vswhere.exe` warning still prints after success.
+- Scene-local cinematic renderer V1 contract test passed.
+- Focused diff check passed with only line-ending warnings.
+- Widened diff check for the coupled descriptor/profile files also passed with
+  only line-ending warnings.
+
+Important fix:
+
+- Previous push had `CMakeLists.txt` already referencing
+  `src/Graphics/RendererSceneProfile.cpp` while the source/header were still
+  untracked locally. This slice must be pushed to keep `main` self-consistent.
+
+Current limitation:
+
+- This is a contract/policy checkpoint, not a visual-quality claim.
+- Full environment/profile render packets still need to be run across
+  old-office IBL, enclosed kitchen, concert stage, stadium, and exterior
+  water/vegetation before promotion.
+
+Next:
+
+1. Commit and push this slice immediately to repair the source-set mismatch.
+2. Add focused environment/profile packets.
+3. Start `CompositeV3` legacy-rescue measurement and contribution debug views.
+
 ## Goal
 
 Move beyond stable blockout scenes into a reusable asset-quality architecture

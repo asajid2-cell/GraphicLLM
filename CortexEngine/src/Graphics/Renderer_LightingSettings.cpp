@@ -333,6 +333,73 @@ void Renderer::ApplyLightingRig(LightingRig rig, Scene::ECS_Registry* registry) 
 }
 
 void Renderer::SetEnvironmentPreset(const std::string& name) {
+    // Search for environment by name (case-insensitive partial match)
+    std::string lowerName = name;
+    std::transform(lowerName.begin(), lowerName.end(), lowerName.begin(),
+                  [](unsigned char c) { return std::tolower(c); });
+
+    if (lowerName == "procedural_sky" || lowerName == "none" || lowerName == "neutral_procedural") {
+        auto fallbackIt = std::find_if(
+            m_environmentState.maps.begin(),
+            m_environmentState.maps.end(),
+            [](const EnvironmentMaps& env) {
+                return env.name == "procedural_sky";
+            });
+
+        if (fallbackIt == m_environmentState.maps.end()) {
+            EnvironmentMaps fallback;
+            fallback.name = "procedural_sky";
+            fallback.budgetClass = "tiny";
+            fallback.maxRuntimeDimension = 0;
+            fallback.defaultDiffuseIntensity = 0.0f;
+            fallback.defaultSpecularIntensity = 0.0f;
+            fallback.diffuseIrradiance = m_materialFallbacks.albedo;
+            fallback.specularPrefiltered = m_materialFallbacks.albedo;
+            m_environmentState.maps.push_back(std::move(fallback));
+            fallbackIt = std::prev(m_environmentState.maps.end());
+        }
+
+        m_environmentState.currentIndex = static_cast<size_t>(
+            std::distance(m_environmentState.maps.begin(), fallbackIt));
+        m_environmentState.selectionFallbackUsed = true;
+        m_environmentState.requestedEnvironment =
+            (lowerName == "neutral_procedural" || lowerName == "none") ? name : "procedural_sky";
+        m_environmentState.fallbackReason = "procedural_environment_selected";
+        SetIBLIntensity(0.0f, 0.0f);
+        if (m_environmentState.maps.size() > 1) {
+            for (size_t i = m_environmentState.maps.size(); i-- > 0;) {
+                const EnvironmentMaps& env = m_environmentState.maps[i];
+                if (env.name == "procedural_sky") {
+                    continue;
+                }
+                PendingEnvironment pending;
+                pending.path = env.path;
+                pending.name = env.name;
+                pending.budgetClass = env.budgetClass;
+                pending.maxRuntimeDimension = env.maxRuntimeDimension;
+                pending.defaultDiffuseIntensity = env.defaultDiffuseIntensity;
+                pending.defaultSpecularIntensity = env.defaultSpecularIntensity;
+                if (!pending.path.empty()) {
+                    m_environmentState.pending.push_back(std::move(pending));
+                    m_assetRuntime.registry.UnregisterTexture(env.path);
+                }
+                m_environmentState.maps.erase(m_environmentState.maps.begin() + static_cast<std::ptrdiff_t>(i));
+            }
+            auto activeFallbackIt = std::find_if(
+                m_environmentState.maps.begin(),
+                m_environmentState.maps.end(),
+                [](const EnvironmentMaps& env) {
+                    return env.name == "procedural_sky";
+                });
+            m_environmentState.currentIndex = activeFallbackIt == m_environmentState.maps.end()
+                ? 0u
+                : static_cast<size_t>(std::distance(m_environmentState.maps.begin(), activeFallbackIt));
+        }
+        UpdateEnvironmentDescriptorTable();
+        spdlog::info("Environment preset set to procedural_sky fallback");
+        return;
+    }
+
     if (m_environmentState.maps.empty()) {
         spdlog::warn("No environments loaded");
         m_environmentState.selectionFallbackUsed = true;
@@ -340,11 +407,6 @@ void Renderer::SetEnvironmentPreset(const std::string& name) {
         m_environmentState.fallbackReason = "no_resident_environments";
         return;
     }
-
-    // Search for environment by name (case-insensitive partial match)
-    std::string lowerName = name;
-    std::transform(lowerName.begin(), lowerName.end(), lowerName.begin(),
-                  [](unsigned char c) { return std::tolower(c); });
 
     size_t targetIndex = m_environmentState.currentIndex;
     bool found = false;
@@ -469,12 +531,46 @@ void Renderer::SetIBLIntensity(float diffuseIntensity, float specularIntensity) 
     spdlog::info("IBL intensity set to diffuse={}, specular={}", m_environmentState.diffuseIntensity, m_environmentState.specularIntensity);
 }
 
+void Renderer::SetLocalReflectionProbeRadiance(bool enabled,
+                                               float diffuseIntensity,
+                                               float specularIntensity) {
+    const float diffuse = std::max(diffuseIntensity, 0.0f);
+    const float specular = std::max(specularIntensity, 0.0f);
+    if (m_environmentState.localProbeRadianceEnabled == enabled &&
+        std::abs(m_environmentState.localProbeDiffuseIntensity - diffuse) < 1e-6f &&
+        std::abs(m_environmentState.localProbeSpecularIntensity - specular) < 1e-6f) {
+        return;
+    }
+
+    m_environmentState.localProbeRadianceEnabled = enabled;
+    m_environmentState.localProbeDiffuseIntensity = diffuse;
+    m_environmentState.localProbeSpecularIntensity = specular;
+    spdlog::info("Local reflection probe radiance: enabled={} diffuse={} specular={}",
+                 enabled,
+                 diffuse,
+                 specular);
+}
+
 void Renderer::SetIBLEnabled(bool enabled) {
     if (m_environmentState.enabled == enabled) {
         return;
     }
     m_environmentState.enabled = enabled;
     spdlog::info("Image-based lighting {}", m_environmentState.enabled ? "ENABLED" : "DISABLED");
+}
+
+void Renderer::SetVisibilityBufferEnabled(bool enabled) {
+    if (m_visibilityBufferState.enabled == enabled) {
+        return;
+    }
+
+    m_visibilityBufferState.enabled = enabled;
+    m_visibilityBufferState.ClearDrawInputs();
+    spdlog::info("VisibilityBuffer {}", enabled ? "ENABLED" : "DISABLED");
+}
+
+bool Renderer::IsVisibilityBufferEnabled() const {
+    return m_visibilityBufferState.enabled;
 }
 
 void Renderer::SetBackgroundPresentation(bool visible, float exposure, float blur) {
@@ -503,6 +599,22 @@ void Renderer::SetEnvironmentRotation(float degrees) {
 
     m_environmentState.rotationDegrees = normalized;
     spdlog::info("Environment rotation set to {} degrees", m_environmentState.rotationDegrees);
+}
+
+void Renderer::SetAmbientLighting(const glm::vec3& color, float intensity) {
+    const glm::vec3 clampedColor = glm::max(color, glm::vec3(0.0f));
+    const float clampedIntensity = std::max(intensity, 0.0f);
+    if (glm::length2(m_lightingState.ambientColor - clampedColor) < 1e-6f &&
+        std::abs(m_lightingState.ambientIntensity - clampedIntensity) < 1e-6f) {
+        return;
+    }
+    m_lightingState.ambientColor = clampedColor;
+    m_lightingState.ambientIntensity = clampedIntensity;
+    spdlog::info("Ambient lighting set to color=({:.3f},{:.3f},{:.3f}) intensity={:.3f}",
+                 m_lightingState.ambientColor.r,
+                 m_lightingState.ambientColor.g,
+                 m_lightingState.ambientColor.b,
+                 m_lightingState.ambientIntensity);
 }
 
 void Renderer::SetSunDirection(const glm::vec3& dir) {

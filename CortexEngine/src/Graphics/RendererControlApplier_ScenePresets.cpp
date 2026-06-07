@@ -1,13 +1,91 @@
 #include "RendererControlApplier.h"
 
 #include "Renderer.h"
+#include "RendererSceneProfile.h"
 
 #include <glm/geometric.hpp>
 #include <glm/vec3.hpp>
+#include <cmath>
+#include <cstdlib>
 
 namespace Cortex::Graphics {
 
+namespace {
+float ReadRTShowcaseRenderScaleOverride(float fallback) {
+    const char* value = std::getenv("CORTEX_RT_SHOWCASE_RENDER_SCALE");
+    if (!value || value[0] == '\0') {
+        return fallback;
+    }
+
+    char* end = nullptr;
+    const float scale = std::strtof(value, &end);
+    if (end == value || !std::isfinite(scale)) {
+        return fallback;
+    }
+    return glm::clamp(scale, 0.5f, 1.0f);
+}
+
+float ReadRTShowcaseFloatOverride(const char* name, float fallback, float minValue, float maxValue) {
+    const char* value = std::getenv(name);
+    if (!value || value[0] == '\0') {
+        return fallback;
+    }
+
+    char* end = nullptr;
+    const float parsed = std::strtof(value, &end);
+    if (end == value || !std::isfinite(parsed)) {
+        return fallback;
+    }
+    return glm::clamp(parsed, minValue, maxValue);
+}
+
+bool ReadRTShowcaseDisableFlag(const char* name) {
+    const char* value = std::getenv(name);
+    return value && value[0] != '\0' && value[0] != '0';
+}
+
+void ApplyRTShowcaseDiagnosticFeatureOverrides(Renderer& renderer) {
+    if (ReadRTShowcaseDisableFlag("CORTEX_DISABLE_SHADOWS")) {
+        renderer.SetShadowsEnabled(false);
+    }
+    if (ReadRTShowcaseDisableFlag("CORTEX_DISABLE_RT")) {
+        renderer.SetRayTracingEnabled(false);
+        renderer.SetRTReflectionsEnabled(false);
+        renderer.SetRTGIEnabled(false);
+    }
+    if (ReadRTShowcaseDisableFlag("CORTEX_DISABLE_RT_REFLECTIONS")) {
+        renderer.SetRTReflectionsEnabled(false);
+    }
+    if (ReadRTShowcaseDisableFlag("CORTEX_DISABLE_RT_GI")) {
+        renderer.SetRTGIEnabled(false);
+    }
+    if (ReadRTShowcaseDisableFlag("CORTEX_DISABLE_TAA")) {
+        renderer.SetTAAEnabled(false);
+    }
+    if (ReadRTShowcaseDisableFlag("CORTEX_DISABLE_FXAA")) {
+        renderer.SetFXAAEnabled(false);
+    }
+    if (ReadRTShowcaseDisableFlag("CORTEX_DISABLE_SSR")) {
+        renderer.SetSSREnabled(false);
+    }
+    if (ReadRTShowcaseDisableFlag("CORTEX_DISABLE_SSAO")) {
+        renderer.SetSSAOEnabled(false);
+    }
+    if (ReadRTShowcaseDisableFlag("CORTEX_DISABLE_FOG")) {
+        renderer.SetFogEnabled(false);
+        renderer.SetGodRayIntensity(0.0f);
+    }
+    if (ReadRTShowcaseDisableFlag("CORTEX_DISABLE_PARTICLES")) {
+        renderer.SetParticlesEnabled(false);
+    }
+    if (ReadRTShowcaseDisableFlag("CORTEX_DISABLE_IBL")) {
+        renderer.SetIBLEnabled(false);
+    }
+}
+} // namespace
+
 void ApplyHeroVisualBaselineControls(Renderer& renderer) {
+    renderer.SetVisibilityBufferEnabled(true);
     renderer.SetEnvironmentPreset("studio");
     renderer.SetIBLEnabled(true);
     renderer.SetIBLIntensity(0.85f, 1.25f);
@@ -37,6 +115,7 @@ void ApplyHeroVisualBaselineControls(Renderer& renderer) {
 }
 
 void ApplyAutoDemoFeatureLock(Renderer& renderer) {
+    renderer.SetVisibilityBufferEnabled(true);
     renderer.SetRayTracingEnabled(true);
 
     renderer.SetSSREnabled(true);
@@ -45,66 +124,28 @@ void ApplyAutoDemoFeatureLock(Renderer& renderer) {
 }
 
 void ApplyRTShowcaseSceneControls(Renderer& renderer, bool conservativeMode) {
-    renderer.SetLightingRigContract("rt_showcase_gallery", "scene_preset", conservativeMode);
-    renderer.SetParticlesEnabled(true);
-    renderer.SetEnvironmentPreset("studio");
-    renderer.SetIBLEnabled(true);
-    renderer.SetIBLIntensity(1.05f, 0.78f);
+    SceneCinematicProfile profile = BuildGalleryCinematicProfile(conservativeMode);
+    profile.environment.iblDiffuse =
+        ReadRTShowcaseFloatOverride("CORTEX_RT_SHOWCASE_IBL_DIFFUSE_INTENSITY", 0.85f, 0.0f, 3.0f);
+    profile.environment.iblSpecular =
+        ReadRTShowcaseFloatOverride("CORTEX_RT_SHOWCASE_IBL_SPECULAR_INTENSITY", 1.25f, 0.0f, 3.0f);
+    profile.environment.backgroundExposure =
+        ReadRTShowcaseFloatOverride("CORTEX_RT_SHOWCASE_BACKGROUND_EXPOSURE", 1.0f, 0.0f, 4.0f);
+    profile.environment.backgroundBlur =
+        ReadRTShowcaseFloatOverride("CORTEX_RT_SHOWCASE_BACKGROUND_BLUR", 0.55f, 0.0f, 1.0f);
+    profile.lighting.shadowBias =
+        ReadRTShowcaseFloatOverride("CORTEX_RT_SHOWCASE_SHADOW_BIAS", 0.0030f, 0.00001f, 0.05f);
+    profile.lighting.shadowPCFRadius =
+        ReadRTShowcaseFloatOverride("CORTEX_RT_SHOWCASE_SHADOW_PCF_RADIUS", 3.0f, 0.0f, 12.0f);
+    profile.post.renderScale =
+        ReadRTShowcaseRenderScaleOverride(conservativeMode ? 0.67f : 0.85f);
 
-    renderer.SetShadowsEnabled(true);
-    renderer.SetShadowBias(0.0005f);
-    renderer.SetShadowPCFRadius(1.5f);
-    renderer.SetCascadeSplitLambda(0.5f);
-
-    const glm::vec3 sunDir = glm::normalize(glm::vec3(0.35f, 0.85f, 0.25f));
-    renderer.SetSunDirection(sunDir);
-    renderer.SetSunColor(glm::vec3(1.0f));
-    renderer.SetSunIntensity(2.85f);
-
-    renderer.SetWaterParams(
-        0.0f,
-        0.15f,
-        10.0f,
-        1.0f,
-        1.0f,
-        0.25f,
-        0.08f,
-        0.6f);
-
-    if (!conservativeMode) {
-        renderer.SetRenderScale(0.85f);
-        renderer.SetExposure(1.12f);
-        renderer.SetBloomIntensity(0.12f);
-
-        renderer.SetFXAAEnabled(true);
-        renderer.SetTAAEnabled(true);
-        renderer.SetSSREnabled(true);
-        renderer.SetSSAOEnabled(true);
-        renderer.SetSSAOParams(0.20f, 0.04f, 0.22f);
-
-        renderer.SetFogEnabled(true);
-        renderer.SetFogParams(0.012f, 0.0f, 0.55f);
-        renderer.SetGodRayIntensity(0.42f);
-        return;
-    }
-
-    renderer.SetRenderScale(0.67f);
-    renderer.SetExposure(1.0f);
-    renderer.SetBloomIntensity(0.11f);
-
-    renderer.SetFXAAEnabled(true);
-    renderer.SetTAAEnabled(true);
-    renderer.SetSSREnabled(true);
-    renderer.SetSSAOEnabled(true);
-    renderer.SetSSAOParams(0.20f, 0.04f, 0.20f);
-    renderer.SetFogEnabled(true);
-    renderer.SetFogParams(0.01f, 0.0f, 0.6f);
-    renderer.SetGodRayIntensity(0.36f);
-    renderer.SetShadowsEnabled(true);
-    renderer.SetIBLEnabled(true);
+    ApplySceneCinematicProfile(renderer, profile);
+    ApplyRTShowcaseDiagnosticFeatureOverrides(renderer);
 }
 
 void ApplyMaterialLabSceneControls(Renderer& renderer) {
+    renderer.SetVisibilityBufferEnabled(true);
     renderer.SetLightingRigContract("material_lab_review", "scene_preset", false);
     renderer.SetParticlesEnabled(false);
     renderer.SetEnvironmentPreset("cool_overcast");
@@ -143,6 +184,7 @@ void ApplyMaterialLabSceneControls(Renderer& renderer) {
 }
 
 void ApplyGlassWaterCourtyardSceneControls(Renderer& renderer) {
+    renderer.SetVisibilityBufferEnabled(true);
     renderer.SetLightingRigContract("sunset_rim", "scene_preset", false);
     renderer.SetParticlesEnabled(false);
     renderer.SetEnvironmentPreset("sunset_courtyard");
@@ -192,6 +234,7 @@ void ApplyGlassWaterCourtyardSceneControls(Renderer& renderer) {
 }
 
 void ApplyLiquidGallerySceneControls(Renderer& renderer) {
+    renderer.SetVisibilityBufferEnabled(true);
     renderer.SetLightingRigContract("liquid_gallery", "scene_preset", false);
     renderer.SetParticlesEnabled(true);
     renderer.SetEnvironmentPreset("warm_gallery");
@@ -241,6 +284,7 @@ void ApplyLiquidGallerySceneControls(Renderer& renderer) {
 }
 
 void ApplyEffectsShowcaseSceneControls(Renderer& renderer) {
+    renderer.SetVisibilityBufferEnabled(true);
     renderer.SetLightingRigContract("night_emissive", "scene_preset", false);
     renderer.SetParticlesEnabled(true);
     renderer.SetEnvironmentPreset("night_city");
@@ -289,6 +333,7 @@ void ApplyEffectsShowcaseSceneControls(Renderer& renderer) {
 }
 
 void ApplyTemporalValidationSceneControls(Renderer& renderer) {
+    renderer.SetVisibilityBufferEnabled(true);
     renderer.SetLightingRigContract("temporal_validation_lab", "scene_preset", false);
     renderer.SetSunDirection(glm::normalize(glm::vec3(-0.35f, -0.85f, 0.25f)));
     renderer.SetSunColor(glm::vec3(1.0f, 0.96f, 0.88f));
@@ -311,6 +356,7 @@ void ApplyTemporalValidationSceneControls(Renderer& renderer) {
 }
 
 void ApplyCornellSceneControls(Renderer& renderer) {
+    renderer.SetVisibilityBufferEnabled(true);
     renderer.SetLightingRigContract("cornell_god_rays", "scene_preset", false);
     renderer.SetSunDirection(glm::normalize(glm::vec3(0.0f, -1.0f, 0.0f)));
     renderer.SetSunColor(glm::vec3(1.0f));
@@ -330,6 +376,7 @@ void ApplyCornellSceneControls(Renderer& renderer) {
 }
 
 void ApplyGodRaysSceneControls(Renderer& renderer) {
+    renderer.SetVisibilityBufferEnabled(true);
     renderer.SetLightingRigContract("god_rays_volume", "scene_preset", false);
     renderer.SetEnvironmentPreset("studio");
     renderer.SetIBLEnabled(true);
@@ -361,16 +408,27 @@ void ApplyGodRaysSceneControls(Renderer& renderer) {
 }
 
 void ApplyDragonWaterStudioSunControls(Renderer& renderer) {
+    renderer.SetVisibilityBufferEnabled(true);
     renderer.SetLightingRigContract("dragon_water_studio_sun", "scene_preset", false);
+    renderer.SetIBLEnabled(false);
+    renderer.SetIBLIntensity(0.0f, 0.0f);
+    renderer.SetBackgroundPresentation(false, 1.0f, 0.0f);
     renderer.SetSunDirection(glm::normalize(glm::vec3(0.4f, 1.0f, 0.3f)));
     renderer.SetSunColor(glm::vec3(1.0f));
     renderer.SetSunIntensity(5.0f);
+    // The dragon/pool closeups put thin hero geometry over a low reflective
+    // floor at grazing view angles. A slightly larger bias keeps the shadow
+    // pattern from crawling during mouse-look without erasing the scene's
+    // broad contact shadows.
+    renderer.SetShadowBias(0.0015f);
+    renderer.SetShadowPCFRadius(1.5f);
 }
 
 void ApplyOutdoorWorldSceneControls(Renderer& renderer,
                                     const glm::vec3& sunDirection,
                                     const glm::vec3& sunColor,
                                     float sunIntensity) {
+    renderer.SetVisibilityBufferEnabled(true);
     renderer.SetLightingRigContract("outdoor_world_sun", "scene_preset", false);
     renderer.SetIBLEnabled(false);
     renderer.SetSSREnabled(true);
@@ -386,6 +444,7 @@ void ApplyOutdoorWorldSceneControls(Renderer& renderer,
 }
 
 void ApplyEditorModeBaseControls(Renderer& renderer) {
+    renderer.SetVisibilityBufferEnabled(true);
     renderer.SetLightingRigContract("editor_time_of_day", "editor", false);
     renderer.SetIBLEnabled(false);
     renderer.SetFogEnabled(true);

@@ -139,7 +139,11 @@ Result<void> Renderer::Initialize(DX12Device* device, Window* window) {
 
     // Create bindless resource manager for SM6.6 bindless access
     m_services.bindlessManager = std::make_unique<BindlessResourceManager>();
-    auto bindlessResult = m_services.bindlessManager->Initialize(device->GetDevice(), 16384, 8192);
+    auto bindlessResult = m_services.bindlessManager->Initialize(
+        device->GetDevice(),
+        m_services.descriptorManager.get(),
+        16384,
+        8192);
     if (bindlessResult.IsErr()) {
         spdlog::warn("Bindless resource manager initialization failed: {} (falling back to legacy descriptor tables)",
                      bindlessResult.Error());

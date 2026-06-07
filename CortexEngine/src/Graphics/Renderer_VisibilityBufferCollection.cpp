@@ -42,6 +42,29 @@ void Renderer::CollectInstancesForVisibilityBuffer(Scene::ECS_Registry* registry
     std::vector<std::vector<VBInstanceData>> alphaMaskedInstancesPerMesh;
     std::vector<std::vector<VBInstanceData>> alphaMaskedDoubleSidedInstancesPerMesh;
 
+    auto ensureMeshBindlessSrvs = [&](const std::shared_ptr<Scene::MeshData>& mesh) {
+        if (!mesh || !mesh->gpuBuffers || !m_services.descriptorManager || !m_services.device) {
+            return;
+        }
+        auto& gpu = *mesh->gpuBuffers;
+        if (!gpu.vertexBuffer || !gpu.indexBuffer) {
+            return;
+        }
+        if (gpu.vbRawSRVIndex != MeshBuffers::kInvalidDescriptorIndex &&
+            gpu.ibRawSRVIndex != MeshBuffers::kInvalidDescriptorIndex) {
+            return;
+        }
+
+        auto srvResult = MeshUploadResourceState::EnsureRawSRVs(
+            m_services.device->GetDevice(),
+            m_services.descriptorManager.get(),
+            gpu);
+        if (srvResult.IsErr()) {
+            spdlog::warn("VB: {}", srvResult.Error());
+            return;
+        }
+    };
+
     // Stable snapshot order so per-instance/material indices don't thrash frame-to-frame.
     std::vector<uint32_t> stableEntryIndices;
     stableEntryIndices.reserve(snapshot->entries.size());
@@ -58,7 +81,7 @@ void Renderer::CollectInstancesForVisibilityBuffer(Scene::ECS_Registry* registry
     std::vector<std::shared_ptr<Scene::MeshData>> uniqueValidMeshes;
 
     // ========================================================================
-    // PRE-PASS: Collect unique valid meshes and sort by pointer address.
+    // PRE-PASS: Collect unique valid meshes and sort by stable mesh properties.
     // This ensures mesh indices are STABLE regardless of entity iteration order,
     // preventing "random terrain" glitching when chunks load/unload.
     // ========================================================================
@@ -69,6 +92,7 @@ void Renderer::CollectInstancesForVisibilityBuffer(Scene::ECS_Registry* registry
             auto& renderable = *sceneEntry.renderable;
             if (!WritesSceneDepth(sceneEntry.depthClass)) continue;
             if (!sceneEntry.hasGpuBuffers) continue;
+            ensureMeshBindlessSrvs(renderable.mesh);
             // Also check for valid SRV indices (same criteria as main loop)
             if (renderable.mesh->gpuBuffers->vbRawSRVIndex == MeshBuffers::kInvalidDescriptorIndex ||
                 renderable.mesh->gpuBuffers->ibRawSRVIndex == MeshBuffers::kInvalidDescriptorIndex) continue;
@@ -202,29 +226,6 @@ void Renderer::CollectInstancesForVisibilityBuffer(Scene::ECS_Registry* registry
     std::vector<VBMaterialConstants> vbMaterials;
     vbMaterials.reserve(stableEntryIndices.size());
 
-    auto ensureMeshBindlessSrvs = [&](const std::shared_ptr<Scene::MeshData>& mesh) {
-        if (!mesh || !mesh->gpuBuffers || !m_services.descriptorManager || !m_services.device) {
-            return;
-        }
-        auto& gpu = *mesh->gpuBuffers;
-        if (!gpu.vertexBuffer || !gpu.indexBuffer) {
-            return;
-        }
-        if (gpu.vbRawSRVIndex != MeshBuffers::kInvalidDescriptorIndex &&
-            gpu.ibRawSRVIndex != MeshBuffers::kInvalidDescriptorIndex) {
-            return;
-        }
-
-        auto srvResult = MeshUploadResourceState::EnsureRawSRVs(
-            m_services.device->GetDevice(),
-            m_services.descriptorManager.get(),
-            gpu);
-        if (srvResult.IsErr()) {
-            spdlog::warn("VB: {}", srvResult.Error());
-            return;
-        }
-    };
-
     // Counters for debugging missing geometry
     static bool s_loggedCounts = false;
     uint32_t countTotal = 0;
@@ -304,11 +305,7 @@ void Renderer::CollectInstancesForVisibilityBuffer(Scene::ECS_Registry* registry
         }
         const uint32_t meshDrawIndex = it->second;
 
-        // Ensure textures are queued/loaded. Descriptor tables are warmed via
-        // PrewarmMaterialDescriptors() early in the frame to avoid mid-frame
-        // persistent allocations (which can stall or fail once transient
-        // allocations have started).
-        EnsureMaterialTextures(renderable);
+        PrepareMaterialResources(renderable);
 
         const MaterialTextureFallbacks materialFallbacks{
             m_materialFallbacks.albedo.get(),
@@ -319,37 +316,12 @@ void Renderer::CollectInstancesForVisibilityBuffer(Scene::ECS_Registry* registry
         const MaterialModel materialModel = MaterialResolver::ResolveRenderable(renderable, materialFallbacks);
         const uint32_t materialClass = ClassifyMaterialSurface(materialModel);
 
-        glm::uvec4 textureIndices(kInvalidBindlessIndex);
-        glm::uvec4 textureIndices2(kInvalidBindlessIndex);
-        glm::uvec4 textureIndices3(kInvalidBindlessIndex);
-        glm::uvec4 textureIndices4(kInvalidBindlessIndex);
-        if (renderable.textures.gpuState) {
-            const auto& desc = renderable.textures.gpuState->descriptors;
-            textureIndices = glm::uvec4(
-                (materialModel.textures.albedo && desc[0].IsValid()) ? desc[0].index : kInvalidBindlessIndex,
-                (materialModel.textures.normal && desc[1].IsValid()) ? desc[1].index : kInvalidBindlessIndex,
-                (materialModel.textures.metallic && desc[2].IsValid()) ? desc[2].index : kInvalidBindlessIndex,
-                (materialModel.textures.roughness && desc[3].IsValid()) ? desc[3].index : kInvalidBindlessIndex
-            );
-            textureIndices2 = glm::uvec4(
-                (materialModel.textures.occlusion && desc[4].IsValid()) ? desc[4].index : kInvalidBindlessIndex,
-                (materialModel.textures.emissive && desc[5].IsValid()) ? desc[5].index : kInvalidBindlessIndex,
-                kInvalidBindlessIndex,
-                kInvalidBindlessIndex
-            );
-            textureIndices3 = glm::uvec4(
-                (materialModel.textures.transmission && desc[6].IsValid()) ? desc[6].index : kInvalidBindlessIndex,
-                (materialModel.textures.clearcoat && desc[7].IsValid()) ? desc[7].index : kInvalidBindlessIndex,
-                (materialModel.textures.clearcoatRoughness && desc[8].IsValid()) ? desc[8].index : kInvalidBindlessIndex,
-                (materialModel.textures.specular && desc[9].IsValid()) ? desc[9].index : kInvalidBindlessIndex
-            );
-            textureIndices4 = glm::uvec4(
-                (materialModel.textures.specularColor && desc[10].IsValid()) ? desc[10].index : kInvalidBindlessIndex,
-                kInvalidBindlessIndex,
-                kInvalidBindlessIndex,
-                kInvalidBindlessIndex
-            );
-        }
+        MaterialConstants materialTextureState = MaterialResolver::BuildMaterialConstants(materialModel);
+        MaterialResolver::FillMaterialTextureIndices(renderable, materialTextureState);
+        const glm::uvec4 textureIndices = materialTextureState.textureIndices;
+        const glm::uvec4 textureIndices2 = materialTextureState.textureIndices2;
+        const glm::uvec4 textureIndices3 = materialTextureState.textureIndices3;
+        const glm::uvec4 textureIndices4 = materialTextureState.textureIndices4;
 
         // Find or create material index for this renderable.
         uint32_t materialIndex = 0;
@@ -498,9 +470,6 @@ void Renderer::CollectInstancesForVisibilityBuffer(Scene::ECS_Registry* registry
             start += draw.instanceCountAlphaDoubleSided;
         }
     }
-
-    // Upload per-frame material table (used by MaterialResolve.hlsl).
-
 
     // Upload per-frame material table (used by MaterialResolve.hlsl).
     auto matResult = m_services.visibilityBuffer->UpdateMaterials(m_commandResources.graphicsList.Get(), vbMaterials);

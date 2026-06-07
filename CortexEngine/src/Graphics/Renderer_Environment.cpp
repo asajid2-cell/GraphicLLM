@@ -6,6 +6,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <cstdlib>
 #include <filesystem>
 #include <limits>
 #include <memory>
@@ -156,8 +157,13 @@ Result<void> Renderer::InitializeEnvironmentMaps() {
                   }
                   return a.name < b.name;
               });
-    const size_t maxStartupEnvs =
-        std::max<size_t>(1, static_cast<size_t>(budget.iblResidentEnvironmentLimit));
+    const bool disableStartupEnvironmentLoads = [] {
+        const char* value = std::getenv("CORTEX_DISABLE_STARTUP_ENVIRONMENT_LOADS");
+        return value && value[0] != '\0' && value[0] != '0';
+    }();
+    const size_t maxStartupEnvs = disableStartupEnvironmentLoads
+        ? 0u
+        : std::max<size_t>(1, static_cast<size_t>(budget.iblResidentEnvironmentLimit));
 
     int successCount = 0;
     bool envBudgetReached = false;
@@ -267,6 +273,9 @@ Result<void> Renderer::InitializeEnvironmentMaps() {
         m_environmentState.pending.size(),
         budget.profileName,
         budget.iblResidentEnvironmentLimit);
+    if (disableStartupEnvironmentLoads) {
+        spdlog::info("Startup environment loads disabled by CORTEX_DISABLE_STARTUP_ENVIRONMENT_LOADS");
+    }
     return Result<void>::Ok();
 }
 
@@ -311,14 +320,17 @@ void Renderer::UpdateEnvironmentDescriptorTable() {
 
     ID3D12Device* device = m_services.device->GetDevice();
 
-    if (EnvironmentMaps* env = m_environmentState.ActiveEnvironment()) {
-        auto bindlessResult = EnvironmentDescriptorState::EnsureEnvironmentBindlessSRVs(
-            device,
-            m_services.descriptorManager.get(),
-            *env,
-            m_materialFallbacks.albedo);
-        if (bindlessResult.IsErr()) {
-            spdlog::warn("{}", bindlessResult.Error());
+    if (m_environmentState.ShouldBindImageBasedLightingTextures()) {
+        EnvironmentMaps* env = m_environmentState.ActiveEnvironment();
+        if (env) {
+            auto bindlessResult = EnvironmentDescriptorState::EnsureEnvironmentBindlessSRVs(
+                device,
+                m_services.descriptorManager.get(),
+                *env,
+                m_materialFallbacks.albedo);
+            if (bindlessResult.IsErr()) {
+                spdlog::warn("{}", bindlessResult.Error());
+            }
         }
     }
 
@@ -327,10 +339,15 @@ void Renderer::UpdateEnvironmentDescriptorTable() {
     inputs.rtShadowMaskSRV = m_rtShadowTargets.maskSRV;
     inputs.rtShadowHistorySRV = m_rtShadowTargets.historySRV;
     inputs.rtGISRV = m_rtGITargets.srv;
+    inputs.rtGIHistorySRV = m_rtGITargets.historySRV;
     inputs.shadowFallback = m_materialFallbacks.roughness;
     inputs.diffuseFallback = m_materialFallbacks.albedo;
     inputs.specularFallback = m_materialFallbacks.albedo;
-    EnvironmentDescriptorState::WriteShadowAndEnvironmentTable(device, m_environmentState, inputs);
+    EnvironmentDescriptorState::WriteShadowAndEnvironmentTable(
+        device,
+        m_services.descriptorManager.get(),
+        m_environmentState,
+        inputs);
 }
 
 void Renderer::EnsureEnvironmentBindlessSRVs(EnvironmentMaps& env) {

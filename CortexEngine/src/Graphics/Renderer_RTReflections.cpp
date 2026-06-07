@@ -1,4 +1,4 @@
-﻿#include "Renderer.h"
+#include "Renderer.h"
 
 #include "Graphics/Passes/RTReflectionDispatchPass.h"
 #include "Graphics/RendererGeometryUtils.h"
@@ -145,9 +145,11 @@ void Renderer::RenderRayTracedReflections() {
         }
     }
 
-    if (const EnvironmentMaps* env = m_environmentState.ActiveEnvironment()) {
-        RTReflectionDispatchPass::EnsureTextureNonPixelReadable(rtCmdList.Get(), env->diffuseIrradiance);
-        RTReflectionDispatchPass::EnsureTextureNonPixelReadable(rtCmdList.Get(), env->specularPrefiltered);
+    if (m_environmentState.ShouldBindImageBasedLightingTextures()) {
+        if (const EnvironmentMaps* env = m_environmentState.ActiveEnvironment()) {
+            RTReflectionDispatchPass::EnsureTextureNonPixelReadable(rtCmdList.Get(), env->diffuseIrradiance);
+            RTReflectionDispatchPass::EnsureTextureNonPixelReadable(rtCmdList.Get(), env->specularPrefiltered);
+        }
     }
 
     // Ensure the descriptor table (space1, t0-t6) is up to date before DXR

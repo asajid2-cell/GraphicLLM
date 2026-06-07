@@ -640,6 +640,7 @@ def analyze_report(
                     "shadow_visibility",
                     "hdr_color",
                     "reflection_radiance",
+                    "reflection_confidence",
                 ]:
                     if resource not in composite_pass.get("reads", []):
                         failures.append(f"FullSceneCompositeV3 pass does not read {resource}")

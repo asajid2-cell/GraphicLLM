@@ -1859,3 +1859,28 @@ Update:
   `0.75008`, target roughness `0.03000`, and no material-stress warnings.
 - Continue renderer work on BRDF/source quality, but do not use opaque
   G-buffer roughness as the water-pass admission gate.
+
+### CompositeV3 Reflection Confidence Slice - 2026-06-06
+
+Status:
+
+- `FullSceneCompositeV3` now consumes `reflection_confidence` with
+  `reflection_radiance`.
+- candidate HDR reflection weighting now follows the ReflectionV3 resolver's
+  actual source confidence instead of a luma-derived estimate.
+- runtime readiness and analyzers require this edge before treating CompositeV3
+  as the real candidate HDR producer.
+
+Evidence:
+
+- `build/captures/v3_composite_reflection_confidence_static_fullviews_20260606`.
+- packet status `review_packet_passed`, with default beauty still not
+  promotable.
+- frame report shows `composite_v3_producer=FullSceneCompositeV3`,
+  `composite_v3_ready=true`, and `reflection_confidence_ready=true`.
+
+Next:
+
+- Add explicit candidate HDR energy/overbright diagnostics.
+- Reduce or report legacy `hdr_color` rescue usage so CompositeV3 becomes less
+  adapter-like and more self-owned.

@@ -108,6 +108,9 @@ struct FrameContract {
         std::string sceneLocalShaderProfile = "unknown";
         float sceneLocalShaderProfileMode = 0.0f;
         float sceneLocalBackgroundStrength = 0.0f;
+        float sceneLocalPayloadTextureRichness = 0.0f;
+        float sceneLocalPayloadProxyScore = 0.0f;
+        float sceneLocalPayloadShaderInfluence = 0.0f;
     };
 
     struct GraphicsPresetInfo {

@@ -9286,3 +9286,97 @@ Current next work:
    already known.
 3. Start LightingShadowV3 high-contrast source-split work after the environment
    payload/resource path has at least one texture-backed non-gallery proof.
+
+### SceneLocalEnvironmentV3 Payload-Backed Shader Influence - 2026-06-07
+
+Implemented:
+
+- Added `Renderer::BuildSceneLocalEnvironmentV3PayloadParams()`.
+  It scans scene-local payload textures and packs:
+  - payload ready
+  - texture richness
+  - proxy score
+  - shader influence
+- `FrameConstants::fogExtraParams.yzw` now carry SceneLocalEnvironmentV3
+  payload lanes:
+  - `.y`: payload ready
+  - `.z`: texture richness
+  - `.w`: payload shader influence
+  `.x` remains fog start distance.
+- `SceneLocalEnvironmentV3.hlsl` now consumes those payload lanes. When a
+  payload is ready, visible background, ambient, reflection background, and
+  output confidence are biased toward payload-owned local radiance instead of
+  only profile palette constants.
+- Added explicit `rt_showcase_gallery -> assets/textures/rtshowcase` payload
+  alias in both the frame-report scanner and shader-constant scanner. This
+  avoids duplicating about 39 MB of DDS textures while still making the gallery
+  use real tracked DDS assets as a scene-local payload.
+- Frame reports now expose:
+  - `scene_local_payload_texture_richness`
+  - `scene_local_payload_proxy_score`
+  - `scene_local_payload_shader_influence`
+  - V3 aliases
+    `scene_local_texture_payload_richness`,
+    `scene_local_texture_payload_proxy_score`, and
+    `scene_local_texture_payload_shader_influence`
+- The V3 contract, environment-payload analyzer, and plan validator now require
+  and check these fields. If payload-ready is true, richness/proxy/influence
+  must be valid and V3 values must match environment values.
+
+Validation:
+
+```powershell
+python -m py_compile tools\analyze_full_scene_shader_v3_environment_payload.py tools\validate_full_scene_shader_pipeline_v3_plan.py tools\analyze_full_scene_shader_v3_placeholders.py tools\analyze_full_scene_shader_v3_environment_profiles.py
+python tools\validate_full_scene_shader_pipeline_v3_plan.py
+git -c submodule.recurse=false diff --check -- src\Graphics\Renderer.h src\Graphics\Renderer_FramePostConstants.cpp src\Graphics\FrameContract.h src\Graphics\Renderer_FrameContractSnapshot.cpp src\Graphics\FrameContractJson.cpp src\Graphics\FullSceneShaderFrameContext.h src\Graphics\ShaderTypes.h assets\shaders\SceneLocalEnvironmentV3.hlsl assets\final_art\full_scene_shader_pipeline_v3_contract.json tools\analyze_full_scene_shader_v3_environment_payload.py tools\validate_full_scene_shader_pipeline_v3_plan.py
+cmd.exe /d /c "call ""C:\Program Files\Microsoft Visual Studio\18\Community\Common7\Tools\VsDevCmd.bat"" -arch=x64 -host_arch=x64 >nul && set ""CORTEX_SKIP_ASSET_SYNC=1"" && ""C:\Program Files\Ninja\ninja.exe"" -C build CortexEngine -j 8"
+Copy-Item -LiteralPath assets\final_art\full_scene_shader_pipeline_v3_contract.json -Destination build\bin\assets\final_art\full_scene_shader_pipeline_v3_contract.json -Force
+$env:CORTEX_V3_REFLECTION_SOURCE_OVERRIDE='ssr'
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_full_scene_shader_pipeline_v3_packet.ps1 -NoBuild -SkipSceneAnalyzers -StressSceneOnly -StressSceneFilter rt_showcase:reflection_closeup -SmokeFrames 16 -CaptureFrame 8 -CaptureSequenceCount 1 -StabilityMotionMode static -OutputRoot build\captures\v3_environment_payload_shader_influence_gallery_20260607
+Remove-Item Env:\CORTEX_V3_REFLECTION_SOURCE_OVERRIDE -ErrorAction SilentlyContinue
+```
+
+Evidence:
+
+- Plan validator passed with `10` domains and `29` required outputs.
+- Native target rebuilt successfully. The known trailing `vswhere.exe` warning
+  printed after successful link.
+- Packet:
+  `build\captures\v3_environment_payload_shader_influence_gallery_20260607`.
+  - scene-local packet passed.
+  - V2 evidence passed.
+  - V3 placeholder packet passed with `54` reports.
+  - scene profile, environment payload, material payload, CompositeV3
+    diagnostics, and promotion decision passed.
+  - promotion status: `review_packet_passed`; default beauty remains
+    non-promotable because matrix family/motion coverage is incomplete.
+- Environment payload proof:
+  - reports: `54`
+  - payload-ready reports: `54`
+  - shader-influence reports: `54`
+  - failures: `0`
+  - first row: texture set `rt_showcase_gallery`, `12` DDS textures,
+    `5` albedo, `6` normal, payload ready `true`, richness `1.0`,
+    proxy score about `0.67`, shader influence about `0.87`
+
+Rejected/known limitation:
+
+- A direct gym/model-authored payload smoke still exited `2173` after writing a
+  visual validation BMP but before writing a frame report. Do not use that as
+  payload evidence yet. Keep the model-scene crash/device-removal path as
+  separate stability debt.
+- This slice still does not bind/sample scene-local DDS textures in HLSL. It
+  converts real payload availability into owned shader influence and contract
+  evidence. The next resource step is actual local irradiance/specular texture
+  binding or generated proxy resources.
+
+Current next work:
+
+1. Add a true SceneLocalEnvironmentV3 payload resource binding path:
+   local irradiance/proxy texture, local specular/prefilter proxy, and visible
+   background proxy.
+2. Add non-gallery payload sets or aliases for enclosed room, stage, and
+   exterior families.
+3. Continue separating model-scene report-evidence capture from visual-capture
+   success so family packets can produce diagnostics even when renderer
+   stability debt remains.

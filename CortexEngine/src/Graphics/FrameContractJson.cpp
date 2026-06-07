@@ -420,6 +420,9 @@ json FullSceneShaderPipelineV3ToJson(const FrameContract& contract) {
         {"scene_local_texture_payload_ready", context.sceneLocalTexturePayloadReady},
         {"scene_local_texture_payload_count", context.sceneLocalTexturePayloadCount},
         {"scene_local_texture_set_id", context.sceneLocalTextureSetId},
+        {"scene_local_texture_payload_richness", context.sceneLocalTexturePayloadRichness},
+        {"scene_local_texture_payload_proxy_score", context.sceneLocalTexturePayloadProxyScore},
+        {"scene_local_texture_payload_shader_influence", context.sceneLocalTexturePayloadShaderInfluence},
         {"reflection_v3_ready", context.reflectionV3Ready},
         {"reflection_radiance_ready", context.reflectionRadianceReady},
         {"reflection_confidence_ready", context.reflectionConfidenceReady},
@@ -559,7 +562,10 @@ json FrameContractToJson(const FrameContract& contract) {
             {"scene_local_visible_background_proxy_ready", contract.environment.sceneLocalVisibleBackgroundProxyReady},
             {"scene_local_shader_profile", contract.environment.sceneLocalShaderProfile},
             {"scene_local_shader_profile_mode", contract.environment.sceneLocalShaderProfileMode},
-            {"scene_local_background_strength", contract.environment.sceneLocalBackgroundStrength}
+            {"scene_local_background_strength", contract.environment.sceneLocalBackgroundStrength},
+            {"scene_local_payload_texture_richness", contract.environment.sceneLocalPayloadTextureRichness},
+            {"scene_local_payload_proxy_score", contract.environment.sceneLocalPayloadProxyScore},
+            {"scene_local_payload_shader_influence", contract.environment.sceneLocalPayloadShaderInfluence}
         }},
         {"graphics_preset", {
             {"id", contract.graphicsPreset.id},

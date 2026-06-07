@@ -29,6 +29,8 @@ cbuffer FrameConstants : register(b1)
     float4   g_EnvParams;
     float4   g_ColorGrade;
     float4   g_FogParams;
+    // x = fog start distance, y = scene-local payload ready,
+    // z = texture richness, w = payload shader influence.
     float4   g_FogExtraParams;
     float4   g_AOParams;
     float4   g_BloomParams;
@@ -103,6 +105,9 @@ PSOutput PSMain(VSOutput input) {
     const float isRoom = 1.0f - step(0.5f, abs(profileMode - 2.0f));
     const float isStage = 1.0f - step(0.5f, abs(profileMode - 3.0f));
     const float isExterior = 1.0f - step(0.5f, abs(profileMode - 4.0f));
+    const float payloadReady = step(0.5f, g_FogExtraParams.y);
+    const float payloadTextureRichness = saturate(g_FogExtraParams.z);
+    const float payloadInfluence = saturate(g_FogExtraParams.w) * payloadReady;
 
     const float3 skyCool = float3(0.20f, 0.31f, 0.48f);
     const float3 galleryNeutral = float3(0.18f, 0.175f, 0.16f);
@@ -114,14 +119,21 @@ PSOutput PSMain(VSOutput input) {
     localPalette = lerp(localPalette, roomWarm, isRoom);
     localPalette = lerp(localPalette, lerp(stageMagenta, stageCyan, input.texCoord.x), isStage);
     localPalette = lerp(localPalette, exteriorSky, isExterior);
+    const float3 payloadRadianceTint =
+        lerp(localPalette * 1.08f, ambientTint * 0.64f + localPalette * 0.58f, payloadTextureRichness);
+    const float3 payloadVisibleTint =
+        lerp(localPalette, payloadRadianceTint, saturate(0.45f + 0.35f * payloadTextureRichness));
+    const float payloadLocalWeight = saturate(payloadInfluence * (0.55f + 0.30f * payloadTextureRichness));
 
     const float externalBackgroundWeight =
         saturate((1.0f - localBackgroundStrength) * (backgroundExposure + 0.35f * iblEnabled));
-    const float3 visibleColor = lerp(localPalette, skyCool, externalBackgroundWeight);
+    const float3 visibleColorBase = lerp(localPalette, skyCool, externalBackgroundWeight);
+    const float3 visibleColor = lerp(visibleColorBase, payloadVisibleTint, payloadLocalWeight);
     const float3 visibleGradient = visibleColor * lerp(0.62f, 1.24f, uvHorizon);
-    const float reflectionLocalWeight = saturate(localBackgroundStrength + localProbeEnabled * 0.35f);
+    const float reflectionLocalWeight = saturate(localBackgroundStrength + localProbeEnabled * 0.35f + payloadInfluence * 0.30f);
     const float3 profileReflection = lerp(localPalette * 0.32f, ambientTint * 0.58f, saturate(specularIBL + probeSpecular));
-    const float3 reflectionColor = lerp(ambientTint * 0.18f, profileReflection, reflectionLocalWeight);
+    const float3 reflectionPayload = lerp(profileReflection, payloadRadianceTint * 0.70f, payloadLocalWeight);
+    const float3 reflectionColor = lerp(ambientTint * 0.18f, reflectionPayload, reflectionLocalWeight);
     const float stageHaze = isStage * saturate(0.35f + 0.45f * fogEnabled + 0.25f * lightCountSignal);
     const float3 fogColor = lerp(ambientTint * 0.22f, visibleColor, saturate(fogEnabled + backgroundExposure + stageHaze));
 
@@ -132,11 +144,13 @@ PSOutput PSMain(VSOutput input) {
         saturate(fogEnabled + backgroundExposure + localBackgroundStrength * 0.25f + stageHaze),
         1.0f);
     output.ambientLighting = float4(
-        lerp(ambientTint, localPalette, saturate(localBackgroundStrength * 0.55f)) *
+        lerp(lerp(ambientTint, localPalette, saturate(localBackgroundStrength * 0.55f)),
+             payloadRadianceTint,
+             payloadLocalWeight * 0.55f) *
             saturate(0.15f + ambientLuma + diffuseIBL + probeDiffuse + 0.10f * sunIntensity),
-        saturate(diffuseIBL + probeDiffuse + lightCountSignal));
-    output.visibleBackground = float4(visibleGradient, saturate(backgroundExposure + iblEnabled * 0.35f));
-    output.reflectionBackground = float4(reflectionColor, saturate(specularIBL + probeSpecular + localProbeEnabled * 0.25f));
+        saturate(diffuseIBL + probeDiffuse + lightCountSignal + payloadInfluence * 0.35f));
+    output.visibleBackground = float4(visibleGradient, saturate(backgroundExposure + iblEnabled * 0.35f + payloadInfluence * 0.45f));
+    output.reflectionBackground = float4(reflectionColor, saturate(specularIBL + probeSpecular + localProbeEnabled * 0.25f + payloadInfluence * 0.40f));
     output.atmosphere = float4(
         fogColor * saturate(0.20f + g_FogParams.x * 20.0f + fogEnabled * 0.55f + stageHaze * 0.45f),
         saturate(fogEnabled + g_ColorGrade.z * 0.25f + stageHaze));

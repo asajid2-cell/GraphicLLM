@@ -567,6 +567,7 @@ private:
     [[nodiscard]] glm::vec4 BuildCinematicLookParams() const;
     [[nodiscard]] glm::vec4 BuildCinematicExposureParams() const;
     [[nodiscard]] glm::vec4 BuildSceneLocalEnvironmentV3ProfileParams() const;
+    [[nodiscard]] glm::vec4 BuildSceneLocalEnvironmentV3PayloadParams() const;
 #ifdef CORTEX_ENABLE_HYPER_EXPERIMENT
     Result<void> EnsureHyperGeometryScene(Scene::ECS_Registry* registry);
 #endif

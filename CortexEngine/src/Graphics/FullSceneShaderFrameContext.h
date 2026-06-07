@@ -1246,6 +1246,9 @@ struct FullSceneShaderPipelineV3FrameContext {
     bool sceneLocalTexturePayloadReady = false;
     uint32_t sceneLocalTexturePayloadCount = 0;
     std::string sceneLocalTextureSetId = "none";
+    float sceneLocalTexturePayloadRichness = 0.0f;
+    float sceneLocalTexturePayloadProxyScore = 0.0f;
+    float sceneLocalTexturePayloadShaderInfluence = 0.0f;
     std::string sceneProfileProducer = "unknown";
     std::string sceneProfileOutput = "unknown";
     std::string sceneProfilePolicyOwner = "unknown";
@@ -1888,6 +1891,9 @@ inline FullSceneShaderPipelineV3FrameContext BuildFullSceneShaderPipelineV3Frame
     context.sceneLocalTexturePayloadReady = contract.environment.sceneLocalPayloadReady;
     context.sceneLocalTexturePayloadCount = contract.environment.sceneLocalTextureCount;
     context.sceneLocalTextureSetId = contract.environment.sceneLocalTextureSetId;
+    context.sceneLocalTexturePayloadRichness = contract.environment.sceneLocalPayloadTextureRichness;
+    context.sceneLocalTexturePayloadProxyScore = contract.environment.sceneLocalPayloadProxyScore;
+    context.sceneLocalTexturePayloadShaderInfluence = contract.environment.sceneLocalPayloadShaderInfluence;
 
     FullSceneShaderPipelineV3DomainEvidence environmentDomain =
         MakeFullSceneShaderPipelineV3DomainEvidence(
@@ -1940,6 +1946,7 @@ inline FullSceneShaderPipelineV3FrameContext BuildFullSceneShaderPipelineV3Frame
         "scene_local_background_strength",
         contract.environment.sceneLocalPayloadReady ? "scene_local_texture_payload_ready"
                                                     : "scene_local_texture_payload_not_ready",
+        "scene_local_texture_payload_shader_influence",
     };
     environmentDomain.backingResourceCount =
         readyEnvironmentResources + (environmentConsumesSceneProfilePolicy ? 1u : 0u);

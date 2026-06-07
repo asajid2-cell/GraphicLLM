@@ -59,19 +59,29 @@ void PopulateSceneLocalTexturePayload(FrameContract::EnvironmentInfo& environmen
         return;
     }
 
-    std::filesystem::path textureSetPath(environment.sceneLocalTextureSetPath);
-    std::error_code ec;
-    if ((!std::filesystem::exists(textureSetPath, ec) || !std::filesystem::is_directory(textureSetPath, ec)) &&
-        environment.sceneLocalTextureSetId != "none") {
-        ec.clear();
-        textureSetPath =
-            std::filesystem::path("../../assets/textures/scene_local") / environment.sceneLocalTextureSetId;
+    std::vector<std::filesystem::path> candidateTextureSetPaths = {
+        std::filesystem::path(environment.sceneLocalTextureSetPath),
+        std::filesystem::path("../../assets/textures/scene_local") / environment.sceneLocalTextureSetId,
+    };
+    if (environment.sceneLocalTextureSetId == "rt_showcase_gallery") {
+        candidateTextureSetPaths.emplace_back("assets/textures/rtshowcase");
+        candidateTextureSetPaths.emplace_back("../../assets/textures/rtshowcase");
     }
-    if (!std::filesystem::exists(textureSetPath, ec) || !std::filesystem::is_directory(textureSetPath, ec)) {
+    std::error_code ec;
+    std::filesystem::path textureSetPath;
+    for (const auto& candidate : candidateTextureSetPaths) {
+        ec.clear();
+        if (std::filesystem::exists(candidate, ec) && std::filesystem::is_directory(candidate, ec)) {
+            textureSetPath = candidate;
+            break;
+        }
+    }
+    if (textureSetPath.empty()) {
         return;
     }
 
     environment.sceneLocalTextureSetPresent = true;
+    environment.sceneLocalTextureSetPath = textureSetPath.generic_string();
     for (const auto& entry : std::filesystem::directory_iterator(textureSetPath, ec)) {
         if (ec) {
             break;
@@ -345,6 +355,10 @@ void Renderer::UpdateFrameContractSnapshot(Scene::ECS_Registry* registry,
     contract.environment.sceneLocalBackgroundStrength = sceneLocalEnvironmentProfile.y;
     contract.environment.sceneLocalShaderProfile =
         SceneLocalEnvironmentShaderProfileName(sceneLocalEnvironmentProfile.x);
+    const glm::vec4 sceneLocalEnvironmentPayload = BuildSceneLocalEnvironmentV3PayloadParams();
+    contract.environment.sceneLocalPayloadTextureRichness = sceneLocalEnvironmentPayload.y;
+    contract.environment.sceneLocalPayloadProxyScore = sceneLocalEnvironmentPayload.z;
+    contract.environment.sceneLocalPayloadShaderInfluence = sceneLocalEnvironmentPayload.w;
 
     contract.plannedFeatures = featurePlan.planned;
     contract.executedFeatures = featurePlan.active;

@@ -3664,3 +3664,57 @@ Next refactor direction:
   model-scene capture stability is separated from frame-report availability.
 - Replace the current profile-palette approximation with texture/resource
   payloads for each profile family.
+
+### SceneLocalEnvironmentV3 Payload-Backed Shader Influence - 2026-06-07
+
+Implemented:
+
+- Added a payload-availability producer,
+  `Renderer::BuildSceneLocalEnvironmentV3PayloadParams()`, that scans
+  scene-local payload textures and derives readiness, texture richness, proxy
+  score, and shader influence.
+- Packed payload readiness, texture richness, and shader influence into
+  `FrameConstants::fogExtraParams.yzw`, leaving `.x` as fog start distance.
+- Updated `SceneLocalEnvironmentV3.hlsl` so payload-ready scenes bias visible
+  background, ambient lighting, reflection background, and confidence toward
+  payload-owned local radiance rather than profile palette constants alone.
+- Added an explicit `rt_showcase_gallery` payload alias to the tracked
+  `assets/textures/rtshowcase` DDS set. This avoids duplicating large binary
+  textures while giving the gallery a real payload-backed path.
+- Added frame-report and V3 aliases for payload texture richness, proxy score,
+  and shader influence. The contract, analyzer, and validator now require and
+  check these fields.
+
+Validated evidence:
+
+- Static Python compile, V3 plan validation, focused diff hygiene, and native
+  `CortexEngine` build all passed.
+- Packet:
+  `build/captures/v3_environment_payload_shader_influence_gallery_20260607`.
+  It passed V2 evidence, V3 placeholder checks, scene-profile analysis,
+  environment-payload analysis, material-payload analysis, CompositeV3
+  diagnostics, and promotion decision.
+- Environment payload result:
+  - `54` reports
+  - `54` payload-ready reports
+  - `54` shader-influence reports
+  - `0` failures
+  - `rt_showcase_gallery` resolves to `12` DDS textures, `5` albedo, `6`
+    normal, richness `1.0`, proxy score about `0.67`, shader influence about
+    `0.87`
+
+Known limitation:
+
+- This is still a payload-influence path, not final texture sampling. Actual
+  AAA environment ownership still needs bound local irradiance/specular/visible
+  background resources and multi-family payload coverage.
+- Model-authored gym direct smoke still exited `2173` after writing a BMP but
+  before writing a frame report; keep that as renderer stability debt, not a
+  SceneLocalEnvironmentV3 proof.
+
+Next refactor direction:
+
+- Add real resource binding for local irradiance/specular/background proxies.
+- Add payload sets or aliases for enclosed room, stage, and exterior profiles.
+- Resume LightingShadowV3/ReflectionV3 work after the environment resource path
+  has at least one non-gallery payload-backed proof.

@@ -63,6 +63,12 @@ def analyze_report(path: Path) -> dict[str, Any]:
         "v3_payload_ready": v3.get("scene_local_texture_payload_ready") is True,
         "v3_payload_count": int(v3.get("scene_local_texture_payload_count", 0) or 0),
         "v3_texture_set_id": v3.get("scene_local_texture_set_id", "none"),
+        "texture_richness": float(environment.get("scene_local_payload_texture_richness", -1.0) or -1.0),
+        "proxy_score": float(environment.get("scene_local_payload_proxy_score", -1.0) or -1.0),
+        "shader_influence": float(environment.get("scene_local_payload_shader_influence", -1.0) or -1.0),
+        "v3_texture_richness": float(v3.get("scene_local_texture_payload_richness", -1.0) or -1.0),
+        "v3_proxy_score": float(v3.get("scene_local_texture_payload_proxy_score", -1.0) or -1.0),
+        "v3_shader_influence": float(v3.get("scene_local_texture_payload_shader_influence", -1.0) or -1.0),
         "failures": [],
     }
     if row["environment_ready"]:
@@ -97,6 +103,18 @@ def analyze_report(path: Path) -> dict[str, Any]:
             row["failures"].append("V3 payload count does not match environment texture count")
         if row["v3_texture_set_id"] != row["texture_set_id"]:
             row["failures"].append("V3 texture set id does not match environment texture set id")
+        if row["texture_richness"] <= 0.0 or row["texture_richness"] > 1.0:
+            row["failures"].append("payload ready with invalid texture richness")
+        if row["proxy_score"] <= 0.0 or row["proxy_score"] > 1.0:
+            row["failures"].append("payload ready with invalid proxy score")
+        if row["shader_influence"] <= 0.0 or row["shader_influence"] > 1.0:
+            row["failures"].append("payload ready with invalid shader influence")
+        if abs(row["v3_texture_richness"] - row["texture_richness"]) > 0.001:
+            row["failures"].append("V3 texture richness does not match environment value")
+        if abs(row["v3_proxy_score"] - row["proxy_score"]) > 0.001:
+            row["failures"].append("V3 proxy score does not match environment value")
+        if abs(row["v3_shader_influence"] - row["shader_influence"]) > 0.001:
+            row["failures"].append("V3 shader influence does not match environment value")
     return row
 
 
@@ -111,8 +129,8 @@ def write_markdown(path: Path, result: dict[str, Any]) -> None:
         f"- profile-policy-consumed reports: `{result['profile_policy_consumed_report_count']}`",
         f"- failures: `{len(result['failures'])}`",
         "",
-        "| Family | Profile Policy | Shader Profile | Local Background | Texture Set | Textures | Albedo | Normal | Payload | Proxies |",
-        "|---|---|---|---:|---|---:|---:|---:|---|---|",
+        "| Family | Profile Policy | Shader Profile | Local Background | Texture Set | Textures | Albedo | Normal | Payload | Influence | Proxies |",
+        "|---|---|---|---:|---|---:|---:|---:|---|---:|---|",
     ]
     for row in result["rows"]:
         proxies = ",".join(
@@ -137,6 +155,7 @@ def write_markdown(path: Path, result: dict[str, Any]) -> None:
                     str(row["albedo_count"]),
                     str(row["normal_count"]),
                     str(row["payload_ready"]).lower(),
+                    f"{row['shader_influence']:.2f}",
                     proxies,
                 ]
             )
@@ -173,6 +192,7 @@ def main() -> int:
         "report_count": len(rows),
         "texture_set_present_report_count": sum(1 for row in rows if row["texture_set_present"]),
         "payload_ready_report_count": payload_ready_count,
+        "shader_influence_report_count": sum(1 for row in rows if row["shader_influence"] > 0.0),
         "profile_policy_consumed_report_count": sum(1 for row in rows if row["profile_policy_consumed"]),
         "rows": rows,
         "failures": failures,

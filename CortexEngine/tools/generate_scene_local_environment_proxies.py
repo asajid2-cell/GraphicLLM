@@ -25,6 +25,7 @@ except Exception:  # pragma: no cover - optional local tool dependency
 ROOT = Path(__file__).resolve().parents[1]
 SOURCE_ID = "generate_scene_local_environment_proxies.py"
 DERIVATION_METHOD = "profile_payload_material_room_light_v1"
+PROXY_RESOURCE_SHAPE = "filtered_directional_bc1_v1"
 GENERATED_CONTRACT_HEADER = ROOT / "src" / "Graphics" / "Generated" / "SceneLocalProxyContracts.generated.h"
 DEFAULT_SETS = {
     "rt_showcase_gallery": {
@@ -522,16 +523,115 @@ def solid_bc1_data(width: int, height: int, color: tuple[int, int, int]) -> byte
     return block * (blocks_x * blocks_y)
 
 
-def write_bc1_dds(path: Path, color: tuple[int, int, int], size: int, overwrite: bool) -> bool:
+def directional_proxy_color(
+    role: str,
+    base_color: tuple[int, int, int],
+    derivation: dict[str, Any],
+    block_x: int,
+    block_y: int,
+    blocks_x: int,
+    blocks_y: int,
+) -> tuple[int, int, int]:
+    u = (float(block_x) + 0.5) / max(1.0, float(blocks_x))
+    v = (float(block_y) + 0.5) / max(1.0, float(blocks_y))
+    influence = derivation["scene_contract_influence"]
+    light = influence["light_rig"]
+    room = influence["room_shell"]
+    material_samples = derivation["payload_inventory"]["material_samples"]
+    role_avg = material_samples.get("role_average_rgb", {})
+    key_rgb = tuple(int(value) for value in light["key_rgb"])
+    fill_rgb = tuple(int(value) for value in light["fill_rgb"])
+    accent_rgb = tuple(int(value) for value in light["accent_rgb"])
+    wall_rgb = tuple(int(value) for value in role_avg.get("wall", fill_rgb))
+    floor_rgb = tuple(int(value) for value in role_avg.get("floor", base_color))
+    object_rgb = average_colors([
+        tuple(int(value) for value in role_avg[name])
+        for name in ("cube", "cylinder", "metal", "other")
+        if name in role_avg
+    ]) or base_color
+    occlusion = float(room["local_background_occlusion"])
+    accent_strength = float(light["accent_strength"])
+    horizon = max(0.0, min(1.0, 1.0 - abs(v - 0.62) * 2.2))
+    key_lobe = max(0.0, min(1.0, 1.0 - ((u - 0.72) ** 2 + (v - 0.30) ** 2) * 5.5))
+    accent_lobe = max(0.0, min(1.0, 1.0 - ((u - 0.22) ** 2 + (v - 0.42) ** 2) * 7.0))
+    vertical = max(0.0, min(1.0, v))
+
+    color = base_color
+    if role == "irradiance":
+        color = mix(color, fill_rgb, 0.18 + 0.16 * horizon)
+        color = mix(color, key_rgb, 0.08 + 0.12 * key_lobe)
+        color = mix(color, floor_rgb, 0.06 + 0.10 * vertical)
+        color = darken(color, occlusion * 0.08 * (1.0 - key_lobe))
+    elif role == "specular":
+        color = mix(color, object_rgb, 0.12)
+        color = mix(color, key_rgb, 0.12 + 0.34 * key_lobe)
+        color = mix(color, accent_rgb, accent_strength * (0.18 + 0.42 * accent_lobe))
+        color = brighten(color, 0.04 + 0.12 * max(key_lobe, accent_lobe))
+    else:
+        color = mix(color, wall_rgb, 0.18 + 0.22 * (1.0 - vertical))
+        color = mix(color, floor_rgb, 0.16 * vertical)
+        color = mix(color, key_rgb, 0.05 * key_lobe)
+        color = mix(color, accent_rgb, accent_strength * 0.18 * accent_lobe)
+        color = darken(color, occlusion * (0.14 + 0.18 * (1.0 - horizon)))
+    return color
+
+
+def filtered_bc1_data(
+    width: int,
+    height: int,
+    role: str,
+    color: tuple[int, int, int],
+    derivation: dict[str, Any],
+) -> tuple[bytes, dict[str, Any]]:
+    blocks_x = max(1, (width + 3) // 4)
+    blocks_y = max(1, (height + 3) // 4)
+    parts: list[bytes] = []
+    colors: list[tuple[int, int, int]] = []
+    for by in range(blocks_y):
+        for bx in range(blocks_x):
+            block_color = directional_proxy_color(role, color, derivation, bx, by, blocks_x, blocks_y)
+            colors.append(block_color)
+            parts.append(struct.pack("<HHI", rgb565(block_color), 0, 0))
+    average = average_colors(colors) or color
+    max_delta = max(
+        (
+            abs(c[0] - average[0]) +
+            abs(c[1] - average[1]) +
+            abs(c[2] - average[2])
+            for c in colors
+        ),
+        default=0,
+    )
+    stats = {
+        "shape": PROXY_RESOURCE_SHAPE,
+        "blocks_x": blocks_x,
+        "blocks_y": blocks_y,
+        "block_count": blocks_x * blocks_y,
+        "average_rgb": list(average),
+        "min_rgb": [min(c[i] for c in colors) for i in range(3)],
+        "max_rgb": [max(c[i] for c in colors) for i in range(3)],
+        "variance_score": round(float(max_delta) / (255.0 * 3.0), 6),
+    }
+    return b"".join(parts), stats
+
+
+def write_bc1_dds(
+    path: Path,
+    role: str,
+    color: tuple[int, int, int],
+    derivation: dict[str, Any],
+    size: int,
+    overwrite: bool,
+) -> tuple[bool, dict[str, Any]]:
     width = max(4, size)
     height = max(4, size)
-    payload = solid_bc1_data(width, height, color)
+    payload, stats = filtered_bc1_data(width, height, role, color, derivation)
     data = dds_header(width, height, len(payload)) + payload
     if path.exists() and not overwrite and path.read_bytes() == data:
-        return False
+        return False, stats
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_bytes(data)
-    return True
+    return True, stats
 
 
 def payload_inventory(set_id: str) -> dict[str, Any]:
@@ -666,7 +766,7 @@ def generate(texture_root: Path, sets: list[str], size: int, overwrite: bool, mi
         changed = 0
         for role, color in colors.items():
             path = set_dir / f"scene_local_{role}_proxy.dds"
-            wrote = write_bc1_dds(path, color, size, overwrite)
+            wrote, filter_stats = write_bc1_dds(path, role, color, derivation, size, overwrite)
             if wrote:
                 changed += 1
             outputs[role] = {
@@ -674,13 +774,23 @@ def generate(texture_root: Path, sets: list[str], size: int, overwrite: bool, mi
                 "rgb": list(color),
                 "changed": wrote,
                 "runtime_mirror": mirror_runtime(path, overwrite) if mirror else None,
+                "filter": filter_stats,
             }
             outputs[role]["derivation_method"] = DERIVATION_METHOD
         manifest_sets[set_id] = {
             "set_id": set_id,
             "output_dir": rel(set_dir),
+            "proxy_resource_shape": PROXY_RESOURCE_SHAPE,
             "derivation": derivation,
             "outputs": {role: value["path"] for role, value in outputs.items()},
+            "output_metadata": {
+                role: {
+                    "rgb": value["rgb"],
+                    "filter": value["filter"],
+                    "derivation_method": value["derivation_method"],
+                }
+                for role, value in outputs.items()
+            },
         }
         rows.append({
             "set_id": set_id,
@@ -708,6 +818,7 @@ def generate(texture_root: Path, sets: list[str], size: int, overwrite: bool, mi
         "schema": "cortex.scene_local_environment_proxy_assets.v1",
         "source": SOURCE_ID,
         "derivation_method": DERIVATION_METHOD,
+        "proxy_resource_shape": PROXY_RESOURCE_SHAPE,
         "texture_root": rel(texture_root),
         "manifest": rel(manifest_path),
         "generated_contract_header": rel(GENERATED_CONTRACT_HEADER),

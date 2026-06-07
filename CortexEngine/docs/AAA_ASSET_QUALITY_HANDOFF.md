@@ -1041,6 +1041,75 @@ Current next work after this checkpoint:
 3. Separate report diagnostics from visual capture success for kitchen/gym/red
    room model-scene instability.
 
+Latest SceneLocalEnvironmentV3 filtered directional proxy checkpoint:
+
+- `tools\generate_scene_local_environment_proxies.py` no longer writes flat
+  solid-color BC1 proxy textures.
+- Proxy resource shape is now `filtered_directional_bc1_v1`.
+- The generator writes per-block directional BC1 color fields for each proxy:
+  - irradiance: broad fill/key/floor low-frequency gradient
+  - specular: key/accent highlight lobe plus object/material tint
+  - visible background: wall/floor/occlusion/key/accent shaping
+- The manifest records per-output filter stats:
+  - shape
+  - block dimensions
+  - average/min/max RGB
+  - `variance_score`
+- `tools\analyze_full_scene_shader_v3_environment_payload.py` now fails
+  payload-ready reports unless:
+  - proxy resource shape is `filtered_directional_bc1_v1`
+  - all three proxy outputs have filter metadata
+  - minimum output variance is greater than `0.01`
+- Static validator now checks for the `filtered_directional_bc1_v1` token.
+- Generated proxy report:
+  `build\captures\scene_local_environment_proxy_generation_20260607\filtered_directional_proxy_report.json`.
+- Manifest variance evidence:
+  - all `24` proxy outputs have filtered stats
+  - weakest output is `rt_showcase_gallery/visible_background` with variance
+    `0.014379`
+
+Validation commands:
+
+```powershell
+python tools\generate_scene_local_environment_proxies.py --overwrite --out build\captures\scene_local_environment_proxy_generation_20260607\filtered_directional_proxy_report.json
+python -m py_compile tools\generate_scene_local_environment_proxies.py tools\analyze_full_scene_shader_v3_environment_payload.py tools\validate_full_scene_shader_pipeline_v3_plan.py
+python tools\validate_full_scene_shader_pipeline_v3_plan.py
+git -c submodule.recurse=false diff --check -- tools\generate_scene_local_environment_proxies.py tools\analyze_full_scene_shader_v3_environment_payload.py tools\validate_full_scene_shader_pipeline_v3_plan.py assets\textures\scene_local_proxy src\Graphics\Generated\SceneLocalProxyContracts.generated.h
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_full_scene_shader_pipeline_v3_packet.ps1 -NoBuild -SkipSceneAnalyzers -StressSceneOnly -StressSceneFilter rt_showcase:reflection_closeup -SmokeFrames 10 -CaptureFrame 5 -CaptureSequenceCount 1 -StabilityMotionMode static -OutputRoot build\captures\v3_scene_local_filtered_proxy_fresh_smoke_20260607
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_scene_local_cinematic_renderer_v1_packets.ps1 -NoBuild -OutputRoot build\captures\v3_scene_local_filtered_proxy_cross_profile_20260607 -FamilyFilter gallery,office,concert,stadium -ViewFilter scene_local_environment -SmokeFrames 10 -CaptureFrame 5 -CaptureSequenceCount 1 -SkipOwnerAnalysis -SkipMaterialAnalysis -SkipStabilityAnalysis -SkipVisualQualityAnalysis
+python tools\analyze_full_scene_shader_v3_environment_payload.py --manifest build\captures\v3_scene_local_filtered_proxy_cross_profile_20260607\manifest.json --output-json build\captures\v3_scene_local_filtered_proxy_cross_profile_20260607\v3_environment_payload_cross_profile.json --output-md build\captures\v3_scene_local_filtered_proxy_cross_profile_20260607\v3_environment_payload_cross_profile.md --min-payload-ready 3
+python tools\analyze_full_scene_shader_v3_environment_profiles.py --manifest build\captures\v3_scene_local_filtered_proxy_cross_profile_20260607\manifest.json --output-json build\captures\v3_scene_local_filtered_proxy_cross_profile_20260607\v3_environment_profiles_cross_profile.json --output-md build\captures\v3_scene_local_filtered_proxy_cross_profile_20260607\v3_environment_profiles_cross_profile.md --min-ready-reports 3 --min-distinct-modes 3 --min-distinct-profiles 3 --require-profile gallery_neutral=1 --require-profile enclosed_room=2 --require-profile stage=3 --require-profile open_exterior=4
+```
+
+Evidence:
+
+- Focused packet:
+  `build\captures\v3_scene_local_filtered_proxy_fresh_smoke_20260607`
+  - full V3 packet passed end to end
+  - `54` reports, `54` payload-ready, `54` filtered proxy,
+    `54` scene-contract proxy
+  - shape: `filtered_directional_bc1_v1`
+  - min variance: `0.014379`
+- Cross-profile packet:
+  `build\captures\v3_scene_local_filtered_proxy_cross_profile_20260607`
+  - packet runner passed
+  - environment payload analyzer passed
+  - environment profile analyzer passed
+  - `4` reports, `4` payload-ready, `4` filtered proxy,
+    `4` scene-contract proxy
+  - shape: `filtered_directional_bc1_v1`
+  - min variance: `0.014379`
+
+Current next work after this checkpoint:
+
+1. Convert the filtered 2D proxies into stronger probe-like resources: higher
+   resolution, mip/prefilter levels, or explicit diffuse/specular sampling
+   contracts.
+2. Feed filtered proxy shape/variance into runtime frame reports, not only the
+   offline manifest/analyzer.
+3. Separate report diagnostics from visual capture success for kitchen/gym/red
+   room model-scene instability.
+
 Latest LightingShadowV3 source-attribution checkpoint:
 
 - `FullSceneLightingV3` now splits `shadow_source_attribution` by source:

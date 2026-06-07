@@ -9,6 +9,7 @@ from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
 EXPECTED_PROXY_DERIVATION = "profile_payload_material_room_light_v1"
+EXPECTED_PROXY_RESOURCE_SHAPE = "filtered_directional_bc1_v1"
 PROXY_MANIFEST_PATH = ROOT / "assets" / "textures" / "scene_local_proxy" / "proxy_manifest.json"
 
 
@@ -48,6 +49,17 @@ def analyze_report(path: Path, proxy_manifest: dict[str, Any]) -> dict[str, Any]
     proxy_derivation = proxy_manifest_set.get("derivation", {}) if isinstance(proxy_manifest_set, dict) else {}
     if not isinstance(proxy_derivation, dict):
         proxy_derivation = {}
+    proxy_output_metadata = proxy_manifest_set.get("output_metadata", {}) if isinstance(proxy_manifest_set, dict) else {}
+    if not isinstance(proxy_output_metadata, dict):
+        proxy_output_metadata = {}
+    proxy_filter_variance = []
+    for role in ("irradiance", "specular", "visible_background"):
+        metadata = proxy_output_metadata.get(role, {})
+        if not isinstance(metadata, dict):
+            continue
+        filter_stats = metadata.get("filter", {})
+        if isinstance(filter_stats, dict):
+            proxy_filter_variance.append(float(filter_stats.get("variance_score", 0.0) or 0.0))
     proxy_inventory = proxy_derivation.get("payload_inventory", {}) if isinstance(proxy_derivation, dict) else {}
     if not isinstance(proxy_inventory, dict):
         proxy_inventory = {}
@@ -146,6 +158,11 @@ def analyze_report(path: Path, proxy_manifest: dict[str, Any]) -> dict[str, Any]
             v3.get("scene_local_environment_proxy_light_accent_strength", -1.0) or -1.0
         ),
         "proxy_manifest_present": bool(proxy_manifest_set),
+        "proxy_resource_shape": proxy_manifest_set.get("proxy_resource_shape", "none")
+        if isinstance(proxy_manifest_set, dict)
+        else "none",
+        "proxy_filtered_output_count": len(proxy_filter_variance),
+        "proxy_min_filter_variance": min(proxy_filter_variance) if proxy_filter_variance else 0.0,
         "proxy_derivation_method": proxy_derivation.get("method", "none"),
         "proxy_material_sample_decoder": proxy_material_samples.get("decoder", "none"),
         "proxy_material_color_payload_count": int(proxy_material_samples.get("color_payload_count", 0) or 0),
@@ -258,6 +275,16 @@ def analyze_report(path: Path, proxy_manifest: dict[str, Any]) -> dict[str, Any]
                 "payload ready without current derived scene-local proxy assets: "
                 f"{row['proxy_derivation_method']}"
             )
+        if row["proxy_resource_shape"] != EXPECTED_PROXY_RESOURCE_SHAPE:
+            row["failures"].append(
+                f"payload ready without filtered directional proxy resource shape: {row['proxy_resource_shape']}"
+            )
+        if row["proxy_filtered_output_count"] < 3:
+            row["failures"].append("payload ready without filtered stats for all proxy outputs")
+        if row["proxy_min_filter_variance"] <= 0.01:
+            row["failures"].append(
+                f"payload ready with effectively flat proxy outputs: {row['proxy_min_filter_variance']:.4f}"
+            )
         if row["runtime_proxy_derivation_method"] != row["proxy_derivation_method"]:
             row["failures"].append(
                 "runtime proxy derivation method does not match manifest: "
@@ -312,8 +339,8 @@ def write_markdown(path: Path, result: dict[str, Any]) -> None:
         f"- profile-policy-consumed reports: `{result['profile_policy_consumed_report_count']}`",
         f"- failures: `{len(result['failures'])}`",
         "",
-        "| Family | Profile Policy | Shader Profile | Local Background | Texture Set | Textures | Albedo | Normal | Payload | Influence | Bound | Proxy Bound | Binding | Proxy Binding | Derivation | Samples | Room | Light | Proxies |",
-        "|---|---|---|---:|---|---:|---:|---:|---|---:|---:|---:|---|---|---|---:|---|---|---|",
+        "| Family | Profile Policy | Shader Profile | Local Background | Texture Set | Textures | Albedo | Normal | Payload | Influence | Bound | Proxy Bound | Binding | Proxy Binding | Derivation | Shape | Var | Samples | Room | Light | Proxies |",
+        "|---|---|---|---:|---|---:|---:|---:|---|---:|---:|---:|---|---|---|---|---:|---:|---|---|---|",
     ]
     for row in result["rows"]:
         proxies = ",".join(
@@ -344,6 +371,8 @@ def write_markdown(path: Path, result: dict[str, Any]) -> None:
                     f"`{row['binding_source']}`",
                     f"`{row['proxy_binding_source']}`",
                     f"`{row['proxy_derivation_method']}`",
+                    f"`{row['proxy_resource_shape']}`",
+                    f"{row['proxy_min_filter_variance']:.3f}",
                     str(row["proxy_material_sampled_color_count"]),
                     f"`{row['proxy_room_shell_enclosure']}`",
                     f"`{row['proxy_light_rig_mode']}`",
@@ -403,6 +432,13 @@ def main() -> int:
             for row in rows
             if str(row["proxy_room_shell_enclosure"]).strip().lower() not in {"", "none", "unknown"}
             and str(row["proxy_light_rig_mode"]).strip().lower() not in {"", "none", "unknown"}
+        ),
+        "filtered_proxy_report_count": sum(
+            1
+            for row in rows
+            if row["proxy_resource_shape"] == EXPECTED_PROXY_RESOURCE_SHAPE
+            and row["proxy_filtered_output_count"] >= 3
+            and row["proxy_min_filter_variance"] > 0.01
         ),
         "proxy_manifest": str(PROXY_MANIFEST_PATH),
         "profile_policy_consumed_report_count": sum(1 for row in rows if row["profile_policy_consumed"]),

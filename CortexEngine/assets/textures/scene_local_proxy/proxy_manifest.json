@@ -6,6 +6,7 @@
     "basketball_gym_day": {
       "set_id": "basketball_gym_day",
       "output_dir": "assets/textures/scene_local_proxy/basketball_gym_day",
+      "proxy_resource_shape": "filtered_directional_bc1_v1",
       "derivation": {
         "method": "profile_payload_material_room_light_v1",
         "base_rgb": {
@@ -195,11 +196,104 @@
         "irradiance": "assets/textures/scene_local_proxy/basketball_gym_day/scene_local_irradiance_proxy.dds",
         "specular": "assets/textures/scene_local_proxy/basketball_gym_day/scene_local_specular_proxy.dds",
         "visible_background": "assets/textures/scene_local_proxy/basketball_gym_day/scene_local_visible_background_proxy.dds"
+      },
+      "output_metadata": {
+        "irradiance": {
+          "rgb": [
+            162,
+            152,
+            133
+          ],
+          "filter": {
+            "shape": "filtered_directional_bc1_v1",
+            "blocks_x": 8,
+            "blocks_y": 8,
+            "block_count": 64,
+            "average_rgb": [
+              165,
+              157,
+              144
+            ],
+            "min_rgb": [
+              160,
+              149,
+              135
+            ],
+            "max_rgb": [
+              174,
+              167,
+              154
+            ],
+            "variance_score": 0.036601
+          },
+          "derivation_method": "profile_payload_material_room_light_v1"
+        },
+        "specular": {
+          "rgb": [
+            192,
+            186,
+            168
+          ],
+          "filter": {
+            "shape": "filtered_directional_bc1_v1",
+            "blocks_x": 8,
+            "blocks_y": 8,
+            "block_count": 64,
+            "average_rgb": [
+              195,
+              189,
+              171
+            ],
+            "min_rgb": [
+              187,
+              180,
+              161
+            ],
+            "max_rgb": [
+              210,
+              206,
+              193
+            ],
+            "variance_score": 0.070588
+          },
+          "derivation_method": "profile_payload_material_room_light_v1"
+        },
+        "visible_background": {
+          "rgb": [
+            109,
+            122,
+            136
+          ],
+          "filter": {
+            "shape": "filtered_directional_bc1_v1",
+            "blocks_x": 8,
+            "blocks_y": 8,
+            "block_count": 64,
+            "average_rgb": [
+              109,
+              109,
+              108
+            ],
+            "min_rgb": [
+              105,
+              104,
+              104
+            ],
+            "max_rgb": [
+              113,
+              113,
+              114
+            ],
+            "variance_score": 0.018301
+          },
+          "derivation_method": "profile_payload_material_room_light_v1"
+        }
       }
     },
     "home_kitchen_lantern": {
       "set_id": "home_kitchen_lantern",
       "output_dir": "assets/textures/scene_local_proxy/home_kitchen_lantern",
+      "proxy_resource_shape": "filtered_directional_bc1_v1",
       "derivation": {
         "method": "profile_payload_material_room_light_v1",
         "base_rgb": {
@@ -399,11 +493,104 @@
         "irradiance": "assets/textures/scene_local_proxy/home_kitchen_lantern/scene_local_irradiance_proxy.dds",
         "specular": "assets/textures/scene_local_proxy/home_kitchen_lantern/scene_local_specular_proxy.dds",
         "visible_background": "assets/textures/scene_local_proxy/home_kitchen_lantern/scene_local_visible_background_proxy.dds"
+      },
+      "output_metadata": {
+        "irradiance": {
+          "rgb": [
+            150,
+            123,
+            95
+          ],
+          "filter": {
+            "shape": "filtered_directional_bc1_v1",
+            "blocks_x": 8,
+            "blocks_y": 8,
+            "block_count": 64,
+            "average_rgb": [
+              156,
+              126,
+              96
+            ],
+            "min_rgb": [
+              149,
+              120,
+              92
+            ],
+            "max_rgb": [
+              169,
+              135,
+              101
+            ],
+            "variance_score": 0.035294
+          },
+          "derivation_method": "profile_payload_material_room_light_v1"
+        },
+        "specular": {
+          "rgb": [
+            195,
+            164,
+            124
+          ],
+          "filter": {
+            "shape": "filtered_directional_bc1_v1",
+            "blocks_x": 8,
+            "blocks_y": 8,
+            "block_count": 64,
+            "average_rgb": [
+              204,
+              167,
+              124
+            ],
+            "min_rgb": [
+              194,
+              159,
+              117
+            ],
+            "max_rgb": [
+              222,
+              182,
+              136
+            ],
+            "variance_score": 0.058824
+          },
+          "derivation_method": "profile_payload_material_room_light_v1"
+        },
+        "visible_background": {
+          "rgb": [
+            118,
+            106,
+            93
+          ],
+          "filter": {
+            "shape": "filtered_directional_bc1_v1",
+            "blocks_x": 8,
+            "blocks_y": 8,
+            "block_count": 64,
+            "average_rgb": [
+              112,
+              96,
+              79
+            ],
+            "min_rgb": [
+              106,
+              90,
+              75
+            ],
+            "max_rgb": [
+              117,
+              101,
+              83
+            ],
+            "variance_score": 0.020915
+          },
+          "derivation_method": "profile_payload_material_room_light_v1"
+        }
       }
     },
     "home_office_evening": {
       "set_id": "home_office_evening",
       "output_dir": "assets/textures/scene_local_proxy/home_office_evening",
+      "proxy_resource_shape": "filtered_directional_bc1_v1",
       "derivation": {
         "method": "profile_payload_material_room_light_v1",
         "base_rgb": {
@@ -603,11 +790,104 @@
         "irradiance": "assets/textures/scene_local_proxy/home_office_evening/scene_local_irradiance_proxy.dds",
         "specular": "assets/textures/scene_local_proxy/home_office_evening/scene_local_specular_proxy.dds",
         "visible_background": "assets/textures/scene_local_proxy/home_office_evening/scene_local_visible_background_proxy.dds"
+      },
+      "output_metadata": {
+        "irradiance": {
+          "rgb": [
+            117,
+            105,
+            93
+          ],
+          "filter": {
+            "shape": "filtered_directional_bc1_v1",
+            "blocks_x": 8,
+            "blocks_y": 8,
+            "block_count": 64,
+            "average_rgb": [
+              126,
+              111,
+              98
+            ],
+            "min_rgb": [
+              121,
+              105,
+              93
+            ],
+            "max_rgb": [
+              139,
+              121,
+              104
+            ],
+            "variance_score": 0.036601
+          },
+          "derivation_method": "profile_payload_material_room_light_v1"
+        },
+        "specular": {
+          "rgb": [
+            175,
+            155,
+            131
+          ],
+          "filter": {
+            "shape": "filtered_directional_bc1_v1",
+            "blocks_x": 8,
+            "blocks_y": 8,
+            "block_count": 64,
+            "average_rgb": [
+              187,
+              161,
+              132
+            ],
+            "min_rgb": [
+              176,
+              152,
+              124
+            ],
+            "max_rgb": [
+              206,
+              178,
+              143
+            ],
+            "variance_score": 0.061438
+          },
+          "derivation_method": "profile_payload_material_room_light_v1"
+        },
+        "visible_background": {
+          "rgb": [
+            94,
+            93,
+            92
+          ],
+          "filter": {
+            "shape": "filtered_directional_bc1_v1",
+            "blocks_x": 8,
+            "blocks_y": 8,
+            "block_count": 64,
+            "average_rgb": [
+              96,
+              87,
+              78
+            ],
+            "min_rgb": [
+              90,
+              80,
+              73
+            ],
+            "max_rgb": [
+              101,
+              92,
+              81
+            ],
+            "variance_score": 0.023529
+          },
+          "derivation_method": "profile_payload_material_room_light_v1"
+        }
       }
     },
     "neon_streamer_concert": {
       "set_id": "neon_streamer_concert",
       "output_dir": "assets/textures/scene_local_proxy/neon_streamer_concert",
+      "proxy_resource_shape": "filtered_directional_bc1_v1",
       "derivation": {
         "method": "profile_payload_material_room_light_v1",
         "base_rgb": {
@@ -807,11 +1087,104 @@
         "irradiance": "assets/textures/scene_local_proxy/neon_streamer_concert/scene_local_irradiance_proxy.dds",
         "specular": "assets/textures/scene_local_proxy/neon_streamer_concert/scene_local_specular_proxy.dds",
         "visible_background": "assets/textures/scene_local_proxy/neon_streamer_concert/scene_local_visible_background_proxy.dds"
+      },
+      "output_metadata": {
+        "irradiance": {
+          "rgb": [
+            97,
+            54,
+            106
+          ],
+          "filter": {
+            "shape": "filtered_directional_bc1_v1",
+            "blocks_x": 8,
+            "blocks_y": 8,
+            "block_count": 64,
+            "average_rgb": [
+              89,
+              67,
+              118
+            ],
+            "min_rgb": [
+              87,
+              61,
+              107
+            ],
+            "max_rgb": [
+              90,
+              82,
+              135
+            ],
+            "variance_score": 0.044444
+          },
+          "derivation_method": "profile_payload_material_room_light_v1"
+        },
+        "specular": {
+          "rgb": [
+            126,
+            164,
+            192
+          ],
+          "filter": {
+            "shape": "filtered_directional_bc1_v1",
+            "blocks_x": 8,
+            "blocks_y": 8,
+            "block_count": 64,
+            "average_rgb": [
+              131,
+              160,
+              193
+            ],
+            "min_rgb": [
+              120,
+              152,
+              184
+            ],
+            "max_rgb": [
+              163,
+              180,
+              215
+            ],
+            "variance_score": 0.069281
+          },
+          "derivation_method": "profile_payload_material_room_light_v1"
+        },
+        "visible_background": {
+          "rgb": [
+            70,
+            41,
+            76
+          ],
+          "filter": {
+            "shape": "filtered_directional_bc1_v1",
+            "blocks_x": 8,
+            "blocks_y": 8,
+            "block_count": 64,
+            "average_rgb": [
+              77,
+              54,
+              68
+            ],
+            "min_rgb": [
+              71,
+              48,
+              60
+            ],
+            "max_rgb": [
+              90,
+              60,
+              74
+            ],
+            "variance_score": 0.026144
+          },
+          "derivation_method": "profile_payload_material_room_light_v1"
+        }
       }
     },
     "red_light_room": {
       "set_id": "red_light_room",
       "output_dir": "assets/textures/scene_local_proxy/red_light_room",
+      "proxy_resource_shape": "filtered_directional_bc1_v1",
       "derivation": {
         "method": "profile_payload_material_room_light_v1",
         "base_rgb": {
@@ -1011,11 +1384,104 @@
         "irradiance": "assets/textures/scene_local_proxy/red_light_room/scene_local_irradiance_proxy.dds",
         "specular": "assets/textures/scene_local_proxy/red_light_room/scene_local_specular_proxy.dds",
         "visible_background": "assets/textures/scene_local_proxy/red_light_room/scene_local_visible_background_proxy.dds"
+      },
+      "output_metadata": {
+        "irradiance": {
+          "rgb": [
+            110,
+            51,
+            60
+          ],
+          "filter": {
+            "shape": "filtered_directional_bc1_v1",
+            "blocks_x": 8,
+            "blocks_y": 8,
+            "block_count": 64,
+            "average_rgb": [
+              121,
+              45,
+              49
+            ],
+            "min_rgb": [
+              116,
+              44,
+              47
+            ],
+            "max_rgb": [
+              137,
+              47,
+              53
+            ],
+            "variance_score": 0.027451
+          },
+          "derivation_method": "profile_payload_material_room_light_v1"
+        },
+        "specular": {
+          "rgb": [
+            204,
+            110,
+            102
+          ],
+          "filter": {
+            "shape": "filtered_directional_bc1_v1",
+            "blocks_x": 8,
+            "blocks_y": 8,
+            "block_count": 64,
+            "average_rgb": [
+              211,
+              106,
+              98
+            ],
+            "min_rgb": [
+              201,
+              102,
+              93
+            ],
+            "max_rgb": [
+              226,
+              121,
+              109
+            ],
+            "variance_score": 0.039216
+          },
+          "derivation_method": "profile_payload_material_room_light_v1"
+        },
+        "visible_background": {
+          "rgb": [
+            75,
+            42,
+            54
+          ],
+          "filter": {
+            "shape": "filtered_directional_bc1_v1",
+            "blocks_x": 8,
+            "blocks_y": 8,
+            "block_count": 64,
+            "average_rgb": [
+              83,
+              54,
+              53
+            ],
+            "min_rgb": [
+              75,
+              49,
+              48
+            ],
+            "max_rgb": [
+              92,
+              58,
+              55
+            ],
+            "variance_score": 0.023529
+          },
+          "derivation_method": "profile_payload_material_room_light_v1"
+        }
       }
     },
     "rt_showcase_gallery": {
       "set_id": "rt_showcase_gallery",
       "output_dir": "assets/textures/scene_local_proxy/rt_showcase_gallery",
+      "proxy_resource_shape": "filtered_directional_bc1_v1",
       "derivation": {
         "method": "profile_payload_material_room_light_v1",
         "base_rgb": {
@@ -1215,11 +1681,104 @@
         "irradiance": "assets/textures/scene_local_proxy/rt_showcase_gallery/scene_local_irradiance_proxy.dds",
         "specular": "assets/textures/scene_local_proxy/rt_showcase_gallery/scene_local_specular_proxy.dds",
         "visible_background": "assets/textures/scene_local_proxy/rt_showcase_gallery/scene_local_visible_background_proxy.dds"
+      },
+      "output_metadata": {
+        "irradiance": {
+          "rgb": [
+            147,
+            138,
+            127
+          ],
+          "filter": {
+            "shape": "filtered_directional_bc1_v1",
+            "blocks_x": 8,
+            "blocks_y": 8,
+            "block_count": 64,
+            "average_rgb": [
+              153,
+              144,
+              136
+            ],
+            "min_rgb": [
+              148,
+              139,
+              128
+            ],
+            "max_rgb": [
+              160,
+              153,
+              146
+            ],
+            "variance_score": 0.033987
+          },
+          "derivation_method": "profile_payload_material_room_light_v1"
+        },
+        "specular": {
+          "rgb": [
+            172,
+            173,
+            171
+          ],
+          "filter": {
+            "shape": "filtered_directional_bc1_v1",
+            "blocks_x": 8,
+            "blocks_y": 8,
+            "block_count": 64,
+            "average_rgb": [
+              179,
+              179,
+              177
+            ],
+            "min_rgb": [
+              170,
+              170,
+              167
+            ],
+            "max_rgb": [
+              195,
+              196,
+              197
+            ],
+            "variance_score": 0.069281
+          },
+          "derivation_method": "profile_payload_material_room_light_v1"
+        },
+        "visible_background": {
+          "rgb": [
+            142,
+            144,
+            144
+          ],
+          "filter": {
+            "shape": "filtered_directional_bc1_v1",
+            "blocks_x": 8,
+            "blocks_y": 8,
+            "block_count": 64,
+            "average_rgb": [
+              132,
+              125,
+              117
+            ],
+            "min_rgb": [
+              129,
+              121,
+              113
+            ],
+            "max_rgb": [
+              135,
+              129,
+              121
+            ],
+            "variance_score": 0.014379
+          },
+          "derivation_method": "profile_payload_material_room_light_v1"
+        }
       }
     },
     "school_classroom_day": {
       "set_id": "school_classroom_day",
       "output_dir": "assets/textures/scene_local_proxy/school_classroom_day",
+      "proxy_resource_shape": "filtered_directional_bc1_v1",
       "derivation": {
         "method": "profile_payload_material_room_light_v1",
         "base_rgb": {
@@ -1419,11 +1978,104 @@
         "irradiance": "assets/textures/scene_local_proxy/school_classroom_day/scene_local_irradiance_proxy.dds",
         "specular": "assets/textures/scene_local_proxy/school_classroom_day/scene_local_specular_proxy.dds",
         "visible_background": "assets/textures/scene_local_proxy/school_classroom_day/scene_local_visible_background_proxy.dds"
+      },
+      "output_metadata": {
+        "irradiance": {
+          "rgb": [
+            150,
+            148,
+            129
+          ],
+          "filter": {
+            "shape": "filtered_directional_bc1_v1",
+            "blocks_x": 8,
+            "blocks_y": 8,
+            "block_count": 64,
+            "average_rgb": [
+              155,
+              153,
+              136
+            ],
+            "min_rgb": [
+              150,
+              145,
+              127
+            ],
+            "max_rgb": [
+              163,
+              162,
+              149
+            ],
+            "variance_score": 0.039216
+          },
+          "derivation_method": "profile_payload_material_room_light_v1"
+        },
+        "specular": {
+          "rgb": [
+            175,
+            181,
+            177
+          ],
+          "filter": {
+            "shape": "filtered_directional_bc1_v1",
+            "blocks_x": 8,
+            "blocks_y": 8,
+            "block_count": 64,
+            "average_rgb": [
+              180,
+              185,
+              184
+            ],
+            "min_rgb": [
+              171,
+              176,
+              172
+            ],
+            "max_rgb": [
+              194,
+              203,
+              206
+            ],
+            "variance_score": 0.070588
+          },
+          "derivation_method": "profile_payload_material_room_light_v1"
+        },
+        "visible_background": {
+          "rgb": [
+            132,
+            137,
+            135
+          ],
+          "filter": {
+            "shape": "filtered_directional_bc1_v1",
+            "blocks_x": 8,
+            "blocks_y": 8,
+            "block_count": 64,
+            "average_rgb": [
+              124,
+              119,
+              110
+            ],
+            "min_rgb": [
+              120,
+              115,
+              106
+            ],
+            "max_rgb": [
+              128,
+              123,
+              116
+            ],
+            "variance_score": 0.016993
+          },
+          "derivation_method": "profile_payload_material_room_light_v1"
+        }
       }
     },
     "stadium_night_match": {
       "set_id": "stadium_night_match",
       "output_dir": "assets/textures/scene_local_proxy/stadium_night_match",
+      "proxy_resource_shape": "filtered_directional_bc1_v1",
       "derivation": {
         "method": "profile_payload_material_room_light_v1",
         "base_rgb": {
@@ -1623,6 +2275,98 @@
         "irradiance": "assets/textures/scene_local_proxy/stadium_night_match/scene_local_irradiance_proxy.dds",
         "specular": "assets/textures/scene_local_proxy/stadium_night_match/scene_local_specular_proxy.dds",
         "visible_background": "assets/textures/scene_local_proxy/stadium_night_match/scene_local_visible_background_proxy.dds"
+      },
+      "output_metadata": {
+        "irradiance": {
+          "rgb": [
+            91,
+            99,
+            108
+          ],
+          "filter": {
+            "shape": "filtered_directional_bc1_v1",
+            "blocks_x": 8,
+            "blocks_y": 8,
+            "block_count": 64,
+            "average_rgb": [
+              102,
+              107,
+              116
+            ],
+            "min_rgb": [
+              97,
+              102,
+              107
+            ],
+            "max_rgb": [
+              113,
+              119,
+              130
+            ],
+            "variance_score": 0.047059
+          },
+          "derivation_method": "profile_payload_material_room_light_v1"
+        },
+        "specular": {
+          "rgb": [
+            161,
+            176,
+            189
+          ],
+          "filter": {
+            "shape": "filtered_directional_bc1_v1",
+            "blocks_x": 8,
+            "blocks_y": 8,
+            "block_count": 64,
+            "average_rgb": [
+              169,
+              183,
+              197
+            ],
+            "min_rgb": [
+              160,
+              173,
+              186
+            ],
+            "max_rgb": [
+              189,
+              202,
+              218
+            ],
+            "variance_score": 0.078431
+          },
+          "derivation_method": "profile_payload_material_room_light_v1"
+        },
+        "visible_background": {
+          "rgb": [
+            83,
+            97,
+            112
+          ],
+          "filter": {
+            "shape": "filtered_directional_bc1_v1",
+            "blocks_x": 8,
+            "blocks_y": 8,
+            "block_count": 64,
+            "average_rgb": [
+              97,
+              98,
+              100
+            ],
+            "min_rgb": [
+              92,
+              92,
+              93
+            ],
+            "max_rgb": [
+              102,
+              103,
+              106
+            ],
+            "variance_score": 0.023529
+          },
+          "derivation_method": "profile_payload_material_room_light_v1"
+        }
       }
     }
   }

@@ -677,9 +677,24 @@ SceneLocalEnvironmentV3 proxy-resource binding:
   `build\captures\v3_scene_local_generated_proxy_contract_cross_profile_20260607`
   passed across gallery, office, concert, and stadium with `4/4` runtime
   scene-contract proxy reports.
+- Scene-local proxies are no longer flat color swatches. The generator now
+  emits `filtered_directional_bc1_v1` BC1 maps with low-frequency directional
+  color variation for irradiance, specular, and visible background roles.
+- The manifest records per-output filter shape, block dimensions,
+  average/min/max RGB, and variance. The environment-payload analyzer rejects
+  payload-ready packets if the proxy shape is not filtered or if the minimum
+  variance is at or below `0.01`.
+- Fresh filtered proxy packet
+  `build\captures\v3_scene_local_filtered_proxy_fresh_smoke_20260607` passed
+  with `54/54` filtered proxy reports.
+- Cross-profile filtered proxy packet
+  `build\captures\v3_scene_local_filtered_proxy_cross_profile_20260607` passed
+  across gallery, office, concert, and stadium with `4/4` filtered proxy
+  reports. The weakest proxy variance was `0.014379`.
 - This is still not final environment generation. The next environment step is
-  to convert flat BC1 proxy colors into filtered diffuse irradiance and
-  specular prefilter/probe-like resources.
+  to convert these filtered 2D BC1 proxies into stronger probe-like resources
+  with higher resolution, mip/prefilter levels, or explicit diffuse/specular
+  sampling contracts.
 
 ## 2026-06-07 Master Refactor Before Goal Feature Completion
 

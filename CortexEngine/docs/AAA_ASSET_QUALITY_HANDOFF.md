@@ -7602,3 +7602,45 @@ Current limitation:
   forced-SSR mouse jitter, but history validity/rejection still warn.
 - The remaining instability is in history/reprojection confidence, not forced
   source availability.
+
+## 2026-06-07 Full Scene Shader Refactor Direction
+
+The current user direction is to move toward full scene shaders for
+Unreal-like visuals, but to plan the whole refactor before completing the goal
+feature. The plan was updated in
+`docs/FULL_SCENE_SHADER_AAA_REFACTOR_PLAN.md` under
+`2026-06-07 Full Scene Shader Refactor Before Goal Feature Completion`.
+
+Current decision:
+
+- Build an opt-in `FullSceneCandidateBeautyV3` path, not a default-beauty
+  shortcut.
+- Treat the final candidate pixel as owned material payload, scene-local
+  environment, lighting, shadows, indirect/emissive, source-aware reflections,
+  transparent/media terms, HDR composite, and cinematic post.
+- Do not hide problems by IBL blur, scene changes, post effects, or disabling
+  reflection/shadow features.
+- Legacy `hdr_color` may remain only as a named, measured rescue/comparison
+  lane and must count as promotion debt.
+
+Immediate implementation direction:
+
+1. Add a focused reflection motion packet runner before more shader tweaking.
+   - It should reproduce the old-office IBL / forced-SSR / smooth-metal mouse
+     jitter case with only the reflection and beauty debug views needed.
+   - This avoids the current disk pressure from full 300 MB V3 packets.
+2. Use that focused packet to attack the actual remaining blocker:
+   `reflection_history_v3_validity` and `reflection_history_v3_rejection`.
+3. After reflection history is stable, continue the planned layers:
+   material payload hardening, scene-local environment split, lighting/shadow
+   rebuild, reflection provider expansion, transparency/media integration,
+   real CompositeV3, CinematicPostV3, then cross-family promotion.
+
+Current constraints:
+
+- `Z:` free space is critically low; last observed free space was about
+  `0.53 GB`.
+- Do not run another full V3 packet until old captures are safely pruned or a
+  focused packet runner is in place.
+- Focused files from the latest reflection commits are clean, but many
+  unrelated dirty files remain in the worktree. Do not stage or revert them.

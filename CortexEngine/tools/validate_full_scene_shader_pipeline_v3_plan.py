@@ -691,6 +691,7 @@ def main() -> int:
         "SceneLocalProxyContracts.generated.h",
         "FindSceneLocalProxyContract",
         "profile_payload_material_room_light_v1",
+        "filtered_directional_bc1_v1",
         "reflectionV3Ready",
         '"reflection_v3_ready"',
         "reflectionRadianceReady",

@@ -437,7 +437,7 @@ foreach ($requiredPacketField in @("SkipOwnerAnalysis", "analyze_scene_local_ref
 foreach ($requiredPacketField in @("SkipMaterialAnalysis", "analyze_scene_local_material_classes.py", "material_class_analysis_stdout.txt")) {
     Assert-Contains "packet tool" $packetTool $requiredPacketField
 }
-foreach ($requiredPacketField in @("CaptureSequenceCount", "StabilityMotionMode", "mouse_jitter", "camera_sweep", "MotionLookAmplitude", "MotionSideAmplitude", "MotionForwardAmplitude", "MotionLiftAmplitude", "CORTEX_CAMERA_MOUSE_JITTER_YAW_AMPLITUDE", "CORTEX_CAMERA_MOTION_SIDE_AMPLITUDE", "CORTEX_CAMERA_MOTION_FORWARD_AMPLITUDE", "CORTEX_CAMERA_MOTION_LIFT_AMPLITUDE", "max-large-changed-pixel-ratio", "SkipStabilityAnalysis", "capture_sequence", "analyze_scene_local_packet_stability.py", "packet_stability_analysis_stdout.txt")) {
+foreach ($requiredPacketField in @("CaptureSequenceCount", "StabilityMotionMode", "mouse_jitter", "camera_sweep", "light_sweep", "MotionLookAmplitude", "MotionSideAmplitude", "MotionForwardAmplitude", "MotionLiftAmplitude", "CORTEX_CAMERA_MOUSE_JITTER_YAW_AMPLITUDE", "CORTEX_CAMERA_MOTION_SIDE_AMPLITUDE", "CORTEX_CAMERA_MOTION_FORWARD_AMPLITUDE", "CORTEX_CAMERA_MOTION_LIFT_AMPLITUDE", "CORTEX_LIGHT_SWEEP", "CORTEX_LIGHT_SWEEP_YAW_AMPLITUDE_DEGREES", "max-large-changed-pixel-ratio", "SkipStabilityAnalysis", "capture_sequence", "analyze_scene_local_packet_stability.py", "packet_stability_analysis_stdout.txt")) {
     Assert-Contains "packet tool" $packetTool $requiredPacketField
 }
 foreach ($requiredPacketField in @("SkipVisualQualityAnalysis", "VisualQualityFailOnReview", "analyze_scene_local_visual_quality.py", "visual_quality_analysis_stdout.txt")) {

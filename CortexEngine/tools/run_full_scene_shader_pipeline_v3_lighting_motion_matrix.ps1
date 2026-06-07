@@ -32,8 +32,8 @@ $modeList = @(
         Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
 )
 foreach ($mode in $modeList) {
-    if (@("static", "mouse_jitter", "camera_sweep") -notcontains $mode) {
-        throw "Unknown motion mode '$mode'. Expected static, mouse_jitter, or camera_sweep."
+    if (@("static", "mouse_jitter", "camera_sweep", "light_sweep") -notcontains $mode) {
+        throw "Unknown motion mode '$mode'. Expected static, mouse_jitter, camera_sweep, or light_sweep."
     }
 }
 

@@ -12,8 +12,10 @@ CONTRACT_PATH = ROOT / "assets" / "final_art" / "full_scene_shader_pipeline_v3_c
 FRAME_CONTRACT_JSON_SOURCE_PATH = ROOT / "src" / "Graphics" / "FrameContractJson.cpp"
 FULL_SCENE_SHADER_FRAME_CONTEXT_PATH = ROOT / "src" / "Graphics" / "FullSceneShaderFrameContext.h"
 RENDERER_FRAME_POST_CONSTANTS_PATH = ROOT / "src" / "Graphics" / "Renderer_FramePostConstants.cpp"
+ENGINE_SOURCE_PATH = ROOT / "src" / "Core" / "Engine.cpp"
 V3_PLACEHOLDER_ANALYZER_PATH = ROOT / "tools" / "analyze_full_scene_shader_v3_placeholders.py"
 V3_PACKET_RUNNER_PATH = ROOT / "tools" / "run_full_scene_shader_pipeline_v3_packet.ps1"
+SCENE_LOCAL_PACKET_RUNNER_PATH = ROOT / "tools" / "run_scene_local_cinematic_renderer_v1_packets.ps1"
 V3_PROMOTION_DECISION_PATH = ROOT / "tools" / "build_full_scene_shader_v3_promotion_decision.py"
 V3_MATERIAL_PAYLOAD_ANALYZER_PATH = ROOT / "tools" / "analyze_full_scene_shader_v3_material_payload.py"
 V3_SCENE_PROFILE_ANALYZER_PATH = ROOT / "tools" / "analyze_full_scene_shader_v3_scene_profile.py"
@@ -132,6 +134,11 @@ def main() -> int:
         f"Missing renderer frame post constants source: {RENDERER_FRAME_POST_CONSTANTS_PATH}",
     )
     require(
+        ENGINE_SOURCE_PATH.exists(),
+        errors,
+        f"Missing engine source: {ENGINE_SOURCE_PATH}",
+    )
+    require(
         V3_PLACEHOLDER_ANALYZER_PATH.exists(),
         errors,
         f"Missing V3 placeholder analyzer: {V3_PLACEHOLDER_ANALYZER_PATH}",
@@ -140,6 +147,11 @@ def main() -> int:
         V3_PACKET_RUNNER_PATH.exists(),
         errors,
         f"Missing V3 packet runner: {V3_PACKET_RUNNER_PATH}",
+    )
+    require(
+        SCENE_LOCAL_PACKET_RUNNER_PATH.exists(),
+        errors,
+        f"Missing scene-local packet runner: {SCENE_LOCAL_PACKET_RUNNER_PATH}",
     )
     require(
         V3_PROMOTION_DECISION_PATH.exists(),
@@ -196,8 +208,10 @@ def main() -> int:
     frame_contract_source = FRAME_CONTRACT_JSON_SOURCE_PATH.read_text(encoding="utf-8")
     frame_context_source = FULL_SCENE_SHADER_FRAME_CONTEXT_PATH.read_text(encoding="utf-8")
     frame_post_constants_source = RENDERER_FRAME_POST_CONSTANTS_PATH.read_text(encoding="utf-8")
+    engine_source = ENGINE_SOURCE_PATH.read_text(encoding="utf-8")
     analyzer_source = V3_PLACEHOLDER_ANALYZER_PATH.read_text(encoding="utf-8")
     packet_source = V3_PACKET_RUNNER_PATH.read_text(encoding="utf-8")
+    scene_local_packet_source = SCENE_LOCAL_PACKET_RUNNER_PATH.read_text(encoding="utf-8")
     promotion_source = V3_PROMOTION_DECISION_PATH.read_text(encoding="utf-8")
     material_payload_source = V3_MATERIAL_PAYLOAD_ANALYZER_PATH.read_text(encoding="utf-8")
     scene_profile_source = V3_SCENE_PROFILE_ANALYZER_PATH.read_text(encoding="utf-8")
@@ -212,8 +226,10 @@ def main() -> int:
             frame_contract_source,
             frame_context_source,
             frame_post_constants_source,
+            engine_source,
             analyzer_source,
             packet_source,
+            scene_local_packet_source,
             promotion_source,
             material_payload_source,
             scene_profile_source,
@@ -690,6 +706,8 @@ def main() -> int:
         "analyze_full_scene_shader_v3_shadow_attribution.py",
         "sun_shadow_loss_ratio",
         "local_shadow_loss_ratio",
+        "CORTEX_LIGHT_SWEEP",
+        "light_sweep",
         "FullSceneReflectionV3",
         "reflection_radiance_owned",
         "reflection_confidence_owned",

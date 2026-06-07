@@ -45,7 +45,7 @@ namespace Cortex::Graphics {
             auto entity = entry.entity;
             auto& renderable = *renderablePtr;
 
-            EnsureMaterialTextures(renderable);
+            PrepareMaterialResources(renderable);
             auto getOrAllocateCullingId = [](entt::entity e) { return static_cast<uint32_t>(e); };
 
         const MaterialTextureFallbacks materialFallbacks{
@@ -227,18 +227,18 @@ namespace Cortex::Graphics {
             m_hzbResources.resources.valid && m_hzbResources.capture.captureValid && m_hzbResources.resources.texture && m_hzbResources.resources.mipCount > 0) {
             // Require the HZB capture to be from the immediately previous frame.
             if (m_hzbResources.capture.captureFrameCounter + 1u == m_frameLifecycle.renderFrameCounter) {
-                const bool strictGate = (std::getenv("CORTEX_GPUCULL_HZB_STRICT_GATE") != nullptr);
-                if (!strictGate) {
-                    // Motion robustness is handled conservatively in the shader
-                    // via inflated footprints + mip bias; do not hard-disable
-                    // occlusion on camera movement by default.
+                const bool relaxedGate = (std::getenv("CORTEX_GPUCULL_HZB_RELAXED") != nullptr);
+                if (relaxedGate) {
                     useHzbOcclusion = true;
                 } else {
                     const float dist = glm::length(m_cameraState.positionWS - m_hzbResources.capture.captureCameraPosWS);
                     const glm::vec3 fwdNow = glm::normalize(m_cameraState.forwardWS);
                     const glm::vec3 fwdThen = glm::normalize(m_hzbResources.capture.captureCameraForwardWS);
                     const float dotFwd = glm::clamp(glm::dot(fwdNow, fwdThen), -1.0f, 1.0f);
-                    // Conservative gates: allow only small camera movement/rotation.
+                    // Public-release default: previous-frame occlusion is only
+                    // accepted for small camera deltas. This favors stability
+                    // over peak culling aggressiveness while flying through
+                    // scenes.
                     constexpr float kMaxHzbDist = 0.35f;          // meters/units
                     constexpr float kMaxHzbAngleDeg = 2.0f;       // degrees
                     const float angleDeg = std::acos(dotFwd) * (180.0f / glm::pi<float>());

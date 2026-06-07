@@ -257,6 +257,59 @@ Next:
 2. Add focused environment/profile packets.
 3. Start `CompositeV3` legacy-rescue measurement and contribution debug views.
 
+## 2026-06-07 Material Descriptor Reliability Slice
+
+Purpose:
+
+- Strengthen material payload readiness before deeper PBR/composite work.
+- Stop relying on a separate prewarm pass as the only path that makes material
+  texture descriptors valid.
+- Reduce material/shader popping risk when generated or streamed material
+  textures appear after a renderable has already been seen.
+
+Implemented:
+
+- `MaterialGPUState` now stores a per-slot bound resource signature.
+- Fallback and material descriptor tables allocate contiguous persistent
+  CBV/SRV/UAV ranges.
+- Material descriptor refresh compares resolved source/fallback resource
+  signatures and rewrites only when the actual bound resources changed.
+- Descriptor overwrites synchronize through the descriptor manager before
+  refreshing a shader-visible material table.
+- Added `Renderer::PrepareMaterialResources()`:
+  - ensures material textures.
+  - refreshes descriptors.
+  - records readiness counters in the frame contract diagnostics.
+- Forward, depth alpha-test, indirect, overlay, transparent, and water passes
+  now call `PrepareMaterialResources()` before binding material descriptors.
+- Transparent and water passes gained explicit diagnostic disable flags:
+  `CORTEX_DISABLE_TRANSPARENT_PASS` and `CORTEX_DISABLE_WATER_PASS`.
+- Transparent sorting now uses view-space far extent for more stable ordering
+  of large glass/transparent architectural surfaces.
+- GPU HZB occlusion default is conservative again; relaxed previous-frame HZB
+  use requires `CORTEX_GPUCULL_HZB_RELAXED`.
+
+Validation:
+
+- Focused diff check passed with only line-ending warnings.
+- Native target had already compiled this source state locally and reported
+  `ninja: no work to do`; rerun native build before/after deeper material
+  payload edits.
+
+Current limitation:
+
+- This is descriptor/material readiness infrastructure, not final material
+  artistry.
+- It does not add new texture channels or material provider provenance yet.
+
+Next:
+
+1. Commit and push this material reliability slice.
+2. Run a material-focused V3 packet after the next concrete material payload
+   edit.
+3. Continue toward material payload provenance/range gates and composite
+   contribution views.
+
 ## Goal
 
 Move beyond stable blockout scenes into a reusable asset-quality architecture

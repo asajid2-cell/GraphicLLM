@@ -1,6 +1,7 @@
 #pragma once
 
 #include <array>
+#include <cstdint>
 #include <memory>
 #include <string>
 #include "Graphics/MaterialState.h"
@@ -72,12 +73,20 @@ struct TextureDescriptorState {
             return Result<void>::Err("Renderer is not initialized for fallback material descriptors");
         }
 
-        for (int i = 0; i < 4; ++i) {
-            auto handleResult = descriptorManager->AllocateCBV_SRV_UAV();
-            if (handleResult.IsErr()) {
-                return Result<void>::Err("Failed to allocate fallback material descriptor: " + handleResult.Error());
+        auto tableResult = descriptorManager->AllocateCBV_SRV_UAVRange(static_cast<uint32_t>(descriptorTable.size()));
+        if (tableResult.IsErr()) {
+            return Result<void>::Err("Failed to allocate fallback material descriptor table: " + tableResult.Error());
+        }
+
+        const DescriptorHandle base = tableResult.Value();
+        for (uint32_t i = 0; i < descriptorTable.size(); ++i) {
+            descriptorTable[i] = descriptorManager->GetCBV_SRV_UAVHandle(base.index + i);
+            if (!descriptorTable[i].IsValid()) {
+                return Result<void>::Err("Fallback material descriptor table produced an invalid descriptor slot");
             }
-            descriptorTable[i] = handleResult.Value();
+            if (i > 0 && descriptorTable[i].index != descriptorTable[i - 1].index + 1) {
+                return Result<void>::Err("Fallback material descriptor table is not contiguous");
+            }
         }
         return Result<void>::Ok();
     }
@@ -116,13 +125,19 @@ struct TextureDescriptorState {
             return Result<void>::Err("Renderer is not initialized for persistent material descriptors");
         }
 
+        auto tableResult = descriptorManager->AllocateCBV_SRV_UAVRange(MaterialGPUState::kSlotCount);
+        if (tableResult.IsErr()) {
+            state.descriptorsReady = false;
+            return Result<void>::Err("Failed to allocate persistent material descriptor table: " + tableResult.Error());
+        }
+
+        const DescriptorHandle base = tableResult.Value();
         for (uint32_t i = 0; i < MaterialGPUState::kSlotCount; ++i) {
-            auto handleResult = descriptorManager->AllocateCBV_SRV_UAV();
-            if (handleResult.IsErr()) {
+            state.descriptors[i] = descriptorManager->GetCBV_SRV_UAVHandle(base.index + i);
+            if (!state.descriptors[i].IsValid()) {
                 state.descriptorsReady = false;
-                return Result<void>::Err("Failed to allocate persistent material descriptor slot " + std::to_string(i) + ": " + handleResult.Error());
+                return Result<void>::Err("Persistent material descriptor table produced an invalid descriptor slot");
             }
-            state.descriptors[i] = handleResult.Value();
 
             if (i > 0 && state.descriptors[i].index != state.descriptors[i - 1].index + 1) {
                 state.descriptorsReady = false;
@@ -150,11 +165,38 @@ struct TextureDescriptorState {
             return Result<bool>::Err(allocResult.Error());
         }
 
-        bool descriptorsChanged = !state.descriptorsReady;
+        std::array<std::shared_ptr<DX12Texture>, MaterialGPUState::kSlotCount> resolvedTextures{};
+        std::array<uint64_t, MaterialGPUState::kSlotCount> newSignatures{};
+        auto textureSignature = [](const std::shared_ptr<DX12Texture>& texture) -> uint64_t {
+            return (texture && texture->GetResource())
+                ? static_cast<uint64_t>(reinterpret_cast<uintptr_t>(texture->GetResource()))
+                : 0ull;
+        };
+
         for (size_t i = 0; i < sources.size(); ++i) {
-            if (state.sourceTextures[i].lock() != sources[i]) {
-                descriptorsChanged = true;
-                break;
+            if (sources[i] && sources[i]->GetResource()) {
+                resolvedTextures[i] = sources[i];
+            } else if (fallbacks[i] && fallbacks[i]->GetResource()) {
+                resolvedTextures[i] = fallbacks[i];
+            }
+            newSignatures[i] = textureSignature(resolvedTextures[i]);
+        }
+
+        bool descriptorsChanged = !state.descriptorsReady;
+        if (!descriptorsChanged) {
+            for (size_t i = 0; i < newSignatures.size(); ++i) {
+                if (state.boundResourceSignatures[i] != newSignatures[i]) {
+                    descriptorsChanged = true;
+                    break;
+                }
+            }
+        }
+        if (!descriptorsChanged) {
+            for (size_t i = 0; i < sources.size(); ++i) {
+                if (state.sourceTextures[i].lock() != sources[i]) {
+                    descriptorsChanged = true;
+                    break;
+                }
             }
         }
 
@@ -162,15 +204,12 @@ struct TextureDescriptorState {
             return Result<bool>::Ok(false);
         }
 
-        for (size_t i = 0; i < sources.size(); ++i) {
-            std::shared_ptr<DX12Texture> texture;
-            if (sources[i] && sources[i]->GetResource()) {
-                texture = sources[i];
-            } else if (fallbacks[i] && fallbacks[i]->GetResource()) {
-                texture = fallbacks[i];
-            }
+        if (state.descriptorsReady) {
+            descriptorManager->SynchronizeForShaderVisibleDescriptorOverwrite("material descriptor table refresh");
+        }
 
-            if (!WriteTexture2DSRV(device, texture, state.descriptors[i].cpu)) {
+        for (size_t i = 0; i < resolvedTextures.size(); ++i) {
+            if (!WriteTexture2DSRV(device, resolvedTextures[i], state.descriptors[i].cpu)) {
                 WriteNullTexture2DSRV(device, DXGI_FORMAT_R8G8B8A8_UNORM, state.descriptors[i].cpu);
             }
         }
@@ -178,6 +217,7 @@ struct TextureDescriptorState {
         for (size_t i = 0; i < sources.size(); ++i) {
             state.sourceTextures[i] = sources[i];
         }
+        state.boundResourceSignatures = newSignatures;
         state.descriptorsReady = true;
         return Result<bool>::Ok(true);
     }

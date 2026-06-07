@@ -12,6 +12,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <cstdlib>
 #include <string>
 #include <vector>
 namespace Cortex::Graphics {
@@ -94,6 +95,9 @@ Scene::WaterSurfaceComponent LiquidProfileFromRenderable(const Scene::Renderable
 } // namespace
 
 void Renderer::RenderWaterSurfaces(Scene::ECS_Registry* registry) {
+    if (std::getenv("CORTEX_DISABLE_WATER_PASS")) {
+        return;
+    }
     if (!m_pipelineState.waterOverlay || !m_mainTargets.hdr.resources.color || !m_depthResources.resources.buffer) {
         return;
     }
@@ -167,7 +171,7 @@ void Renderer::RenderWaterSurfaces(Scene::ECS_Registry* registry) {
             continue;
         }
 
-        EnsureMaterialTextures(renderable);
+        PrepareMaterialResources(renderable);
 
         Scene::WaterSurfaceComponent liquidProfile = LiquidProfileFromRenderable(renderable);
         if (registry && registry->HasComponent<Scene::WaterSurfaceComponent>(entry.entity)) {

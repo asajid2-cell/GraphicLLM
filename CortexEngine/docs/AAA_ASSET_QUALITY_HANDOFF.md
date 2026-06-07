@@ -7766,3 +7766,82 @@ Current next work:
    resource/debug view or a stricter equivalent frame-contract gate.
 2. After material payload debt is explicit and shrinking, move to
    `SceneLocalEnvironmentV3` visible/background/reflection-environment split.
+
+### Material Missing Channel Mask Debug Slice - 2026-06-07
+
+Implemented:
+
+- Added visibility debug mode `MaterialMissingChannelMask`.
+- External debug view `82` maps to the new mode.
+- Packet alias:
+  `material_missing_channel_mask`.
+- The shader computes the mask from the material table per visible pixel:
+  - red: missing core texture evidence ratio
+    (albedo, normal, metallic, roughness).
+  - green: requested advanced feature missing texture ratio
+    (occlusion, emissive, transmission, clearcoat, clearcoat roughness,
+    specular, specular color).
+  - blue: max fallback debt.
+- This does not steal `MaterialExt2`; anisotropy, sheen, surface class, and
+  named scene material class remain intact for lighting/reflection consumers.
+- `tools/analyze_full_scene_shader_v3_material_payload.py` now treats
+  `material_missing_channel_mask` as a required captured view instead of a
+  missing packet alias.
+- `tools/analyze_full_scene_shader_v3_placeholders.py` classifies debug view
+  `82` as material-payload scope.
+
+Validation:
+
+```powershell
+python -m py_compile tools\analyze_full_scene_shader_v3_material_payload.py tools\analyze_full_scene_shader_v3_placeholders.py
+$tokens = $errors = $null
+[System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path tools\run_scene_local_cinematic_renderer_v1_packets.ps1), [ref]$tokens, [ref]$errors) | Out-Null
+if ($errors.Count -gt 0) { $errors | Format-List; exit 1 }
+$tokens = $errors = $null
+[System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path tools\run_full_scene_shader_pipeline_v3_packet.ps1), [ref]$tokens, [ref]$errors) | Out-Null
+if ($errors.Count -gt 0) { $errors | Format-List; exit 1 }
+cmd.exe /d /c "call ""C:\Program Files\Microsoft Visual Studio\18\Community\Common7\Tools\VsDevCmd.bat"" -arch=x64 -host_arch=x64 >nul && set ""CORTEX_SKIP_ASSET_SYNC=1"" && ""C:\Program Files\Ninja\ninja.exe"" -C build CortexEngine -j 8"
+Copy-Item -LiteralPath assets\shaders\DebugBlitVisibility.hlsl -Destination build\bin\assets\shaders\DebugBlitVisibility.hlsl -Force
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_scene_local_cinematic_renderer_v1_packets.ps1 -NoBuild -SkipOwnerAnalysis -SkipStabilityAnalysis -SkipVisualQualityAnalysis -StressSceneOnly -StressSceneFilter rt_showcase:reflection_closeup -ViewFilter material_base_color,material_normal,material_missing_channel_mask,roughness,metallic,surface_class,surface_policy,material_family,reflection_policy,temporal_policy,post_sensitivity,material_id,object_id -SmokeFrames 16 -CaptureFrame 8 -CaptureSequenceCount 1 -OutputRoot build\captures\v3_material_missing_channel_mask_material_only_20260607
+python tools\analyze_full_scene_shader_debug_view_metrics.py --manifest build\captures\v3_material_missing_channel_mask_material_only_20260607\manifest.json --output-json build\captures\v3_material_missing_channel_mask_material_only_20260607\debug_view_metrics.json --output-md build\captures\v3_material_missing_channel_mask_material_only_20260607\debug_view_metrics.md
+python tools\analyze_full_scene_shader_v3_material_payload.py --manifest build\captures\v3_material_missing_channel_mask_material_only_20260607\manifest.json --output-json build\captures\v3_material_missing_channel_mask_material_only_20260607\v3_material_payload.json --output-md build\captures\v3_material_missing_channel_mask_material_only_20260607\v3_material_payload.md
+python tools\analyze_full_scene_shader_v3_placeholders.py --input build\captures\v3_material_missing_channel_mask_material_only_20260607 --signal-output build\captures\v3_material_missing_channel_mask_material_only_20260607\v3_signal.json --stability-output build\captures\v3_material_missing_channel_mask_material_only_20260607\v3_stability.json
+$env:CORTEX_V3_REFLECTION_SOURCE_OVERRIDE='ssr'
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_full_scene_shader_pipeline_v3_packet.ps1 -NoBuild -SkipSceneAnalyzers -StressSceneOnly -StressSceneFilter rt_showcase:reflection_closeup -SmokeFrames 16 -CaptureFrame 8 -CaptureSequenceCount 1 -StabilityMotionMode static -OutputRoot build\captures\v3_material_missing_channel_mask_full_stress_20260607
+Remove-Item Env:\CORTEX_V3_REFLECTION_SOURCE_OVERRIDE -ErrorAction SilentlyContinue
+```
+
+Evidence:
+
+- Native target follow-up: `ninja -C build CortexEngine -j 8` reported
+  `no work to do`; the existing `vswhere.exe` warning printed after success.
+- Material-only packet:
+  `build\captures\v3_material_missing_channel_mask_material_only_20260607`.
+  - debug-view metrics passed with `13` measured captures.
+  - placeholder analyzer passed with `13` reports.
+  - material payload passed with `0` failures and `0` warnings.
+  - contract debug view debt: `0`.
+- Full short stress packet:
+  `build\captures\v3_material_missing_channel_mask_full_stress_20260607`.
+  - V2 evidence passed.
+  - V3 placeholder packet passed with `45` reports.
+  - material payload passed:
+    sampled materials `2700`, named materials `2700`, advanced feature
+    materials `1440`, reflection eligible `810`.
+  - `material_missing_channel_mask` captured with mean luma `0.56898` and
+    nonblack ratio `1.00000`.
+  - contract debug view debt: `0`.
+  - CompositeV3 diagnostics passed.
+  - promotion decision: `review_packet_passed`,
+    `default_beauty_promotable=false` because this was a stress-only static
+    subset.
+
+Current next work:
+
+1. Move to `SceneLocalEnvironmentV3`.
+   - Split visible background, lighting environment, reflection environment,
+     and atmosphere.
+   - Keep IBL blur/post/scene swaps out of the root-cause strategy.
+2. Continue material payload enrichment after environment split:
+   texture-backed scalar maps, provider provenance, and broader family/motion
+   packet coverage.

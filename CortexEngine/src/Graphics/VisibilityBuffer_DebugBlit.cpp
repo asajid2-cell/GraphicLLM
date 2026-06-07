@@ -147,7 +147,8 @@ Result<void> VisibilityBufferRenderer::DebugBlitVisibilityToHDR(
         mode == DebugBlitVisibilityMode::MaterialFamily ||
         mode == DebugBlitVisibilityMode::ReflectionPolicy ||
         mode == DebugBlitVisibilityMode::TemporalPolicy ||
-        mode == DebugBlitVisibilityMode::PostSensitivity;
+        mode == DebugBlitVisibilityMode::PostSensitivity ||
+        mode == DebugBlitVisibilityMode::MaterialMissingChannelMask;
     const D3D12_GPU_VIRTUAL_ADDRESS materialAddress = GetMaterialBufferAddress();
     if (needsMaterialTable && (materialAddress == 0 || m_materialCount == 0)) {
         return Result<void>::Err("Visibility material-policy debug blit requires a populated material table");

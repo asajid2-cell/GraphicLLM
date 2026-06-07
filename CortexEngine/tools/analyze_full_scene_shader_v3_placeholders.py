@@ -56,7 +56,7 @@ ALLOWED_READY_DOMAINS = {
     "candidate_beauty",
 }
 
-MATERIAL_PAYLOAD_DEBUG_MODES = {2, 3, 35, 36, 41, 47, 48, 49, 50, 51, 52, 53}
+MATERIAL_PAYLOAD_DEBUG_MODES = {2, 3, 35, 36, 41, 47, 48, 49, 50, 51, 52, 53, 82}
 
 LIGHTING_SIGNAL_THRESHOLDS = {
     "direct_light": {"min_mean_luma": 0.02, "min_nonblack_ratio": 0.05},

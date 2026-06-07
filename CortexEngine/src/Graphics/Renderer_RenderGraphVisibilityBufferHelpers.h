@@ -22,6 +22,7 @@ inline constexpr uint32_t kVBDebugMaterialFamily = 11;
 inline constexpr uint32_t kVBDebugReflectionPolicy = 12;
 inline constexpr uint32_t kVBDebugTemporalPolicy = 13;
 inline constexpr uint32_t kVBDebugPostSensitivity = 14;
+inline constexpr uint32_t kVBDebugMaterialMissingChannelMask = 20;
 inline constexpr uint32_t kVBDebugLightingV3Direct = 15;
 inline constexpr uint32_t kVBDebugLightingV3DirectUnshadowed = 16;
 inline constexpr uint32_t kVBDebugLightingV3ShadowVisibility = 17;
@@ -45,7 +46,8 @@ inline bool IsVBVisibilityIdentityDebugView(uint32_t debugView) {
            debugView == kVBDebugMaterialFamily ||
            debugView == kVBDebugReflectionPolicy ||
            debugView == kVBDebugTemporalPolicy ||
-           debugView == kVBDebugPostSensitivity;
+           debugView == kVBDebugPostSensitivity ||
+           debugView == kVBDebugMaterialMissingChannelMask;
 }
 
 inline VisibilityBufferRenderer::DebugBlitVisibilityMode SelectVBVisibilityDebugMode(uint32_t debugView) {
@@ -66,6 +68,9 @@ inline VisibilityBufferRenderer::DebugBlitVisibilityMode SelectVBVisibilityDebug
     }
     if (debugView == kVBDebugPostSensitivity) {
         return VisibilityBufferRenderer::DebugBlitVisibilityMode::PostSensitivity;
+    }
+    if (debugView == kVBDebugMaterialMissingChannelMask) {
+        return VisibilityBufferRenderer::DebugBlitVisibilityMode::MaterialMissingChannelMask;
     }
     return VisibilityBufferRenderer::DebugBlitVisibilityMode::PayloadInstance;
 }

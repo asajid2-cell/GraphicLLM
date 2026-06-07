@@ -12,6 +12,7 @@ from typing import Any
 REQUIRED_DEBUG_VIEWS = {
     "material_base_color": {"min_nonblack_ratio": 0.05, "min_mean_luma": 0.01, "max_mean_luma": 0.98},
     "material_normal": {"min_nonblack_ratio": 0.05, "min_mean_luma": 0.01, "max_mean_luma": 0.98},
+    "material_missing_channel_mask": {"min_nonblack_ratio": 0.001},
     "roughness": {"min_nonblack_ratio": 0.05, "min_mean_luma": 0.01, "max_mean_luma": 0.98},
     "surface_class": {"min_nonblack_ratio": 0.01},
     "surface_policy": {"min_nonblack_ratio": 0.01},
@@ -33,7 +34,7 @@ CONTRACT_DEBUG_VIEW_ALIASES = {
     "material_metallic": "metallic",
     "material_normal": "material_normal",
     "material_class": "surface_class",
-    "material_missing_channel_mask": "",
+    "material_missing_channel_mask": "material_missing_channel_mask",
 }
 
 

@@ -53,6 +53,7 @@ $views = @(
     [pscustomobject]@{ Name = "candidate_beauty_v3"; DebugView = $null; CandidateBeautyV3 = $true },
     [pscustomobject]@{ Name = "material_base_color"; DebugView = 35 },
     [pscustomobject]@{ Name = "material_normal"; DebugView = 36 },
+    [pscustomobject]@{ Name = "material_missing_channel_mask"; DebugView = 82 },
     [pscustomobject]@{ Name = "roughness"; DebugView = 2 },
     [pscustomobject]@{ Name = "metallic"; DebugView = 3 },
     [pscustomobject]@{ Name = "surface_class"; DebugView = 41 },

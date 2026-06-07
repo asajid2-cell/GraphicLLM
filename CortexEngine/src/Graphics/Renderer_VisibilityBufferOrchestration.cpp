@@ -36,6 +36,7 @@ constexpr uint32_t kVBDebugMaterialFamily = 11;
 constexpr uint32_t kVBDebugReflectionPolicy = 12;
 constexpr uint32_t kVBDebugTemporalPolicy = 13;
 constexpr uint32_t kVBDebugPostSensitivity = 14;
+constexpr uint32_t kVBDebugMaterialMissingChannelMask = 20;
 
 bool IsVisibilityBufferDebugView(uint32_t debugView) {
     return debugView != kVBDebugNone;
@@ -49,7 +50,8 @@ bool IsVisibilityBufferUnculledDebugView(uint32_t debugView) {
            debugView == kVBDebugMaterialFamily ||
            debugView == kVBDebugReflectionPolicy ||
            debugView == kVBDebugTemporalPolicy ||
-           debugView == kVBDebugPostSensitivity;
+           debugView == kVBDebugPostSensitivity ||
+           debugView == kVBDebugMaterialMissingChannelMask;
 }
 
 bool IsVisibilityBufferGBufferDebugView(uint32_t debugView) {

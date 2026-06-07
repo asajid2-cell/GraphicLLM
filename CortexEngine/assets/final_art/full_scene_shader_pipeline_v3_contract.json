@@ -89,6 +89,7 @@
       "packet_debug_views": [
         "material_base_color",
         "material_normal",
+        "material_missing_channel_mask",
         "roughness",
         "metallic",
         "surface_class",

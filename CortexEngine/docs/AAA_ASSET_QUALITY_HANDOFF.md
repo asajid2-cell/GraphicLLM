@@ -539,14 +539,30 @@ Evidence:
     resources, proxy fallback reason `none`
 - Promotion status stayed `review_packet_passed`, not default promotion,
   because the packet intentionally covered one stress family and static motion.
+- Cross-profile proxy-resource packet:
+  `build\captures\v3_scene_local_proxy_binding_cross_profile_20260607` passed
+  the scene-local packet runner and both follow-up analyzers.
+  - payload reports: `4`
+  - payload-ready reports: `4`
+  - payload-resource-bindable reports: `4`
+  - proxy-resource-bindable reports: `4`
+  - bound-proxy-resource reports: `4`
+  - covered families:
+    `rt_showcase_gallery`, `home_office_evening`,
+    `neon_streamer_concert`, and `stadium_night_match`
+  - shader profiles/modes:
+    `gallery_neutral=1.0`, `enclosed_room=2.0`, `stage=3.0`,
+    and `open_exterior=4.0`
+  - every row bound `2` payload resources and `3` proxy resources with
+    source `cached_scene_local_proxy_triple`
 
 Current next work after this checkpoint:
 
 1. Replace reused albedo/normal proxy aliases with generated or authored
    irradiance, specular prefilter, and visible-background proxy resources.
-2. Run a cross-profile proxy-resource packet once model-scene report/capture
-   separation is clean enough not to hide proxy binding behind device-removal
-   exits.
+2. Expand proxy-resource proof to the unstable kitchen/gym/red-room model
+   scenes after report/capture separation is clean enough not to hide proxy
+   binding behind device-removal exits.
 3. Continue `LightingShadowV3` attribution and broader `ReflectionV3`
    auto-resolver coverage before strong `CinematicPostV3` tuning.
 

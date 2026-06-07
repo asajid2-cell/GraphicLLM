@@ -332,6 +332,11 @@ SceneLocalEnvironmentV3 proxy-resource binding:
   reports, and `54` proxy-resource-bindable reports. First row bound `2`
   payload resources and `3` proxy resources with source
   `cached_scene_local_proxy_triple`.
+- Cross-profile evidence
+  `build\captures\v3_scene_local_proxy_binding_cross_profile_20260607` passed
+  with `4` payload-ready reports, `4` proxy-resource-bindable reports, and
+  profile coverage for `gallery_neutral=1.0`, `enclosed_room=2.0`,
+  `stage=3.0`, and `open_exterior=4.0`.
 - This is still not final environment generation. The next environment step is
   authored or generated irradiance/specular/background proxy resources instead
   of reusing selected scene-local albedo/normal textures as proxy inputs.

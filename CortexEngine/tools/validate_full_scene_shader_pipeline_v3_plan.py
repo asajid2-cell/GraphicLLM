@@ -22,6 +22,9 @@ V3_SCENE_PROFILE_ANALYZER_PATH = ROOT / "tools" / "analyze_full_scene_shader_v3_
 V3_ENVIRONMENT_PAYLOAD_ANALYZER_PATH = ROOT / "tools" / "analyze_full_scene_shader_v3_environment_payload.py"
 V3_ENVIRONMENT_PROFILE_ANALYZER_PATH = ROOT / "tools" / "analyze_full_scene_shader_v3_environment_profiles.py"
 V3_ENVIRONMENT_PROXY_GENERATOR_PATH = ROOT / "tools" / "generate_scene_local_environment_proxies.py"
+V3_ENVIRONMENT_PROXY_CONTRACT_HEADER_PATH = (
+    ROOT / "src" / "Graphics" / "Generated" / "SceneLocalProxyContracts.generated.h"
+)
 V3_SHADOW_ATTRIBUTION_ANALYZER_PATH = ROOT / "tools" / "analyze_full_scene_shader_v3_shadow_attribution.py"
 V3_SHADOW_FOCUS_RUNNER_PATH = ROOT / "tools" / "run_lighting_v3_shadow_motion_focus_packet.ps1"
 V3_REFLECTION_SOURCE_RESOLVER_ANALYZER_PATH = ROOT / "tools" / "analyze_reflection_v3_source_resolver.py"
@@ -183,6 +186,11 @@ def main() -> int:
         f"Missing V3 environment profile analyzer: {V3_ENVIRONMENT_PROFILE_ANALYZER_PATH}",
     )
     require(
+        V3_ENVIRONMENT_PROXY_CONTRACT_HEADER_PATH.exists(),
+        errors,
+        f"Missing V3 environment proxy contract header: {V3_ENVIRONMENT_PROXY_CONTRACT_HEADER_PATH}",
+    )
+    require(
         V3_SHADOW_ATTRIBUTION_ANALYZER_PATH.exists(),
         errors,
         f"Missing V3 shadow attribution analyzer: {V3_SHADOW_ATTRIBUTION_ANALYZER_PATH}",
@@ -237,6 +245,7 @@ def main() -> int:
     environment_payload_source = V3_ENVIRONMENT_PAYLOAD_ANALYZER_PATH.read_text(encoding="utf-8")
     environment_profile_source = V3_ENVIRONMENT_PROFILE_ANALYZER_PATH.read_text(encoding="utf-8")
     environment_proxy_generator_source = V3_ENVIRONMENT_PROXY_GENERATOR_PATH.read_text(encoding="utf-8")
+    environment_proxy_contract_header_source = V3_ENVIRONMENT_PROXY_CONTRACT_HEADER_PATH.read_text(encoding="utf-8")
     shadow_attribution_source = V3_SHADOW_ATTRIBUTION_ANALYZER_PATH.read_text(encoding="utf-8")
     shadow_focus_runner_source = V3_SHADOW_FOCUS_RUNNER_PATH.read_text(encoding="utf-8")
     reflection_source_resolver_source = V3_REFLECTION_SOURCE_RESOLVER_ANALYZER_PATH.read_text(encoding="utf-8")
@@ -259,6 +268,7 @@ def main() -> int:
             environment_payload_source,
             environment_profile_source,
             environment_proxy_generator_source,
+            environment_proxy_contract_header_source,
             shadow_attribution_source,
             shadow_focus_runner_source,
             reflection_source_resolver_source,
@@ -677,6 +687,9 @@ def main() -> int:
         '"scene_local_proxy_light_accent_strength"',
         '"v3_environment_payload.json"',
         "generate_scene_local_environment_proxies.py",
+        "generated_contract_header",
+        "SceneLocalProxyContracts.generated.h",
+        "FindSceneLocalProxyContract",
         "profile_payload_material_room_light_v1",
         "reflectionV3Ready",
         '"reflection_v3_ready"',

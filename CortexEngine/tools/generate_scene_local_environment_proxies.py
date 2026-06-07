@@ -25,6 +25,7 @@ except Exception:  # pragma: no cover - optional local tool dependency
 ROOT = Path(__file__).resolve().parents[1]
 SOURCE_ID = "generate_scene_local_environment_proxies.py"
 DERIVATION_METHOD = "profile_payload_material_room_light_v1"
+GENERATED_CONTRACT_HEADER = ROOT / "src" / "Graphics" / "Generated" / "SceneLocalProxyContracts.generated.h"
 DEFAULT_SETS = {
     "rt_showcase_gallery": {
         "irradiance": (150, 146, 134),
@@ -215,6 +216,68 @@ def rel(path: Path) -> str:
         return str(path.relative_to(ROOT)).replace("\\", "/")
     except ValueError:
         return str(path).replace("\\", "/")
+
+
+def cpp_string(value: str) -> str:
+    return value.replace("\\", "\\\\").replace('"', '\\"')
+
+
+def format_float(value: float) -> str:
+    return f"{value:.6f}f"
+
+
+def write_contract_header(path: Path) -> None:
+    lines = [
+        "#pragma once",
+        "",
+        "#include <string_view>",
+        "",
+        "namespace Cortex::Graphics::Generated {",
+        "",
+        "struct SceneLocalProxyContractRecord {",
+        "    const char* textureSetId;",
+        "    const char* derivationMethod;",
+        "    const char* roomShell;",
+        "    float roomOcclusion;",
+        "    const char* lightRig;",
+        "    float lightAccentStrength;",
+        "};",
+        "",
+        f'inline constexpr const char* kSceneLocalProxyDerivationMethod = "{cpp_string(DERIVATION_METHOD)}";',
+        "",
+        "inline constexpr SceneLocalProxyContractRecord kSceneLocalProxyContracts[] = {",
+    ]
+    for set_id in sorted(ROOM_LIGHT_CONTRACTS):
+        contract = ROOM_LIGHT_CONTRACTS[set_id]
+        room = contract["room_shell"]
+        light = contract["light_rig"]
+        lines.append(
+            "    {"
+            f'"{cpp_string(set_id)}", '
+            "kSceneLocalProxyDerivationMethod, "
+            f'"{cpp_string(str(room["enclosure"]))}", '
+            f'{format_float(float(room["local_background_occlusion"]))}, '
+            f'"{cpp_string(str(light["mode"]))}", '
+            f'{format_float(float(light["accent_strength"]))}'
+            "},"
+        )
+    lines.extend([
+        "};",
+        "",
+        "inline const SceneLocalProxyContractRecord* FindSceneLocalProxyContract(std::string_view textureSetId) {",
+        "    for (const SceneLocalProxyContractRecord& contract : kSceneLocalProxyContracts) {",
+        "        if (textureSetId == contract.textureSetId) {",
+        "            return &contract;",
+        "        }",
+        "    }",
+        "    return nullptr;",
+        "}",
+        "",
+        "} // namespace Cortex::Graphics::Generated",
+        "",
+    ])
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("\n".join(lines), encoding="utf-8")
 
 
 def rgb565(color: tuple[int, int, int]) -> int:
@@ -640,12 +703,14 @@ def generate(texture_root: Path, sets: list[str], size: int, overwrite: bool, mi
         runtime_manifest = ROOT / "build" / "bin" / manifest_path.relative_to(ROOT)
         runtime_manifest.parent.mkdir(parents=True, exist_ok=True)
         runtime_manifest.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
+    write_contract_header(GENERATED_CONTRACT_HEADER)
     return {
         "schema": "cortex.scene_local_environment_proxy_assets.v1",
         "source": SOURCE_ID,
         "derivation_method": DERIVATION_METHOD,
         "texture_root": rel(texture_root),
         "manifest": rel(manifest_path),
+        "generated_contract_header": rel(GENERATED_CONTRACT_HEADER),
         "set_count": len(rows),
         "size": size,
         "sets": rows,

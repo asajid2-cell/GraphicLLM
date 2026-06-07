@@ -250,6 +250,25 @@ Evidence:
   This proves the analyzer catches provider churn and leaves forced SSR as a
   remaining targeted diagnostic.
 
+Follow-up diagnosis:
+
+- The source resolver analyzer now summarizes adjacent ReflectionV3 diagnostic
+  views, not just `reflection_source_id`.
+- Forced SSR churn is currently attributed to:
+  `ssr_signal_changes_under_motion`,
+  `ssr_rejection_mask_high`,
+  `ssr_rejection_changes_under_motion`,
+  `forced_or_history_debt_present`,
+  `temporal_delta_tracks_source_churn`,
+  `material_suppression_contributes`, and
+  `history_validity_changes_under_motion`.
+- This means the warning is not generic shimmer. It is provider continuity debt:
+  SSR signal and rejection state change under motion, and the history/material
+  diagnostics move with it.
+- Production implication: keep auto source resolution as the public candidate
+  gate. Do not promote forced SSR for this view until SSR continuity or a
+  stronger RT/local-probe fallback is proven.
+
 ## 2026-06-07 Master Refactor Before Goal Feature Completion
 
 This is the current authoritative plan for moving CortexEngine from

@@ -293,6 +293,19 @@ def main() -> int:
     required_artifacts = set(domains.get("validation", {}).get("required_artifacts", []))
     require("v3_scene_profile.json" in required_artifacts, errors, "V3 validation missing v3_scene_profile.json artifact")
 
+    for domain_id in ["composite", "cinematic_post"]:
+        require(
+            domains.get(domain_id, {}).get("readiness_scope") == "candidate_beauty_requested",
+            errors,
+            f"V3 {domain_id} contract must declare candidate-only readiness scope",
+        )
+    for token in [
+        "CANDIDATE_ONLY_DOMAINS",
+        "candidate_beauty_requested_count",
+        "candidate_beauty_requested",
+    ]:
+        require(token in runtime_surface, errors, f"V3 candidate-only domain gate missing token: {token}")
+
     candidate_beauty_contract = domains.get("candidate_beauty", {})
     require(
         candidate_beauty_contract.get("producer") == "CinematicPostV3",

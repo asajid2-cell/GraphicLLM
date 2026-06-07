@@ -8746,3 +8746,62 @@ Current next work:
 4. After composite/post coverage is coherent, continue the full scene shader
    refactor into texture-backed `SceneLocalEnvironmentV3` and richer
    material/environment payloads.
+
+### Composite/Post Candidate-Scope Gate - 2026-06-07
+
+Implemented:
+
+- `assets/final_art/full_scene_shader_pipeline_v3_contract.json` now declares
+  `readiness_scope: candidate_beauty_requested` for `composite` and
+  `cinematic_post`.
+- `tools/build_full_scene_shader_v3_promotion_decision.py` now treats
+  `composite` and `cinematic_post` as candidate-only domains:
+  - base domains (`scene_profile`, material, lighting, environment, reflection)
+    are still required for every full-pipeline report.
+  - candidate domains are required only for rows where
+    `candidate_beauty_requested=true`.
+- `tools/validate_full_scene_shader_pipeline_v3_plan.py` now validates that
+  the contract and promotion script both preserve the candidate-only domain
+  scope.
+
+Validation:
+
+```powershell
+python -m py_compile tools\build_full_scene_shader_v3_promotion_decision.py tools\validate_full_scene_shader_pipeline_v3_plan.py
+python tools\validate_full_scene_shader_pipeline_v3_plan.py
+python tools\build_full_scene_shader_v3_promotion_decision.py --packet-root build\captures\v3_scene_profile_full_stress_20260607 --output-json build\captures\v3_scene_profile_full_stress_20260607\promotion_decision_candidate_scope.json --output-md build\captures\v3_scene_profile_full_stress_20260607\promotion_decision_candidate_scope.md --allow-subset-review
+git -c submodule.recurse=false diff --check -- assets\final_art\full_scene_shader_pipeline_v3_contract.json tools\build_full_scene_shader_v3_promotion_decision.py tools\validate_full_scene_shader_pipeline_v3_plan.py
+```
+
+Evidence:
+
+- Plan validator still passes with `10` V3 domains and `29` required outputs.
+- Re-running the promotion decision on the existing full stress packet passed:
+  `status=review_packet_passed`, `review_packet_passed=true`.
+- Counts after the scope fix:
+  - `scene_profile=41/41`
+  - material `54/54`
+  - lighting/environment/reflection `41/41`
+  - composite/cinematic-post `6/6` for candidate-requested rows
+  - candidate beauty ready `6/6`
+- Default beauty remains non-promotable because the packet is stress-only,
+  single-family, and static-only.
+
+Blocked follow-up:
+
+- A fresh integrated V3 packet rerun to
+  `build\captures\v3_candidate_scope_full_stress_20260607` failed while
+  writing packet stdout because `Z:` had insufficient disk space.
+- The failed partial packet directory was deleted after verifying the resolved
+  path was under `build\captures`.
+- Remaining free space after cleanup was about `108 MB`, so do not run more
+  rendered packet sweeps until capture artifacts are archived or cleaned.
+
+Current next work:
+
+1. Free or archive capture space before running more rendered validation.
+2. Use the candidate-scope gate as the correct promotion contract: do not force
+   candidate composite/post resources onto upstream debug views.
+3. Resume the full shader refactor with texture-backed
+   `SceneLocalEnvironmentV3`, richer material payloads, and cross-family /
+   motion packets once disk space is available.

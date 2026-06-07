@@ -3149,3 +3149,27 @@ Important boundary:
 - Next refactor step is to make composite/post readiness coverage coherent
   across full-pipeline debug views, then continue into texture-backed
   `SceneLocalEnvironmentV3`.
+
+Follow-up correction:
+
+- CompositeV3 and CinematicPostV3 are candidate-beauty domains, not mandatory
+  upstream diagnostic domains.
+- The contract now records `readiness_scope: candidate_beauty_requested` for
+  both domains.
+- Promotion now requires:
+  - base domains for every full-pipeline row.
+  - composite/post domains only where `candidate_beauty_requested=true`.
+- Re-running promotion on
+  `build/captures/v3_scene_profile_full_stress_20260607` passed as a review
+  packet:
+  `scene_profile=41/41`, material `54/54`,
+  lighting/environment/reflection `41/41`,
+  composite/cinematic-post `6/6` candidate rows, candidate beauty `6/6`.
+- Default beauty remains non-promotable until cross-family and motion evidence
+  exists.
+
+Operational blocker:
+
+- A fresh integrated rerun was attempted, but `Z:` ran out of disk while
+  writing packet stdout. More rendered sweeps require capture cleanup or
+  archive first.

@@ -284,6 +284,36 @@ Family packet extension:
 - This moves ReflectionV3 from one stress-scene proof toward cross-family
   evidence, but does not satisfy the final promotion matrix.
 
+CompositeV3 promotion gate:
+
+- `build_full_scene_shader_v3_promotion_decision.py` now requires
+  `v3_composite_diagnostics.json`.
+- Promotion evidence exposes CompositeV3 legacy-rescue, clamp, direct
+  contribution, and reflection contribution metrics.
+- Promotion blocks when explicit or overbright legacy rescue exceeds `0.05`,
+  when clamp debt exceeds `0.10`, or when requested candidate beauty lacks
+  meaningful direct/reflection contribution.
+- Existing clean evidence
+  `build\captures\v3_environment_payload_resource_binding_gallery_20260607`
+  passed the updated decision probe:
+  mean explicit legacy rescue `0.000000`, mean legacy rescue `0.000000`,
+  mean clamp mask `0.000110`, mean clamp ratio `0.000031`,
+  mean direct contribution `0.642235`, mean reflection contribution
+  `0.011335`.
+- Fresh post-change packet
+  `build\captures\v3_composite_promotion_gate_fresh_smoke_20260607` passed
+  end to end with V2 evidence, V3 placeholders, scene profile, environment
+  payload, material payload, CompositeV3 diagnostics, and promotion decision.
+  Its CompositeV3 metrics were: mean explicit legacy rescue `0.000000`, mean
+  legacy rescue `0.000000`, mean clamp mask `0.000110`, mean clamp ratio
+  `0.000031`, mean direct contribution `0.643191`, and mean reflection
+  contribution `0.011720`.
+- The fresh packet remained a review packet, not default promotion, because it
+  intentionally covered only the `stress_rt_showcase_reflection_closeup` family
+  and static motion.
+- This does not make CompositeV3 complete, but it prevents candidate-promotion
+  packets from ignoring legacy HDR rescue debt.
+
 ## 2026-06-07 Master Refactor Before Goal Feature Completion
 
 This is the current authoritative plan for moving CortexEngine from

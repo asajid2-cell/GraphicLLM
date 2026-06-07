@@ -184,6 +184,84 @@ Current next work after this checkpoint:
    alternatives than local/environment fallback on glossy surfaces.
 3. Promote `ReflectionV3` auto resolver packet evidence across more families.
 
+Latest CompositeV3 promotion gate checkpoint:
+
+- `tools\build_full_scene_shader_v3_promotion_decision.py` now requires and
+  consumes `v3_composite_diagnostics.json`.
+- The promotion decision evidence map now includes `composite_diagnostics`.
+- Composite diagnostic failures and warnings are folded into promotion
+  failures/warnings.
+- Promotion decisions now expose:
+  - `mean_explicit_legacy_rescue`
+  - `mean_legacy_rescue`
+  - `mean_clamp_mask`
+  - `mean_clamp_ratio`
+  - `mean_direct_contribution`
+  - `mean_reflection_contribution`
+- Promotion now blocks when:
+  - explicit legacy rescue mean exceeds `0.05`
+  - overbright legacy rescue mean exceeds `0.05`
+  - clamp mask or clamp ratio exceeds `0.10`
+  - requested candidate beauty has no meaningful direct/reflection
+    contribution
+- Updated the V3 static validator to require the CompositeV3 promotion metrics.
+
+Validation for CompositeV3 promotion gate:
+
+```powershell
+python -m py_compile tools\build_full_scene_shader_v3_promotion_decision.py tools\analyze_full_scene_shader_v3_composite_diagnostics.py tools\validate_full_scene_shader_pipeline_v3_plan.py
+python tools\validate_full_scene_shader_pipeline_v3_plan.py
+python tools\build_full_scene_shader_v3_promotion_decision.py --packet-root build\captures\v3_environment_payload_resource_binding_gallery_20260607 --output-json build\captures\v3_environment_payload_resource_binding_gallery_20260607\promotion_decision_composite_gate_probe.json --output-md build\captures\v3_environment_payload_resource_binding_gallery_20260607\promotion_decision_composite_gate_probe.md --allow-subset-review
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_full_scene_shader_pipeline_v3_packet.ps1 -NoBuild -SkipSceneAnalyzers -StressSceneOnly -StressSceneFilter rt_showcase:reflection_closeup -SmokeFrames 10 -CaptureFrame 5 -CaptureSequenceCount 1 -StabilityMotionMode static -OutputRoot build\captures\v3_composite_promotion_gate_fresh_smoke_20260607
+```
+
+Evidence:
+
+- Probe promotion decision passed with status `review_packet_passed`.
+- The promotion markdown now includes a `CompositeV3 Diagnostics` section.
+- Probe metrics from
+  `build\captures\v3_environment_payload_resource_binding_gallery_20260607`:
+  - mean explicit legacy rescue `0.000000`
+  - mean legacy rescue `0.000000`
+  - mean clamp mask `0.000110`
+  - mean clamp ratio `0.000031`
+  - mean direct contribution `0.642235`
+  - mean reflection contribution `0.011335`
+- Fresh V3 smoke packet:
+  `build\captures\v3_composite_promotion_gate_fresh_smoke_20260607`.
+  - scene-local packet passed
+  - V2 evidence passed
+  - V3 placeholder packet passed with `54` reports
+  - scene profile, environment payload, material payload, CompositeV3
+    diagnostics, and promotion decision passed
+  - promotion status `review_packet_passed`
+  - default beauty remained non-promotable because the packet intentionally
+    covered only `stress_rt_showcase_reflection_closeup` and static motion
+  - fresh CompositeV3 metrics:
+    - mean explicit legacy rescue `0.000000`
+    - mean legacy rescue `0.000000`
+    - mean clamp mask `0.000110`
+    - mean clamp ratio `0.000031`
+    - mean direct contribution `0.643191`
+    - mean reflection contribution `0.011720`
+
+Interpretation:
+
+- Candidate beauty promotion can no longer silently ignore CompositeV3
+  diagnostic artifacts.
+- Clean packets with zero legacy rescue continue to pass review.
+- Packets leaning on legacy HDR rescue will now be visible in the promotion
+  decision and can block promotion before user review.
+
+Current next work after this checkpoint:
+
+1. Add a negative synthetic/fixture test for promotion blocking when
+   `v3_composite_diagnostics.json` is missing or has high legacy rescue.
+2. Add a broader CompositeV3 matrix row with at least two motion modes and more
+   than the single stress family.
+3. Continue toward `SceneLocalEnvironmentV3` proxy-resource expansion and
+   broader ReflectionV3 family coverage.
+
 Latest ReflectionV3 bounded family packet checkpoint:
 
 - `tools\run_reflection_v3_motion_focus_packet.ps1` now supports

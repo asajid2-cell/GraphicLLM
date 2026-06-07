@@ -1,4 +1,4 @@
-# Full Scene Shader AAA Refactor Plan
+﻿# Full Scene Shader AAA Refactor Plan
 
 Status: planning ledger.
 
@@ -4006,3 +4006,49 @@ Known limitation:
   not used as clean environment-ready proof yet.
 - Aliases are an ownership bridge. They are not a substitute for proper
   per-family baked irradiance/specular/background proxy generation.
+
+### LightingShadowV3 Source Attribution Split - 2026-06-07
+
+Implemented:
+
+- Split `FullSceneLightingV3` shadow-source attribution into explicit source
+  channels:
+  - red: directional/sun shadow-loss ratio.
+  - green: local fixture shadow-loss ratio.
+  - blue: shadow-map path enabled.
+  - alpha: PCSS/filter path enabled.
+- Added `tools/analyze_full_scene_shader_v3_shadow_attribution.py`.
+  The analyzer checks that `v3_shadow_source_attribution` is not just present,
+  but has source signal consistent with `v3_shadow_loss`,
+  `v3_shadow_visibility`, and `v3_lighting_energy_budget`.
+- Updated `tools/run_lighting_v3_shadow_motion_focus_packet.ps1` so the
+  focused packet runs the attribution analyzer and emits
+  `v3_shadow_attribution.json/md`.
+- Narrowed `--focus shadow` in
+  `tools/analyze_full_scene_shader_v3_lighting_motion.py` to shadow-owned
+  views. `v3_indirect_lighting` is no longer part of this focused gate.
+- Updated the static V3 validator to include the new analyzer, runner,
+  deferred lighting shader, and source-split tokens.
+
+Validated evidence:
+
+- Static Python compile and PowerShell parse checks passed.
+- Native `CortexEngine` build passed with the known trailing `vswhere.exe`
+  warning after the successful Ninja target.
+- Fresh packet:
+  `build/captures/v3_lighting_shadow_source_split_focus_pass2_20260607`.
+- Packet wrapper passed end to end.
+- Motion analyzer passed:
+  `11` view sequences, `0` warnings, `0` failures.
+- Shadow-attribution analyzer passed:
+  `1` family, `0` warnings, `0` failures.
+- Attribution row for `stress_rt_showcase_reflection_closeup`:
+  sun loss `0.339516`, local loss `0.007993`, source active `0.464322`,
+  shadow-loss active `0.839763`, visibility occlusion `1.000000`,
+  shadow-map enabled `1.000000`, energy active `1.000000`.
+
+Known limitation:
+
+- This is still mouse-jitter stress, not the planned high-contrast light-sweep
+  row. The next LightingShadowV3 pass should add scripted light-rig variation
+  or cascade/slice attribution if source-specific instability remains.

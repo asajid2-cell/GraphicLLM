@@ -1,7 +1,7 @@
 param(
     [string]$OutputRoot = "build/captures/v3_lighting_shadow_motion_focus_packet",
     [string]$StressSceneFilter = "rt_showcase:reflection_closeup",
-    [string]$ViewFilter = "beauty,direct_light,direct_light_unshadowed,direct_light_shadow_loss,shadow_factor,ambient_ibl,v3_direct_lighting,v3_direct_lighting_unshadowed,v3_shadow_visibility,v3_shadow_loss,v3_indirect_lighting,v3_lighting_energy_budget,v3_shadow_source_attribution",
+    [string]$ViewFilter = "beauty,direct_light,direct_light_unshadowed,direct_light_shadow_loss,shadow_factor,v3_direct_lighting,v3_direct_lighting_unshadowed,v3_shadow_visibility,v3_shadow_loss,v3_lighting_energy_budget,v3_shadow_source_attribution",
     [int]$SmokeFrames = 24,
     [int]$CaptureFrame = 12,
     [int]$CaptureSequenceCount = 2,
@@ -21,11 +21,14 @@ $ErrorActionPreference = "Stop"
 $root = Resolve-Path (Join-Path $PSScriptRoot "..")
 $packetRunner = Join-Path $root "tools/run_scene_local_cinematic_renderer_v1_packets.ps1"
 $motionAnalyzer = Join-Path $root "tools/analyze_full_scene_shader_v3_lighting_motion.py"
+$shadowAttributionAnalyzer = Join-Path $root "tools/analyze_full_scene_shader_v3_shadow_attribution.py"
 $reviewSheetBuilder = Join-Path $root "tools/build_full_scene_shader_v2_review_sheet.py"
 $outputPath = Join-Path $root $OutputRoot
 $manifestPath = Join-Path $outputPath "manifest.json"
 $motionJson = Join-Path $outputPath "v3_lighting_shadow_motion_focus.json"
 $motionMd = Join-Path $outputPath "v3_lighting_shadow_motion_focus.md"
+$shadowAttributionJson = Join-Path $outputPath "v3_shadow_attribution.json"
+$shadowAttributionMd = Join-Path $outputPath "v3_shadow_attribution.md"
 $reviewSheet = Join-Path $outputPath "v3_lighting_shadow_motion_focus_sheet.png"
 $reviewSheetJson = Join-Path $outputPath "v3_lighting_shadow_motion_focus_sheet.json"
 $reviewSheetMd = Join-Path $outputPath "v3_lighting_shadow_motion_focus_sheet.md"
@@ -35,6 +38,9 @@ if (-not (Test-Path $packetRunner)) {
 }
 if (-not (Test-Path $motionAnalyzer)) {
     throw "V3 lighting motion analyzer missing: $motionAnalyzer"
+}
+if (-not (Test-Path $shadowAttributionAnalyzer)) {
+    throw "V3 shadow attribution analyzer missing: $shadowAttributionAnalyzer"
 }
 if (-not (Test-Path $reviewSheetBuilder)) {
     throw "Review sheet builder missing: $reviewSheetBuilder"
@@ -80,6 +86,15 @@ if ($FailOnWarning) {
     $analyzerArgs += "--fail-on-warning"
 }
 
+$shadowAttributionArgs = @(
+    "--manifest", $manifestPath,
+    "--output-json", $shadowAttributionJson,
+    "--output-md", $shadowAttributionMd
+)
+if ($FailOnWarning) {
+    $shadowAttributionArgs += "--fail-on-warning"
+}
+
 $reviewViews = "beauty,v3_shadow_visibility,v3_shadow_loss,v3_lighting_energy_budget,v3_shadow_source_attribution,direct_light_shadow_loss,shadow_factor"
 $reviewArgs = @(
     "--manifest", $manifestPath,
@@ -107,6 +122,11 @@ try {
         exit $LASTEXITCODE
     }
 
+    & python $shadowAttributionAnalyzer @shadowAttributionArgs
+    if ($LASTEXITCODE -ne 0) {
+        exit $LASTEXITCODE
+    }
+
     & python $reviewSheetBuilder @reviewArgs
     if ($LASTEXITCODE -ne 0) {
         exit $LASTEXITCODE
@@ -122,4 +142,5 @@ try {
 Write-Host "LightingV3 focused shadow-motion packet passed."
 Write-Host "manifest=$manifestPath"
 Write-Host "motion=$motionJson"
+Write-Host "shadow_attribution=$shadowAttributionJson"
 Write-Host "review_sheet=$reviewSheet"

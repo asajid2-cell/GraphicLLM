@@ -22,6 +22,15 @@ V3_LIGHTING_VIEWS = [
     "v3_shadow_source_attribution",
 ]
 
+SHADOW_FOCUS_LIGHTING_VIEWS = [
+    "v3_direct_lighting",
+    "v3_direct_lighting_unshadowed",
+    "v3_shadow_visibility",
+    "v3_shadow_loss",
+    "v3_lighting_energy_budget",
+    "v3_shadow_source_attribution",
+]
+
 CANDIDATE_COMPOSITE_VIEWS = [
     "candidate_hdr_scene_color",
     "reflection_radiance",
@@ -79,9 +88,14 @@ FOCUS_VIEW_SETS = {
         "legacy": [],
     },
     "shadow": {
-        "lighting": V3_LIGHTING_VIEWS,
+        "lighting": SHADOW_FOCUS_LIGHTING_VIEWS,
         "candidate": [],
-        "legacy": list(LEGACY_PAIRS.values()),
+        "legacy": [
+            "direct_light",
+            "direct_light_unshadowed",
+            "direct_light_shadow_loss",
+            "shadow_factor",
+        ],
     },
 }
 

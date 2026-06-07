@@ -8,7 +8,7 @@ from typing import Any
 
 
 ROOT = Path(__file__).resolve().parents[1]
-EXPECTED_PROXY_DERIVATION = "profile_payload_material_sample_v1"
+EXPECTED_PROXY_DERIVATION = "profile_payload_material_room_light_v1"
 PROXY_MANIFEST_PATH = ROOT / "assets" / "textures" / "scene_local_proxy" / "proxy_manifest.json"
 
 
@@ -54,6 +54,17 @@ def analyze_report(path: Path, proxy_manifest: dict[str, Any]) -> dict[str, Any]
     proxy_material_samples = proxy_inventory.get("material_samples", {}) if isinstance(proxy_inventory, dict) else {}
     if not isinstance(proxy_material_samples, dict):
         proxy_material_samples = {}
+    proxy_scene_influence = (
+        proxy_derivation.get("scene_contract_influence", {}) if isinstance(proxy_derivation, dict) else {}
+    )
+    if not isinstance(proxy_scene_influence, dict):
+        proxy_scene_influence = {}
+    proxy_room_shell = proxy_scene_influence.get("room_shell", {}) if isinstance(proxy_scene_influence, dict) else {}
+    if not isinstance(proxy_room_shell, dict):
+        proxy_room_shell = {}
+    proxy_light_rig = proxy_scene_influence.get("light_rig", {}) if isinstance(proxy_scene_influence, dict) else {}
+    if not isinstance(proxy_light_rig, dict):
+        proxy_light_rig = {}
     row = {
         "report": str(path),
         "family": scene_visual.get("family", "unknown"),
@@ -128,6 +139,10 @@ def analyze_report(path: Path, proxy_manifest: dict[str, Any]) -> dict[str, Any]
         "proxy_material_failed_color_count": int(
             proxy_material_samples.get("failed_color_payload_count", 0) or 0
         ),
+        "proxy_room_shell_enclosure": proxy_room_shell.get("enclosure", "none"),
+        "proxy_room_shell_occlusion": float(proxy_room_shell.get("local_background_occlusion", -1.0) or -1.0),
+        "proxy_light_rig_mode": proxy_light_rig.get("mode", "none"),
+        "proxy_light_rig_accent_strength": float(proxy_light_rig.get("accent_strength", -1.0) or -1.0),
         "failures": [],
     }
     if row["environment_ready"]:
@@ -223,6 +238,14 @@ def analyze_report(path: Path, proxy_manifest: dict[str, Any]) -> dict[str, Any]
             row["failures"].append(
                 f"payload ready without expected material-color decoder: {row['proxy_material_sample_decoder']}"
             )
+        if str(row["proxy_room_shell_enclosure"]).strip().lower() in {"", "none", "unknown"}:
+            row["failures"].append("payload ready without room-shell proxy influence")
+        if row["proxy_room_shell_occlusion"] < 0.0 or row["proxy_room_shell_occlusion"] > 1.0:
+            row["failures"].append("payload ready with invalid room-shell occlusion influence")
+        if str(row["proxy_light_rig_mode"]).strip().lower() in {"", "none", "unknown"}:
+            row["failures"].append("payload ready without light-rig proxy influence")
+        if row["proxy_light_rig_accent_strength"] < 0.0 or row["proxy_light_rig_accent_strength"] > 1.0:
+            row["failures"].append("payload ready with invalid light-rig accent influence")
     return row
 
 
@@ -237,8 +260,8 @@ def write_markdown(path: Path, result: dict[str, Any]) -> None:
         f"- profile-policy-consumed reports: `{result['profile_policy_consumed_report_count']}`",
         f"- failures: `{len(result['failures'])}`",
         "",
-        "| Family | Profile Policy | Shader Profile | Local Background | Texture Set | Textures | Albedo | Normal | Payload | Influence | Bound | Proxy Bound | Binding | Proxy Binding | Derivation | Samples | Proxies |",
-        "|---|---|---|---:|---|---:|---:|---:|---|---:|---:|---:|---|---|---|---:|---|",
+        "| Family | Profile Policy | Shader Profile | Local Background | Texture Set | Textures | Albedo | Normal | Payload | Influence | Bound | Proxy Bound | Binding | Proxy Binding | Derivation | Samples | Room | Light | Proxies |",
+        "|---|---|---|---:|---|---:|---:|---:|---|---:|---:|---:|---|---|---|---:|---|---|---|",
     ]
     for row in result["rows"]:
         proxies = ",".join(
@@ -270,6 +293,8 @@ def write_markdown(path: Path, result: dict[str, Any]) -> None:
                     f"`{row['proxy_binding_source']}`",
                     f"`{row['proxy_derivation_method']}`",
                     str(row["proxy_material_sampled_color_count"]),
+                    f"`{row['proxy_room_shell_enclosure']}`",
+                    f"`{row['proxy_light_rig_mode']}`",
                     proxies,
                 ]
             )
@@ -320,6 +345,12 @@ def main() -> int:
         ),
         "material_sampled_proxy_report_count": sum(
             1 for row in rows if row["proxy_material_sampled_color_count"] > 0
+        ),
+        "scene_contract_proxy_report_count": sum(
+            1
+            for row in rows
+            if str(row["proxy_room_shell_enclosure"]).strip().lower() not in {"", "none", "unknown"}
+            and str(row["proxy_light_rig_mode"]).strip().lower() not in {"", "none", "unknown"}
         ),
         "proxy_manifest": str(PROXY_MANIFEST_PATH),
         "profile_policy_consumed_report_count": sum(1 for row in rows if row["profile_policy_consumed"]),

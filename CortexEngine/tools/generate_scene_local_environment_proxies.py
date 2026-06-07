@@ -24,7 +24,7 @@ except Exception:  # pragma: no cover - optional local tool dependency
 
 ROOT = Path(__file__).resolve().parents[1]
 SOURCE_ID = "generate_scene_local_environment_proxies.py"
-DERIVATION_METHOD = "profile_payload_material_sample_v1"
+DERIVATION_METHOD = "profile_payload_material_room_light_v1"
 DEFAULT_SETS = {
     "rt_showcase_gallery": {
         "irradiance": (150, 146, 134),
@@ -85,6 +85,128 @@ ROLE_TINTS = {
     "metal": (196, 198, 198),
     "stage": (70, 42, 105),
     "exterior": (54, 77, 98),
+}
+ROOM_LIGHT_CONTRACTS = {
+    "rt_showcase_gallery": {
+        "room_shell": {
+            "enclosure": "gallery_partial",
+            "wall_reflectance": 0.66,
+            "ceiling_reflectance": 0.72,
+            "local_background_occlusion": 0.22,
+        },
+        "light_rig": {
+            "mode": "neutral_gallery_key",
+            "key_rgb": (214, 218, 224),
+            "fill_rgb": (170, 176, 184),
+            "accent_rgb": (192, 196, 198),
+            "accent_strength": 0.10,
+        },
+    },
+    "home_kitchen_lantern": {
+        "room_shell": {
+            "enclosure": "warm_enclosed_room",
+            "wall_reflectance": 0.58,
+            "ceiling_reflectance": 0.62,
+            "local_background_occlusion": 0.46,
+        },
+        "light_rig": {
+            "mode": "warm_practical_plus_fill",
+            "key_rgb": (255, 191, 119),
+            "fill_rgb": (167, 150, 133),
+            "accent_rgb": (255, 148, 70),
+            "accent_strength": 0.24,
+        },
+    },
+    "home_office_evening": {
+        "room_shell": {
+            "enclosure": "evening_enclosed_room",
+            "wall_reflectance": 0.52,
+            "ceiling_reflectance": 0.56,
+            "local_background_occlusion": 0.52,
+        },
+        "light_rig": {
+            "mode": "soft_warm_desk_fill",
+            "key_rgb": (235, 187, 127),
+            "fill_rgb": (120, 130, 148),
+            "accent_rgb": (255, 171, 92),
+            "accent_strength": 0.18,
+        },
+    },
+    "school_classroom_day": {
+        "room_shell": {
+            "enclosure": "bright_enclosed_room",
+            "wall_reflectance": 0.72,
+            "ceiling_reflectance": 0.78,
+            "local_background_occlusion": 0.28,
+        },
+        "light_rig": {
+            "mode": "cool_daylight_windows",
+            "key_rgb": (210, 226, 242),
+            "fill_rgb": (174, 185, 174),
+            "accent_rgb": (206, 216, 196),
+            "accent_strength": 0.08,
+        },
+    },
+    "basketball_gym_day": {
+        "room_shell": {
+            "enclosure": "tall_gym_volume",
+            "wall_reflectance": 0.62,
+            "ceiling_reflectance": 0.68,
+            "local_background_occlusion": 0.34,
+        },
+        "light_rig": {
+            "mode": "high_bay_day_fill",
+            "key_rgb": (228, 230, 220),
+            "fill_rgb": (184, 198, 211),
+            "accent_rgb": (255, 188, 86),
+            "accent_strength": 0.12,
+        },
+    },
+    "neon_streamer_concert": {
+        "room_shell": {
+            "enclosure": "dark_stage_volume",
+            "wall_reflectance": 0.24,
+            "ceiling_reflectance": 0.18,
+            "local_background_occlusion": 0.72,
+        },
+        "light_rig": {
+            "mode": "cyan_magenta_stage",
+            "key_rgb": (40, 205, 255),
+            "fill_rgb": (89, 48, 156),
+            "accent_rgb": (255, 61, 166),
+            "accent_strength": 0.42,
+        },
+    },
+    "red_light_room": {
+        "room_shell": {
+            "enclosure": "dark_red_room",
+            "wall_reflectance": 0.30,
+            "ceiling_reflectance": 0.24,
+            "local_background_occlusion": 0.66,
+        },
+        "light_rig": {
+            "mode": "red_practical_accent",
+            "key_rgb": (255, 42, 50),
+            "fill_rgb": (110, 24, 34),
+            "accent_rgb": (255, 94, 62),
+            "accent_strength": 0.36,
+        },
+    },
+    "stadium_night_match": {
+        "room_shell": {
+            "enclosure": "open_exterior_bowl",
+            "wall_reflectance": 0.36,
+            "ceiling_reflectance": 0.04,
+            "local_background_occlusion": 0.18,
+        },
+        "light_rig": {
+            "mode": "cool_floodlights",
+            "key_rgb": (214, 229, 255),
+            "fill_rgb": (72, 92, 118),
+            "accent_rgb": (122, 185, 255),
+            "accent_strength": 0.20,
+        },
+    },
 }
 
 
@@ -223,6 +345,66 @@ def material_sample_summary(dds_files: list[Path]) -> dict[str, Any]:
             for row in failures[:12]
         ],
     }
+
+
+def apply_room_light_contract(
+    colors: dict[str, tuple[int, int, int]],
+    contract: dict[str, Any],
+) -> tuple[dict[str, tuple[int, int, int]], dict[str, Any]]:
+    room_shell = contract["room_shell"]
+    light_rig = contract["light_rig"]
+    wall_reflectance = float(room_shell["wall_reflectance"])
+    ceiling_reflectance = float(room_shell["ceiling_reflectance"])
+    local_background_occlusion = float(room_shell["local_background_occlusion"])
+    accent_strength = float(light_rig["accent_strength"])
+    key_rgb = tuple(int(v) for v in light_rig["key_rgb"])
+    fill_rgb = tuple(int(v) for v in light_rig["fill_rgb"])
+    accent_rgb = tuple(int(v) for v in light_rig["accent_rgb"])
+
+    diffuse_reflectance = max(0.0, min(1.0, (wall_reflectance + ceiling_reflectance) * 0.5))
+    ambient_strength = 0.16 + 0.22 * diffuse_reflectance
+    occlusion_strength = max(0.0, min(0.78, local_background_occlusion))
+
+    irradiance = colors["irradiance"]
+    specular = colors["specular"]
+    visible = colors["visible_background"]
+
+    irradiance = mix(irradiance, fill_rgb, ambient_strength)
+    irradiance = darken(irradiance, occlusion_strength * 0.18)
+    specular = mix(specular, key_rgb, 0.18)
+    specular = mix(specular, accent_rgb, accent_strength * 0.32)
+    visible = mix(visible, fill_rgb, 0.12 + 0.14 * diffuse_reflectance)
+    visible = darken(visible, occlusion_strength * 0.36)
+    if str(room_shell["enclosure"]).startswith("open_"):
+        visible = mix(visible, key_rgb, 0.12)
+        irradiance = mix(irradiance, key_rgb, 0.08)
+    if "stage" in str(light_rig["mode"]) or "red" in str(light_rig["mode"]):
+        visible = mix(visible, accent_rgb, accent_strength * 0.22)
+        irradiance = mix(irradiance, accent_rgb, accent_strength * 0.18)
+
+    influenced = {
+        "irradiance": irradiance,
+        "specular": specular,
+        "visible_background": visible,
+    }
+    influence = {
+        "room_shell": {
+            "enclosure": room_shell["enclosure"],
+            "wall_reflectance": wall_reflectance,
+            "ceiling_reflectance": ceiling_reflectance,
+            "local_background_occlusion": local_background_occlusion,
+            "diffuse_reflectance": diffuse_reflectance,
+            "ambient_strength": ambient_strength,
+        },
+        "light_rig": {
+            "mode": light_rig["mode"],
+            "key_rgb": list(key_rgb),
+            "fill_rgb": list(fill_rgb),
+            "accent_rgb": list(accent_rgb),
+            "accent_strength": accent_strength,
+        },
+    }
+    return influenced, influence
 
 
 def dds_header(width: int, height: int, linear_size: int) -> bytes:
@@ -380,11 +562,13 @@ def derive_colors(set_id: str) -> tuple[dict[str, tuple[int, int, int]], dict[st
         "specular": specular,
         "visible_background": visible,
     }
+    colors, scene_contract_influence = apply_room_light_contract(colors, ROOM_LIGHT_CONTRACTS[set_id])
     derivation = {
         "method": DERIVATION_METHOD,
         "base_rgb": {role: list(rgb) for role, rgb in base.items()},
         "derived_rgb": {role: list(rgb) for role, rgb in colors.items()},
         "payload_inventory": inv,
+        "scene_contract_influence": scene_contract_influence,
         "weights": {
             "floor": floor_w,
             "wall": wall_w,

@@ -634,10 +634,29 @@ SceneLocalEnvironmentV3 proxy-resource binding:
   `build\captures\v3_scene_local_material_sample_proxy_cross_profile_20260607`
   passed environment payload/profile analysis across gallery, office, concert,
   and stadium with `4/4` material-sampled proxy reports.
+- Room/light proxy generation now exists through
+  `profile_payload_material_room_light_v1`.
+- The proxy generator records room-shell and light-rig influence in the
+  manifest, including enclosure, reflectance, local background occlusion, light
+  mode, key/fill/accent RGB, and accent strength.
+- The environment-payload analyzer now fails payload-ready packets unless
+  decoded material samples and scene-contract influence are both present.
+- Latest generation report:
+  `build\captures\scene_local_environment_proxy_generation_20260607\room_light_proxy_generation_report.json`.
+- Fresh room/light proxy packet
+  `build\captures\v3_scene_local_room_light_proxy_fresh_smoke_20260607`
+  passed with `54/54` derived proxy reports, `54/54` material-sampled proxy
+  reports, and `54/54` scene-contract proxy reports.
+- Cross-profile room/light proxy packet
+  `build\captures\v3_scene_local_room_light_proxy_cross_profile_20260607`
+  passed environment payload/profile analysis across gallery, office, concert,
+  and stadium with `4/4` scene-contract proxy reports and profile coverage for
+  gallery, enclosed room, stage, and open exterior.
 - This is still not final environment generation. The next environment step is
-  to add light-rig influence, room-shell influence, filtered diffuse
-  irradiance, filtered specular prefilter, and fresh packet proof for the
-  material-sampled derivation.
+  to convert flat BC1 proxy colors into filtered diffuse irradiance and
+  specular prefilter/probe-like resources, and to feed room/light contract
+  fields into renderer frame reports directly instead of only the offline
+  manifest.
 
 ## 2026-06-07 Master Refactor Before Goal Feature Completion
 

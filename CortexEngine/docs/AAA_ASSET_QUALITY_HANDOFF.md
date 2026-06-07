@@ -16,10 +16,11 @@ User direction:
 Current planning checkpoint:
 
 - Latest implementation moved `SceneLocalEnvironmentV3` proxy generation from
-  filename inventory into decoded material-color sampling. The generator now
-  uses Pillow DDS decoding for albedo/diffuse payloads and writes
-  `profile_payload_material_sample_v1` in the proxy manifest. The analyzer now
-  fails payload-ready reports unless decoded material samples are present.
+  filename inventory into decoded material-color sampling plus room-shell and
+  light-rig influence. The generator now uses Pillow DDS decoding for
+  albedo/diffuse payloads and writes `profile_payload_material_room_light_v1`
+  in the proxy manifest. The analyzer now fails payload-ready reports unless
+  decoded material samples and scene-contract influence are present.
 - Added the expanded
   `2026-06-07 Full Scene Shader Goal Feature Execution Architecture`
   section near the top of
@@ -816,6 +817,91 @@ Current next work after this checkpoint:
 2. Add room-shell and light-rig influence to the proxy derivation manifest.
 3. Separate frame-report diagnostics from visual capture success for unstable
    model-scene paths.
+
+Latest SceneLocalEnvironmentV3 room/light proxy checkpoint:
+
+- `tools\generate_scene_local_environment_proxies.py` now adds explicit
+  `ROOM_LIGHT_CONTRACTS` for every tracked scene-local proxy set.
+- Derivation method is now `profile_payload_material_room_light_v1`.
+- The manifest records `scene_contract_influence` with:
+  - room enclosure
+  - wall reflectance
+  - ceiling reflectance
+  - local background occlusion
+  - diffuse reflectance
+  - ambient strength
+  - light-rig mode
+  - key/fill/accent RGB
+  - accent strength
+- The generator applies that contract to the material-sampled proxy colors:
+  room reflectance and occlusion affect irradiance/visible background, while
+  light key/fill/accent colors affect irradiance/specular/background.
+- `tools\analyze_full_scene_shader_v3_environment_payload.py` now requires
+  payload-ready packets to prove room-shell and light-rig influence, not just
+  material samples.
+- `tools\validate_full_scene_shader_pipeline_v3_plan.py` now checks
+  `profile_payload_material_room_light_v1` in the V3 runtime surface.
+- Generated proxy report:
+  `build\captures\scene_local_environment_proxy_generation_20260607\room_light_proxy_generation_report.json`.
+- Manifest evidence:
+  - `basketball_gym_day`: `tall_gym_volume`, `high_bay_day_fill`
+  - `home_kitchen_lantern`: `warm_enclosed_room`,
+    `warm_practical_plus_fill`
+  - `home_office_evening`: `evening_enclosed_room`,
+    `soft_warm_desk_fill`
+  - `neon_streamer_concert`: `dark_stage_volume`, `cyan_magenta_stage`
+  - `red_light_room`: `dark_red_room`, `red_practical_accent`
+  - `rt_showcase_gallery`: `gallery_partial`, `neutral_gallery_key`
+  - `school_classroom_day`: `bright_enclosed_room`,
+    `cool_daylight_windows`
+  - `stadium_night_match`: `open_exterior_bowl`, `cool_floodlights`
+- Validation commands:
+
+```powershell
+python tools\generate_scene_local_environment_proxies.py --overwrite --out build\captures\scene_local_environment_proxy_generation_20260607\room_light_proxy_generation_report.json
+python -m py_compile tools\generate_scene_local_environment_proxies.py tools\analyze_full_scene_shader_v3_environment_payload.py tools\analyze_full_scene_shader_v3_placeholders.py tools\validate_full_scene_shader_pipeline_v3_plan.py
+python tools\validate_full_scene_shader_pipeline_v3_plan.py
+git -c submodule.recurse=false diff --check -- tools\generate_scene_local_environment_proxies.py tools\analyze_full_scene_shader_v3_environment_payload.py tools\validate_full_scene_shader_pipeline_v3_plan.py assets\textures\scene_local_proxy
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_full_scene_shader_pipeline_v3_packet.ps1 -NoBuild -SkipSceneAnalyzers -StressSceneOnly -StressSceneFilter rt_showcase:reflection_closeup -SmokeFrames 10 -CaptureFrame 5 -CaptureSequenceCount 1 -StabilityMotionMode static -OutputRoot build\captures\v3_scene_local_room_light_proxy_fresh_smoke_20260607
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_scene_local_cinematic_renderer_v1_packets.ps1 -NoBuild -OutputRoot build\captures\v3_scene_local_room_light_proxy_cross_profile_20260607 -FamilyFilter gallery,office,concert,stadium -ViewFilter scene_local_environment -SmokeFrames 10 -CaptureFrame 5 -CaptureSequenceCount 1 -SkipOwnerAnalysis -SkipMaterialAnalysis -SkipStabilityAnalysis -SkipVisualQualityAnalysis
+python tools\analyze_full_scene_shader_v3_environment_payload.py --manifest build\captures\v3_scene_local_room_light_proxy_cross_profile_20260607\manifest.json --output-json build\captures\v3_scene_local_room_light_proxy_cross_profile_20260607\v3_environment_payload_cross_profile.json --output-md build\captures\v3_scene_local_room_light_proxy_cross_profile_20260607\v3_environment_payload_cross_profile.md --min-payload-ready 3
+python tools\analyze_full_scene_shader_v3_environment_profiles.py --manifest build\captures\v3_scene_local_room_light_proxy_cross_profile_20260607\manifest.json --output-json build\captures\v3_scene_local_room_light_proxy_cross_profile_20260607\v3_environment_profiles_cross_profile.json --output-md build\captures\v3_scene_local_room_light_proxy_cross_profile_20260607\v3_environment_profiles_cross_profile.md --min-ready-reports 3 --min-distinct-modes 3 --min-distinct-profiles 3 --require-profile gallery_neutral=1 --require-profile enclosed_room=2 --require-profile stage=3 --require-profile open_exterior=4
+```
+
+- Focused packet:
+  `build\captures\v3_scene_local_room_light_proxy_fresh_smoke_20260607`.
+  - full V3 packet passed end to end
+  - `54` reports
+  - `54` payload-ready reports
+  - `54` derived proxy reports
+  - `54` material-sampled proxy reports
+  - `54` scene-contract proxy reports
+  - derivation: `profile_payload_material_room_light_v1`
+  - room: `gallery_partial`
+  - light: `neutral_gallery_key`
+- Cross-profile packet:
+  `build\captures\v3_scene_local_room_light_proxy_cross_profile_20260607`.
+  - packet runner passed
+  - environment payload analyzer passed
+  - environment profile analyzer passed
+  - `4` reports, `4` payload-ready, `4` derived proxy,
+    `4` material-sampled proxy, `4` scene-contract proxy
+  - derivation: `profile_payload_material_room_light_v1`
+  - rooms covered:
+    `dark_stage_volume`, `evening_enclosed_room`, `gallery_partial`,
+    `open_exterior_bowl`
+  - light rigs covered:
+    `cool_floodlights`, `cyan_magenta_stage`, `neutral_gallery_key`,
+    `soft_warm_desk_fill`
+
+Current next work after this checkpoint:
+
+1. Convert these room/light/material proxies from flat BC1 colors into filtered
+   irradiance/specular maps or probe-like resources.
+2. Separate report diagnostics from visual capture success for kitchen/gym/red
+   room model-scene instability.
+3. Feed the room/light contract into renderer frame reports directly, not only
+   the offline proxy manifest.
 
 Latest LightingShadowV3 source-attribution checkpoint:
 

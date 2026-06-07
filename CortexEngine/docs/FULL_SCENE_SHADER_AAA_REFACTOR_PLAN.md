@@ -3969,3 +3969,40 @@ Remaining environment debt:
   scene-local irradiance/specular/background proxy generation.
 - Cross-profile payload resource evidence is still required for enclosed room,
   stage/red room, exterior water, and stadium-like spaces.
+
+### SceneLocalEnvironmentV3 Cross-Profile Payload Aliases - 2026-06-07
+
+Implemented:
+
+- Added explicit scene-local payload source aliases for non-gallery families
+  without duplicating DDS assets:
+  `home_kitchen_lantern`, `home_office_evening`, `school_classroom_day`,
+  `basketball_gym_day`, `neon_streamer_concert`, `red_light_room`, and
+  `stadium_night_match`.
+- The alias path is shared by payload scanning and payload binding discovery,
+  so frame-report texture counts and shader SRV binding use the same source.
+- The static V3 validator now checks for the alias helper.
+
+Validated evidence:
+
+- Native build passed.
+- Cross-profile payload analysis passed on
+  `build/captures/v3_environment_payload_resource_binding_cross_profile_20260607`:
+  `5/5` reports payload-ready and resource-bindable.
+- Office probe passed on
+  `build/captures/v3_environment_payload_resource_binding_office_probe_20260607`:
+  `home_office_evening`, shader profile `enclosed_room`, `2` bound resources,
+  binding source `cached_scene_local_payload_pair`.
+- Combined profile analysis passed across gallery, office, concert, and
+  stadium evidence:
+  `57` environment-ready reports with shader profiles
+  `gallery_neutral`, `enclosed_room`, `stage`, and `open_exterior`.
+
+Known limitation:
+
+- Kitchen, gym, and red-room model packets still return nonzero because those
+  scenes hit the known renderer/model-scene capture instability before the
+  environment pass executes. They still emit payload diagnostics, but they are
+  not used as clean environment-ready proof yet.
+- Aliases are an ownership bridge. They are not a substitute for proper
+  per-family baked irradiance/specular/background proxy generation.

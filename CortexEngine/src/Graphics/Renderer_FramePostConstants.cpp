@@ -103,6 +103,26 @@ bool IsDdsPath(const std::filesystem::path& path) {
     return extension == ".dds" || extension == ".DDS";
 }
 
+void AppendSceneLocalPayloadAliasPaths(const std::string& setId,
+                                       std::vector<std::filesystem::path>& paths) {
+    auto addAlias = [&paths](const char* path) {
+        paths.emplace_back(path);
+        paths.emplace_back(std::filesystem::path("../../") / path);
+    };
+
+    if (setId == "rt_showcase_gallery" ||
+        setId == "home_kitchen_lantern" ||
+        setId == "home_office_evening" ||
+        setId == "school_classroom_day" ||
+        setId == "neon_streamer_concert" ||
+        setId == "red_light_room" ||
+        setId == "stadium_night_match") {
+        addAlias("assets/textures/rtshowcase");
+    } else if (setId == "basketball_gym_day") {
+        addAlias("assets/textures/scene_local/basketball_gym_day");
+    }
+}
+
 int PayloadTexturePriority(const std::filesystem::path& path) {
     const std::string filename = ToLowerAscii(path.filename().string());
     if (filename.find("floor") != std::string::npos) {
@@ -128,10 +148,7 @@ SceneLocalPayloadTextureCandidates FindSceneLocalPayloadTextureCandidates(const 
         std::filesystem::path("assets/textures/scene_local") / result.textureSetId,
         std::filesystem::path("../../assets/textures/scene_local") / result.textureSetId,
     };
-    if (result.textureSetId == "rt_showcase_gallery") {
-        candidateTextureSetPaths.emplace_back("assets/textures/rtshowcase");
-        candidateTextureSetPaths.emplace_back("../../assets/textures/rtshowcase");
-    }
+    AppendSceneLocalPayloadAliasPaths(result.textureSetId, candidateTextureSetPaths);
 
     std::error_code ec;
     std::filesystem::path textureSetPath;
@@ -195,10 +212,7 @@ SceneLocalPayloadScan ScanSceneLocalPayload(const std::string& family) {
         std::filesystem::path("assets/textures/scene_local") / setId,
         std::filesystem::path("../../assets/textures/scene_local") / setId,
     };
-    if (setId == "rt_showcase_gallery") {
-        candidateTextureSetPaths.emplace_back("assets/textures/rtshowcase");
-        candidateTextureSetPaths.emplace_back("../../assets/textures/rtshowcase");
-    }
+    AppendSceneLocalPayloadAliasPaths(setId, candidateTextureSetPaths);
     std::error_code ec;
     std::filesystem::path textureSetPath;
     for (const auto& candidate : candidateTextureSetPaths) {

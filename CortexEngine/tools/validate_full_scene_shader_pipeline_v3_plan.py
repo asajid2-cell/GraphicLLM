@@ -536,6 +536,7 @@ def main() -> int:
         "BuildSceneLocalEnvironmentV3ProfileParams",
         "BuildSceneLocalEnvironmentV3PayloadParams",
         "BuildSceneLocalEnvironmentV3PayloadBindingInfo",
+        "AppendSceneLocalPayloadAliasPaths",
         "g_CinematicDofParams.z",
         "g_CinematicDofParams.w",
         "g_FogExtraParams.y",

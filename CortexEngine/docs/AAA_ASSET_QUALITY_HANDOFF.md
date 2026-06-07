@@ -8881,3 +8881,54 @@ Current next work:
    authored atmosphere parameters per scene profile.
 2. Add cross-family/motion evidence once packet size is controlled.
 3. Keep default beauty unpromoted until cross-family and motion evidence pass.
+
+### V3 Promotion Matrix Harness - 2026-06-07
+
+Implemented:
+
+- Added `tools/build_full_scene_shader_v3_matrix_decision.py`.
+  - Aggregates multiple V3 packet roots.
+  - Reads each packet's `manifest.json` and `promotion_decision.json`.
+  - Tracks observed families and motion modes only from packets whose
+    promotion decision passed review.
+  - Emits `v3_matrix_decision.json` and `v3_matrix_decision.md`.
+  - Keeps `default_beauty_promotable=false`; this is evidence aggregation,
+    not automatic promotion.
+- Added `tools/run_full_scene_shader_pipeline_v3_matrix.ps1`.
+  - Safe default: aggregates existing `-PacketRoots`.
+  - Rendering a matrix requires explicit `-RunPackets`.
+  - Can run a bounded matrix over selected `-FamilyFilter`,
+    `-MotionModes`, and packet settings.
+
+Validation:
+
+```powershell
+python -m py_compile tools\build_full_scene_shader_v3_matrix_decision.py
+$tokens=$null; $errors=$null; [System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path tools\run_full_scene_shader_pipeline_v3_matrix.ps1), [ref]$tokens, [ref]$errors) | Out-Null; if ($errors.Count -gt 0) { $errors | Format-List; exit 1 }
+python tools\build_full_scene_shader_v3_matrix_decision.py --packet-root build\captures\v3_scene_local_environment_provenance_full_stress_20260607 --required-families gallery,kitchen --required-motion-modes static,mouse_jitter --output-json build\captures\v3_matrix_smoke_existing_20260607\v3_matrix_decision.json --output-md build\captures\v3_matrix_smoke_existing_20260607\v3_matrix_decision.md
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_full_scene_shader_pipeline_v3_matrix.ps1 -OutputRoot build\captures\v3_matrix_wrapper_existing_20260607 -PacketRoots build\captures\v3_scene_local_environment_provenance_full_stress_20260607 -RequiredFamilies gallery,kitchen -RequiredMotionModes static,mouse_jitter
+```
+
+Evidence:
+
+- The direct analyzer and wrapper both produced matrix reports from the
+  existing passing V3 packet.
+- Expected smoke result:
+  - packet count `1`
+  - passed packet count `1`
+  - observed family `stress_rt_showcase_reflection_closeup`
+  - observed motion `static`
+  - full matrix ready `false`
+  - missing required families `gallery,kitchen`
+  - missing required motion `mouse_jitter`
+- This proves the matrix harness catches incomplete coverage instead of
+  allowing a single stress/static packet to masquerade as full promotion
+  evidence.
+
+Current next work:
+
+1. Use the matrix harness for bounded cross-family/motion runs after choosing
+   the next packet budget.
+2. Continue texture-backed `SceneLocalEnvironmentV3` payload work.
+3. Keep default beauty unpromoted until matrix coverage is complete and visual
+   review accepts the generated scene quality.

@@ -3216,3 +3216,25 @@ Next refactor direction:
   texture-backed scene-local environment payloads: authored room visible
   background, local irradiance/specular proxies, and atmosphere parameters per
   scene profile.
+
+### V3 Promotion Matrix Harness - 2026-06-07
+
+Implemented:
+
+- `tools/build_full_scene_shader_v3_matrix_decision.py` aggregates passed V3
+  review packets and reports observed/missing families and motion modes.
+- `tools/run_full_scene_shader_pipeline_v3_matrix.ps1` either aggregates
+  existing packet roots or, with explicit `-RunPackets`, renders a bounded
+  family/motion matrix.
+- The harness keeps `default_beauty_promotable=false`; it is a promotion
+  evidence gate, not an automatic default switch.
+
+Smoke proof:
+
+- Existing passing packet
+  `build/captures/v3_scene_local_environment_provenance_full_stress_20260607`
+  was aggregated by both the Python analyzer and PowerShell wrapper.
+- The matrix correctly reported incomplete coverage:
+  one passed packet, observed motion `static`, observed family
+  `stress_rt_showcase_reflection_closeup`, missing required families
+  `gallery,kitchen`, and missing required motion `mouse_jitter`.

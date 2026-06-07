@@ -314,7 +314,10 @@
         "scene_local_payload_ready",
         "scene_local_irradiance_proxy_ready",
         "scene_local_specular_proxy_ready",
-        "scene_local_visible_background_proxy_ready"
+        "scene_local_visible_background_proxy_ready",
+        "scene_local_payload_texture_richness",
+        "scene_local_payload_proxy_score",
+        "scene_local_payload_shader_influence"
       ],
       "required_debug_views": [
         "environment_mode",

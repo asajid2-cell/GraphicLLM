@@ -5,8 +5,11 @@
 #include "Scene/Components.h"
 
 #include <algorithm>
+#include <cctype>
 #include <cstdlib>
 #include <cstring>
+#include <filesystem>
+#include <vector>
 
 #include <spdlog/spdlog.h>
 
@@ -54,6 +57,83 @@ float ReflectionV3SourceOverrideFromEnv() {
 
     spdlog::info("Renderer: ReflectionV3 source override {}", s_override);
     return s_override;
+}
+
+std::string SceneLocalPayloadTextureSetIdForFamily(const std::string& family) {
+    std::string id;
+    id.reserve(family.size());
+    for (char c : family) {
+        if ((c >= 'a' && c <= 'z') ||
+            (c >= 'A' && c <= 'Z') ||
+            (c >= '0' && c <= '9')) {
+            id.push_back(static_cast<char>(std::tolower(static_cast<unsigned char>(c))));
+        } else if (!id.empty() && id.back() != '_') {
+            id.push_back('_');
+        }
+    }
+    while (!id.empty() && id.back() == '_') {
+        id.pop_back();
+    }
+    return id.empty() ? "none" : id;
+}
+
+struct SceneLocalPayloadScan {
+    uint32_t textureCount = 0;
+    uint32_t albedoCount = 0;
+    uint32_t normalCount = 0;
+    bool present = false;
+};
+
+SceneLocalPayloadScan ScanSceneLocalPayload(const std::string& family) {
+    SceneLocalPayloadScan scan{};
+    const std::string setId = SceneLocalPayloadTextureSetIdForFamily(family);
+    if (setId == "none") {
+        return scan;
+    }
+
+    std::vector<std::filesystem::path> candidateTextureSetPaths = {
+        std::filesystem::path("assets/textures/scene_local") / setId,
+        std::filesystem::path("../../assets/textures/scene_local") / setId,
+    };
+    if (setId == "rt_showcase_gallery") {
+        candidateTextureSetPaths.emplace_back("assets/textures/rtshowcase");
+        candidateTextureSetPaths.emplace_back("../../assets/textures/rtshowcase");
+    }
+    std::error_code ec;
+    std::filesystem::path textureSetPath;
+    for (const auto& candidate : candidateTextureSetPaths) {
+        ec.clear();
+        if (std::filesystem::exists(candidate, ec) && std::filesystem::is_directory(candidate, ec)) {
+            textureSetPath = candidate;
+            break;
+        }
+    }
+    if (textureSetPath.empty()) {
+        return scan;
+    }
+
+    scan.present = true;
+    for (const auto& entry : std::filesystem::directory_iterator(textureSetPath, ec)) {
+        if (ec) {
+            break;
+        }
+        if (!entry.is_regular_file(ec)) {
+            continue;
+        }
+        const auto extension = entry.path().extension().string();
+        if (extension != ".dds" && extension != ".DDS") {
+            continue;
+        }
+        ++scan.textureCount;
+        const std::string filename = entry.path().filename().string();
+        if (filename.find("albedo") != std::string::npos) {
+            ++scan.albedoCount;
+        }
+        if (filename.find("normal") != std::string::npos) {
+            ++scan.normalCount;
+        }
+    }
+    return scan;
 }
 
 } // namespace
@@ -250,6 +330,45 @@ glm::vec4 Renderer::BuildSceneLocalEnvironmentV3ProfileParams() const {
                      0.0f);
 }
 
+glm::vec4 Renderer::BuildSceneLocalEnvironmentV3PayloadParams() const {
+    if (!m_sceneVisualContract.active) {
+        return glm::vec4(0.0f);
+    }
+
+    const SceneLocalPayloadScan scan = ScanSceneLocalPayload(m_sceneVisualContract.family);
+    const bool irradianceProxyReady =
+        scan.albedoCount > 0 &&
+        m_environmentState.localProbeDiffuseIntensity > 0.0f;
+    const bool specularProxyReady =
+        scan.normalCount > 0 &&
+        m_environmentState.localProbeSpecularIntensity > 0.0f;
+    const bool visibleBackgroundProxyReady =
+        m_sceneVisualContract.enclosedScene &&
+        !m_sceneVisualContract.externalHDRIVisible &&
+        scan.albedoCount > 0;
+    const uint32_t proxyCount =
+        (irradianceProxyReady ? 1u : 0u) +
+        (specularProxyReady ? 1u : 0u) +
+        (visibleBackgroundProxyReady ? 1u : 0u);
+    const bool payloadReady =
+        scan.present &&
+        scan.textureCount >= 2 &&
+        scan.albedoCount > 0 &&
+        scan.normalCount > 0 &&
+        proxyCount > 0u;
+    const float textureRichness = glm::clamp(static_cast<float>(scan.textureCount) / 10.0f, 0.0f, 1.0f);
+    const float proxyScore = glm::clamp(static_cast<float>(proxyCount) / 3.0f, 0.0f, 1.0f);
+    const float shaderInfluence =
+        payloadReady
+            ? glm::clamp(0.35f + 0.35f * textureRichness + 0.25f * proxyScore, 0.0f, 1.0f)
+            : 0.0f;
+
+    return glm::vec4(payloadReady ? 1.0f : 0.0f,
+                     textureRichness,
+                     proxyScore,
+                     shaderInfluence);
+}
+
 void Renderer::PopulateFrameDebugAndPostConstants(FrameConstants& frameData,
                                                  Scene::ECS_Registry* registry,
                                                  const FrameConstantCameraState& cameraState) {
@@ -329,7 +448,12 @@ void Renderer::PopulateFrameDebugAndPostConstants(FrameConstants& frameData,
         m_fogState.height,
         m_fogState.falloff,
         m_fogState.enabled ? 1.0f : 0.0f);
-    frameData.fogExtraParams = glm::vec4(m_fogState.startDistance, 0.0f, 0.0f, 0.0f);
+    const glm::vec4 sceneLocalPayload = BuildSceneLocalEnvironmentV3PayloadParams();
+    frameData.fogExtraParams = glm::vec4(
+        m_fogState.startDistance,
+        sceneLocalPayload.x,
+        sceneLocalPayload.y,
+        sceneLocalPayload.w);
 
     // SSAO parameters packed into aoParams. Disable sampling if the SSAO
     // resources are unavailable so post-process does not read null SRVs.

@@ -12,7 +12,7 @@ param(
     [double]$MotionLookCycles = 8.0,
     [double]$FixedDeltaTime = 0.008333333,
     [ValidateSet("auto", "local", "ssr", "rt", "environment", "none")]
-    [string]$SourceOverride = "ssr",
+    [string]$SourceOverride = "auto",
     [switch]$NoBuild,
     [switch]$RunSceneAnalyzers,
     [switch]$FailOnWarning
@@ -23,11 +23,14 @@ $ErrorActionPreference = "Stop"
 $root = Resolve-Path (Join-Path $PSScriptRoot "..")
 $packetRunner = Join-Path $root "tools/run_scene_local_cinematic_renderer_v1_packets.ps1"
 $motionAnalyzer = Join-Path $root "tools/analyze_full_scene_shader_v3_lighting_motion.py"
+$sourceResolverAnalyzer = Join-Path $root "tools/analyze_reflection_v3_source_resolver.py"
 $reviewSheetBuilder = Join-Path $root "tools/build_full_scene_shader_v2_review_sheet.py"
 $outputPath = Join-Path $root $OutputRoot
 $manifestPath = Join-Path $outputPath "manifest.json"
 $motionJson = Join-Path $outputPath "v3_reflection_motion_focus.json"
 $motionMd = Join-Path $outputPath "v3_reflection_motion_focus.md"
+$sourceResolverJson = Join-Path $outputPath "v3_reflection_source_resolver.json"
+$sourceResolverMd = Join-Path $outputPath "v3_reflection_source_resolver.md"
 $reviewSheet = Join-Path $outputPath "v3_reflection_motion_focus_sheet.png"
 $reviewSheetJson = Join-Path $outputPath "v3_reflection_motion_focus_sheet.json"
 $reviewSheetMd = Join-Path $outputPath "v3_reflection_motion_focus_sheet.md"
@@ -37,6 +40,9 @@ if (-not (Test-Path $packetRunner)) {
 }
 if (-not (Test-Path $motionAnalyzer)) {
     throw "V3 lighting/reflection motion analyzer missing: $motionAnalyzer"
+}
+if (-not (Test-Path $sourceResolverAnalyzer)) {
+    throw "ReflectionV3 source resolver analyzer missing: $sourceResolverAnalyzer"
 }
 if (-not (Test-Path $reviewSheetBuilder)) {
     throw "Review sheet builder missing: $reviewSheetBuilder"
@@ -83,6 +89,16 @@ if ($FailOnWarning) {
     $analyzerArgs += "--fail-on-warning"
 }
 
+$sourceResolverArgs = @(
+    "--manifest", $manifestPath,
+    "--output-json", $sourceResolverJson,
+    "--output-md", $sourceResolverMd,
+    "--min-sequence-count", [string]$CaptureSequenceCount
+)
+if ($FailOnWarning) {
+    $sourceResolverArgs += "--fail-on-warning"
+}
+
 $reviewViews = "beauty,reflection_radiance,reflection_confidence,reflection_source_id,reflection_rejected_source_mask,reflection_temporal_delta,reflection_history_v3_validity,reflection_history_v3_rejection"
 $reviewArgs = @(
     "--manifest", $manifestPath,
@@ -111,6 +127,11 @@ try {
         exit $LASTEXITCODE
     }
 
+    & python $sourceResolverAnalyzer @sourceResolverArgs
+    if ($LASTEXITCODE -ne 0) {
+        exit $LASTEXITCODE
+    }
+
     & python $reviewSheetBuilder @reviewArgs
     if ($LASTEXITCODE -ne 0) {
         exit $LASTEXITCODE
@@ -131,4 +152,5 @@ try {
 Write-Host "ReflectionV3 focused motion packet passed."
 Write-Host "manifest=$manifestPath"
 Write-Host "motion=$motionJson"
+Write-Host "source_resolver=$sourceResolverJson"
 Write-Host "review_sheet=$reviewSheet"

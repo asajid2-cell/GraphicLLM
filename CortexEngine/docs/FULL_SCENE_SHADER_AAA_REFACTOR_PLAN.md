@@ -213,6 +213,43 @@ requires candidate beauty to pass packet evidence and human review across the
 required family and motion matrix. Until then, the correct status is active
 renderer refactor, not public-release-ready AAA visuals.
 
+### ReflectionV3 Source Resolver Hysteresis Checkpoint
+
+Implemented after the planning slice:
+
+- Added bounded source hysteresis to `FullSceneReflectionResolverV3`.
+  Auto mode can hold the previous reflection source only when previous history
+  is reusable, the same source is still available, and the new winner is not
+  decisively better.
+- Forced overrides remain untouched as diagnostics. `local`, `ssr`, `rt`,
+  `environment`, and `none` still show what happens when a provider is forced.
+- Added `tools/analyze_reflection_v3_source_resolver.py`.
+  It measures `reflection_source_id` as categorical provider evidence instead
+  of generic luma:
+  - red: source class
+  - green: confidence
+  - blue: override policy
+  - outputs: source delta, switch ratio, active switch ratio, dominant source,
+    and warnings
+- Wired the analyzer into
+  `tools/run_reflection_v3_motion_focus_packet.ps1`.
+- Changed the focused runner default to `-SourceOverride auto` because the
+  production resolver gate should test the actual auto policy. Forced SSR
+  remains available as explicit stress evidence.
+- Updated the V3 static validator so the resolver shader, focused runner, and
+  source analyzer stay in the checked runtime surface.
+
+Evidence:
+
+- `build\captures\v3_reflection_source_hysteresis_focus_20260607`
+  passed in auto mode with `0` resolver warnings:
+  max source switch `0.000442`, max active switch `0.000442`.
+- `build\captures\v3_reflection_source_hysteresis_forced_ssr_focus_20260607`
+  produced expected resolver warnings:
+  max source switch `0.101157`, max active switch `0.261804`.
+  This proves the analyzer catches provider churn and leaves forced SSR as a
+  remaining targeted diagnostic.
+
 ## 2026-06-07 Master Refactor Before Goal Feature Completion
 
 This is the current authoritative plan for moving CortexEngine from

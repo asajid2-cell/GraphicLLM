@@ -35,4 +35,27 @@ bool FullSceneShaderV3GraphBuilder::SubmitDisplay(
     return FullSceneShaderV3Passes::AddCandidateBeautyDisplayPass(m_graph, context);
 }
 
+bool FullSceneShaderV3GraphBuilder::SubmitDisplay(
+    const DisplayCommon& common,
+    const DisplaySubmission& submission) {
+    FullSceneShaderV3Passes::CandidateBeautyDisplayContext context{};
+    context.passName = submission.passName;
+    context.candidate = submission.candidate;
+    context.backBuffer = common.backBuffer;
+    context.device = common.device;
+    context.descriptorManager = common.descriptorManager;
+    context.commandList = common.commandList;
+    context.rootSignature = common.rootSignature;
+    context.pipeline = common.pipeline;
+    context.frameConstants = common.frameConstants;
+    context.candidateSRV = submission.candidateSRV;
+    context.backBufferRTV = common.backBufferRTV;
+    context.width = common.width;
+    context.height = common.height;
+    context.ran = submission.ran;
+    context.failed = common.failed;
+    context.stage = common.stage;
+    return SubmitDisplay(context);
+}
+
 } // namespace Cortex::Graphics

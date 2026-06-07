@@ -361,6 +361,8 @@ def main() -> int:
     )
     for token in [
         "FullSceneShaderV3GraphBuilder",
+        "DisplayCommon",
+        "DisplaySubmission",
         "SubmitSceneLocalEnvironment",
         "SubmitReflectionResolver",
         "SubmitReflectionHistory",
@@ -402,6 +404,21 @@ def main() -> int:
         "src/Graphics/Passes/FullSceneShaderV3Passes.cpp" in cmake_source,
         errors,
         "CMakeLists.txt must compile FullSceneShaderV3Passes.cpp",
+    )
+    require(
+        "CandidateBeautyDisplayContext" not in render_graph_end_frame_source,
+        errors,
+        "Renderer_RenderGraphEndFrame.cpp must not construct CandidateBeautyDisplayContext directly",
+    )
+    require(
+        "DisplayCommon displayCommon" in render_graph_end_frame_source,
+        errors,
+        "Renderer_RenderGraphEndFrame.cpp must use shared V3 display common state",
+    )
+    require(
+        "SubmitDisplay(displayCommon" in render_graph_end_frame_source,
+        errors,
+        "Renderer_RenderGraphEndFrame.cpp must submit V3 displays through graph-builder common display API",
     )
     for token in [
         "AddSceneLocalEnvironmentV3Pass(",

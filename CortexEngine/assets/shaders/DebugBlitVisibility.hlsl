@@ -3,7 +3,7 @@
 
 Texture2D<uint2> g_VisibilityTexture : register(t0);
 cbuffer DebugBlitConstants : register(b0) {
-    uint g_DebugMode;      // 0=payload/instance, 1=material id, 2=stable object id, 3..6=material-table policy columns
+    uint g_DebugMode;      // 0=payload/instance, 1=material id, 2=stable object id, 3..7=material-table diagnostics
     uint g_InstanceCount;
     uint g_MaterialCount;
     uint g_Padding;
@@ -49,6 +49,8 @@ struct VBMaterialConstants {
 };
 StructuredBuffer<VBMaterialConstants> g_Materials : register(t2);
 SamplerState g_Sampler : register(s0); // Unused (kept for shared root sig)
+
+static const uint INVALID_BINDLESS_INDEX = 0xFFFFFFFFu;
 
 struct VSOutput {
     float4 position : SV_Position;
@@ -105,6 +107,55 @@ static float3 PolicyColor(uint id, uint mode) {
     return ColorFromID(id + mode * 1024u);
 }
 
+static float MissingTexture(uint textureIndex) {
+    return textureIndex == INVALID_BINDLESS_INDEX ? 1.0f : 0.0f;
+}
+
+static float RequestedMissingTexture(float requested, uint textureIndex) {
+    return step(0.01f, saturate(requested)) * MissingTexture(textureIndex);
+}
+
+static float4 MaterialMissingChannelMaskColor(VBMaterialConstants material) {
+    const float coreMissing =
+        (MissingTexture(material.textureIndices.x) +
+         MissingTexture(material.textureIndices.y) +
+         MissingTexture(material.textureIndices.z) +
+         MissingTexture(material.textureIndices.w)) * 0.25f;
+
+    const float occlusionRequested = saturate(material.extraParams.x);
+    const float emissiveRequested =
+        saturate(max(max(material.emissiveFactorStrength.x, material.emissiveFactorStrength.y),
+                     max(material.emissiveFactorStrength.z, material.emissiveFactorStrength.w)));
+    const float transmissionRequested = saturate(material.transmissionParams.x);
+    const float clearCoatRequested = saturate(material.coatParams.x);
+    const float clearCoatRoughnessRequested = clearCoatRequested;
+    const float specularRequested = saturate(material.specularParams.w);
+    const float specularColorRequested =
+        saturate(max(max(material.specularParams.x, material.specularParams.y), material.specularParams.z));
+
+    const float requested =
+        step(0.01f, occlusionRequested) +
+        step(0.01f, emissiveRequested) +
+        step(0.01f, transmissionRequested) +
+        step(0.01f, clearCoatRequested) +
+        step(0.01f, clearCoatRoughnessRequested) +
+        step(0.01f, specularRequested) +
+        step(0.01f, specularColorRequested);
+
+    const float advancedMissing =
+        RequestedMissingTexture(occlusionRequested, material.textureIndices2.x) +
+        RequestedMissingTexture(emissiveRequested, material.textureIndices2.y) +
+        RequestedMissingTexture(transmissionRequested, material.textureIndices3.x) +
+        RequestedMissingTexture(clearCoatRequested, material.textureIndices3.y) +
+        RequestedMissingTexture(clearCoatRoughnessRequested, material.textureIndices3.z) +
+        RequestedMissingTexture(specularRequested, material.textureIndices3.w) +
+        RequestedMissingTexture(specularColorRequested, material.textureIndices4.x);
+    const float advancedMissingRatio = requested > 0.0f ? advancedMissing / requested : 0.0f;
+    const float fallbackDebt = max(coreMissing, advancedMissingRatio);
+
+    return float4(coreMissing, advancedMissingRatio, fallbackDebt, 1.0f);
+}
+
 float4 PSMain(VSOutput input) : SV_Target0 {
     uint2 pixelCoord = uint2(input.position.xy);
     uint2 vis = g_VisibilityTexture.Load(int3(pixelCoord, 0));
@@ -126,12 +177,14 @@ float4 PSMain(VSOutput input) : SV_Target0 {
             id = instance.materialIndex;
         } else if (g_DebugMode == 2u) {
             id = instance.cullingId;
-        } else if (g_DebugMode >= 3u && g_DebugMode <= 6u) {
+        } else if (g_DebugMode >= 3u && g_DebugMode <= 7u) {
             if (instance.materialIndex >= g_MaterialCount) {
                 return float4(1, 0, 1, 1);
             }
             VBMaterialConstants material = g_Materials[instance.materialIndex];
-            if (g_DebugMode == 3u) {
+            if (g_DebugMode == 7u) {
+                return MaterialMissingChannelMaskColor(material);
+            } else if (g_DebugMode == 3u) {
                 id = material.policyParams.x;
             } else if (g_DebugMode == 4u) {
                 id = material.policyParams.y;

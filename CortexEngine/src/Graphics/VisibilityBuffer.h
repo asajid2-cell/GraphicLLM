@@ -443,6 +443,7 @@ public:
         ReflectionPolicy = 4,
         TemporalPolicy = 5,
         PostSensitivity = 6,
+        MaterialMissingChannelMask = 7,
     };
 
     // Debug: Blit albedo to HDR buffer for visualization

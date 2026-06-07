@@ -17,6 +17,10 @@ REQUIRED_DOMAINS = {
     "composite",
     "cinematic_post",
 }
+CANDIDATE_ONLY_DOMAINS = {
+    "composite",
+    "cinematic_post",
+}
 
 DEFAULT_REQUIRED_FAMILIES = [
     "gallery",
@@ -171,6 +175,8 @@ def make_decision(
     if stability.get("lighting_signal_metrics_ready") is not True:
         failures.append("lighting signal metrics are not ready")
 
+    candidate_beauty_requested_count = count_signal_flag(signal, "candidate_beauty_requested")
+    candidate_beauty_ready_count = count_signal_flag(signal, "candidate_beauty_ready")
     required_count_fields = {
         "scene_profile": "scene_profile_ready_report_count",
         "material": "material_ready_report_count",
@@ -184,8 +190,15 @@ def make_decision(
     for domain, field in required_count_fields.items():
         value = int(stability.get(field, 0) or 0)
         domain_counts[domain] = value
-        expected_count = report_count if domain == "material" else full_pipeline_report_count
-        expected_label = "report_count" if domain == "material" else "full_pipeline_report_count"
+        if domain in CANDIDATE_ONLY_DOMAINS:
+            expected_count = candidate_beauty_requested_count
+            expected_label = "candidate_beauty_requested_count"
+        elif domain == "material":
+            expected_count = report_count
+            expected_label = "report_count"
+        else:
+            expected_count = full_pipeline_report_count
+            expected_label = "full_pipeline_report_count"
         if value != expected_count:
             failures.append(f"{field} {value} does not match {expected_label} {expected_count}")
 
@@ -198,12 +211,13 @@ def make_decision(
             if "material" not in domains:
                 failures.append(f"{report} material diagnostic row is missing material ready domain")
             continue
-        missing = sorted(REQUIRED_DOMAINS - domains)
+        required_domains = set(REQUIRED_DOMAINS)
+        if row.get("candidate_beauty_requested") is not True:
+            required_domains -= CANDIDATE_ONLY_DOMAINS
+        missing = sorted(required_domains - domains)
         if missing:
             failures.append(f"{report} missing ready domains: {', '.join(missing)}")
 
-    candidate_beauty_requested_count = count_signal_flag(signal, "candidate_beauty_requested")
-    candidate_beauty_ready_count = count_signal_flag(signal, "candidate_beauty_ready")
     if candidate_beauty_ready_count > candidate_beauty_requested_count:
         failures.append("candidate beauty ready count exceeds requested count")
     for row in signal_rows_with_flag(signal, "candidate_beauty_ready"):

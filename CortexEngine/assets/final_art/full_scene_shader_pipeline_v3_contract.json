@@ -299,6 +299,7 @@
       "producer": "FullSceneCompositeV3",
       "adapter_producer": "FullSceneCompositeV3Adapter",
       "adapter_output_resource": "hdr_color",
+      "readiness_scope": "candidate_beauty_requested",
       "required_inputs": [
         "material_attributes",
         "direct_lighting",
@@ -327,6 +328,7 @@
     },
     "cinematic_post": {
       "producer": "CinematicPostV3",
+      "readiness_scope": "candidate_beauty_requested",
       "required_stages": [
         "filmic_tonemap",
         "exposure",

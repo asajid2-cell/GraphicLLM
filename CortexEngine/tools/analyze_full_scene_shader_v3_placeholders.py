@@ -464,7 +464,7 @@ def analyze_report(
                 failures.append("environment domain must expose environment_mode debug view")
             if environment_domain.get("default_beauty_affects") is not False:
                 failures.append("environment domain must not affect default beauty yet")
-            if environment_domain.get("ready_channel_count", 0) < 13:
+            if environment_domain.get("ready_channel_count", 0) < 15:
                 failures.append("environment domain ready without all required channels")
             mode = v3.get("scene_local_environment_mode")
             if mode not in {"enclosed_room", "open_exterior", "stage", "neutral_lab"}:
@@ -495,6 +495,17 @@ def analyze_report(
                     failures.append("environment policy does not match SceneProfileV3 policy")
                 if v3.get("scene_local_environment_profile_reflection_policy") != policy_contract.get("reflection_policy"):
                     failures.append("environment reflection policy does not match SceneProfileV3 policy")
+            shader_profile = v3.get("scene_local_environment_shader_profile")
+            shader_profile_mode = float(v3.get("scene_local_environment_shader_profile_mode", -1.0) or -1.0)
+            local_background_strength = float(
+                v3.get("scene_local_environment_local_background_strength", -1.0) or -1.0
+            )
+            if not isinstance(shader_profile, str) or shader_profile.strip().lower() in {"", "unknown", "none", "default"}:
+                failures.append("environment domain ready without shader profile resource selection")
+            if shader_profile_mode < 0.0 or shader_profile_mode > 4.0:
+                failures.append("environment shader profile mode is out of range")
+            if local_background_strength < 0.0 or local_background_strength > 1.0:
+                failures.append("environment local background strength is out of range")
         for resource in [
             "scene_local_environment",
             "ambient_lighting",

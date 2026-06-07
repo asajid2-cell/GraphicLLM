@@ -3572,3 +3572,51 @@ Next refactor direction:
   irradiance/specular/background color selection.
 - Treat repeated model-authored scene `DXGI_ERROR_DEVICE_HUNG` failures as a
   separate renderer stability blocker for broad cross-family capture packets.
+
+### SceneLocalEnvironmentV3 Shader Profile Resource Selection - 2026-06-07
+
+Implemented:
+
+- `SceneLocalEnvironmentV3` now has a runtime shader-profile selector produced
+  from the active scene profile/visual contract by
+  `Renderer::BuildSceneLocalEnvironmentV3ProfileParams()`.
+- The profile selector is carried to shaders in
+  `FrameConstants::cinematicDofParams.zw`:
+  profile mode in `.z`, local-background ownership strength in `.w`.
+- The environment shader uses the profile to choose local gallery, enclosed
+  room, stage, and exterior palettes for visible background, ambient lighting,
+  reflection background, and atmosphere. This is the first actual shader-side
+  resource-selection step after the earlier provenance/policy-consumption
+  checkpoints.
+- Frame reports and V3 context now expose the selected shader profile, numeric
+  profile mode, and local-background strength. Environment readiness requires
+  these lanes, raising the channel contract to `15/15`.
+- The contract, analyzers, and validator now require these lanes. The validator
+  explicitly includes `Renderer_FramePostConstants.cpp`, so producer-side C++
+  wiring is part of the checked runtime surface.
+
+Validated evidence:
+
+- Static Python compile and V3 plan validation passed.
+- Focused diff hygiene passed for the renderer, shader, contract, analyzer,
+  and validator files.
+- Native `CortexEngine` target rebuilt successfully.
+- Packet
+  `build/captures/v3_scene_local_environment_shader_profile_stress_20260607`
+  passed V2 evidence, V3 placeholder checks, scene-profile analysis,
+  environment-payload analysis, material-payload analysis, CompositeV3
+  diagnostics, and promotion decision.
+- Environment payload reported `54` reports, `54` profile-policy-consumed
+  reports, `0` failures, and the new shader profile row:
+  `gallery_neutral`, mode `1.0`, local-background strength `0.35`.
+
+Next refactor direction:
+
+- Add texture-backed payload sets for gallery and promotion-family scenes, then
+  replace palette-only profile selection with payload-backed local irradiance,
+  local specular, visible-background, and atmosphere resources.
+- Add a bounded cross-profile packet proving gallery, enclosed room, stage/red
+  room, and exterior modes select different environment behavior.
+- Keep CinematicPostV3 tuning blocked until SceneLocalEnvironmentV3,
+  LightingShadowV3, ReflectionV3, and CompositeV3 ownership evidence is
+  materially stronger.

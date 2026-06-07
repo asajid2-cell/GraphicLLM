@@ -47,6 +47,8 @@ cbuffer FrameConstants : register(b1)
     uint4    g_ClusterSRVIndices;
     float4   g_ProjectionParams;
     float4   g_CinematicParams;
+    // x/y = DOF focus/aperture for post, z = SceneLocalEnvironmentV3 profile
+    // mode, w = local background ownership strength.
     float4   g_CinematicDofParams;
     float4   g_CinematicStabilityParams;
     float4   g_CinematicLookParams;
@@ -95,27 +97,48 @@ PSOutput PSMain(VSOutput input) {
     const float backgroundExposure = saturate(g_EnvParams.w / 4.0f);
     const float probeDiffuse = saturate(g_LocalProbeParams.x);
     const float probeSpecular = saturate(g_LocalProbeParams.y);
+    const float profileMode = round(max(g_CinematicDofParams.z, 0.0f));
+    const float localBackgroundStrength = saturate(g_CinematicDofParams.w);
+    const float isGallery = 1.0f - step(0.5f, abs(profileMode - 1.0f));
+    const float isRoom = 1.0f - step(0.5f, abs(profileMode - 2.0f));
+    const float isStage = 1.0f - step(0.5f, abs(profileMode - 3.0f));
+    const float isExterior = 1.0f - step(0.5f, abs(profileMode - 4.0f));
 
     const float3 skyCool = float3(0.20f, 0.31f, 0.48f);
-    const float3 roomNeutral = float3(0.12f, 0.13f, 0.14f);
-    const float3 visibleColor = lerp(roomNeutral, skyCool, saturate(backgroundExposure + 0.35f * iblEnabled));
-    const float3 visibleGradient = visibleColor * lerp(0.65f, 1.20f, uvHorizon);
-    const float3 reflectionColor = lerp(ambientTint * 0.18f, ambientTint * 0.55f, saturate(specularIBL + probeSpecular));
-    const float3 fogColor = lerp(ambientTint * 0.22f, visibleColor, saturate(fogEnabled + backgroundExposure));
+    const float3 galleryNeutral = float3(0.18f, 0.175f, 0.16f);
+    const float3 roomWarm = float3(0.22f, 0.155f, 0.105f);
+    const float3 stageMagenta = float3(0.24f, 0.045f, 0.16f);
+    const float3 stageCyan = float3(0.025f, 0.19f, 0.27f);
+    const float3 exteriorSky = float3(0.24f, 0.34f, 0.50f);
+    float3 localPalette = galleryNeutral;
+    localPalette = lerp(localPalette, roomWarm, isRoom);
+    localPalette = lerp(localPalette, lerp(stageMagenta, stageCyan, input.texCoord.x), isStage);
+    localPalette = lerp(localPalette, exteriorSky, isExterior);
+
+    const float externalBackgroundWeight =
+        saturate((1.0f - localBackgroundStrength) * (backgroundExposure + 0.35f * iblEnabled));
+    const float3 visibleColor = lerp(localPalette, skyCool, externalBackgroundWeight);
+    const float3 visibleGradient = visibleColor * lerp(0.62f, 1.24f, uvHorizon);
+    const float reflectionLocalWeight = saturate(localBackgroundStrength + localProbeEnabled * 0.35f);
+    const float3 profileReflection = lerp(localPalette * 0.32f, ambientTint * 0.58f, saturate(specularIBL + probeSpecular));
+    const float3 reflectionColor = lerp(ambientTint * 0.18f, profileReflection, reflectionLocalWeight);
+    const float stageHaze = isStage * saturate(0.35f + 0.45f * fogEnabled + 0.25f * lightCountSignal);
+    const float3 fogColor = lerp(ambientTint * 0.22f, visibleColor, saturate(fogEnabled + backgroundExposure + stageHaze));
 
     PSOutput output;
     output.sceneLocalEnvironment = float4(
-        saturate(0.15f + 0.30f * iblEnabled + 0.35f * localProbeEnabled),
+        saturate(0.12f + 0.24f * iblEnabled + 0.38f * localProbeEnabled + 0.18f * localBackgroundStrength),
         saturate(lightCountSignal + diffuseIBL),
-        saturate(fogEnabled + backgroundExposure),
+        saturate(fogEnabled + backgroundExposure + localBackgroundStrength * 0.25f + stageHaze),
         1.0f);
     output.ambientLighting = float4(
-        ambientTint * saturate(0.15f + ambientLuma + diffuseIBL + probeDiffuse + 0.10f * sunIntensity),
+        lerp(ambientTint, localPalette, saturate(localBackgroundStrength * 0.55f)) *
+            saturate(0.15f + ambientLuma + diffuseIBL + probeDiffuse + 0.10f * sunIntensity),
         saturate(diffuseIBL + probeDiffuse + lightCountSignal));
     output.visibleBackground = float4(visibleGradient, saturate(backgroundExposure + iblEnabled * 0.35f));
     output.reflectionBackground = float4(reflectionColor, saturate(specularIBL + probeSpecular + localProbeEnabled * 0.25f));
     output.atmosphere = float4(
-        fogColor * saturate(0.20f + g_FogParams.x * 20.0f + fogEnabled * 0.55f),
-        saturate(fogEnabled + g_ColorGrade.z * 0.25f));
+        fogColor * saturate(0.20f + g_FogParams.x * 20.0f + fogEnabled * 0.55f + stageHaze * 0.45f),
+        saturate(fogEnabled + g_ColorGrade.z * 0.25f + stageHaze));
     return output;
 }

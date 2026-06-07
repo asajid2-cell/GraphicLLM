@@ -229,6 +229,22 @@ void FinalizeCinematicPostBudget(FrameContract& contract) {
     post.lensDirtBudgeted = post.budgetTracked && post.lensDirt > 0.0f;
 }
 
+std::string SceneLocalEnvironmentShaderProfileName(float mode) {
+    const int rounded = static_cast<int>(std::round(mode));
+    switch (rounded) {
+    case 1:
+        return "gallery_neutral";
+    case 2:
+        return "enclosed_room";
+    case 3:
+        return "stage";
+    case 4:
+        return "open_exterior";
+    default:
+        return "neutral_lab";
+    }
+}
+
 } // namespace
 
 void Renderer::UpdateFrameContractSnapshot(Scene::ECS_Registry* registry,
@@ -324,6 +340,11 @@ void Renderer::UpdateFrameContractSnapshot(Scene::ECS_Registry* registry,
     contract.sceneVisual.lightingScriptId = m_lightingState.activeLightingScriptId;
     contract.sceneVisual.toneMapperPreset = m_postProcessState.toneMapperPreset;
     PopulateSceneLocalTexturePayload(contract.environment, contract.sceneVisual);
+    const glm::vec4 sceneLocalEnvironmentProfile = BuildSceneLocalEnvironmentV3ProfileParams();
+    contract.environment.sceneLocalShaderProfileMode = sceneLocalEnvironmentProfile.x;
+    contract.environment.sceneLocalBackgroundStrength = sceneLocalEnvironmentProfile.y;
+    contract.environment.sceneLocalShaderProfile =
+        SceneLocalEnvironmentShaderProfileName(sceneLocalEnvironmentProfile.x);
 
     contract.plannedFeatures = featurePlan.planned;
     contract.executedFeatures = featurePlan.active;

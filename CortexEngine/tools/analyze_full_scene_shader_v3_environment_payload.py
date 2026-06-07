@@ -41,6 +41,11 @@ def analyze_report(path: Path) -> dict[str, Any]:
         "profile_policy_environment": v3.get("scene_local_environment_profile_policy", "unknown"),
         "profile_policy_enclosure_mode": v3.get("scene_local_environment_profile_enclosure_mode", "unknown"),
         "profile_policy_reflection": v3.get("scene_local_environment_profile_reflection_policy", "unknown"),
+        "shader_profile": v3.get("scene_local_environment_shader_profile", "unknown"),
+        "shader_profile_mode": float(v3.get("scene_local_environment_shader_profile_mode", -1.0) or -1.0),
+        "local_background_strength": float(
+            v3.get("scene_local_environment_local_background_strength", -1.0) or -1.0
+        ),
         "scene_profile_policy_contract_id": policy_contract.get("contract_id", "unknown"),
         "scene_profile_policy_environment": policy_contract.get("environment_policy", "unknown"),
         "scene_profile_policy_enclosure_mode": policy_contract.get("enclosure_mode", "unknown"),
@@ -71,6 +76,12 @@ def analyze_report(path: Path) -> dict[str, Any]:
             row["failures"].append("environment enclosure mode does not match SceneProfileV3 policy")
         if row["profile_policy_reflection"] != row["scene_profile_policy_reflection"]:
             row["failures"].append("environment reflection policy does not match SceneProfileV3 policy")
+        if str(row["shader_profile"]).strip().lower() in {"", "unknown", "none", "default"}:
+            row["failures"].append("environment ready without shader profile")
+        if row["shader_profile_mode"] < 0.0 or row["shader_profile_mode"] > 4.0:
+            row["failures"].append("environment shader profile mode out of range")
+        if row["local_background_strength"] < 0.0 or row["local_background_strength"] > 1.0:
+            row["failures"].append("environment local background strength out of range")
     if row["payload_ready"]:
         if row["texture_count"] < 2:
             row["failures"].append("payload ready with fewer than two textures")
@@ -100,8 +111,8 @@ def write_markdown(path: Path, result: dict[str, Any]) -> None:
         f"- profile-policy-consumed reports: `{result['profile_policy_consumed_report_count']}`",
         f"- failures: `{len(result['failures'])}`",
         "",
-        "| Family | Profile Policy | Texture Set | Textures | Albedo | Normal | Payload | Proxies |",
-        "|---|---|---|---:|---:|---:|---|---|",
+        "| Family | Profile Policy | Shader Profile | Local Background | Texture Set | Textures | Albedo | Normal | Payload | Proxies |",
+        "|---|---|---|---:|---|---:|---:|---:|---|---|",
     ]
     for row in result["rows"]:
         proxies = ",".join(
@@ -119,6 +130,8 @@ def write_markdown(path: Path, result: dict[str, Any]) -> None:
                 [
                     str(row["family"]),
                     f"`{row['profile_policy_environment']}`",
+                    f"`{row['shader_profile']}`",
+                    f"{row['local_background_strength']:.2f}",
                     f"`{row['texture_set_id']}`",
                     str(row["texture_count"]),
                     str(row["albedo_count"]),

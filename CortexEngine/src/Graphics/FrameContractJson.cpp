@@ -413,6 +413,10 @@ json FullSceneShaderPipelineV3ToJson(const FrameContract& contract) {
         {"scene_local_environment_profile_policy", context.sceneLocalEnvironmentProfilePolicy},
         {"scene_local_environment_profile_reflection_policy",
          context.sceneLocalEnvironmentProfileReflectionPolicy},
+        {"scene_local_environment_shader_profile", context.sceneLocalEnvironmentShaderProfile},
+        {"scene_local_environment_shader_profile_mode", context.sceneLocalEnvironmentShaderProfileMode},
+        {"scene_local_environment_local_background_strength",
+         context.sceneLocalEnvironmentLocalBackgroundStrength},
         {"scene_local_texture_payload_ready", context.sceneLocalTexturePayloadReady},
         {"scene_local_texture_payload_count", context.sceneLocalTexturePayloadCount},
         {"scene_local_texture_set_id", context.sceneLocalTextureSetId},
@@ -552,7 +556,10 @@ json FrameContractToJson(const FrameContract& contract) {
             {"scene_local_payload_ready", contract.environment.sceneLocalPayloadReady},
             {"scene_local_irradiance_proxy_ready", contract.environment.sceneLocalIrradianceProxyReady},
             {"scene_local_specular_proxy_ready", contract.environment.sceneLocalSpecularProxyReady},
-            {"scene_local_visible_background_proxy_ready", contract.environment.sceneLocalVisibleBackgroundProxyReady}
+            {"scene_local_visible_background_proxy_ready", contract.environment.sceneLocalVisibleBackgroundProxyReady},
+            {"scene_local_shader_profile", contract.environment.sceneLocalShaderProfile},
+            {"scene_local_shader_profile_mode", contract.environment.sceneLocalShaderProfileMode},
+            {"scene_local_background_strength", contract.environment.sceneLocalBackgroundStrength}
         }},
         {"graphics_preset", {
             {"id", contract.graphicsPreset.id},

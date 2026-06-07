@@ -105,6 +105,9 @@ struct FrameContract {
         bool sceneLocalIrradianceProxyReady = false;
         bool sceneLocalSpecularProxyReady = false;
         bool sceneLocalVisibleBackgroundProxyReady = false;
+        std::string sceneLocalShaderProfile = "unknown";
+        float sceneLocalShaderProfileMode = 0.0f;
+        float sceneLocalBackgroundStrength = 0.0f;
     };
 
     struct GraphicsPresetInfo {

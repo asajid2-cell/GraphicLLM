@@ -7625,9 +7625,17 @@ Current decision:
 
 Immediate implementation direction:
 
-1. Add a focused reflection motion packet runner before more shader tweaking.
-   - It should reproduce the old-office IBL / forced-SSR / smooth-metal mouse
-     jitter case with only the reflection and beauty debug views needed.
+1. Use the new focused reflection motion packet runner before more shader
+   tweaking.
+   - Script:
+     `tools/run_reflection_v3_motion_focus_packet.ps1`.
+   - It reproduces the forced-SSR / smooth-metal mouse jitter case with only
+     the reflection and beauty debug views needed.
+   - It sets `CORTEX_ENABLE_FULL_SCENE_LIGHTING_V3_SPLIT=1` and defaults
+     `CORTEX_V3_REFLECTION_SOURCE_OVERRIDE=ssr`.
+   - It writes `v3_reflection_motion_focus.json`,
+     `v3_reflection_motion_focus.md`, and
+     `v3_reflection_motion_focus_sheet.png`.
    - This avoids the current disk pressure from full 300 MB V3 packets.
 2. Use that focused packet to attack the actual remaining blocker:
    `reflection_history_v3_validity` and `reflection_history_v3_rejection`.
@@ -7644,3 +7652,19 @@ Current constraints:
   focused packet runner is in place.
 - Focused files from the latest reflection commits are clean, but many
   unrelated dirty files remain in the worktree. Do not stage or revert them.
+
+Latest harness status:
+
+- `tools/analyze_full_scene_shader_v3_lighting_motion.py` supports
+  `--focus reflection`.
+- The focused runner exists but has not yet been exercised with a real capture
+  in this slice because `Z:` had only about `0.51 GB` free before validation.
+- Lightweight validation to run after edits:
+
+```powershell
+python -m py_compile tools\analyze_full_scene_shader_v3_lighting_motion.py tools\build_full_scene_shader_v2_review_sheet.py
+$tokens = $errors = $null
+[System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path tools\run_reflection_v3_motion_focus_packet.ps1), [ref]$tokens, [ref]$errors) | Out-Null
+if ($errors.Count -gt 0) { $errors | Format-List; exit 1 }
+git -c submodule.recurse=false diff --check -- tools\run_reflection_v3_motion_focus_packet.ps1 tools\analyze_full_scene_shader_v3_lighting_motion.py docs\FULL_SCENE_SHADER_AAA_REFACTOR_PLAN.md docs\AAA_ASSET_QUALITY_HANDOFF.md
+```

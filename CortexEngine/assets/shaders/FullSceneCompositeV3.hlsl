@@ -15,11 +15,17 @@ struct VSOutput {
     float2 texCoord : TEXCOORD0;
 };
 
+struct PSOutput {
+    float4 hdrSceneColor : SV_Target0;
+    float4 energyClampPolicy : SV_Target1;
+    float4 overbrightDiagnostics : SV_Target2;
+};
+
 static float Luma(float3 color) {
     return dot(color, float3(0.2126f, 0.7152f, 0.0722f));
 }
 
-float4 PSMain(VSOutput input) : SV_Target0 {
+PSOutput PSMain(VSOutput input) {
     float3 direct = max(g_DirectLighting.Sample(g_LinearClamp, input.texCoord).rgb, 0.0f.xxx);
     float3 indirect = max(g_IndirectLighting.Sample(g_LinearClamp, input.texCoord).rgb, 0.0f.xxx);
     float shadow = saturate(g_ShadowVisibility.Sample(g_LinearClamp, input.texCoord).r);
@@ -36,10 +42,25 @@ float4 PSMain(VSOutput input) : SV_Target0 {
 
     float splitLuma = Luma(composite);
     float fallbackLuma = Luma(fallback);
+    float legacyFallbackUsed = 0.0f;
     if (splitLuma < 0.002f && fallbackLuma > 0.002f) {
         composite = fallback * lerp(0.10f, 0.18f, shadow);
+        legacyFallbackUsed = 1.0f;
     }
 
-    composite = min(composite, 16.0f.xxx);
-    return float4(composite, 1.0f);
+    float3 unclampedComposite = composite;
+    composite = min(unclampedComposite, 16.0f.xxx);
+
+    float unclampedLuma = Luma(unclampedComposite);
+    float clampedLuma = Luma(composite);
+    float clampMask = any(unclampedComposite > 16.0f.xxx) ? 1.0f : 0.0f;
+    float clampRatio = saturate((unclampedLuma - clampedLuma) / max(unclampedLuma, 1.0e-4f));
+    float overbrightMask = saturate((unclampedLuma - 1.0f) / 4.0f);
+    float underlitMask = 1.0f - smoothstep(0.002f, 0.05f, unclampedLuma);
+
+    PSOutput output;
+    output.hdrSceneColor = float4(composite, 1.0f);
+    output.energyClampPolicy = float4(saturate(unclampedLuma / 16.0f), clampMask, clampRatio, legacyFallbackUsed);
+    output.overbrightDiagnostics = float4(overbrightMask, underlitMask, legacyFallbackUsed, reflectionConfidence);
+    return output;
 }

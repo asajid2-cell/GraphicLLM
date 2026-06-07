@@ -1466,3 +1466,63 @@ Validation:
 - static gallery V3 packet passed with `review_packet_passed`.
 - `composite_v3_producer=FullSceneCompositeV3`.
 - `candidate_hdr_scene_color_owned_by_full_scene_composite_v3`.
+
+### CompositeV3 Energy Diagnostics Output - 2026-06-06
+
+Implemented:
+
+- `FullSceneCompositeV3` now writes three concrete MRT outputs:
+  - `candidate_hdr_scene_color`.
+  - `energy_clamp_policy`.
+  - `overbright_diagnostics`.
+- `energy_clamp_policy` stores pre-clamp luma, clamp mask, clamp ratio, and
+  legacy HDR rescue usage.
+- `overbright_diagnostics` stores overbright mask, underlit mask, legacy rescue
+  usage, and reflection confidence.
+- CompositeV3 render-target allocation, render-graph import/write tracking,
+  frame-contract resources, memory accounting, and V3 analyzer gates now
+  require the two diagnostic resources when `FullSceneCompositeV3` is the real
+  producer.
+- Debug modes:
+  - `80`: `FullSceneCompositeV3EnergyClampPolicy`.
+  - `81`: `FullSceneCompositeV3OverbrightDiagnostics`.
+- V3 packet view names:
+  - `energy_clamp_policy`.
+  - `overbright_diagnostics`.
+
+Validation:
+
+- `python -m py_compile tools/analyze_full_scene_shader_v3_placeholders.py
+  tools/validate_full_scene_shader_pipeline_v3_plan.py
+  tools/check_full_scene_shader_pipeline_v2_frame_report.py`.
+- `python tools/validate_full_scene_shader_pipeline_v3_plan.py`.
+- native `CortexEngine` build passed.
+- packet:
+  `build/captures/v3_composite_energy_diagnostics_static_fullviews_20260606`.
+
+Evidence:
+
+- packet status: `review_packet_passed`.
+- `report_count=32`.
+- `composite_v3_producer=FullSceneCompositeV3`.
+- `FullSceneCompositeV3` reads `direct_lighting`, `indirect_lighting`,
+  `shadow_visibility`, `hdr_color`, `reflection_radiance`, and
+  `reflection_confidence`.
+- `FullSceneCompositeV3` writes `candidate_hdr_scene_color`,
+  `energy_clamp_policy`, and `overbright_diagnostics`.
+- frame resources for all three outputs are valid at `1088x612`.
+- debug metrics:
+  - `candidate_hdr_scene_color.mean_luma=0.4412127`,
+    `nonblack_ratio=0.9693370`.
+  - `energy_clamp_policy.mean_luma=0.0063769`,
+    `nonblack_ratio=0.8010699`.
+  - `overbright_diagnostics.mean_luma=0.0654600`,
+    `nonblack_ratio=0.2378244`.
+
+Remaining limitation:
+
+- This proves concrete CompositeV3 diagnostic ownership for a static gallery
+  packet only.
+- Default beauty remains unchanged and not promotable.
+- Cross-family and motion evidence are still required before this can support
+  candidate/default promotion.

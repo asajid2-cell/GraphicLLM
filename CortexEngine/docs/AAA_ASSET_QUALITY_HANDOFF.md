@@ -6903,3 +6903,71 @@ Current limitation:
 - CompositeV3 still keeps `hdr_color` as a bounded rescue/reference input.
 - Next CompositeV3 work should add explicit candidate energy diagnostics and
   reduce legacy HDR fallback use, rather than claiming final beauty promotion.
+
+### CompositeV3 Energy Diagnostics Output - 2026-06-06
+
+Implemented:
+
+- `FullSceneCompositeV3` now writes concrete diagnostic MRTs in addition to
+  candidate HDR:
+  - `candidate_hdr_scene_color`.
+  - `energy_clamp_policy`.
+  - `overbright_diagnostics`.
+- `energy_clamp_policy` lanes:
+  - `R`: pre-clamp luma normalized to the 16.0 HDR clamp ceiling.
+  - `G`: clamp mask.
+  - `B`: clamp ratio.
+  - `A`: legacy `hdr_color` rescue usage.
+- `overbright_diagnostics` lanes:
+  - `R`: overbright mask.
+  - `G`: underlit mask.
+  - `B`: legacy `hdr_color` rescue usage.
+  - `A`: ReflectionV3 confidence.
+- CompositeV3 resource allocation, render-graph import/write tracking,
+  frame-contract resources, memory accounting, runtime readiness, and analyzer
+  gates now require `energy_clamp_policy` and `overbright_diagnostics` when the
+  real `FullSceneCompositeV3` producer is active.
+- Debug modes:
+  - `80`: `FullSceneCompositeV3EnergyClampPolicy`.
+  - `81`: `FullSceneCompositeV3OverbrightDiagnostics`.
+- Packet views:
+  - `energy_clamp_policy`.
+  - `overbright_diagnostics`.
+- Updated the legacy V2 frame-report checker debug-range token to `81u` so the
+  expanded debug registry remains compatible with V2 evidence packets.
+
+Validation:
+
+```powershell
+python -m py_compile tools\analyze_full_scene_shader_v3_placeholders.py tools\validate_full_scene_shader_pipeline_v3_plan.py tools\check_full_scene_shader_pipeline_v2_frame_report.py
+python tools\validate_full_scene_shader_pipeline_v3_plan.py
+cmd.exe /d /c "call ""C:\Program Files\Microsoft Visual Studio\18\Community\Common7\Tools\VsDevCmd.bat"" -arch=x64 -host_arch=x64 >nul && set ""CORTEX_SKIP_ASSET_SYNC=1"" && ""C:\Program Files\Ninja\ninja.exe"" -C build CortexEngine -j 8"
+Copy-Item -LiteralPath assets\shaders\FullSceneCompositeV3.hlsl -Destination build\bin\assets\shaders\FullSceneCompositeV3.hlsl -Force
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_full_scene_shader_pipeline_v3_packet.ps1 -NoBuild -SkipSceneAnalyzers -NoStressScene -FamilyFilter gallery -SmokeFrames 24 -CaptureFrame 12 -CaptureSequenceCount 1 -StabilityMotionMode static -OutputRoot build\captures\v3_composite_energy_diagnostics_static_fullviews_20260606
+```
+
+Evidence:
+
+- packet root:
+  `build/captures/v3_composite_energy_diagnostics_static_fullviews_20260606`.
+- packet status: `review_packet_passed`.
+- `report_count=32`.
+- `composite_v3_producer=FullSceneCompositeV3`.
+- `FullSceneCompositeV3` pass writes:
+  `candidate_hdr_scene_color`, `energy_clamp_policy`, and
+  `overbright_diagnostics`.
+- all three resources are valid and size-matched at `1088x612`.
+- debug metrics:
+  - `candidate_hdr_scene_color.mean_luma=0.4412127`,
+    `nonblack_ratio=0.9693370`.
+  - `energy_clamp_policy.mean_luma=0.0063769`,
+    `nonblack_ratio=0.8010699`.
+  - `overbright_diagnostics.mean_luma=0.0654600`,
+    `nonblack_ratio=0.2378244`.
+
+Current limitation:
+
+- This is still gallery/static evidence only.
+- Default beauty remains unchanged and not promotable.
+- Next CompositeV3 work should use the new diagnostics to reduce measured
+  legacy HDR rescue usage and then run mouse-jitter/camera-sweep packets.

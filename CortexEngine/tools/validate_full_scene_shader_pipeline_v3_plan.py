@@ -81,6 +81,8 @@ REQUIRED_OUTPUTS = [
     "scene_local_environment",
     "hdr_scene_color",
     "candidate_hdr_scene_color",
+    "energy_clamp_policy",
+    "overbright_diagnostics",
     "ldr_cinematic_output",
     "candidate_ldr_cinematic_output",
 ]
@@ -371,6 +373,8 @@ def main() -> int:
         "candidate_hdr_scene_color_owned_by_full_scene_composite_v3",
         "v3_lighting_and_reflection_inputs_read",
         "hdr_scene_color_owned",
+        "energy_clamp_policy_owned_by_full_scene_composite_v3",
+        "overbright_diagnostics_owned_by_full_scene_composite_v3",
         "energy_clamp_policy_owned",
         "overbright_diagnostics_owned",
         "CinematicPostV3",

@@ -8,7 +8,7 @@
 namespace Cortex::Graphics {
 
 namespace {
-constexpr uint32_t kMaxDebugViewMode = 79u;
+constexpr uint32_t kMaxDebugViewMode = 81u;
 }
 
 int Renderer::GetDebugViewMode() const {
@@ -78,6 +78,7 @@ void Renderer::CycleDebugViewMode() {
     // 67 = candidate HDR scene color from FullSceneCompositeV3
     // 68-74, 79 = FullSceneReflectionV3 resolver outputs.
     // 75-78 = FullSceneReflectionHistoryV3 outputs.
+    // 80-81 = FullSceneCompositeV3 diagnostics.
     m_debugViewState.mode = (m_debugViewState.mode + 1) % (kMaxDebugViewMode + 1u);
     const char* label = nullptr;
     switch (m_debugViewState.mode) {
@@ -161,6 +162,8 @@ void Renderer::CycleDebugViewMode() {
         case 77: label = "FullSceneReflectionHistoryV3Prev"; break;
         case 78: label = "FullSceneReflectionHistoryV3Rejection"; break;
         case 79: label = "FullSceneReflectionV3SourceSuppression"; break;
+        case 80: label = "FullSceneCompositeV3EnergyClampPolicy"; break;
+        case 81: label = "FullSceneCompositeV3OverbrightDiagnostics"; break;
         default: label = "Unknown"; break;
     }
     spdlog::info("Debug view mode: {}", label);

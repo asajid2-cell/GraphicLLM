@@ -29,6 +29,8 @@ REQUIRED_OUTPUTS = {
     "scene_local_environment",
     "hdr_scene_color",
     "candidate_hdr_scene_color",
+    "energy_clamp_policy",
+    "overbright_diagnostics",
     "ldr_cinematic_output",
     "candidate_ldr_cinematic_output",
 }
@@ -624,11 +626,16 @@ def analyze_report(
             if composite_domain.get("missing_required_channel_count", 1) != 0:
                 failures.append("composite domain ready with missing required channels")
         if composite_is_real:
-            composite_resource = find_frame_resource(report, "candidate_hdr_scene_color")
-            if not isinstance(composite_resource, dict) or composite_resource.get("valid") is not True:
-                failures.append("FullSceneCompositeV3 ready without valid candidate_hdr_scene_color resource")
-            elif composite_resource.get("size_matches_contract") is not True:
-                failures.append("candidate_hdr_scene_color size does not match render contract")
+            for resource in [
+                "candidate_hdr_scene_color",
+                "energy_clamp_policy",
+                "overbright_diagnostics",
+            ]:
+                composite_resource = find_frame_resource(report, resource)
+                if not isinstance(composite_resource, dict) or composite_resource.get("valid") is not True:
+                    failures.append(f"FullSceneCompositeV3 ready without valid {resource} resource")
+                elif composite_resource.get("size_matches_contract") is not True:
+                    failures.append(f"{resource} size does not match render contract")
             if not isinstance(composite_pass, dict):
                 failures.append("composite domain produced by FullSceneCompositeV3 but pass is missing")
             else:
@@ -644,8 +651,13 @@ def analyze_report(
                 ]:
                     if resource not in composite_pass.get("reads", []):
                         failures.append(f"FullSceneCompositeV3 pass does not read {resource}")
-                if "candidate_hdr_scene_color" not in composite_pass.get("writes", []):
-                    failures.append("FullSceneCompositeV3 pass does not write candidate_hdr_scene_color")
+                for resource in [
+                    "candidate_hdr_scene_color",
+                    "energy_clamp_policy",
+                    "overbright_diagnostics",
+                ]:
+                    if resource not in composite_pass.get("writes", []):
+                        failures.append(f"FullSceneCompositeV3 pass does not write {resource}")
         for key in [
             "hdr_scene_color_ready",
             "composite_inputs_ready",

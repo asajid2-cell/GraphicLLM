@@ -70,6 +70,8 @@ void Renderer::RecordFramePass(const char* name,
         if (resource == "hdr_color") return resourceBytes(m_mainTargets.hdr.resources.color.Get());
         if (resource == "gbuffer_normal_roughness") return resourceBytes(m_mainTargets.normalRoughness.resources.texture.Get());
         if (resource == "candidate_hdr_scene_color") return resourceBytes(m_mainTargets.compositeV3.resources.hdrSceneColor.Get());
+        if (resource == "energy_clamp_policy") return resourceBytes(m_mainTargets.compositeV3.resources.energyClampPolicy.Get());
+        if (resource == "overbright_diagnostics") return resourceBytes(m_mainTargets.compositeV3.resources.overbrightDiagnostics.Get());
         if (resource == "candidate_ldr_cinematic_output") return resourceBytes(m_mainTargets.candidateBeautyV3.resources.ldrOutput.Get());
         if (resource == "direct_lighting") return resourceBytes(m_mainTargets.lightingV3.resources.directLighting.Get());
         if (resource == "direct_lighting_unshadowed") return resourceBytes(m_mainTargets.lightingV3.resources.directLightingUnshadowed.Get());
@@ -121,6 +123,8 @@ void Renderer::RecordFramePass(const char* name,
             }
             if (write == "depth" || write == "hdr_color" ||
                 write == "candidate_hdr_scene_color" ||
+                write == "energy_clamp_policy" ||
+                write == "overbright_diagnostics" ||
                 write == "candidate_ldr_cinematic_output" ||
                 write == "reflection_radiance" || write == "reflection_confidence" ||
                 write == "reflection_source_id" || write == "reflection_rejected_source_mask" ||

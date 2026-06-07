@@ -30,6 +30,8 @@ struct FullSceneCompositeV3Context {
     RGResourceHandle localReflectionRadiance;
     RGResourceHandle reflectionConfidence;
     RGResourceHandle output;
+    RGResourceHandle energyClampPolicy;
+    RGResourceHandle overbrightDiagnostics;
     ID3D12Device* device = nullptr;
     DescriptorHeapManager* descriptorManager = nullptr;
     ID3D12GraphicsCommandList* commandList = nullptr;
@@ -40,7 +42,7 @@ struct FullSceneCompositeV3Context {
     DescriptorHandle indirectLightingSRV;
     DescriptorHandle shadowVisibilitySRV;
     DescriptorHandle legacyHdrSRV;
-    D3D12_CPU_DESCRIPTOR_HANDLE outputRTV{};
+    std::array<D3D12_CPU_DESCRIPTOR_HANDLE, 3> outputRTVs{};
     uint32_t width = 0;
     uint32_t height = 0;
     bool* ran = nullptr;
@@ -159,6 +161,8 @@ void FailFullSceneReflectionHistoryV3Copy(const FullSceneReflectionHistoryV3Copy
         !context.shadowVisibility.IsValid() ||
         !context.legacyHdr.IsValid() ||
         !context.output.IsValid() ||
+        !context.energyClampPolicy.IsValid() ||
+        !context.overbrightDiagnostics.IsValid() ||
         !context.device ||
         !context.descriptorManager ||
         !context.commandList ||
@@ -170,11 +174,16 @@ void FailFullSceneReflectionHistoryV3Copy(const FullSceneReflectionHistoryV3Copy
         !context.indirectLightingSRV.IsValid() ||
         !context.shadowVisibilitySRV.IsValid() ||
         !context.legacyHdrSRV.IsValid() ||
-        context.outputRTV.ptr == 0 ||
         context.width == 0 ||
         context.height == 0) {
         FailFullSceneCompositeV3(context, "full_scene_composite_v3_contract");
         return false;
+    }
+    for (const auto rtv : context.outputRTVs) {
+        if (rtv.ptr == 0) {
+            FailFullSceneCompositeV3(context, "full_scene_composite_v3_rtv");
+            return false;
+        }
     }
 
     graph.AddPass(
@@ -192,6 +201,8 @@ void FailFullSceneReflectionHistoryV3Copy(const FullSceneReflectionHistoryV3Copy
                 builder.Read(context.reflectionConfidence, RGResourceUsage::ShaderResource);
             }
             builder.Write(context.output, RGResourceUsage::RenderTarget);
+            builder.Write(context.energyClampPolicy, RGResourceUsage::RenderTarget);
+            builder.Write(context.overbrightDiagnostics, RGResourceUsage::RenderTarget);
         },
         [context](ID3D12GraphicsCommandList*, const RenderGraph& graph) {
             auto tableResult = context.descriptorManager->AllocateTransientCBV_SRV_UAVRange(6);
@@ -243,7 +254,11 @@ void FailFullSceneReflectionHistoryV3Copy(const FullSceneReflectionHistoryV3Copy
                 return;
             }
 
-            context.commandList->OMSetRenderTargets(1, &context.outputRTV, FALSE, nullptr);
+            context.commandList->OMSetRenderTargets(
+                static_cast<UINT>(context.outputRTVs.size()),
+                context.outputRTVs.data(),
+                FALSE,
+                nullptr);
             FullscreenPass::SetViewportAndScissor(context.commandList, context.width, context.height);
             if (!FullscreenPass::BindGraphicsState({
                     context.commandList,
@@ -767,8 +782,14 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
         wantsCandidateBeautyThisFrame &&
         m_pipelineState.fullSceneCompositeV3 &&
         m_mainTargets.compositeV3.resources.hdrSceneColor &&
+        m_mainTargets.compositeV3.resources.energyClampPolicy &&
+        m_mainTargets.compositeV3.resources.overbrightDiagnostics &&
         m_mainTargets.compositeV3.descriptors.hdrSceneColorRTV.IsValid() &&
         m_mainTargets.compositeV3.descriptors.hdrSceneColorSRV.IsValid() &&
+        m_mainTargets.compositeV3.descriptors.energyClampPolicyRTV.IsValid() &&
+        m_mainTargets.compositeV3.descriptors.energyClampPolicySRV.IsValid() &&
+        m_mainTargets.compositeV3.descriptors.overbrightDiagnosticsRTV.IsValid() &&
+        m_mainTargets.compositeV3.descriptors.overbrightDiagnosticsSRV.IsValid() &&
         m_mainTargets.lightingV3.resources.directLighting &&
         m_mainTargets.lightingV3.resources.indirectLighting &&
         m_mainTargets.lightingV3.resources.shadowVisibility &&
@@ -778,9 +799,13 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
         m_mainTargets.hdr.descriptors.srv.IsValid();
     const bool wantsCompositeV3DebugViewThisFrame =
         wantsCompositeV3ThisFrame &&
-        m_debugViewState.mode == 67u &&
+        (m_debugViewState.mode == 67u ||
+         m_debugViewState.mode == 80u ||
+         m_debugViewState.mode == 81u) &&
         m_pipelineState.candidateBeautyDisplay &&
-        m_mainTargets.compositeV3.descriptors.hdrSceneColorSRV.IsValid();
+        m_mainTargets.compositeV3.descriptors.hdrSceneColorSRV.IsValid() &&
+        m_mainTargets.compositeV3.descriptors.energyClampPolicySRV.IsValid() &&
+        m_mainTargets.compositeV3.descriptors.overbrightDiagnosticsSRV.IsValid();
     const bool wantsReflectionResolverV3ThisFrame =
         wantsRgPostThisFrame &&
         m_pipelineState.fullSceneReflectionResolverV3 &&
@@ -894,6 +919,8 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
     RGResourceHandle reflectionHistoryValidityHandle{};
     RGResourceHandle reflectionHistoryRejectionHandle{};
     RGResourceHandle candidateHdrSceneColorHandle{};
+    RGResourceHandle energyClampPolicyHandle{};
+    RGResourceHandle overbrightDiagnosticsHandle{};
     RGResourceHandle candidateBeautyHandle{};
     std::array<RGResourceHandle, kBloomLevels> bloomA{};
     std::array<RGResourceHandle, kBloomLevels> bloomB{};
@@ -1085,8 +1112,16 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
                 "V3ShadowVisibility_ForComposite");
             candidateHdrSceneColorHandle = m_services.renderGraph->ImportResource(
                 m_mainTargets.compositeV3.resources.hdrSceneColor.Get(),
-                m_mainTargets.compositeV3.resources.state,
+                m_mainTargets.compositeV3.resources.hdrSceneColorState,
                 "CandidateHDRSceneColor");
+            energyClampPolicyHandle = m_services.renderGraph->ImportResource(
+                m_mainTargets.compositeV3.resources.energyClampPolicy.Get(),
+                m_mainTargets.compositeV3.resources.energyClampPolicyState,
+                "EnergyClampPolicy");
+            overbrightDiagnosticsHandle = m_services.renderGraph->ImportResource(
+                m_mainTargets.compositeV3.resources.overbrightDiagnostics.Get(),
+                m_mainTargets.compositeV3.resources.overbrightDiagnosticsState,
+                "OverbrightDiagnostics");
         }
         if (wantsReflectionResolverV3ThisFrame) {
             reflectionRadianceHandle = m_services.renderGraph->ImportResource(
@@ -1391,7 +1426,10 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
         executeContext.status.stage = &postProcessGraphStageError;
         executeContext.ranPostProcess = &result.ranPostProcess;
 
-        if (wantsCompositeV3ThisFrame && candidateHdrSceneColorHandle.IsValid()) {
+        if (wantsCompositeV3ThisFrame &&
+            candidateHdrSceneColorHandle.IsValid() &&
+            energyClampPolicyHandle.IsValid() &&
+            overbrightDiagnosticsHandle.IsValid()) {
             FullSceneCompositeV3Context compositeContext{};
             compositeContext.directLighting = v3DirectLightingHandle;
             compositeContext.indirectLighting = v3IndirectLightingHandle;
@@ -1404,6 +1442,8 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
                 ? reflectionConfidenceHandle
                 : RGResourceHandle{};
             compositeContext.output = candidateHdrSceneColorHandle;
+            compositeContext.energyClampPolicy = energyClampPolicyHandle;
+            compositeContext.overbrightDiagnostics = overbrightDiagnosticsHandle;
             compositeContext.device = m_services.device ? m_services.device->GetDevice() : nullptr;
             compositeContext.descriptorManager = m_services.descriptorManager.get();
             compositeContext.commandList = m_commandResources.graphicsList.Get();
@@ -1414,7 +1454,11 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
             compositeContext.indirectLightingSRV = m_mainTargets.lightingV3.descriptors.indirectLightingSRV;
             compositeContext.shadowVisibilitySRV = m_mainTargets.lightingV3.descriptors.shadowVisibilitySRV;
             compositeContext.legacyHdrSRV = m_mainTargets.hdr.descriptors.srv;
-            compositeContext.outputRTV = m_mainTargets.compositeV3.descriptors.hdrSceneColorRTV.cpu;
+            compositeContext.outputRTVs = {
+                m_mainTargets.compositeV3.descriptors.hdrSceneColorRTV.cpu,
+                m_mainTargets.compositeV3.descriptors.energyClampPolicyRTV.cpu,
+                m_mainTargets.compositeV3.descriptors.overbrightDiagnosticsRTV.cpu,
+            };
             compositeContext.width = GetInternalRenderWidth();
             compositeContext.height = GetInternalRenderHeight();
             compositeContext.ran = &result.ranCompositeV3;
@@ -1492,9 +1536,18 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
         }
 
         if (wantsCompositeV3DebugViewThisFrame && candidateHdrSceneColorHandle.IsValid()) {
+            RGResourceHandle compositeDebugHandle = candidateHdrSceneColorHandle;
+            DescriptorHandle compositeDebugSRV = m_mainTargets.compositeV3.descriptors.hdrSceneColorSRV;
+            if (m_debugViewState.mode == 80u && energyClampPolicyHandle.IsValid()) {
+                compositeDebugHandle = energyClampPolicyHandle;
+                compositeDebugSRV = m_mainTargets.compositeV3.descriptors.energyClampPolicySRV;
+            } else if (m_debugViewState.mode == 81u && overbrightDiagnosticsHandle.IsValid()) {
+                compositeDebugHandle = overbrightDiagnosticsHandle;
+                compositeDebugSRV = m_mainTargets.compositeV3.descriptors.overbrightDiagnosticsSRV;
+            }
             CandidateBeautyDisplayContext debugContext{};
             debugContext.passName = "FullSceneCompositeV3DebugView";
-            debugContext.candidate = candidateHdrSceneColorHandle;
+            debugContext.candidate = compositeDebugHandle;
             debugContext.backBuffer = backBufferHandle;
             debugContext.device = m_services.device ? m_services.device->GetDevice() : nullptr;
             debugContext.descriptorManager = m_services.descriptorManager.get();
@@ -1502,7 +1555,7 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
             debugContext.rootSignature = m_pipelineState.rootSignature.get();
             debugContext.pipeline = m_pipelineState.candidateBeautyDisplay.get();
             debugContext.frameConstants = m_constantBuffers.currentFrameGPU;
-            debugContext.candidateSRV = m_mainTargets.compositeV3.descriptors.hdrSceneColorSRV;
+            debugContext.candidateSRV = compositeDebugSRV;
             debugContext.backBufferRTV = m_services.window->GetCurrentRTV();
             debugContext.width = m_services.window->GetWidth();
             debugContext.height = m_services.window->GetHeight();
@@ -1708,8 +1761,18 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
                 m_services.renderGraph->GetResourceState(candidateBeautyHandle);
         }
         if (candidateHdrSceneColorHandle.IsValid()) {
-            m_mainTargets.compositeV3.resources.state =
+            m_mainTargets.compositeV3.resources.hdrSceneColorState =
                 m_services.renderGraph->GetResourceState(candidateHdrSceneColorHandle);
+            m_mainTargets.compositeV3.resources.state =
+                m_mainTargets.compositeV3.resources.hdrSceneColorState;
+        }
+        if (energyClampPolicyHandle.IsValid()) {
+            m_mainTargets.compositeV3.resources.energyClampPolicyState =
+                m_services.renderGraph->GetResourceState(energyClampPolicyHandle);
+        }
+        if (overbrightDiagnosticsHandle.IsValid()) {
+            m_mainTargets.compositeV3.resources.overbrightDiagnosticsState =
+                m_services.renderGraph->GetResourceState(overbrightDiagnosticsHandle);
         }
         if (reflectionRadianceHandle.IsValid()) {
             m_mainTargets.reflectionV3.resources.radianceState =
@@ -1841,7 +1904,7 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
                                 result.ranCompositeV3 ? 1u : 0u,
                                 {"direct_lighting", "indirect_lighting", "shadow_visibility", "hdr_color",
                                  "reflection_radiance", "reflection_confidence"},
-                                {"candidate_hdr_scene_color"},
+                                {"candidate_hdr_scene_color", "energy_clamp_policy", "overbright_diagnostics"},
                                 false,
                                 nullptr,
                                 true);
@@ -1852,7 +1915,7 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
                                 result.ranCompositeV3 ? 1u : 0u,
                                 {"direct_lighting", "indirect_lighting", "shadow_visibility", "hdr_color",
                                  "local_reflection_radiance"},
-                                {"candidate_hdr_scene_color"},
+                                {"candidate_hdr_scene_color", "energy_clamp_policy", "overbright_diagnostics"},
                                 false,
                                 nullptr,
                                 true);
@@ -1862,7 +1925,7 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
                                 result.ranCompositeV3,
                                 result.ranCompositeV3 ? 1u : 0u,
                                 {"direct_lighting", "indirect_lighting", "shadow_visibility", "hdr_color"},
-                                {"candidate_hdr_scene_color"},
+                                {"candidate_hdr_scene_color", "energy_clamp_policy", "overbright_diagnostics"},
                                 false,
                                 nullptr,
                                 true);
@@ -1896,11 +1959,15 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
                             true);
         }
         if (wantsCompositeV3DebugViewThisFrame) {
+            const char* readResource =
+                m_debugViewState.mode == 80u ? "energy_clamp_policy" :
+                m_debugViewState.mode == 81u ? "overbright_diagnostics" :
+                "candidate_hdr_scene_color";
             RecordFramePass("FullSceneCompositeV3DebugView",
                             true,
                             result.ranCompositeV3DebugView,
                             result.ranCompositeV3DebugView ? 1u : 0u,
-                            {"candidate_hdr_scene_color"},
+                            {readResource},
                             {"back_buffer"},
                             false,
                             nullptr,
@@ -1939,7 +2006,7 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
                          "velocity", "rt_reflection", "vb_gbuffer_material_ext1",
                          "vb_gbuffer_material_ext2", "hzb"},
                         wantsCompositeV3ThisFrame
-                            ? std::initializer_list<const char*>{"hzb", "back_buffer", "candidate_hdr_scene_color", "candidate_ldr_cinematic_output", "reflection_history_v3_prev"}
+                            ? std::initializer_list<const char*>{"hzb", "back_buffer", "candidate_hdr_scene_color", "energy_clamp_policy", "overbright_diagnostics", "candidate_ldr_cinematic_output", "reflection_history_v3_prev"}
                             : std::initializer_list<const char*>{"hzb", "back_buffer", "candidate_ldr_cinematic_output"});
     } else {
         RecordFramePass("RenderGraphEndFrame", true, true, result.ranPostProcess ? 1u : 0u,

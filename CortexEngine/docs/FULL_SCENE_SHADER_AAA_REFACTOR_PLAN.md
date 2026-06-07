@@ -13,6 +13,217 @@ or one polished screenshot. The goal feature is an opt-in candidate renderer
 where every visible contribution has a named producer, typed resource,
 debug view, frame-report field, analyzer, and promotion packet.
 
+## 2026-06-07 Full Scene Shader Refactor Blueprint
+
+This section is the high-level architecture pass before continuing
+implementation. The target is not to mimic Unreal with a pile of toggles. The
+target is to give CortexEngine the same kind of full-frame ownership that makes
+high-end realtime renderers stable: a scene policy controls the render intent,
+typed material/environment/lighting/reflection resources carry that intent, and
+composite/post only beautify terms that are already owned and diagnosable.
+
+### North Star
+
+Build a candidate V3 beauty path that can render an enclosed kitchen, a gallery,
+an office, a gym, a concert/stage scene, a red room, a stadium, and an exterior
+water/vegetation scene with:
+
+- coherent local environment lighting instead of arbitrary visible/reflected
+  HDRI bleed
+- rich material response from typed PBR payloads, not anonymous defaults
+- stable shadows/reflections under mouse jitter and close camera movement
+- believable transparency/media for glass, water, fog, particles, and decals
+- cinematic HDR assembly and post that improves the frame without hiding
+  upstream bugs
+
+Default public beauty remains the fallback until this candidate path passes the
+promotion matrix and human review.
+
+### Refactor Principle
+
+Every visible pixel in candidate beauty must be explainable by a chain like:
+
+```text
+scene profile
+  -> typed resource producer
+  -> shader contribution
+  -> debug view
+  -> frame-report field
+  -> analyzer gate
+  -> promotion packet
+```
+
+If that chain is broken, the term is not production-ready. If a shader uses a
+fallback, null resource, legacy buffer, or profile approximation, it must report
+that debt. We do not tune post, blur an IBL, lower reflection sharpness, or swap
+scenes to make a defect disappear.
+
+### Architecture Layers
+
+1. Scene policy layer.
+   `SceneProfileV3` becomes the single policy source for family, enclosure,
+   lighting rig, reflection priority, material expectations, exposure/post
+   intent, motion tolerance, and local environment ownership.
+
+2. Visibility and geometry layer.
+   `VisibilityV3` owns stable depth, velocity, normals, object/material/surface
+   ids, disocclusion, and motion confidence. This is the base for temporal
+   stability, reflection history, contact shadows, decals, and transparent
+   ordering.
+
+3. Material payload layer.
+   `MaterialPayloadV3` owns base color, normal, roughness, metallic, specular,
+   AO, emissive, opacity/transmission, clearcoat, sheen, anisotropy, IOR,
+   thickness, material class, missing-channel mask, and invalid-range mask.
+   Downstream domains must report whether they consumed missing material debt.
+
+4. Scene-local environment layer.
+   `SceneLocalEnvironmentV3` owns visible background, diffuse irradiance,
+   specular prefilter, reflection background, atmosphere parameters, and an
+   ownership mask. Enclosed spaces get local room/stage radiance. Exterior and
+   gallery profiles may admit HDRI only when the profile authorizes it.
+
+5. Lighting and shadow layer.
+   `LightingShadowV3` splits direct lighting, unshadowed direct, indirect,
+   shadow visibility, shadow loss, lighting-energy budget, and shadow source
+   attribution. Remaining floor/wall flicker must identify a concrete source:
+   directional shadow, local shadow, contact/RT/screen-space shadow, PCSS
+   radius, exposure, or environment.
+
+6. Reflection layer.
+   `ReflectionV3` produces separate SSR, RT/ray-query, planar/hero probe, local
+   probe, and environment signals. A resolver chooses the source using material
+   policy, source confidence, disocclusion, history validity, rejection mask,
+   and hysteresis. Smooth/metallic object jitter is fixed here, not hidden in
+   composite or post.
+
+7. Transparency and media layer.
+   `TransparencyMediaV3` owns glass, water, transparent accumulation, decals,
+   particles, volumetric inscatter, volumetric transmittance, and ordering
+   diagnostics. It must be separable from opaque reflections and lighting.
+
+8. Composite layer.
+   `CompositeV3` assembles candidate HDR from V3 material, environment,
+   lighting, reflection, transparency, emissive, atmosphere, and decals. Legacy
+   rescue is allowed only as a measured emergency lane trending toward zero.
+
+9. Cinematic post layer.
+   `CinematicPostV3` owns exposure meter/state, bloom extract/resolve, glare,
+   tonemap, color grade, sharpen, vignette, optional DOF, and bypass views.
+   Post tuning starts only after upstream V3 resources are real enough to
+   inspect.
+
+10. Promotion layer.
+    Matrix packets cover families and motion modes. The promotion decision
+    aggregates analyzers, contact sheets, frame reports, stability metrics,
+    legacy-rescue debt, and human review.
+
+### Dependency Order
+
+Work proceeds in this order because each step gives the next step typed inputs:
+
+1. Reconcile V3 contracts and promotion gates.
+2. Finish material missing-channel ownership and downstream debt reporting.
+3. Promote `SceneProfileV3` from evidence adapter to consumed renderer policy.
+4. Make `SceneLocalEnvironmentV3` resource-backed, starting with real
+   descriptor binding for local payload textures/proxies.
+5. Expand cross-profile payload coverage for gallery, enclosed room, stage,
+   exterior, and stadium-like spaces.
+6. Add high-contrast `LightingShadowV3` stress rows and split source
+   attribution until shadow/floor/wall flicker has named causes.
+7. Harden `ReflectionV3` provider fusion, history, and source hysteresis for
+   smooth/metallic motion.
+8. Add `TransparencyMediaV3` only after opaque material/environment/reflection
+   ownership is stable.
+9. Convert `CompositeV3` into the real candidate HDR owner and reduce legacy
+   rescue.
+10. Build `CinematicPostV3` on the candidate HDR path.
+11. Run cross-family promotion, inspect packet evidence, and only then consider
+    default-beauty promotion.
+
+### Near-Term Implementation Slices
+
+Slice 1, resource-backed environment.
+
+- Bind real scene-local payload/proxy SRVs into `SceneLocalEnvironmentV3`.
+- Keep null descriptors valid and reported when resources are missing.
+- Emit resource binding fields: table bound, bound resource count, binding
+  source, payload/proxy source id, and fallback reason.
+- Validate with the old-office/gallery stress case with IBL enabled and sharp
+  enough to reveal bad reflections.
+
+Slice 2, multi-profile environment payloads.
+
+- Add or alias payload sets for enclosed room, stage/red room, exterior water,
+  and stadium.
+- Prove profile changes alter visible background, diffuse irradiance, specular
+  reflection background, and atmosphere without shader-code edits.
+
+Slice 3, shadow flicker attribution.
+
+- Add high-contrast light-sweep and close-floor/wall motion rows.
+- Split shadow attribution into directional, local, contact/RT, screen-space,
+  filter-radius, and exposure/env interaction channels if the current
+  attribution is too coarse.
+
+Slice 4, reflection provider resolver.
+
+- Expand source signals and debug outputs so metallic/smooth jitter is tied to
+  source-id churn, history rejection, low confidence, SSR holes, RT fallback,
+  planar/local probe mismatch, or environment fallback.
+- Add hysteresis where the diagnostics prove source churn.
+
+Slice 5, V3-only HDR assembly.
+
+- Make candidate beauty consume V3 resources by default.
+- Keep legacy rescue visible in contribution maps and promotion reports.
+- Block promotion when rescue dominates, when required V3 resources are blank,
+  or when fallback debt is unreported.
+
+Slice 6, cinematic post.
+
+- Implement post as an inspected final layer: locked exposure, bounded auto
+  exposure, bloom/glare from real HDR masks, filmic tonemap, color grade,
+  sharpening, vignette, optional DOF, and bypass views.
+- Validate final LDR against raw HDR, bloom-off, grade-off, and exposure-locked
+  views.
+
+### Validation Harnesses
+
+Focused harnesses stay small and root-cause oriented:
+
+- environment payload binding focus
+- cross-profile environment focus
+- lighting/shadow high-contrast motion focus
+- reflection smooth/metallic motion focus
+- transparency/media closeup focus
+- composite contribution focus
+- post bypass/final LDR focus
+
+Promotion harnesses are broader and slower:
+
+- family matrix: gallery, kitchen, office, gym, classroom, concert, red room,
+  stadium, bathroom, bedroom, workshop, store, street, exterior water/vegetation
+- motion matrix: static, mouse jitter, camera sweep, close-surface orbit,
+  reflective-object orbit, high-contrast light sweep
+- review packet: contact sheets, metrics, frame reports, failure reports,
+  default-promotion decision, and human review notes
+
+### What Blocks Completion
+
+The goal feature remains incomplete while any of these are true:
+
+- candidate beauty still depends on uninspected legacy HDR as a normal path
+- enclosed scenes show or sharply reflect unauthorized external IBL content
+- smooth/metallic objects jitter without a named ReflectionV3 cause
+- floor/wall shadow or color flicker lacks LightingShadowV3 attribution
+- material channels are missing without visible downstream debt reporting
+- scene-local environment uses only scalar/profile tint instead of bound local
+  resources where resources are expected
+- post-processing is used to hide upstream instability
+- cross-family packets are missing or fail
+- the user has not accepted the resulting visuals as good enough
+
 ### Product Shape
 
 Keep two render lines until promotion:

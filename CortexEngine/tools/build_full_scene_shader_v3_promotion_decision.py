@@ -83,6 +83,72 @@ def signal_rows_with_flag(signal: dict[str, Any], field: str) -> list[dict[str, 
     ]
 
 
+def candidate_predicate_summary(signal: dict[str, Any]) -> dict[str, Any]:
+    rows = [row for row in signal.get("rows", []) if isinstance(row, dict)]
+    requested_rows = [row for row in rows if row.get("candidate_beauty_requested") is True]
+    ready_rows = [row for row in rows if row.get("candidate_beauty_ready") is True]
+    blocker_counts: dict[str, int] = {}
+    min_ready_predicates: int | None = None
+    max_ready_predicates = 0
+    predicate_count = 0
+    predicate_totals = {
+        "composite_ready": 0,
+        "cinematic_post_ready": 0,
+        "ldr_output_ready": 0,
+        "reads_candidate_hdr": 0,
+        "legacy_bridge_rejected": 0,
+        "default_beauty_unchanged": 0,
+    }
+
+    for row in rows:
+        ready_predicates = int(row.get("candidate_beauty_ready_predicate_count", 0) or 0)
+        row_predicate_count = int(row.get("candidate_beauty_predicate_count", 0) or 0)
+        predicate_count = max(predicate_count, row_predicate_count)
+        max_ready_predicates = max(max_ready_predicates, ready_predicates)
+        min_ready_predicates = (
+            ready_predicates
+            if min_ready_predicates is None
+            else min(min_ready_predicates, ready_predicates)
+        )
+        blockers = row.get("candidate_beauty_blockers", [])
+        if isinstance(blockers, list):
+            for blocker in blockers:
+                blocker_counts[str(blocker)] = blocker_counts.get(str(blocker), 0) + 1
+        if row.get("candidate_beauty_composite_ready") is True:
+            predicate_totals["composite_ready"] += 1
+        if row.get("candidate_beauty_cinematic_post_ready") is True:
+            predicate_totals["cinematic_post_ready"] += 1
+        if row.get("candidate_beauty_ldr_output_ready") is True:
+            predicate_totals["ldr_output_ready"] += 1
+        if row.get("candidate_beauty_reads_candidate_hdr") is True:
+            predicate_totals["reads_candidate_hdr"] += 1
+        if row.get("candidate_beauty_legacy_bridge_rejected") is True:
+            predicate_totals["legacy_bridge_rejected"] += 1
+        if row.get("candidate_beauty_default_beauty_unchanged") is True:
+            predicate_totals["default_beauty_unchanged"] += 1
+
+    requested_blocker_counts: dict[str, int] = {}
+    for row in requested_rows:
+        blockers = row.get("candidate_beauty_blockers", [])
+        if isinstance(blockers, list):
+            for blocker in blockers:
+                requested_blocker_counts[str(blocker)] = (
+                    requested_blocker_counts.get(str(blocker), 0) + 1
+                )
+
+    return {
+        "report_count": len(rows),
+        "requested_report_count": len(requested_rows),
+        "ready_report_count": len(ready_rows),
+        "predicate_count": predicate_count,
+        "min_ready_predicate_count": min_ready_predicates or 0,
+        "max_ready_predicate_count": max_ready_predicates,
+        "predicate_ready_report_counts": predicate_totals,
+        "blocker_counts": dict(sorted(blocker_counts.items())),
+        "requested_blocker_counts": dict(sorted(requested_blocker_counts.items())),
+    }
+
+
 def make_decision(
     *,
     packet_root: pathlib.Path,
@@ -202,6 +268,7 @@ def make_decision(
 
     candidate_beauty_requested_count = count_signal_flag(signal, "candidate_beauty_requested")
     candidate_beauty_ready_count = count_signal_flag(signal, "candidate_beauty_ready")
+    candidate_predicates = candidate_predicate_summary(signal)
     required_count_fields = {
         "scene_profile": "scene_profile_ready_report_count",
         "material": "material_ready_report_count",
@@ -245,6 +312,17 @@ def make_decision(
 
     if candidate_beauty_ready_count > candidate_beauty_requested_count:
         failures.append("candidate beauty ready count exceeds requested count")
+    if candidate_predicates["requested_report_count"] != candidate_beauty_requested_count:
+        failures.append("candidate predicate requested count disagrees with signal count")
+    if candidate_predicates["ready_report_count"] != candidate_beauty_ready_count:
+        failures.append("candidate predicate ready count disagrees with signal count")
+    if candidate_beauty_ready_count < candidate_beauty_requested_count:
+        requested_blockers = candidate_predicates.get("requested_blocker_counts", {})
+        if isinstance(requested_blockers, dict) and requested_blockers:
+            warnings.append(
+                "candidate beauty requested reports have blockers: "
+                + ", ".join(f"{key}={value}" for key, value in requested_blockers.items())
+            )
     for row in signal_rows_with_flag(signal, "candidate_beauty_ready"):
         report = str(row.get("report", "unknown_report"))
         if row.get("candidate_beauty_producer") != "CinematicPostV3":
@@ -349,6 +427,7 @@ def make_decision(
         "ready_domain_report_counts": domain_counts,
         "candidate_beauty_requested_report_count": candidate_beauty_requested_count,
         "candidate_beauty_ready_report_count": candidate_beauty_ready_count,
+        "candidate_beauty_predicates": candidate_predicates,
         "composite_v3_diagnostics": {
             "mean_explicit_legacy_rescue": mean_explicit_legacy_rescue,
             "mean_legacy_rescue": mean_legacy_rescue,
@@ -388,6 +467,22 @@ def write_markdown(path: pathlib.Path, decision: dict[str, Any]) -> None:
     if isinstance(counts, dict):
         for domain in sorted(counts):
             lines.append(f"| {domain} | {counts[domain]} |")
+    candidate_predicates = decision.get("candidate_beauty_predicates", {})
+    if isinstance(candidate_predicates, dict):
+        blocker_counts = candidate_predicates.get("blocker_counts", {})
+        requested_blocker_counts = candidate_predicates.get("requested_blocker_counts", {})
+        lines.extend(
+            [
+                "",
+                "## Candidate Beauty Predicates",
+                "",
+                f"- predicate count: `{candidate_predicates.get('predicate_count', 0)}`",
+                f"- min ready predicates: `{candidate_predicates.get('min_ready_predicate_count', 0)}`",
+                f"- max ready predicates: `{candidate_predicates.get('max_ready_predicate_count', 0)}`",
+                f"- blocker counts: `{json.dumps(blocker_counts, sort_keys=True)}`",
+                f"- requested blocker counts: `{json.dumps(requested_blocker_counts, sort_keys=True)}`",
+            ]
+        )
     composite = decision.get("composite_v3_diagnostics", {})
     if isinstance(composite, dict):
         lines.extend(

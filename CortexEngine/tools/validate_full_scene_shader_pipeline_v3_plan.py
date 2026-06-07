@@ -15,8 +15,10 @@ RENDERER_FRAME_POST_CONSTANTS_PATH = ROOT / "src" / "Graphics" / "Renderer_Frame
 ENGINE_SOURCE_PATH = ROOT / "src" / "Core" / "Engine.cpp"
 V3_PLACEHOLDER_ANALYZER_PATH = ROOT / "tools" / "analyze_full_scene_shader_v3_placeholders.py"
 V3_PACKET_RUNNER_PATH = ROOT / "tools" / "run_full_scene_shader_pipeline_v3_packet.ps1"
+V3_MATRIX_RUNNER_PATH = ROOT / "tools" / "run_full_scene_shader_pipeline_v3_matrix.ps1"
 SCENE_LOCAL_PACKET_RUNNER_PATH = ROOT / "tools" / "run_scene_local_cinematic_renderer_v1_packets.ps1"
 V3_PROMOTION_DECISION_PATH = ROOT / "tools" / "build_full_scene_shader_v3_promotion_decision.py"
+V3_MATRIX_DECISION_PATH = ROOT / "tools" / "build_full_scene_shader_v3_matrix_decision.py"
 V3_MATERIAL_PAYLOAD_ANALYZER_PATH = ROOT / "tools" / "analyze_full_scene_shader_v3_material_payload.py"
 V3_SCENE_PROFILE_ANALYZER_PATH = ROOT / "tools" / "analyze_full_scene_shader_v3_scene_profile.py"
 V3_ENVIRONMENT_PAYLOAD_ANALYZER_PATH = ROOT / "tools" / "analyze_full_scene_shader_v3_environment_payload.py"
@@ -157,6 +159,11 @@ def main() -> int:
         f"Missing V3 packet runner: {V3_PACKET_RUNNER_PATH}",
     )
     require(
+        V3_MATRIX_RUNNER_PATH.exists(),
+        errors,
+        f"Missing V3 matrix runner: {V3_MATRIX_RUNNER_PATH}",
+    )
+    require(
         SCENE_LOCAL_PACKET_RUNNER_PATH.exists(),
         errors,
         f"Missing scene-local packet runner: {SCENE_LOCAL_PACKET_RUNNER_PATH}",
@@ -165,6 +172,11 @@ def main() -> int:
         V3_PROMOTION_DECISION_PATH.exists(),
         errors,
         f"Missing V3 promotion decision builder: {V3_PROMOTION_DECISION_PATH}",
+    )
+    require(
+        V3_MATRIX_DECISION_PATH.exists(),
+        errors,
+        f"Missing V3 matrix decision builder: {V3_MATRIX_DECISION_PATH}",
     )
     require(
         V3_MATERIAL_PAYLOAD_ANALYZER_PATH.exists(),
@@ -239,8 +251,10 @@ def main() -> int:
     engine_source = ENGINE_SOURCE_PATH.read_text(encoding="utf-8")
     analyzer_source = V3_PLACEHOLDER_ANALYZER_PATH.read_text(encoding="utf-8")
     packet_source = V3_PACKET_RUNNER_PATH.read_text(encoding="utf-8")
+    matrix_runner_source = V3_MATRIX_RUNNER_PATH.read_text(encoding="utf-8")
     scene_local_packet_source = SCENE_LOCAL_PACKET_RUNNER_PATH.read_text(encoding="utf-8")
     promotion_source = V3_PROMOTION_DECISION_PATH.read_text(encoding="utf-8")
+    matrix_source = V3_MATRIX_DECISION_PATH.read_text(encoding="utf-8")
     material_payload_source = V3_MATERIAL_PAYLOAD_ANALYZER_PATH.read_text(encoding="utf-8")
     scene_profile_source = V3_SCENE_PROFILE_ANALYZER_PATH.read_text(encoding="utf-8")
     environment_payload_source = V3_ENVIRONMENT_PAYLOAD_ANALYZER_PATH.read_text(encoding="utf-8")
@@ -262,8 +276,10 @@ def main() -> int:
             engine_source,
             analyzer_source,
             packet_source,
+            matrix_runner_source,
             scene_local_packet_source,
             promotion_source,
+            matrix_source,
             material_payload_source,
             scene_profile_source,
             environment_payload_source,
@@ -970,6 +986,14 @@ def main() -> int:
         "full_pipeline_report_count",
         "promotion_decision.json",
         "promotion_decision.md",
+        "v3_matrix_decision.json",
+        "v3_matrix_decision.md",
+        "candidate_predicate_summary",
+        "candidate_beauty_predicates",
+        "candidate_beauty_blocker_counts",
+        "candidate_beauty_requested_blocker_counts",
+        "predicate_ready_report_counts",
+        "requested_blocker_counts",
         "v3_composite_diagnostics.json",
         "composite_v3_diagnostics",
         "mean_explicit_legacy_rescue",

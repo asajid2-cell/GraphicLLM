@@ -78,6 +78,11 @@ FOCUS_VIEW_SETS = {
         ],
         "legacy": [],
     },
+    "shadow": {
+        "lighting": V3_LIGHTING_VIEWS,
+        "candidate": [],
+        "legacy": list(LEGACY_PAIRS.values()),
+    },
 }
 
 
@@ -214,8 +219,8 @@ def build_family_rows(
 
         for v3_view in focus_views["lighting"]:
             v3_row = views.get(v3_view)
-            legacy_view = LEGACY_PAIRS[v3_view]
-            legacy_row = views.get(legacy_view)
+            legacy_view = LEGACY_PAIRS.get(v3_view, "")
+            legacy_row = views.get(legacy_view) if legacy_view else None
             if not v3_row:
                 family_status = "missing_v3_view"
                 view_rows.append({"view": v3_view, "status": "missing_v3_view"})
@@ -235,6 +240,13 @@ def build_family_rows(
                         f"{family}/{v3_view}: motion delta {v3_delta:.6f} is "
                         f"{ratio:.2f}x legacy {legacy_view} ({legacy_delta:.6f})"
                     )
+            elif v3_delta > 0.02 and (v3_delta / max(beauty_delta, 1e-6)) > 1.75:
+                status = "v3_motion_above_beauty"
+                family_status = "motion_warning"
+                warnings.append(
+                    f"{family}/{v3_view}: diagnostic motion delta {v3_delta:.6f} is "
+                    f"{v3_delta / max(beauty_delta, 1e-6):.2f}x beauty ({beauty_delta:.6f})"
+                )
             view_rows.append(
                 {
                     "view": v3_view,

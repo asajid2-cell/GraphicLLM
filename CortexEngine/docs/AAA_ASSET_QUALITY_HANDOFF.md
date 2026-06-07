@@ -3,6 +3,74 @@
 This is the living handoff for the AAA asset-quality goal.
 Read this after compaction before continuing.
 
+## 2026-06-07 LightingV3 Shadow Motion Focus Harness
+
+Purpose:
+
+- Add a small, repeatable harness for shadow/lighting motion instead of using
+  broad V3 promotion packets for every shadow-flicker question.
+- Measure `lighting_energy_budget` and `shadow_source_attribution` under
+  mouse jitter alongside legacy lighting/shadow views and beauty.
+
+Implemented:
+
+- Added `tools\run_lighting_v3_shadow_motion_focus_packet.ps1`.
+- Added `--focus shadow` support to
+  `tools\analyze_full_scene_shader_v3_lighting_motion.py`.
+- Shadow focus measures:
+  - `beauty`.
+  - legacy `direct_light`, `direct_light_unshadowed`,
+    `direct_light_shadow_loss`, `shadow_factor`, and `ambient_ibl`.
+  - V3 `v3_direct_lighting`, `v3_direct_lighting_unshadowed`,
+    `v3_shadow_visibility`, `v3_shadow_loss`, `v3_indirect_lighting`,
+    `v3_lighting_energy_budget`, and `v3_shadow_source_attribution`.
+- The analyzer now handles V3 diagnostic-only lighting views without requiring
+  a nonexistent legacy counterpart. Those are compared against beauty motion.
+- The runner writes:
+  - `v3_lighting_shadow_motion_focus.json`.
+  - `v3_lighting_shadow_motion_focus.md`.
+  - `v3_lighting_shadow_motion_focus_sheet.png`.
+
+Validation:
+
+```powershell
+python -m py_compile tools\analyze_full_scene_shader_v3_lighting_motion.py
+$tokens = $null
+$errors = $null
+[System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path tools\run_lighting_v3_shadow_motion_focus_packet.ps1), [ref]$tokens, [ref]$errors) | Out-Null
+if ($errors.Count -gt 0) { $errors | Format-List; exit 1 }
+git -c submodule.recurse=false diff --check -- tools\run_lighting_v3_shadow_motion_focus_packet.ps1 tools\analyze_full_scene_shader_v3_lighting_motion.py
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_lighting_v3_shadow_motion_focus_packet.ps1 -NoBuild -OutputRoot build\captures\v3_lighting_shadow_motion_focus_mouse_jitter_20260607 -SmokeFrames 18 -CaptureFrame 9 -CaptureSequenceCount 2 -MotionFrames 72 -MotionLookAmplitude 0.025 -MotionLookCycles 6.0
+python tools\analyze_full_scene_shader_v3_lighting_motion.py --manifest build\captures\v3_lighting_shadow_motion_focus_mouse_jitter_20260607\manifest.json --output-json build\captures\v3_lighting_shadow_motion_focus_mouse_jitter_20260607\v3_lighting_shadow_motion_focus.json --output-md build\captures\v3_lighting_shadow_motion_focus_mouse_jitter_20260607\v3_lighting_shadow_motion_focus.md --min-sequence-count 2 --focus shadow
+python tools\build_full_scene_shader_v2_review_sheet.py --manifest build\captures\v3_lighting_shadow_motion_focus_mouse_jitter_20260607\manifest.json --output build\captures\v3_lighting_shadow_motion_focus_mouse_jitter_20260607\v3_lighting_shadow_motion_focus_sheet.png --summary-json build\captures\v3_lighting_shadow_motion_focus_mouse_jitter_20260607\v3_lighting_shadow_motion_focus_sheet.json --summary-md build\captures\v3_lighting_shadow_motion_focus_mouse_jitter_20260607\v3_lighting_shadow_motion_focus_sheet.md --views beauty,v3_shadow_visibility,v3_shadow_loss,v3_lighting_energy_budget,v3_shadow_source_attribution,direct_light_shadow_loss,shadow_factor --thumb-width 300 --thumb-height 174
+```
+
+Evidence:
+
+- focused packet:
+  `build\captures\v3_lighting_shadow_motion_focus_mouse_jitter_20260607`.
+- motion mode: `mouse_jitter`.
+- capture sequence count: `2`.
+- view rows: `13`.
+- failures: `0`.
+- warnings: `0`.
+- key rows:
+  - `v3_shadow_visibility.delta=0.00761387`, `1.002x` legacy,
+    `0.378x` beauty.
+  - `v3_shadow_loss.delta=0.01245458`, `0.820x` legacy,
+    `0.618x` beauty.
+  - `v3_lighting_energy_budget.delta=0.00535823`, `0.266x` beauty.
+  - `v3_shadow_source_attribution.delta=0.01232620`, `0.612x` beauty.
+
+Current next work:
+
+1. Add a high-contrast light-sweep row to this harness or a sibling harness.
+2. If a user-visible shadow flicker remains, split
+   `shadow_source_attribution` into separate directional shadow map, local
+   shadow map, RT shadow, and PCSS/filter-radius attribution views.
+3. Keep using focused packets first; reserve full V3 promotion packets for
+   cross-family acceptance.
+
 ## 2026-06-07 LightingV3 Energy and Shadow Attribution Slice
 
 Purpose:

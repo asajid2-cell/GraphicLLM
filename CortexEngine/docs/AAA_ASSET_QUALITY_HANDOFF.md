@@ -207,6 +207,92 @@ Next:
 3. Then move to `ReflectionV3` source resolver stability before increasing
    reflection strength or cinematic post.
 
+## 2026-06-07 Candidate Beauty Requests LightingV3 Split Producer
+
+Problem found after the CompositeV3 diagnostic slice:
+
+- The focused packet proved `composite_contribution_map` and
+  `legacy_rescue_usage` rendered and analyzed.
+- However, the V3 frame report still showed:
+  - `lighting_split_resources_ready=false`.
+  - `composite_v3_ready=false`.
+  - `candidate_beauty_ready=false`.
+- Root cause:
+  `FullSceneLightingV3` only ran for LightingV3 debug views or the explicit
+  `CORTEX_ENABLE_FULL_SCENE_LIGHTING_V3_SPLIT` env var. Candidate-beauty
+  packets used CompositeV3, but did not automatically request the split-lighting
+  producer. That left valid allocated split targets without pass ownership.
+
+Implemented:
+
+- In `Renderer_RenderGraphVisibilityBuffer.cpp`, candidate-beauty frames now
+  request `FullSceneLightingV3`.
+- Candidate request sources:
+  - `m_postProcessState.fullSceneCandidateBeautyV3Enabled`.
+  - `CORTEX_ENABLE_FULL_SCENE_CANDIDATE_BEAUTY_V3`.
+  - `CORTEX_DISPLAY_FULL_SCENE_CANDIDATE_BEAUTY_V3`.
+- The existing explicit split-lighting env var still works:
+  `CORTEX_ENABLE_FULL_SCENE_LIGHTING_V3_SPLIT`.
+
+Validation:
+
+```powershell
+cmd.exe /d /c "call ""C:\Program Files\Microsoft Visual Studio\18\Community\Common7\Tools\VsDevCmd.bat"" -arch=x64 -host_arch=x64 >nul && set ""CORTEX_SKIP_ASSET_SYNC=1"" && ""C:\Program Files\Ninja\ninja.exe"" -C build CortexEngine -j 8"
+Copy-Item assets\shaders\FullSceneCompositeV3.hlsl build\bin\assets\shaders\FullSceneCompositeV3.hlsl -Force
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_scene_local_cinematic_renderer_v1_packets.ps1 -NoBuild -SkipOwnerAnalysis -SkipMaterialAnalysis -SkipStabilityAnalysis -SkipVisualQualityAnalysis -StressSceneOnly -StressSceneFilter rt_showcase:reflection_closeup -ViewFilter candidate_hdr_scene_color,energy_clamp_policy,overbright_diagnostics,composite_contribution_map,legacy_rescue_usage -SmokeFrames 14 -CaptureFrame 7 -CaptureSequenceCount 1 -OutputRoot build\captures\v3_lighting_split_candidate_beauty_readiness_20260607
+python tools\analyze_full_scene_shader_debug_view_metrics.py --manifest build\captures\v3_lighting_split_candidate_beauty_readiness_20260607\manifest.json --output-json build\captures\v3_lighting_split_candidate_beauty_readiness_20260607\debug_view_metrics.json --output-md build\captures\v3_lighting_split_candidate_beauty_readiness_20260607\debug_view_metrics.md
+python tools\analyze_full_scene_shader_v3_composite_diagnostics.py --manifest build\captures\v3_lighting_split_candidate_beauty_readiness_20260607\manifest.json --output-json build\captures\v3_lighting_split_candidate_beauty_readiness_20260607\v3_composite_diagnostics.json --output-md build\captures\v3_lighting_split_candidate_beauty_readiness_20260607\v3_composite_diagnostics.md
+python tools\analyze_full_scene_shader_v3_placeholders.py --input build\captures\v3_lighting_split_candidate_beauty_readiness_20260607 --signal-output build\captures\v3_lighting_split_candidate_beauty_readiness_20260607\v3_signal.json --stability-output build\captures\v3_lighting_split_candidate_beauty_readiness_20260607\v3_stability.json
+```
+
+Evidence:
+
+- focused packet:
+  `build\captures\v3_lighting_split_candidate_beauty_readiness_20260607`.
+- debug-view metrics:
+  - captured views: `5`.
+  - measured views: `5`.
+  - failures: `0`.
+- CompositeV3 diagnostics:
+  - ready: `true`.
+  - failures: `0`.
+  - warnings: `0`.
+  - mean clamp mask: `0.000110`.
+  - mean clamp ratio: `0.000031`.
+  - mean legacy rescue: `0.000000`.
+  - mean explicit legacy rescue: `0.000000`.
+  - mean direct contribution: `0.643191`.
+  - mean reflection contribution: `0.011720`.
+- V3 frame report evidence from the candidate HDR capture:
+  - `lighting_split_resources_ready=true`.
+  - `composite_v3_ready=true`.
+  - `candidate_beauty_ready=true`.
+  - `lighting_split_resource_count=5`.
+  - `composite_v3_channel_count=6`.
+  - `FullSceneLightingV3` executed and wrote:
+    `direct_lighting`, `direct_lighting_unshadowed`, `shadow_visibility`,
+    `shadow_loss`, and `indirect_lighting`.
+  - `FullSceneCompositeV3` executed and wrote:
+    `candidate_hdr_scene_color`, `energy_clamp_policy`,
+    `overbright_diagnostics`, `composite_contribution_map`, and
+    `legacy_rescue_usage`.
+  - `CinematicPostV3` executed and wrote:
+    `candidate_ldr_cinematic_output`.
+
+Current limitation:
+
+- This proves the focused candidate-beauty path requests its required
+  split-lighting producer.
+- It is not a cross-family promotion and not a visual-quality acceptance pass.
+
+Next:
+
+1. Commit and push this readiness fix.
+2. Start the real `LightingShadowV3` split-quality pass:
+   source IDs, shadow-loss attribution, locked-exposure motion packets, and
+   family-specific lighting rigs.
+3. Then continue into `ReflectionV3` source stability.
+
 ## 2026-06-07 SceneLocalEnvironmentV3 Producer Slice
 
 Implemented:

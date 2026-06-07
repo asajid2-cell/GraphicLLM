@@ -77,8 +77,14 @@ Renderer::ExecuteVisibilityBufferInRenderGraph(Scene::ECS_Registry* registry) {
         const auto deferredInputs = debugPath
             ? VisibilityBufferDeferredLightingInputs{}
             : PrepareVisibilityBufferDeferredLighting(registry);
+        const bool candidateBeautyV3Requested =
+            m_postProcessState.fullSceneCandidateBeautyV3Enabled ||
+            std::getenv("CORTEX_ENABLE_FULL_SCENE_CANDIDATE_BEAUTY_V3") != nullptr ||
+            std::getenv("CORTEX_DISPLAY_FULL_SCENE_CANDIDATE_BEAUTY_V3") != nullptr;
         const bool fullSceneLightingV3Requested =
-            debugLightingV3 || std::getenv("CORTEX_ENABLE_FULL_SCENE_LIGHTING_V3_SPLIT") != nullptr;
+            debugLightingV3 ||
+            candidateBeautyV3Requested ||
+            std::getenv("CORTEX_ENABLE_FULL_SCENE_LIGHTING_V3_SPLIT") != nullptr;
         const bool fullSceneLightingV3Enabled =
             !debugPath &&
             fullSceneLightingV3Requested &&

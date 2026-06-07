@@ -1,13 +1,13 @@
 {
   "schema": "cortex.scene_local_environment_proxy_manifest.v1",
   "source": "generate_scene_local_environment_proxies.py",
-  "derivation_method": "profile_payload_inventory_v1",
+  "derivation_method": "profile_payload_material_sample_v1",
   "sets": {
     "basketball_gym_day": {
       "set_id": "basketball_gym_day",
       "output_dir": "assets/textures/scene_local_proxy/basketball_gym_day",
       "derivation": {
-        "method": "profile_payload_inventory_v1",
+        "method": "profile_payload_material_sample_v1",
         "base_rgb": {
           "irradiance": [
             179,
@@ -27,19 +27,19 @@
         },
         "derived_rgb": {
           "irradiance": [
-            179,
-            164,
-            130
+            168,
+            146,
+            112
           ],
           "specular": [
-            202,
-            197,
-            182
+            181,
+            176,
+            160
           ],
           "visible_background": [
-            101,
-            125,
-            151
+            108,
+            123,
+            140
           ]
         },
         "payload_inventory": {
@@ -55,6 +55,92 @@
             "cube": 2,
             "cylinder": 2,
             "metal": 2
+          },
+          "material_samples": {
+            "decoder": "pillow_dds",
+            "color_payload_count": 5,
+            "sampled_color_payload_count": 5,
+            "failed_color_payload_count": 0,
+            "average_rgb": [
+              102,
+              81,
+              57
+            ],
+            "role_average_rgb": {
+              "cube": [
+                61,
+                50,
+                28
+              ],
+              "floor": [
+                119,
+                73,
+                37
+              ],
+              "metal": [
+                61,
+                50,
+                28
+              ],
+              "wall": [
+                134,
+                116,
+                95
+              ]
+            },
+            "sampled_textures": [
+              {
+                "path": "assets/textures/scene_local/basketball_gym_day/rt_gallery_cube_plastic_albedo.dds",
+                "role": "cube",
+                "rgb": [
+                  61,
+                  50,
+                  28
+                ],
+                "decoder": "pillow_dds"
+              },
+              {
+                "path": "assets/textures/scene_local/basketball_gym_day/rt_gallery_cylinder_brushed_albedo.dds",
+                "role": "metal",
+                "rgb": [
+                  61,
+                  50,
+                  28
+                ],
+                "decoder": "pillow_dds"
+              },
+              {
+                "path": "assets/textures/scene_local/basketball_gym_day/rt_gallery_floor_albedo.dds",
+                "role": "floor",
+                "rgb": [
+                  119,
+                  73,
+                  37
+                ],
+                "decoder": "pillow_dds"
+              },
+              {
+                "path": "assets/textures/scene_local/basketball_gym_day/rt_gallery_leftwall_albedo.dds",
+                "role": "wall",
+                "rgb": [
+                  129,
+                  97,
+                  73
+                ],
+                "decoder": "pillow_dds"
+              },
+              {
+                "path": "assets/textures/scene_local/basketball_gym_day/rt_gallery_rightwall_albedo.dds",
+                "role": "wall",
+                "rgb": [
+                  140,
+                  134,
+                  117
+                ],
+                "decoder": "pillow_dds"
+              }
+            ],
+            "failed_textures": []
           },
           "sample_textures": [
             "rt_gallery_cube_plastic_albedo.dds",
@@ -72,7 +158,8 @@
           "wall": 0.44,
           "object": 0.28,
           "metal": 0.24,
-          "role_count": 12
+          "role_count": 12,
+          "material_sample": 0.48
         }
       },
       "outputs": {
@@ -85,7 +172,7 @@
       "set_id": "home_kitchen_lantern",
       "output_dir": "assets/textures/scene_local_proxy/home_kitchen_lantern",
       "derivation": {
-        "method": "profile_payload_inventory_v1",
+        "method": "profile_payload_material_sample_v1",
         "base_rgb": {
           "irradiance": [
             186,
@@ -105,19 +192,19 @@
         },
         "derived_rgb": {
           "irradiance": [
-            177,
-            146,
-            111
+            162,
+            127,
+            92
           ],
           "specular": [
-            203,
-            184,
-            154
+            176,
+            159,
+            130
           ],
           "visible_background": [
             134,
-            122,
-            109
+            121,
+            106
           ]
         },
         "payload_inventory": {
@@ -133,6 +220,102 @@
             "cube": 2,
             "cylinder": 2,
             "metal": 3
+          },
+          "material_samples": {
+            "decoder": "pillow_dds",
+            "color_payload_count": 6,
+            "sampled_color_payload_count": 6,
+            "failed_color_payload_count": 0,
+            "average_rgb": [
+              95,
+              76,
+              52
+            ],
+            "role_average_rgb": {
+              "cube": [
+                61,
+                50,
+                28
+              ],
+              "floor": [
+                119,
+                73,
+                37
+              ],
+              "metal": [
+                61,
+                50,
+                28
+              ],
+              "wall": [
+                134,
+                116,
+                95
+              ]
+            },
+            "sampled_textures": [
+              {
+                "path": "assets/textures/rtshowcase/metal_plate_diff_4k.dds",
+                "role": "metal",
+                "rgb": [
+                  61,
+                  50,
+                  28
+                ],
+                "decoder": "pillow_dds"
+              },
+              {
+                "path": "assets/textures/rtshowcase/rt_gallery_cube_plastic_albedo.dds",
+                "role": "cube",
+                "rgb": [
+                  61,
+                  50,
+                  28
+                ],
+                "decoder": "pillow_dds"
+              },
+              {
+                "path": "assets/textures/rtshowcase/rt_gallery_cylinder_brushed_albedo.dds",
+                "role": "metal",
+                "rgb": [
+                  61,
+                  50,
+                  28
+                ],
+                "decoder": "pillow_dds"
+              },
+              {
+                "path": "assets/textures/rtshowcase/rt_gallery_floor_albedo.dds",
+                "role": "floor",
+                "rgb": [
+                  119,
+                  73,
+                  37
+                ],
+                "decoder": "pillow_dds"
+              },
+              {
+                "path": "assets/textures/rtshowcase/rt_gallery_leftwall_albedo.dds",
+                "role": "wall",
+                "rgb": [
+                  129,
+                  97,
+                  73
+                ],
+                "decoder": "pillow_dds"
+              },
+              {
+                "path": "assets/textures/rtshowcase/rt_gallery_rightwall_albedo.dds",
+                "role": "wall",
+                "rgb": [
+                  140,
+                  134,
+                  117
+                ],
+                "decoder": "pillow_dds"
+              }
+            ],
+            "failed_textures": []
           },
           "sample_textures": [
             "metal_plate_diff_4k.dds",
@@ -150,7 +333,8 @@
           "wall": 0.44,
           "object": 0.28,
           "metal": 0.32,
-          "role_count": 13
+          "role_count": 13,
+          "material_sample": 0.54
         }
       },
       "outputs": {
@@ -163,7 +347,7 @@
       "set_id": "home_office_evening",
       "output_dir": "assets/textures/scene_local_proxy/home_office_evening",
       "derivation": {
-        "method": "profile_payload_inventory_v1",
+        "method": "profile_payload_material_sample_v1",
         "base_rgb": {
           "irradiance": [
             124,
@@ -183,19 +367,19 @@
         },
         "derived_rgb": {
           "irradiance": [
-            138,
-            123,
-            102
+            133,
+            110,
+            85
           ],
           "specular": [
-            178,
-            170,
-            159
+            156,
+            147,
+            134
           ],
           "visible_background": [
-            109,
-            109,
-            107
+            115,
+            111,
+            104
           ]
         },
         "payload_inventory": {
@@ -211,6 +395,102 @@
             "cube": 2,
             "cylinder": 2,
             "metal": 3
+          },
+          "material_samples": {
+            "decoder": "pillow_dds",
+            "color_payload_count": 6,
+            "sampled_color_payload_count": 6,
+            "failed_color_payload_count": 0,
+            "average_rgb": [
+              95,
+              76,
+              52
+            ],
+            "role_average_rgb": {
+              "cube": [
+                61,
+                50,
+                28
+              ],
+              "floor": [
+                119,
+                73,
+                37
+              ],
+              "metal": [
+                61,
+                50,
+                28
+              ],
+              "wall": [
+                134,
+                116,
+                95
+              ]
+            },
+            "sampled_textures": [
+              {
+                "path": "assets/textures/rtshowcase/metal_plate_diff_4k.dds",
+                "role": "metal",
+                "rgb": [
+                  61,
+                  50,
+                  28
+                ],
+                "decoder": "pillow_dds"
+              },
+              {
+                "path": "assets/textures/rtshowcase/rt_gallery_cube_plastic_albedo.dds",
+                "role": "cube",
+                "rgb": [
+                  61,
+                  50,
+                  28
+                ],
+                "decoder": "pillow_dds"
+              },
+              {
+                "path": "assets/textures/rtshowcase/rt_gallery_cylinder_brushed_albedo.dds",
+                "role": "metal",
+                "rgb": [
+                  61,
+                  50,
+                  28
+                ],
+                "decoder": "pillow_dds"
+              },
+              {
+                "path": "assets/textures/rtshowcase/rt_gallery_floor_albedo.dds",
+                "role": "floor",
+                "rgb": [
+                  119,
+                  73,
+                  37
+                ],
+                "decoder": "pillow_dds"
+              },
+              {
+                "path": "assets/textures/rtshowcase/rt_gallery_leftwall_albedo.dds",
+                "role": "wall",
+                "rgb": [
+                  129,
+                  97,
+                  73
+                ],
+                "decoder": "pillow_dds"
+              },
+              {
+                "path": "assets/textures/rtshowcase/rt_gallery_rightwall_albedo.dds",
+                "role": "wall",
+                "rgb": [
+                  140,
+                  134,
+                  117
+                ],
+                "decoder": "pillow_dds"
+              }
+            ],
+            "failed_textures": []
           },
           "sample_textures": [
             "metal_plate_diff_4k.dds",
@@ -228,7 +508,8 @@
           "wall": 0.44,
           "object": 0.28,
           "metal": 0.32,
-          "role_count": 13
+          "role_count": 13,
+          "material_sample": 0.54
         }
       },
       "outputs": {
@@ -241,7 +522,7 @@
       "set_id": "neon_streamer_concert",
       "output_dir": "assets/textures/scene_local_proxy/neon_streamer_concert",
       "derivation": {
-        "method": "profile_payload_inventory_v1",
+        "method": "profile_payload_material_sample_v1",
         "base_rgb": {
           "irradiance": [
             86,
@@ -262,18 +543,18 @@
         "derived_rgb": {
           "irradiance": [
             99,
-            66,
-            121
+            65,
+            105
           ],
           "specular": [
-            130,
-            199,
-            213
+            121,
+            175,
+            183
           ],
           "visible_background": [
-            59,
-            48,
-            78
+            65,
+            53,
+            79
           ]
         },
         "payload_inventory": {
@@ -289,6 +570,102 @@
             "cube": 2,
             "cylinder": 2,
             "metal": 3
+          },
+          "material_samples": {
+            "decoder": "pillow_dds",
+            "color_payload_count": 6,
+            "sampled_color_payload_count": 6,
+            "failed_color_payload_count": 0,
+            "average_rgb": [
+              95,
+              76,
+              52
+            ],
+            "role_average_rgb": {
+              "cube": [
+                61,
+                50,
+                28
+              ],
+              "floor": [
+                119,
+                73,
+                37
+              ],
+              "metal": [
+                61,
+                50,
+                28
+              ],
+              "wall": [
+                134,
+                116,
+                95
+              ]
+            },
+            "sampled_textures": [
+              {
+                "path": "assets/textures/rtshowcase/metal_plate_diff_4k.dds",
+                "role": "metal",
+                "rgb": [
+                  61,
+                  50,
+                  28
+                ],
+                "decoder": "pillow_dds"
+              },
+              {
+                "path": "assets/textures/rtshowcase/rt_gallery_cube_plastic_albedo.dds",
+                "role": "cube",
+                "rgb": [
+                  61,
+                  50,
+                  28
+                ],
+                "decoder": "pillow_dds"
+              },
+              {
+                "path": "assets/textures/rtshowcase/rt_gallery_cylinder_brushed_albedo.dds",
+                "role": "metal",
+                "rgb": [
+                  61,
+                  50,
+                  28
+                ],
+                "decoder": "pillow_dds"
+              },
+              {
+                "path": "assets/textures/rtshowcase/rt_gallery_floor_albedo.dds",
+                "role": "floor",
+                "rgb": [
+                  119,
+                  73,
+                  37
+                ],
+                "decoder": "pillow_dds"
+              },
+              {
+                "path": "assets/textures/rtshowcase/rt_gallery_leftwall_albedo.dds",
+                "role": "wall",
+                "rgb": [
+                  129,
+                  97,
+                  73
+                ],
+                "decoder": "pillow_dds"
+              },
+              {
+                "path": "assets/textures/rtshowcase/rt_gallery_rightwall_albedo.dds",
+                "role": "wall",
+                "rgb": [
+                  140,
+                  134,
+                  117
+                ],
+                "decoder": "pillow_dds"
+              }
+            ],
+            "failed_textures": []
           },
           "sample_textures": [
             "metal_plate_diff_4k.dds",
@@ -306,7 +683,8 @@
           "wall": 0.44,
           "object": 0.28,
           "metal": 0.32,
-          "role_count": 13
+          "role_count": 13,
+          "material_sample": 0.54
         }
       },
       "outputs": {
@@ -319,7 +697,7 @@
       "set_id": "red_light_room",
       "output_dir": "assets/textures/scene_local_proxy/red_light_room",
       "derivation": {
-        "method": "profile_payload_inventory_v1",
+        "method": "profile_payload_material_sample_v1",
         "base_rgb": {
           "irradiance": [
             138,
@@ -339,19 +717,19 @@
         },
         "derived_rgb": {
           "irradiance": [
-            119,
-            65,
-            85
+            115,
+            64,
+            78
           ],
           "specular": [
-            207,
-            139,
-            135
+            184,
+            127,
+            120
           ],
           "visible_background": [
-            68,
-            49,
-            73
+            72,
+            53,
+            75
           ]
         },
         "payload_inventory": {
@@ -367,6 +745,102 @@
             "cube": 2,
             "cylinder": 2,
             "metal": 3
+          },
+          "material_samples": {
+            "decoder": "pillow_dds",
+            "color_payload_count": 6,
+            "sampled_color_payload_count": 6,
+            "failed_color_payload_count": 0,
+            "average_rgb": [
+              95,
+              76,
+              52
+            ],
+            "role_average_rgb": {
+              "cube": [
+                61,
+                50,
+                28
+              ],
+              "floor": [
+                119,
+                73,
+                37
+              ],
+              "metal": [
+                61,
+                50,
+                28
+              ],
+              "wall": [
+                134,
+                116,
+                95
+              ]
+            },
+            "sampled_textures": [
+              {
+                "path": "assets/textures/rtshowcase/metal_plate_diff_4k.dds",
+                "role": "metal",
+                "rgb": [
+                  61,
+                  50,
+                  28
+                ],
+                "decoder": "pillow_dds"
+              },
+              {
+                "path": "assets/textures/rtshowcase/rt_gallery_cube_plastic_albedo.dds",
+                "role": "cube",
+                "rgb": [
+                  61,
+                  50,
+                  28
+                ],
+                "decoder": "pillow_dds"
+              },
+              {
+                "path": "assets/textures/rtshowcase/rt_gallery_cylinder_brushed_albedo.dds",
+                "role": "metal",
+                "rgb": [
+                  61,
+                  50,
+                  28
+                ],
+                "decoder": "pillow_dds"
+              },
+              {
+                "path": "assets/textures/rtshowcase/rt_gallery_floor_albedo.dds",
+                "role": "floor",
+                "rgb": [
+                  119,
+                  73,
+                  37
+                ],
+                "decoder": "pillow_dds"
+              },
+              {
+                "path": "assets/textures/rtshowcase/rt_gallery_leftwall_albedo.dds",
+                "role": "wall",
+                "rgb": [
+                  129,
+                  97,
+                  73
+                ],
+                "decoder": "pillow_dds"
+              },
+              {
+                "path": "assets/textures/rtshowcase/rt_gallery_rightwall_albedo.dds",
+                "role": "wall",
+                "rgb": [
+                  140,
+                  134,
+                  117
+                ],
+                "decoder": "pillow_dds"
+              }
+            ],
+            "failed_textures": []
           },
           "sample_textures": [
             "metal_plate_diff_4k.dds",
@@ -384,7 +858,8 @@
           "wall": 0.44,
           "object": 0.28,
           "metal": 0.32,
-          "role_count": 13
+          "role_count": 13,
+          "material_sample": 0.54
         }
       },
       "outputs": {
@@ -397,7 +872,7 @@
       "set_id": "rt_showcase_gallery",
       "output_dir": "assets/textures/scene_local_proxy/rt_showcase_gallery",
       "derivation": {
-        "method": "profile_payload_inventory_v1",
+        "method": "profile_payload_material_sample_v1",
         "base_rgb": {
           "irradiance": [
             150,
@@ -417,19 +892,19 @@
         },
         "derived_rgb": {
           "irradiance": [
-            154,
-            149,
-            134
+            145,
+            129,
+            109
           ],
           "specular": [
-            186,
-            188,
-            188
+            162,
+            162,
+            158
           ],
           "visible_background": [
-            154,
-            160,
-            164
+            149,
+            150,
+            148
           ]
         },
         "payload_inventory": {
@@ -445,6 +920,102 @@
             "cube": 2,
             "cylinder": 2,
             "metal": 3
+          },
+          "material_samples": {
+            "decoder": "pillow_dds",
+            "color_payload_count": 6,
+            "sampled_color_payload_count": 6,
+            "failed_color_payload_count": 0,
+            "average_rgb": [
+              95,
+              76,
+              52
+            ],
+            "role_average_rgb": {
+              "cube": [
+                61,
+                50,
+                28
+              ],
+              "floor": [
+                119,
+                73,
+                37
+              ],
+              "metal": [
+                61,
+                50,
+                28
+              ],
+              "wall": [
+                134,
+                116,
+                95
+              ]
+            },
+            "sampled_textures": [
+              {
+                "path": "assets/textures/rtshowcase/metal_plate_diff_4k.dds",
+                "role": "metal",
+                "rgb": [
+                  61,
+                  50,
+                  28
+                ],
+                "decoder": "pillow_dds"
+              },
+              {
+                "path": "assets/textures/rtshowcase/rt_gallery_cube_plastic_albedo.dds",
+                "role": "cube",
+                "rgb": [
+                  61,
+                  50,
+                  28
+                ],
+                "decoder": "pillow_dds"
+              },
+              {
+                "path": "assets/textures/rtshowcase/rt_gallery_cylinder_brushed_albedo.dds",
+                "role": "metal",
+                "rgb": [
+                  61,
+                  50,
+                  28
+                ],
+                "decoder": "pillow_dds"
+              },
+              {
+                "path": "assets/textures/rtshowcase/rt_gallery_floor_albedo.dds",
+                "role": "floor",
+                "rgb": [
+                  119,
+                  73,
+                  37
+                ],
+                "decoder": "pillow_dds"
+              },
+              {
+                "path": "assets/textures/rtshowcase/rt_gallery_leftwall_albedo.dds",
+                "role": "wall",
+                "rgb": [
+                  129,
+                  97,
+                  73
+                ],
+                "decoder": "pillow_dds"
+              },
+              {
+                "path": "assets/textures/rtshowcase/rt_gallery_rightwall_albedo.dds",
+                "role": "wall",
+                "rgb": [
+                  140,
+                  134,
+                  117
+                ],
+                "decoder": "pillow_dds"
+              }
+            ],
+            "failed_textures": []
           },
           "sample_textures": [
             "metal_plate_diff_4k.dds",
@@ -462,7 +1033,8 @@
           "wall": 0.44,
           "object": 0.28,
           "metal": 0.32,
-          "role_count": 13
+          "role_count": 13,
+          "material_sample": 0.54
         }
       },
       "outputs": {
@@ -475,7 +1047,7 @@
       "set_id": "school_classroom_day",
       "output_dir": "assets/textures/scene_local_proxy/school_classroom_day",
       "derivation": {
-        "method": "profile_payload_inventory_v1",
+        "method": "profile_payload_material_sample_v1",
         "base_rgb": {
           "irradiance": [
             161,
@@ -495,19 +1067,19 @@
         },
         "derived_rgb": {
           "irradiance": [
-            161,
-            166,
-            146
+            150,
+            142,
+            118
           ],
           "specular": [
-            190,
-            198,
-            192
+            166,
+            170,
+            161
           ],
           "visible_background": [
-            140,
-            150,
-            157
+            139,
+            142,
+            143
           ]
         },
         "payload_inventory": {
@@ -523,6 +1095,102 @@
             "cube": 2,
             "cylinder": 2,
             "metal": 3
+          },
+          "material_samples": {
+            "decoder": "pillow_dds",
+            "color_payload_count": 6,
+            "sampled_color_payload_count": 6,
+            "failed_color_payload_count": 0,
+            "average_rgb": [
+              95,
+              76,
+              52
+            ],
+            "role_average_rgb": {
+              "cube": [
+                61,
+                50,
+                28
+              ],
+              "floor": [
+                119,
+                73,
+                37
+              ],
+              "metal": [
+                61,
+                50,
+                28
+              ],
+              "wall": [
+                134,
+                116,
+                95
+              ]
+            },
+            "sampled_textures": [
+              {
+                "path": "assets/textures/rtshowcase/metal_plate_diff_4k.dds",
+                "role": "metal",
+                "rgb": [
+                  61,
+                  50,
+                  28
+                ],
+                "decoder": "pillow_dds"
+              },
+              {
+                "path": "assets/textures/rtshowcase/rt_gallery_cube_plastic_albedo.dds",
+                "role": "cube",
+                "rgb": [
+                  61,
+                  50,
+                  28
+                ],
+                "decoder": "pillow_dds"
+              },
+              {
+                "path": "assets/textures/rtshowcase/rt_gallery_cylinder_brushed_albedo.dds",
+                "role": "metal",
+                "rgb": [
+                  61,
+                  50,
+                  28
+                ],
+                "decoder": "pillow_dds"
+              },
+              {
+                "path": "assets/textures/rtshowcase/rt_gallery_floor_albedo.dds",
+                "role": "floor",
+                "rgb": [
+                  119,
+                  73,
+                  37
+                ],
+                "decoder": "pillow_dds"
+              },
+              {
+                "path": "assets/textures/rtshowcase/rt_gallery_leftwall_albedo.dds",
+                "role": "wall",
+                "rgb": [
+                  129,
+                  97,
+                  73
+                ],
+                "decoder": "pillow_dds"
+              },
+              {
+                "path": "assets/textures/rtshowcase/rt_gallery_rightwall_albedo.dds",
+                "role": "wall",
+                "rgb": [
+                  140,
+                  134,
+                  117
+                ],
+                "decoder": "pillow_dds"
+              }
+            ],
+            "failed_textures": []
           },
           "sample_textures": [
             "metal_plate_diff_4k.dds",
@@ -540,7 +1208,8 @@
           "wall": 0.44,
           "object": 0.28,
           "metal": 0.32,
-          "role_count": 13
+          "role_count": 13,
+          "material_sample": 0.54
         }
       },
       "outputs": {
@@ -553,7 +1222,7 @@
       "set_id": "stadium_night_match",
       "output_dir": "assets/textures/scene_local_proxy/stadium_night_match",
       "derivation": {
-        "method": "profile_payload_inventory_v1",
+        "method": "profile_payload_material_sample_v1",
         "base_rgb": {
           "irradiance": [
             62,
@@ -573,19 +1242,19 @@
         },
         "derived_rgb": {
           "irradiance": [
-            83,
-            97,
-            106
+            86,
+            91,
+            93
           ],
           "specular": [
-            167,
-            180,
-            188
+            153,
+            163,
+            168
           ],
           "visible_background": [
-            62,
-            79,
-            94
+            68,
+            83,
+            95
           ]
         },
         "payload_inventory": {
@@ -601,6 +1270,102 @@
             "cube": 2,
             "cylinder": 2,
             "metal": 3
+          },
+          "material_samples": {
+            "decoder": "pillow_dds",
+            "color_payload_count": 6,
+            "sampled_color_payload_count": 6,
+            "failed_color_payload_count": 0,
+            "average_rgb": [
+              95,
+              76,
+              52
+            ],
+            "role_average_rgb": {
+              "cube": [
+                61,
+                50,
+                28
+              ],
+              "floor": [
+                119,
+                73,
+                37
+              ],
+              "metal": [
+                61,
+                50,
+                28
+              ],
+              "wall": [
+                134,
+                116,
+                95
+              ]
+            },
+            "sampled_textures": [
+              {
+                "path": "assets/textures/rtshowcase/metal_plate_diff_4k.dds",
+                "role": "metal",
+                "rgb": [
+                  61,
+                  50,
+                  28
+                ],
+                "decoder": "pillow_dds"
+              },
+              {
+                "path": "assets/textures/rtshowcase/rt_gallery_cube_plastic_albedo.dds",
+                "role": "cube",
+                "rgb": [
+                  61,
+                  50,
+                  28
+                ],
+                "decoder": "pillow_dds"
+              },
+              {
+                "path": "assets/textures/rtshowcase/rt_gallery_cylinder_brushed_albedo.dds",
+                "role": "metal",
+                "rgb": [
+                  61,
+                  50,
+                  28
+                ],
+                "decoder": "pillow_dds"
+              },
+              {
+                "path": "assets/textures/rtshowcase/rt_gallery_floor_albedo.dds",
+                "role": "floor",
+                "rgb": [
+                  119,
+                  73,
+                  37
+                ],
+                "decoder": "pillow_dds"
+              },
+              {
+                "path": "assets/textures/rtshowcase/rt_gallery_leftwall_albedo.dds",
+                "role": "wall",
+                "rgb": [
+                  129,
+                  97,
+                  73
+                ],
+                "decoder": "pillow_dds"
+              },
+              {
+                "path": "assets/textures/rtshowcase/rt_gallery_rightwall_albedo.dds",
+                "role": "wall",
+                "rgb": [
+                  140,
+                  134,
+                  117
+                ],
+                "decoder": "pillow_dds"
+              }
+            ],
+            "failed_textures": []
           },
           "sample_textures": [
             "metal_plate_diff_4k.dds",
@@ -618,7 +1383,8 @@
           "wall": 0.44,
           "object": 0.28,
           "metal": 0.32,
-          "role_count": 13
+          "role_count": 13,
+          "material_sample": 0.54
         }
       },
       "outputs": {

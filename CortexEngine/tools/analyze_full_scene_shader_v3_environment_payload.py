@@ -8,7 +8,7 @@ from typing import Any
 
 
 ROOT = Path(__file__).resolve().parents[1]
-EXPECTED_PROXY_DERIVATION = "profile_payload_inventory_v1"
+EXPECTED_PROXY_DERIVATION = "profile_payload_material_sample_v1"
 PROXY_MANIFEST_PATH = ROOT / "assets" / "textures" / "scene_local_proxy" / "proxy_manifest.json"
 
 
@@ -48,6 +48,12 @@ def analyze_report(path: Path, proxy_manifest: dict[str, Any]) -> dict[str, Any]
     proxy_derivation = proxy_manifest_set.get("derivation", {}) if isinstance(proxy_manifest_set, dict) else {}
     if not isinstance(proxy_derivation, dict):
         proxy_derivation = {}
+    proxy_inventory = proxy_derivation.get("payload_inventory", {}) if isinstance(proxy_derivation, dict) else {}
+    if not isinstance(proxy_inventory, dict):
+        proxy_inventory = {}
+    proxy_material_samples = proxy_inventory.get("material_samples", {}) if isinstance(proxy_inventory, dict) else {}
+    if not isinstance(proxy_material_samples, dict):
+        proxy_material_samples = {}
     row = {
         "report": str(path),
         "family": scene_visual.get("family", "unknown"),
@@ -114,6 +120,14 @@ def analyze_report(path: Path, proxy_manifest: dict[str, Any]) -> dict[str, Any]
         "v3_proxy_fallback_reason": v3.get("scene_local_environment_proxy_fallback_reason", "none"),
         "proxy_manifest_present": bool(proxy_manifest_set),
         "proxy_derivation_method": proxy_derivation.get("method", "none"),
+        "proxy_material_sample_decoder": proxy_material_samples.get("decoder", "none"),
+        "proxy_material_color_payload_count": int(proxy_material_samples.get("color_payload_count", 0) or 0),
+        "proxy_material_sampled_color_count": int(
+            proxy_material_samples.get("sampled_color_payload_count", 0) or 0
+        ),
+        "proxy_material_failed_color_count": int(
+            proxy_material_samples.get("failed_color_payload_count", 0) or 0
+        ),
         "failures": [],
     }
     if row["environment_ready"]:
@@ -203,6 +217,12 @@ def analyze_report(path: Path, proxy_manifest: dict[str, Any]) -> dict[str, Any]
                 "payload ready without current derived scene-local proxy assets: "
                 f"{row['proxy_derivation_method']}"
             )
+        if row["proxy_material_sampled_color_count"] <= 0:
+            row["failures"].append("payload ready without decoded material-color proxy samples")
+        if row["proxy_material_sample_decoder"] != "pillow_dds":
+            row["failures"].append(
+                f"payload ready without expected material-color decoder: {row['proxy_material_sample_decoder']}"
+            )
     return row
 
 
@@ -217,8 +237,8 @@ def write_markdown(path: Path, result: dict[str, Any]) -> None:
         f"- profile-policy-consumed reports: `{result['profile_policy_consumed_report_count']}`",
         f"- failures: `{len(result['failures'])}`",
         "",
-        "| Family | Profile Policy | Shader Profile | Local Background | Texture Set | Textures | Albedo | Normal | Payload | Influence | Bound | Proxy Bound | Binding | Proxy Binding | Derivation | Proxies |",
-        "|---|---|---|---:|---|---:|---:|---:|---|---:|---:|---:|---|---|---|---|",
+        "| Family | Profile Policy | Shader Profile | Local Background | Texture Set | Textures | Albedo | Normal | Payload | Influence | Bound | Proxy Bound | Binding | Proxy Binding | Derivation | Samples | Proxies |",
+        "|---|---|---|---:|---|---:|---:|---:|---|---:|---:|---:|---|---|---|---:|---|",
     ]
     for row in result["rows"]:
         proxies = ",".join(
@@ -249,6 +269,7 @@ def write_markdown(path: Path, result: dict[str, Any]) -> None:
                     f"`{row['binding_source']}`",
                     f"`{row['proxy_binding_source']}`",
                     f"`{row['proxy_derivation_method']}`",
+                    str(row["proxy_material_sampled_color_count"]),
                     proxies,
                 ]
             )
@@ -296,6 +317,9 @@ def main() -> int:
         ),
         "derived_proxy_report_count": sum(
             1 for row in rows if row["proxy_derivation_method"] == EXPECTED_PROXY_DERIVATION
+        ),
+        "material_sampled_proxy_report_count": sum(
+            1 for row in rows if row["proxy_material_sampled_color_count"] > 0
         ),
         "proxy_manifest": str(PROXY_MANIFEST_PATH),
         "profile_policy_consumed_report_count": sum(1 for row in rows if row["profile_policy_consumed"]),

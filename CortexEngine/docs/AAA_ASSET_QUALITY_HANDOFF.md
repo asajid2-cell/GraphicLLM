@@ -15,6 +15,11 @@ User direction:
 
 Current planning checkpoint:
 
+- Latest implementation moved `SceneLocalEnvironmentV3` proxy generation from
+  filename inventory into decoded material-color sampling. The generator now
+  uses Pillow DDS decoding for albedo/diffuse payloads and writes
+  `profile_payload_material_sample_v1` in the proxy manifest. The analyzer now
+  fails payload-ready reports unless decoded material samples are present.
 - Added the expanded
   `2026-06-07 Full Scene Shader Goal Feature Execution Architecture`
   section near the top of
@@ -739,6 +744,78 @@ Current next work after this checkpoint:
    analyzer.
 3. Expand derived proxy proof to kitchen/gym/red-room after model-scene
    report/capture separation is reliable.
+
+Latest SceneLocalEnvironmentV3 material-sampled proxy checkpoint:
+
+- `tools\generate_scene_local_environment_proxies.py` now uses Pillow's DDS
+  loader to decode scene-local albedo/diffuse payloads, including current BC7
+  DX10 payload textures.
+- Derivation method is now `profile_payload_material_sample_v1`.
+- The generator records material sample evidence in
+  `assets\textures\scene_local_proxy\proxy_manifest.json`:
+  - color payload count
+  - sampled color payload count
+  - failed color payload count
+  - average sampled RGB
+  - role-average RGB
+  - sampled texture paths/roles/RGB values
+- `tools\analyze_full_scene_shader_v3_environment_payload.py` now requires
+  payload-ready packets to have:
+  - explicit generated proxy binding
+  - manifest derivation `profile_payload_material_sample_v1`
+  - decoded material-color sample count greater than zero
+  - decoder `pillow_dds`
+- `tools\validate_full_scene_shader_pipeline_v3_plan.py` now checks for the
+  new derivation token in the V3 runtime surface.
+- Generated proxy report:
+  `build\captures\scene_local_environment_proxy_generation_20260607\material_sample_proxy_generation_report.json`.
+- Generation evidence:
+  - `basketball_gym_day`: `5` sampled color payloads, `0` failed
+  - all other tracked sets: `6` sampled color payloads, `0` failed
+- Validation commands:
+
+```powershell
+python tools\generate_scene_local_environment_proxies.py --overwrite --out build\captures\scene_local_environment_proxy_generation_20260607\material_sample_proxy_generation_report.json
+python -m py_compile tools\generate_scene_local_environment_proxies.py tools\analyze_full_scene_shader_v3_environment_payload.py tools\analyze_full_scene_shader_v3_placeholders.py tools\validate_full_scene_shader_pipeline_v3_plan.py
+python tools\validate_full_scene_shader_pipeline_v3_plan.py
+git -c submodule.recurse=false diff --check -- tools\generate_scene_local_environment_proxies.py tools\analyze_full_scene_shader_v3_environment_payload.py tools\validate_full_scene_shader_pipeline_v3_plan.py docs\AAA_ASSET_QUALITY_HANDOFF.md docs\FULL_SCENE_SHADER_AAA_REFACTOR_PLAN.md assets\textures\scene_local_proxy
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_full_scene_shader_pipeline_v3_packet.ps1 -NoBuild -SkipSceneAnalyzers -StressSceneOnly -StressSceneFilter rt_showcase:reflection_closeup -SmokeFrames 10 -CaptureFrame 5 -CaptureSequenceCount 1 -StabilityMotionMode static -OutputRoot build\captures\v3_scene_local_material_sample_proxy_fresh_smoke_20260607
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_scene_local_cinematic_renderer_v1_packets.ps1 -NoBuild -OutputRoot build\captures\v3_scene_local_material_sample_proxy_cross_profile_20260607 -FamilyFilter gallery,office,concert,stadium -ViewFilter scene_local_environment -SmokeFrames 10 -CaptureFrame 5 -CaptureSequenceCount 1 -SkipOwnerAnalysis -SkipMaterialAnalysis -SkipStabilityAnalysis -SkipVisualQualityAnalysis
+python tools\analyze_full_scene_shader_v3_environment_payload.py --manifest build\captures\v3_scene_local_material_sample_proxy_cross_profile_20260607\manifest.json --output-json build\captures\v3_scene_local_material_sample_proxy_cross_profile_20260607\v3_environment_payload_cross_profile.json --output-md build\captures\v3_scene_local_material_sample_proxy_cross_profile_20260607\v3_environment_payload_cross_profile.md --min-payload-ready 3
+python tools\analyze_full_scene_shader_v3_environment_profiles.py --manifest build\captures\v3_scene_local_material_sample_proxy_cross_profile_20260607\manifest.json --output-json build\captures\v3_scene_local_material_sample_proxy_cross_profile_20260607\v3_environment_profiles_cross_profile.json --output-md build\captures\v3_scene_local_material_sample_proxy_cross_profile_20260607\v3_environment_profiles_cross_profile.md --min-ready-reports 3 --min-distinct-modes 3 --min-distinct-profiles 3 --require-profile gallery_neutral=1 --require-profile enclosed_room=2 --require-profile stage=3 --require-profile open_exterior=4
+```
+
+- Focused V3 packet:
+  `build\captures\v3_scene_local_material_sample_proxy_fresh_smoke_20260607`.
+  - full V3 packet passed end to end
+  - `54` reports
+  - `54` payload-ready reports
+  - `54` explicit proxy binding reports
+  - `54` material-sampled proxy reports
+  - only source: `cached_explicit_scene_local_proxy_triple`
+  - only derivation: `profile_payload_material_sample_v1`
+  - sample counts: `6`
+- Cross-profile packet:
+  `build\captures\v3_scene_local_material_sample_proxy_cross_profile_20260607`.
+  - packet runner passed
+  - environment payload analyzer passed
+  - environment profile analyzer passed
+  - `4` reports, `4` payload-ready, `4` explicit proxy binding,
+    `4` material-sampled proxy reports
+  - only source: `cached_explicit_scene_local_proxy_triple`
+  - only derivation: `profile_payload_material_sample_v1`
+  - sample counts: `6`
+- This is a real improvement over filename-only inventory, but still not final
+  radiance baking. Remaining debt: room-shell influence, light-rig influence,
+  filtered irradiance/specular prefilter, and broader clean cross-family proof.
+
+Current next work after this checkpoint:
+
+1. Run fresh focused and cross-profile environment packets against the
+   material-sampled proxies.
+2. Add room-shell and light-rig influence to the proxy derivation manifest.
+3. Separate frame-report diagnostics from visual capture success for unstable
+   model-scene paths.
 
 Latest LightingShadowV3 source-attribution checkpoint:
 

@@ -3,9 +3,9 @@
 
 The V3 renderer can bind separate irradiance, specular, and visible-background
 proxy resources. This tool creates small deterministic BC1 DDS proxy maps from
-scene profile palettes plus scene-local payload inventory so the renderer no
-longer has to treat payload albedo/normal textures as the proxy resources
-themselves.
+scene profile palettes plus sampled scene-local material payloads so the
+renderer no longer has to treat payload albedo/normal textures as the proxy
+resources themselves.
 """
 
 from __future__ import annotations
@@ -16,10 +16,15 @@ import struct
 from pathlib import Path
 from typing import Any
 
+try:
+    from PIL import Image
+except Exception:  # pragma: no cover - optional local tool dependency
+    Image = None  # type: ignore[assignment]
+
 
 ROOT = Path(__file__).resolve().parents[1]
 SOURCE_ID = "generate_scene_local_environment_proxies.py"
-DERIVATION_METHOD = "profile_payload_inventory_v1"
+DERIVATION_METHOD = "profile_payload_material_sample_v1"
 DEFAULT_SETS = {
     "rt_showcase_gallery": {
         "irradiance": (150, 146, 134),
@@ -112,6 +117,114 @@ def darken(color: tuple[int, int, int], amount: float) -> tuple[int, int, int]:
     return clamp_rgb(tuple(float(c) * (1.0 - amount) for c in color))
 
 
+def texture_role(name: str) -> str:
+    lower = name.lower()
+    if "floor" in lower:
+        return "floor"
+    if "wall" in lower:
+        return "wall"
+    if "metal" in lower or "brushed" in lower:
+        return "metal"
+    if "cylinder" in lower:
+        return "cylinder"
+    if "cube" in lower:
+        return "cube"
+    return "other"
+
+
+def is_albedo_payload(name: str) -> bool:
+    lower = name.lower()
+    if "normal" in lower or "roughness" in lower or "metallic" in lower:
+        return False
+    return "albedo" in lower or "diff" in lower or "basecolor" in lower or "base_color" in lower
+
+
+def average_colors(colors: list[tuple[int, int, int]]) -> tuple[int, int, int] | None:
+    if not colors:
+        return None
+    return clamp_rgb(tuple(sum(float(c[i]) for c in colors) / float(len(colors)) for i in range(3)))
+
+
+def mix_optional(
+    base: tuple[int, int, int], sample: tuple[int, int, int] | None, weight: float
+) -> tuple[int, int, int]:
+    if sample is None:
+        return base
+    return mix(base, sample, weight)
+
+
+def sample_material_color(path: Path) -> dict[str, Any]:
+    row: dict[str, Any] = {
+        "path": rel(path),
+        "role": texture_role(path.name),
+        "sampled": False,
+        "rgb": None,
+        "decoder": "none",
+        "failure": "not_attempted",
+    }
+    if not is_albedo_payload(path.name):
+        row["failure"] = "non_color_payload"
+        return row
+    if Image is None:
+        row["failure"] = "pillow_unavailable"
+        return row
+    try:
+        with Image.open(path) as image:
+            rgb_image = image.convert("RGB")
+            try:
+                resampling = Image.Resampling.BOX  # type: ignore[attr-defined]
+            except AttributeError:  # pragma: no cover - old Pillow fallback
+                resampling = Image.BOX  # type: ignore[attr-defined]
+            pixel = rgb_image.resize((1, 1), resampling).getpixel((0, 0))
+        row["sampled"] = True
+        row["rgb"] = [int(pixel[0]), int(pixel[1]), int(pixel[2])]
+        row["decoder"] = "pillow_dds"
+        row["failure"] = "none"
+    except Exception as exc:
+        row["failure"] = f"{type(exc).__name__}: {exc}"
+    return row
+
+
+def material_sample_summary(dds_files: list[Path]) -> dict[str, Any]:
+    samples = [sample_material_color(path) for path in dds_files if is_albedo_payload(path.name)]
+    sampled_rows = [row for row in samples if row.get("sampled") is True and isinstance(row.get("rgb"), list)]
+    sampled_colors = [tuple(int(v) for v in row["rgb"]) for row in sampled_rows]
+    role_colors: dict[str, list[tuple[int, int, int]]] = {}
+    for row in sampled_rows:
+        role_colors.setdefault(str(row["role"]), []).append(tuple(int(v) for v in row["rgb"]))
+    role_average_rgb = {
+        role: list(avg)
+        for role, colors in sorted(role_colors.items())
+        if (avg := average_colors(colors)) is not None
+    }
+    failures = [row for row in samples if row.get("sampled") is not True]
+    return {
+        "decoder": "pillow_dds" if Image is not None else "none",
+        "color_payload_count": len(samples),
+        "sampled_color_payload_count": len(sampled_rows),
+        "failed_color_payload_count": len(failures),
+        "average_rgb": list(average_colors(sampled_colors) or (0, 0, 0)),
+        "role_average_rgb": role_average_rgb,
+        "sampled_textures": [
+            {
+                "path": row["path"],
+                "role": row["role"],
+                "rgb": row["rgb"],
+                "decoder": row["decoder"],
+            }
+            for row in sampled_rows[:12]
+        ],
+        "failed_textures": [
+            {
+                "path": row["path"],
+                "role": row["role"],
+                "failure": row["failure"],
+            }
+            for row in failures[:12]
+        ],
+    }
+
+
 def dds_header(width: int, height: int, linear_size: int) -> bytes:
     ddsd_caps = 0x00000001
     ddsd_height = 0x00000002
@@ -195,12 +308,14 @@ def payload_inventory(set_id: str) -> dict[str, Any]:
         "cylinder": sum(1 for n in names if "cylinder" in n),
         "metal": sum(1 for n in names if "metal" in n or "brushed" in n),
     }
+    material_samples = material_sample_summary(dds_files)
     return {
         "source_paths": [rel(p) for p in paths[:1]],
         "texture_count": len(dds_files),
         "albedo_count": len(albedo),
         "normal_count": len(normal),
         "roles": roles,
+        "material_samples": material_samples,
         "sample_textures": [p.name for p in dds_files[:8]],
     }
 
@@ -209,6 +324,30 @@ def derive_colors(set_id: str) -> tuple[dict[str, tuple[int, int, int]], dict[st
     base = DEFAULT_SETS[set_id]
     inv = payload_inventory(set_id)
     roles = inv["roles"]
+    material_samples = inv["material_samples"]
+    role_average_rgb = material_samples.get("role_average_rgb", {})
+    sampled_count = int(material_samples.get("sampled_color_payload_count", 0) or 0)
+    material_sample_weight = 0.0 if sampled_count <= 0 else min(0.55, 0.18 + 0.06 * sampled_count)
+    scene_avg = tuple(int(v) for v in material_samples.get("average_rgb", [0, 0, 0]))
+    floor_sample = tuple(role_average_rgb["floor"]) if "floor" in role_average_rgb else None
+    wall_samples = [
+        tuple(role_average_rgb[role])
+        for role in ("wall",)
+        if role in role_average_rgb
+    ]
+    object_samples = [
+        tuple(role_average_rgb[role])
+        for role in ("cube", "cylinder", "other")
+        if role in role_average_rgb
+    ]
+    metal_samples = [
+        tuple(role_average_rgb[role])
+        for role in ("metal", "cylinder")
+        if role in role_average_rgb
+    ]
+    wall_sample = average_colors(wall_samples)
+    object_sample = average_colors(object_samples)
+    metal_sample = average_colors(metal_samples)
     role_count = max(1, sum(int(v) for v in roles.values()))
     floor_w = min(0.45, 0.10 + 0.08 * roles["floor"])
     wall_w = min(0.55, 0.12 + 0.08 * roles["wall"])
@@ -220,6 +359,9 @@ def derive_colors(set_id: str) -> tuple[dict[str, tuple[int, int, int]], dict[st
     visible = mix(base["visible_background"], ROLE_TINTS["wall"], wall_w)
     specular = mix(base["specular"], ROLE_TINTS["metal"], metal_w)
     specular = mix(specular, ROLE_TINTS["cylinder"], object_w * 0.45)
+    irradiance = mix_optional(irradiance, floor_sample or scene_avg, material_sample_weight * 0.48)
+    visible = mix_optional(visible, wall_sample or scene_avg, material_sample_weight * 0.42)
+    specular = mix_optional(specular, metal_sample or object_sample or scene_avg, material_sample_weight * 0.35)
 
     if set_id in {"neon_streamer_concert", "red_light_room"}:
         irradiance = mix(irradiance, ROLE_TINTS["stage"], 0.35)
@@ -249,6 +391,7 @@ def derive_colors(set_id: str) -> tuple[dict[str, tuple[int, int, int]], dict[st
             "object": object_w,
             "metal": metal_w,
             "role_count": role_count,
+            "material_sample": material_sample_weight,
         },
     }
     return colors, derivation

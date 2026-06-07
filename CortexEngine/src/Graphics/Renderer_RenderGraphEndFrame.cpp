@@ -920,25 +920,27 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
             bloomStageFailed = true;
         }
 
+        FullSceneShaderV3GraphBuilder::DisplayCommon displayCommon{};
+        displayCommon.backBuffer = backBufferHandle;
+        displayCommon.device = m_services.device ? m_services.device->GetDevice() : nullptr;
+        displayCommon.descriptorManager = m_services.descriptorManager.get();
+        displayCommon.commandList = m_commandResources.graphicsList.Get();
+        displayCommon.rootSignature = m_pipelineState.rootSignature.get();
+        displayCommon.pipeline = m_pipelineState.candidateBeautyDisplay.get();
+        displayCommon.frameConstants = m_constantBuffers.currentFrameGPU;
+        displayCommon.backBufferRTV = m_services.window->GetCurrentRTV();
+        displayCommon.width = m_services.window->GetWidth();
+        displayCommon.height = m_services.window->GetHeight();
+        displayCommon.failed = &bloomStageFailed;
+        displayCommon.stage = &postProcessGraphStageError;
+
         if (wantsCandidateBeautyDisplayThisFrame && candidateBeautyHandle.IsValid()) {
-            CandidateBeautyDisplayContext displayContext{};
-            displayContext.passName = "FullSceneCandidateBeautyV3Display";
-            displayContext.candidate = candidateBeautyHandle;
-            displayContext.backBuffer = backBufferHandle;
-            displayContext.device = m_services.device ? m_services.device->GetDevice() : nullptr;
-            displayContext.descriptorManager = m_services.descriptorManager.get();
-            displayContext.commandList = m_commandResources.graphicsList.Get();
-            displayContext.rootSignature = m_pipelineState.rootSignature.get();
-            displayContext.pipeline = m_pipelineState.candidateBeautyDisplay.get();
-            displayContext.frameConstants = m_constantBuffers.currentFrameGPU;
-            displayContext.candidateSRV = m_mainTargets.candidateBeautyV3.descriptors.ldrOutputSRV;
-            displayContext.backBufferRTV = m_services.window->GetCurrentRTV();
-            displayContext.width = m_services.window->GetWidth();
-            displayContext.height = m_services.window->GetHeight();
-            displayContext.ran = &result.ranCandidateBeautyDisplay;
-            displayContext.failed = &bloomStageFailed;
-            displayContext.stage = &postProcessGraphStageError;
-            if (!fullSceneShaderV3.SubmitDisplay(displayContext)) {
+            FullSceneShaderV3GraphBuilder::DisplaySubmission displaySubmission{};
+            displaySubmission.passName = "FullSceneCandidateBeautyV3Display";
+            displaySubmission.candidate = candidateBeautyHandle;
+            displaySubmission.candidateSRV = m_mainTargets.candidateBeautyV3.descriptors.ldrOutputSRV;
+            displaySubmission.ran = &result.ranCandidateBeautyDisplay;
+            if (!fullSceneShaderV3.SubmitDisplay(displayCommon, displaySubmission)) {
                 bloomStageFailed = true;
             }
         }
@@ -959,24 +961,12 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
                 compositeDebugHandle = legacyRescueUsageHandle;
                 compositeDebugSRV = m_mainTargets.compositeV3.descriptors.legacyRescueUsageSRV;
             }
-            CandidateBeautyDisplayContext debugContext{};
-            debugContext.passName = "FullSceneCompositeV3DebugView";
-            debugContext.candidate = compositeDebugHandle;
-            debugContext.backBuffer = backBufferHandle;
-            debugContext.device = m_services.device ? m_services.device->GetDevice() : nullptr;
-            debugContext.descriptorManager = m_services.descriptorManager.get();
-            debugContext.commandList = m_commandResources.graphicsList.Get();
-            debugContext.rootSignature = m_pipelineState.rootSignature.get();
-            debugContext.pipeline = m_pipelineState.candidateBeautyDisplay.get();
-            debugContext.frameConstants = m_constantBuffers.currentFrameGPU;
-            debugContext.candidateSRV = compositeDebugSRV;
-            debugContext.backBufferRTV = m_services.window->GetCurrentRTV();
-            debugContext.width = m_services.window->GetWidth();
-            debugContext.height = m_services.window->GetHeight();
-            debugContext.ran = &result.ranCompositeV3DebugView;
-            debugContext.failed = &bloomStageFailed;
-            debugContext.stage = &postProcessGraphStageError;
-            if (!fullSceneShaderV3.SubmitDisplay(debugContext)) {
+            FullSceneShaderV3GraphBuilder::DisplaySubmission debugSubmission{};
+            debugSubmission.passName = "FullSceneCompositeV3DebugView";
+            debugSubmission.candidate = compositeDebugHandle;
+            debugSubmission.candidateSRV = compositeDebugSRV;
+            debugSubmission.ran = &result.ranCompositeV3DebugView;
+            if (!fullSceneShaderV3.SubmitDisplay(displayCommon, debugSubmission)) {
                 bloomStageFailed = true;
             }
         }
@@ -1016,24 +1006,12 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
             }
 
             if (environmentDebugHandle.IsValid() && environmentDebugSRV.IsValid()) {
-                CandidateBeautyDisplayContext environmentDebugContext{};
-                environmentDebugContext.passName = debugPassName;
-                environmentDebugContext.candidate = environmentDebugHandle;
-                environmentDebugContext.backBuffer = backBufferHandle;
-                environmentDebugContext.device = m_services.device ? m_services.device->GetDevice() : nullptr;
-                environmentDebugContext.descriptorManager = m_services.descriptorManager.get();
-                environmentDebugContext.commandList = m_commandResources.graphicsList.Get();
-                environmentDebugContext.rootSignature = m_pipelineState.rootSignature.get();
-                environmentDebugContext.pipeline = m_pipelineState.candidateBeautyDisplay.get();
-                environmentDebugContext.frameConstants = m_constantBuffers.currentFrameGPU;
-                environmentDebugContext.candidateSRV = environmentDebugSRV;
-                environmentDebugContext.backBufferRTV = m_services.window->GetCurrentRTV();
-                environmentDebugContext.width = m_services.window->GetWidth();
-                environmentDebugContext.height = m_services.window->GetHeight();
-                environmentDebugContext.ran = &ranSceneLocalEnvironmentV3DebugView;
-                environmentDebugContext.failed = &bloomStageFailed;
-                environmentDebugContext.stage = &postProcessGraphStageError;
-                if (!fullSceneShaderV3.SubmitDisplay(environmentDebugContext)) {
+                FullSceneShaderV3GraphBuilder::DisplaySubmission environmentDebugSubmission{};
+                environmentDebugSubmission.passName = debugPassName;
+                environmentDebugSubmission.candidate = environmentDebugHandle;
+                environmentDebugSubmission.candidateSRV = environmentDebugSRV;
+                environmentDebugSubmission.ran = &ranSceneLocalEnvironmentV3DebugView;
+                if (!fullSceneShaderV3.SubmitDisplay(displayCommon, environmentDebugSubmission)) {
                     bloomStageFailed = true;
                 }
             }
@@ -1109,24 +1087,12 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
             }
 
             if (debugSource.IsValid() && debugSRV.IsValid()) {
-                CandidateBeautyDisplayContext reflectionDebugContext{};
-                reflectionDebugContext.passName = debugPassName;
-                reflectionDebugContext.candidate = debugSource;
-                reflectionDebugContext.backBuffer = backBufferHandle;
-                reflectionDebugContext.device = m_services.device ? m_services.device->GetDevice() : nullptr;
-                reflectionDebugContext.descriptorManager = m_services.descriptorManager.get();
-                reflectionDebugContext.commandList = m_commandResources.graphicsList.Get();
-                reflectionDebugContext.rootSignature = m_pipelineState.rootSignature.get();
-                reflectionDebugContext.pipeline = m_pipelineState.candidateBeautyDisplay.get();
-                reflectionDebugContext.frameConstants = m_constantBuffers.currentFrameGPU;
-                reflectionDebugContext.candidateSRV = debugSRV;
-                reflectionDebugContext.backBufferRTV = m_services.window->GetCurrentRTV();
-                reflectionDebugContext.width = m_services.window->GetWidth();
-                reflectionDebugContext.height = m_services.window->GetHeight();
-                reflectionDebugContext.ran = &ranReflectionResolverV3DebugView;
-                reflectionDebugContext.failed = &bloomStageFailed;
-                reflectionDebugContext.stage = &postProcessGraphStageError;
-                if (!fullSceneShaderV3.SubmitDisplay(reflectionDebugContext)) {
+                FullSceneShaderV3GraphBuilder::DisplaySubmission reflectionDebugSubmission{};
+                reflectionDebugSubmission.passName = debugPassName;
+                reflectionDebugSubmission.candidate = debugSource;
+                reflectionDebugSubmission.candidateSRV = debugSRV;
+                reflectionDebugSubmission.ran = &ranReflectionResolverV3DebugView;
+                if (!fullSceneShaderV3.SubmitDisplay(displayCommon, reflectionDebugSubmission)) {
                     bloomStageFailed = true;
                 }
             }

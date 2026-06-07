@@ -56,6 +56,8 @@ ALLOWED_READY_DOMAINS = {
     "candidate_beauty",
 }
 
+MATERIAL_PAYLOAD_DEBUG_MODES = {2, 3, 41, 47, 48, 49, 50, 51, 52, 53}
+
 LIGHTING_SIGNAL_THRESHOLDS = {
     "direct_light": {"min_mean_luma": 0.02, "min_nonblack_ratio": 0.05},
     "direct_light_unshadowed": {"min_mean_luma": 0.02, "min_nonblack_ratio": 0.05},
@@ -245,6 +247,18 @@ def get_v3(report: dict[str, Any]) -> dict[str, Any] | None:
     return v3 if isinstance(v3, dict) else None
 
 
+def diagnostic_scope(report: dict[str, Any]) -> str:
+    renderer = report.get("renderer")
+    if isinstance(renderer, dict):
+        try:
+            debug_view_mode = int(renderer.get("debug_view_mode", -1))
+        except (TypeError, ValueError):
+            debug_view_mode = -1
+        if debug_view_mode in MATERIAL_PAYLOAD_DEBUG_MODES:
+            return "material_payload"
+    return "full_pipeline"
+
+
 def find_frame_pass(report: dict[str, Any], name: str) -> dict[str, Any] | None:
     frame_contract = report.get("frame_contract")
     if not isinstance(frame_contract, dict):
@@ -279,6 +293,7 @@ def analyze_report(
 ) -> dict[str, Any]:
     report = load_json(path)
     v3 = get_v3(report)
+    scope = diagnostic_scope(report)
     failures: list[str] = []
     warnings: list[str] = []
 
@@ -383,9 +398,13 @@ def analyze_report(
                 failures.append("lighting adapter ready without required debug signal channels")
 
     if require_lighting_split_ready:
-        if v3.get("lighting_split_resources_ready") is not True:
+        if scope == "material_payload":
+            pass
+        elif v3.get("lighting_split_resources_ready") is not True:
             failures.append("V3 split packet requires lighting_split_resources_ready=true")
-        if not isinstance(lighting_split_pass, dict):
+        if scope == "material_payload":
+            pass
+        elif not isinstance(lighting_split_pass, dict):
             failures.append("V3 split packet requires FullSceneLightingV3 pass evidence")
         else:
             if lighting_split_pass.get("executed") is not True:
@@ -781,6 +800,7 @@ def analyze_report(
     return {
         "report": str(path),
         "status": "ok" if not failures else "failed",
+        "diagnostic_scope": scope,
         "schema": v3.get("schema"),
         "v3_status": v3.get("status"),
         "beauty_output": v3.get("beauty_output"),
@@ -869,6 +889,8 @@ def main() -> int:
         )
         for path in reports
     ]
+    full_pipeline_rows = [row for row in rows if row.get("diagnostic_scope") == "full_pipeline"]
+    material_payload_rows = [row for row in rows if row.get("diagnostic_scope") == "material_payload"]
     failures = [failure for row in rows for failure in row.get("failures", [])]
     warnings = [warning for row in rows for warning in row.get("warnings", [])]
     lighting_signal_metrics = None
@@ -881,6 +903,8 @@ def main() -> int:
         "schema": "cortex.full_scene_shader_pipeline_v3.placeholder_signal.v1",
         "input": str(input_path),
         "report_count": len(reports),
+        "full_pipeline_report_count": len(full_pipeline_rows),
+        "material_payload_report_count": len(material_payload_rows),
         "ok_report_count": sum(1 for row in rows if row.get("status") == "ok"),
         "lighting_signal_metrics": lighting_signal_metrics,
         "failures": failures,
@@ -892,39 +916,41 @@ def main() -> int:
         "schema": "cortex.full_scene_shader_pipeline_v3.placeholder_stability.v1",
         "input": str(input_path),
         "report_count": len(reports),
+        "full_pipeline_report_count": len(full_pipeline_rows),
+        "material_payload_report_count": len(material_payload_rows),
         "default_beauty_affects_any": any(
             row.get("default_beauty_affects") is not False for row in rows
         ),
         "promoted_report_count": sum(
             1 for row in rows if row.get("v3_status") != "planned_not_promoted"
         ),
-        "ready_domain_report_count": sum(1 for row in rows if row.get("ready_domains")),
+        "ready_domain_report_count": sum(1 for row in full_pipeline_rows if row.get("ready_domains")),
         "material_ready_report_count": sum(
             1 for row in rows if row.get("material_attributes_ready") is True
         ),
         "lighting_adapter_ready_report_count": sum(
-            1 for row in rows if row.get("lighting_adapter_ready") is True
+            1 for row in full_pipeline_rows if row.get("lighting_adapter_ready") is True
         ),
         "lighting_split_allocated_report_count": sum(
-            1 for row in rows if row.get("lighting_split_resources_allocated") is True
+            1 for row in full_pipeline_rows if row.get("lighting_split_resources_allocated") is True
         ),
         "lighting_split_ready_report_count": sum(
-            1 for row in rows if row.get("lighting_split_resources_ready") is True
+            1 for row in full_pipeline_rows if row.get("lighting_split_resources_ready") is True
         ),
         "scene_local_environment_ready_report_count": sum(
-            1 for row in rows if row.get("scene_local_environment_ready") is True
+            1 for row in full_pipeline_rows if row.get("scene_local_environment_ready") is True
         ),
         "reflection_v3_ready_report_count": sum(
-            1 for row in rows if row.get("reflection_v3_ready") is True
+            1 for row in full_pipeline_rows if row.get("reflection_v3_ready") is True
         ),
         "composite_v3_ready_report_count": sum(
-            1 for row in rows if row.get("composite_v3_ready") is True
+            1 for row in full_pipeline_rows if row.get("composite_v3_ready") is True
         ),
         "cinematic_post_v3_ready_report_count": sum(
-            1 for row in rows if row.get("cinematic_post_v3_ready") is True
+            1 for row in full_pipeline_rows if row.get("cinematic_post_v3_ready") is True
         ),
         "full_scene_lighting_v3_executed_report_count": sum(
-            1 for row in rows if row.get("full_scene_lighting_v3_executed") is True
+            1 for row in full_pipeline_rows if row.get("full_scene_lighting_v3_executed") is True
         ),
         "lighting_signal_metrics_ready": (
             lighting_signal_metrics.get("ready") if isinstance(lighting_signal_metrics, dict) else None

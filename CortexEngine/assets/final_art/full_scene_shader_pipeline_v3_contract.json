@@ -85,6 +85,18 @@
         "material_normal",
         "material_class",
         "material_missing_channel_mask"
+      ],
+      "packet_debug_views": [
+        "roughness",
+        "metallic",
+        "surface_class",
+        "surface_policy",
+        "material_family",
+        "reflection_policy",
+        "temporal_policy",
+        "post_sensitivity",
+        "material_id",
+        "object_id"
       ]
     },
     "lighting": {
@@ -283,6 +295,7 @@
       "required_artifacts": [
         "frame_report_shutdown.json",
         "debug_view_metrics.json",
+        "v3_material_payload.json",
         "v3_signal.json",
         "v3_stability.json",
         "contact_sheet.png",
@@ -291,6 +304,8 @@
       "required_gates": [
         "no_missing_required_resource",
         "no_missing_required_material_channel",
+        "material_payload_debug_views_present",
+        "material_payload_ranges_valid",
         "lighting_signal_nonzero",
         "shadow_visibility_stable",
         "reflection_confidence_nonzero",

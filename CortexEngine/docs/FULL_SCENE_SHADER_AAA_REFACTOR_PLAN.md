@@ -4,6 +4,215 @@ Status: planning ledger.
 
 Default beauty stays unchanged until a separate promotion gate passes.
 
+## 2026-06-07 Goal Feature Refactor Plan - Full Scene Shader Renderer
+
+This is the short authoritative plan for the requested goal feature. The
+feature is not a single visual preset. It is a refactored candidate renderer
+that can eventually produce high-end full-scene visuals because each visible
+term is owned, inspectable, and validated before it reaches the final frame.
+
+### Product Goal
+
+Build an opt-in `FullSceneShaderV3` candidate beauty path that can render
+interior rooms, stage scenes, stadiums, galleries, and exterior water or
+vegetation scenes with the kind of visual depth expected from modern realtime
+engines:
+
+- local environment lighting that matches the scene instead of leaking random
+  IBL content into enclosed rooms
+- physically meaningful material response from typed PBR payloads
+- stable shadows and reflections during mouse movement, camera orbit, and
+  high-contrast light motion
+- believable glass, water, decals, particles, fog, and atmosphere
+- final cinematic post that enhances a valid HDR frame instead of hiding
+  upstream instability
+
+The existing public beauty path remains the stable baseline. The candidate path
+can be aggressive, but it does not become the default until the promotion matrix
+and human review pass.
+
+### Why This Refactor Is Required
+
+The current renderer has useful pieces, but they are still too easy to tune in
+isolation. That creates the failure mode we have been fighting: a scene can look
+better because an IBL was blurred, a reflection was softened, a background was
+swapped, or a post pass hid a defect. That is not robust.
+
+The V3 refactor makes the renderer harder to fool. Every visible contribution
+must have this chain:
+
+```text
+SceneProfileV3 policy
+  -> typed producer/resource
+  -> shader pass contribution
+  -> debug view
+  -> frame-report fields
+  -> analyzer gate
+  -> packet/promotion evidence
+```
+
+If any link is missing, the contribution is still prototype debt, even if a
+screenshot looks good.
+
+### Renderer Stack To Build
+
+The final candidate renderer should be structured as these domains:
+
+1. `SceneProfileV3`
+   Owns scene family, enclosure mode, light rig, reflection policy, environment
+   policy, material expectations, exposure policy, post look, motion tolerance,
+   and promotion family metadata.
+
+2. `VisibilityV3`
+   Owns depth, velocity, stable normals, object id, material id, surface id,
+   disocclusion, motion confidence, and close-surface flags. This becomes the
+   stability input for temporal reflection, shadows, decals, transparency, and
+   post.
+
+3. `MaterialPayloadV3`
+   Owns base color, normal, roughness, metallic, specular, AO, emissive,
+   opacity, transmission, clearcoat, sheen, anisotropy, IOR, thickness, material
+   class, missing-channel mask, and invalid-range mask. Missing or synthesized
+   material channels must be reported and consumed intentionally downstream.
+
+4. `SceneLocalEnvironmentV3`
+   Owns local visible background, diffuse irradiance, specular prefilter,
+   reflection background, atmosphere parameters, and ownership masks. Enclosed
+   rooms and stages should use local room/stage radiance. Gallery and exterior
+   scenes may use HDRI only when the scene profile explicitly allows it.
+
+5. `LightingShadowV3`
+   Owns direct lighting, unshadowed direct, indirect lighting, shadow
+   visibility, shadow loss, energy budget, source attribution, filter radius,
+   and light-motion diagnostics. Floor or wall flicker must map to a named
+   source before we call it fixed.
+
+6. `ReflectionV3`
+   Owns SSR, RT/ray-query, planar or hero probe, local probe, environment
+   fallback, source id, confidence, rejected-source mask, history validity,
+   temporal delta, and hysteresis. Smooth or metallic jitter is fixed here, not
+   in tonemapping or by making the IBL blurry.
+
+7. `TransparencyMediaV3`
+   Owns glass, water, transmission, decals, particles, volumetric inscatter,
+   volumetric transmittance, and ordering diagnostics. It must be separable from
+   opaque reflection and lighting.
+
+8. `CompositeV3`
+   Owns candidate HDR scene color, contribution map, energy clamp policy,
+   overbright/underlit diagnostics, and measured legacy-rescue usage.
+
+9. `CinematicPostV3`
+   Owns exposure meter/state, bloom extraction and resolve, glare, tone map,
+   color grade, sharpening, vignette, optional DOF, and bypass debug outputs.
+   Post work starts only after upstream V3 resources are sufficiently real.
+
+10. `PromotionV3`
+    Owns focused packets, cross-family packets, contact sheets, frame reports,
+    analyzer summaries, failure reports, default-promotion decisions, and human
+    review state.
+
+### Refactor Order
+
+The implementation order is strict because each layer feeds the next:
+
+1. Reconcile contracts and promotion gates.
+   Make JSON contracts, C++ frame context, HLSL bindings, debug views, packet
+   aliases, analyzers, and promotion scripts use the same V3 domain names.
+
+2. Finish material ownership.
+   Material channels must be owned, synthesized with a reason, or marked
+   missing. Lighting, reflection, transparency, composite, and post must report
+   whether they consumed missing material debt.
+
+3. Make `SceneProfileV3` the renderer policy brain.
+   Remove scattered family conditionals where possible and replace them with a
+   single consumed policy object.
+
+4. Make `SceneLocalEnvironmentV3` resource-backed.
+   Move beyond scalar palette influence. Bind and eventually generate local
+   irradiance, local specular/prefilter, visible background, and atmosphere
+   resources per profile.
+
+5. Expand environment coverage across scene families.
+   Gallery, enclosed room, stage/red room, stadium, and exterior water profiles
+   need payload-backed proof, not just a gallery stress case.
+
+6. Finish `LightingShadowV3` attribution and stability.
+   Use mouse jitter, close floor/wall views, and high-contrast light sweep to
+   prove flicker is absent or attributed to directional, local, contact, RT,
+   screen-space, filter, exposure, or environment sources.
+
+7. Harden `ReflectionV3`.
+   Add provider confidence, source-id stability, history rejection reasons, and
+   hysteresis where diagnostics prove source churn on smooth or metallic
+   surfaces.
+
+8. Add `TransparencyMediaV3`.
+   Only add water/glass/fog/particles once opaque environment, lighting, and
+   reflection ownership is good enough to separate artifact sources.
+
+9. Convert `CompositeV3` into the candidate HDR owner.
+   Candidate beauty should normally consume V3 resources, not legacy HDR.
+   Legacy rescue remains visible and should trend toward zero.
+
+10. Build `CinematicPostV3`.
+    Add filmic exposure, bloom, glare, tonemap, grade, sharpen, vignette, and
+    optional DOF with bypass views for every strong post term.
+
+11. Run the promotion matrix.
+    Required families include gallery, kitchen, office, gym, classroom,
+    concert, red room, stadium, bathroom, bedroom, workshop, store, street, and
+    exterior water or vegetation. Required motion includes static, mouse
+    jitter, camera sweep, close-surface orbit, reflective-object orbit, and
+    high-contrast light sweep.
+
+### Evidence Gates
+
+Each domain must ship with:
+
+- debug view coverage
+- frame-report fields for readiness, source, fallback, and debt
+- focused analyzer
+- focused packet
+- cross-family matrix row before promotion
+- human-readable markdown summary
+- failure mode that tells us what to fix next
+
+The promotion gate blocks default beauty if:
+
+- candidate HDR depends on uninspected legacy rescue as a normal path
+- enclosed spaces show or sharply reflect unauthorized external IBL content
+- shadow/floor/wall flicker lacks source attribution
+- metallic or smooth jitter lacks ReflectionV3 source/history attribution
+- required material channels are missing without downstream debt reporting
+- environment resources are scalar approximations where payload-backed
+  resources are expected
+- post is hiding upstream instability
+- cross-family packets are missing or fail
+
+### Immediate Work After This Planning Slice
+
+The next implementation phase should not start with final post-processing. It
+should harden the core producer stack in this order:
+
+1. `ReflectionV3` provider resolver hardening, because the user still sees
+   smooth/metallic jitter and reflection instability.
+2. `SceneLocalEnvironmentV3` resource expansion beyond payload aliases into
+   generated or selected local irradiance/specular/background proxies.
+3. Cross-family capture/report separation, so known model-scene crashes do not
+   prevent frame-report diagnostics from being collected.
+4. `CompositeV3` legacy-rescue accounting, so the candidate beauty path cannot
+   quietly fall back to old HDR.
+5. Only then, `CinematicPostV3` polish.
+
+### Completion Boundary
+
+Do not call the goal feature complete when one scene looks good. Completion
+requires candidate beauty to pass packet evidence and human review across the
+required family and motion matrix. Until then, the correct status is active
+renderer refactor, not public-release-ready AAA visuals.
+
 ## 2026-06-07 Master Refactor Before Goal Feature Completion
 
 This is the current authoritative plan for moving CortexEngine from

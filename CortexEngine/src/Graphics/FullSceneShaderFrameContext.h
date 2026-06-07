@@ -339,6 +339,42 @@ inline bool FullSceneShaderPassReadsResource(
         });
 }
 
+inline bool FullSceneShaderPipelineV3PassName(const std::string& name) {
+    return name.find("V3") != std::string::npos ||
+           name == "SceneLocalEnvironmentV3" ||
+           name == "VBDeferredLighting" ||
+           name == "VBDeferredLightingDebugView";
+}
+
+inline bool FullSceneShaderPipelineV3ResourceName(const std::string& name) {
+    return name.find("scene_local") != std::string::npos ||
+           name.find("candidate_") != std::string::npos ||
+           name.find("reflection_") != std::string::npos ||
+           name.find("lighting_") != std::string::npos ||
+           name.find("shadow_visibility") != std::string::npos ||
+           name.find("shadow_loss") != std::string::npos ||
+           name.find("direct_lighting") != std::string::npos ||
+           name.find("indirect_lighting") != std::string::npos ||
+           name.find("composite_") != std::string::npos ||
+           name.find("legacy_rescue") != std::string::npos ||
+           name.find("energy_clamp") != std::string::npos ||
+           name.find("overbright") != std::string::npos ||
+           name == "ambient_lighting" ||
+           name == "visible_background" ||
+           name == "reflection_background" ||
+           name == "atmosphere" ||
+           name == "hdr_color";
+}
+
+inline void FullSceneShaderPushUnique(std::vector<std::string>& values, const std::string& value) {
+    if (value.empty()) {
+        return;
+    }
+    if (std::find(values.begin(), values.end(), value) == values.end()) {
+        values.push_back(value);
+    }
+}
+
 inline const FrameContract::HistoryInfo* FullSceneShaderFindHistory(
     const FrameContract& contract,
     const char* name) {
@@ -1185,6 +1221,16 @@ struct FullSceneShaderPipelineV3FrameContext {
     bool runtimePlaceholdersReady = true;
     bool contractGrounded = true;
     bool packetGateReady = false;
+    bool renderGraphV3InventoryReady = false;
+    uint32_t renderGraphV3PassCount = 0;
+    uint32_t renderGraphV3ExecutedPassCount = 0;
+    uint32_t renderGraphV3ReadResourceCount = 0;
+    uint32_t renderGraphV3WriteResourceCount = 0;
+    uint32_t renderGraphV3MissingProducerCount = 0;
+    std::vector<std::string> renderGraphV3PassNames;
+    std::vector<std::string> renderGraphV3ReadResources;
+    std::vector<std::string> renderGraphV3WrittenResources;
+    std::vector<std::string> renderGraphV3MissingProducerResources;
     bool sceneProfileReady = false;
     uint32_t sceneProfilePolicyCount = 0;
     bool sceneProfilePolicyContractReady = false;
@@ -1495,6 +1541,54 @@ inline FullSceneShaderPipelineV3FrameContext BuildFullSceneShaderPipelineV3Frame
             contract,
             "FullSceneCandidateBeautyV3Display",
             "back_buffer");
+
+    for (const auto& pass : contract.passes) {
+        bool touchesV3Resource = false;
+        for (const auto& read : pass.reads) {
+            touchesV3Resource = touchesV3Resource || FullSceneShaderPipelineV3ResourceName(read);
+        }
+        for (const auto& write : pass.writes) {
+            touchesV3Resource = touchesV3Resource || FullSceneShaderPipelineV3ResourceName(write);
+        }
+        const bool inventoryPass = FullSceneShaderPipelineV3PassName(pass.name) || touchesV3Resource;
+        if (!inventoryPass) {
+            continue;
+        }
+        ++context.renderGraphV3PassCount;
+        if (pass.executed) {
+            ++context.renderGraphV3ExecutedPassCount;
+        }
+        FullSceneShaderPushUnique(context.renderGraphV3PassNames, pass.name);
+        for (const auto& read : pass.reads) {
+            if (FullSceneShaderPipelineV3ResourceName(read)) {
+                FullSceneShaderPushUnique(context.renderGraphV3ReadResources, read);
+            }
+        }
+        for (const auto& write : pass.writes) {
+            if (FullSceneShaderPipelineV3ResourceName(write)) {
+                FullSceneShaderPushUnique(context.renderGraphV3WrittenResources, write);
+            }
+        }
+    }
+    context.renderGraphV3ReadResourceCount =
+        static_cast<uint32_t>(context.renderGraphV3ReadResources.size());
+    context.renderGraphV3WriteResourceCount =
+        static_cast<uint32_t>(context.renderGraphV3WrittenResources.size());
+    for (const auto& read : context.renderGraphV3ReadResources) {
+        const bool written =
+            std::find(context.renderGraphV3WrittenResources.begin(),
+                      context.renderGraphV3WrittenResources.end(),
+                      read) != context.renderGraphV3WrittenResources.end();
+        if (!written && !FullSceneShaderHasResource(contract, read.c_str())) {
+            FullSceneShaderPushUnique(context.renderGraphV3MissingProducerResources, read);
+        }
+    }
+    context.renderGraphV3MissingProducerCount =
+        static_cast<uint32_t>(context.renderGraphV3MissingProducerResources.size());
+    context.renderGraphV3InventoryReady =
+        context.renderGraphV3PassCount > 0u &&
+        context.renderGraphV3ExecutedPassCount > 0u &&
+        context.renderGraphV3WriteResourceCount > 0u;
 
     const bool sceneProfileActive = contract.sceneVisual.active;
     const bool sceneProfilePolicyReady =
@@ -2624,12 +2718,6 @@ inline FullSceneShaderPipelineV3FrameContext BuildFullSceneShaderPipelineV3Frame
         candidateBeautyDomain.requiredChannelCount - candidateBeautyDomain.readyChannelCount;
 
     context.domains = {
-        MakeFullSceneShaderPipelineV3DomainEvidence(
-            "render_graph",
-            "FullSceneShaderPipelineV3",
-            "v3_resource_registry",
-            "v3_resource_ownership",
-            "V3 render-graph resources are planned but not allocated"),
         sceneProfileDomain,
         materialDomain,
         lightingDomain,
@@ -2645,6 +2733,36 @@ inline FullSceneShaderPipelineV3FrameContext BuildFullSceneShaderPipelineV3Frame
             "contact_sheet.png",
             "V3 packet gate is planned but not implemented"),
     };
+    FullSceneShaderPipelineV3DomainEvidence renderGraphDomain =
+        MakeFullSceneShaderPipelineV3DomainEvidence(
+            "render_graph",
+            "RenderGraphV3Inventory",
+            "v3_resource_inventory",
+            "v3_resource_ownership",
+            context.renderGraphV3InventoryReady
+                ? "RenderGraphV3 inventory is populated from runtime pass records"
+                : "RenderGraphV3 inventory has no runtime V3 pass/resource records");
+    renderGraphDomain.enabled = context.renderGraphV3PassCount > 0u;
+    renderGraphDomain.ready = context.renderGraphV3InventoryReady;
+    renderGraphDomain.promotionState =
+        context.renderGraphV3InventoryReady ? "instrumented" : "planned";
+    renderGraphDomain.backingResources = context.renderGraphV3WrittenResources;
+    renderGraphDomain.debugViews = {
+        "passes",
+        "render_graph",
+        "pass_budget_summary",
+        "v3_resource_inventory",
+    };
+    renderGraphDomain.channels = context.renderGraphV3PassNames;
+    renderGraphDomain.backingResourceCount = context.renderGraphV3WriteResourceCount;
+    renderGraphDomain.requiredChannelCount = 3u;
+    renderGraphDomain.readyChannelCount =
+        static_cast<uint32_t>((context.renderGraphV3PassCount > 0u ? 1u : 0u) +
+                              (context.renderGraphV3ExecutedPassCount > 0u ? 1u : 0u) +
+                              (context.renderGraphV3WriteResourceCount > 0u ? 1u : 0u));
+    renderGraphDomain.missingRequiredChannelCount =
+        renderGraphDomain.requiredChannelCount - renderGraphDomain.readyChannelCount;
+    context.domains.insert(context.domains.begin(), std::move(renderGraphDomain));
     return context;
 }
 

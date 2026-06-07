@@ -243,6 +243,14 @@ foundation that makes later visual work faster:
    runtime reports expose `filtered_directional_bc1_v1`, three filtered proxy
    outputs, non-flat minimum variance, and zero analyzer failures.
 2. Add `RenderGraphV3` pass/resource inventory to the frame contract.
+   This is now implemented as a V3 runtime inventory derived from existing
+   `FrameContract::PassRecord` entries. Reports expose V3 pass counts, executed
+   pass counts, read/write resource counts, missing producer counts, pass names,
+   read resources, written resources, and missing producer resources. The V3
+   `render_graph` domain now reports `RenderGraphV3Inventory` instead of a
+   planned empty placeholder. The first focused packet exposes one remaining
+   producer debt, `local_reflection_radiance`, which should feed the next
+   ReflectionV3/local-probe provider slice.
 3. Add a static validator rule that every V3 shader/debug view has an owning
    domain, contract field, and analyzer mention.
 4. Add an explicit "candidate path debt" section to frame JSON:

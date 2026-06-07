@@ -314,6 +314,28 @@ CompositeV3 promotion gate:
 - This does not make CompositeV3 complete, but it prevents candidate-promotion
   packets from ignoring legacy HDR rescue debt.
 
+SceneLocalEnvironmentV3 proxy-resource binding:
+
+- The environment producer has moved past the previous two-texture payload
+  binding. It now binds a five-slot table: payload albedo, payload normal,
+  local irradiance proxy, local specular proxy, and visible-background proxy.
+- The shader samples those proxy resources separately, so ambient, reflection,
+  and visible-background ownership can diverge instead of all being derived
+  from the same payload albedo signal.
+- Frame reports and V3 aliases expose proxy-resource table required/bindable,
+  bound count, binding source, and fallback reason.
+- `scene_local_environment_ready` now requires `21` channels; payload-ready
+  scenes must prove both payload texture binding and proxy texture binding.
+- Fresh evidence
+  `build\captures\v3_scene_local_proxy_binding_fresh_smoke_20260607` passed
+  end to end with `54` payload-ready reports, `54` payload-resource-bindable
+  reports, and `54` proxy-resource-bindable reports. First row bound `2`
+  payload resources and `3` proxy resources with source
+  `cached_scene_local_proxy_triple`.
+- This is still not final environment generation. The next environment step is
+  authored or generated irradiance/specular/background proxy resources instead
+  of reusing selected scene-local albedo/normal textures as proxy inputs.
+
 ## 2026-06-07 Master Refactor Before Goal Feature Completion
 
 This is the current authoritative plan for moving CortexEngine from

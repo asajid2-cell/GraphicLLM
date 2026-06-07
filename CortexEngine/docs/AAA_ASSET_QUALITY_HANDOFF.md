@@ -470,6 +470,86 @@ Current next work after this checkpoint:
 3. Later replace alias payload packs with proper per-family texture/proxy
    generation for true scene-local irradiance/specular/background resources.
 
+Latest SceneLocalEnvironmentV3 proxy-resource binding checkpoint:
+
+- Supersedes the older two-slot payload-only environment binding.
+- `SceneLocalEnvironmentV3` now binds a five-slot transient SRV table at root
+  parameter `3`:
+  - `t0`: scene-local payload albedo
+  - `t1`: scene-local payload normal/detail
+  - `t2`: scene-local irradiance proxy
+  - `t3`: scene-local specular proxy
+  - `t4`: scene-local visible-background proxy
+- `Renderer::BuildSceneLocalEnvironmentV3PayloadBindingInfo()` now chooses
+  explicit proxy paths from the scene-local payload set and reports separate
+  payload-resource and proxy-resource binding state.
+- `SceneLocalEnvironmentV3.hlsl` now samples the proxy textures separately:
+  ambient/radiance uses the irradiance proxy, reflection background uses the
+  specular proxy, and visible background uses the visible-background proxy
+  where the scene profile authorizes that signal.
+- Frame reports now expose environment and V3 alias fields for:
+  - `scene_local_proxy_resource_table_required`
+  - `scene_local_proxy_resource_table_bindable`
+  - `scene_local_proxy_bound_resource_count`
+  - `scene_local_proxy_binding_source`
+  - `scene_local_proxy_fallback_reason`
+  - `scene_local_environment_proxy_resource_table_required`
+  - `scene_local_environment_proxy_resource_table_bindable`
+  - `scene_local_environment_proxy_bound_resource_count`
+  - `scene_local_environment_proxy_binding_source`
+  - `scene_local_environment_proxy_fallback_reason`
+- Environment readiness now requires `21` channels. Payload-ready scenes must
+  prove both payload table binding and proxy table binding.
+- The V3 contract, placeholder analyzer, environment-payload analyzer, and
+  static validator now gate the proxy-resource fields.
+
+Validation for proxy-resource binding:
+
+```powershell
+python -m py_compile tools\analyze_full_scene_shader_v3_environment_payload.py tools\analyze_full_scene_shader_v3_placeholders.py tools\validate_full_scene_shader_pipeline_v3_plan.py
+python tools\validate_full_scene_shader_pipeline_v3_plan.py
+git -c submodule.recurse=false diff --check -- src\Graphics\Renderer.h src\Graphics\Renderer_FramePostConstants.cpp src\Graphics\Renderer_RenderGraphEndFrame.cpp src\Graphics\Renderer_FrameContractSnapshot.cpp src\Graphics\FrameContract.h src\Graphics\FrameContractJson.cpp src\Graphics\FullSceneShaderFrameContext.h assets\shaders\SceneLocalEnvironmentV3.hlsl assets\final_art\full_scene_shader_pipeline_v3_contract.json tools\analyze_full_scene_shader_v3_environment_payload.py tools\analyze_full_scene_shader_v3_placeholders.py tools\validate_full_scene_shader_pipeline_v3_plan.py
+cmd.exe /d /c "call ""C:\Program Files\Microsoft Visual Studio\18\Community\Common7\Tools\VsDevCmd.bat"" -arch=x64 -host_arch=x64 >nul && set ""CORTEX_SKIP_ASSET_SYNC=1"" && ""C:\Program Files\Ninja\ninja.exe"" -C build CortexEngine -j 8"
+Copy-Item -LiteralPath assets\shaders\SceneLocalEnvironmentV3.hlsl -Destination build\bin\assets\shaders\SceneLocalEnvironmentV3.hlsl -Force
+Copy-Item -LiteralPath assets\final_art\full_scene_shader_pipeline_v3_contract.json -Destination build\bin\assets\final_art\full_scene_shader_pipeline_v3_contract.json -Force
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_full_scene_shader_pipeline_v3_packet.ps1 -NoBuild -SkipSceneAnalyzers -StressSceneOnly -StressSceneFilter rt_showcase:reflection_closeup -SmokeFrames 10 -CaptureFrame 5 -CaptureSequenceCount 1 -StabilityMotionMode static -OutputRoot build\captures\v3_scene_local_proxy_binding_fresh_smoke_20260607
+```
+
+Evidence:
+
+- Native `CortexEngine` target was already built by the timed-out Ninja run;
+  rerunning Ninja reported `no work to do`. The known trailing `vswhere.exe`
+  warning still printed after success.
+- Fresh packet:
+  `build\captures\v3_scene_local_proxy_binding_fresh_smoke_20260607` passed
+  scene-local packet, V2 evidence, V3 placeholder checks, scene profile,
+  environment payload, material payload, CompositeV3 diagnostics, and promotion
+  decision.
+- Environment-payload proof:
+  - reports: `54`
+  - payload-ready reports: `54`
+  - resource-bindable reports: `54`
+  - bound-resource reports: `54`
+  - proxy-resource-bindable reports: `54`
+  - bound-proxy-resource reports: `54`
+  - first row: texture set `rt_showcase_gallery`, `12` DDS textures,
+    `5` albedo, `6` normal, payload binding source
+    `cached_scene_local_payload_pair`, `2` bound payload resources, proxy
+    binding source `cached_scene_local_proxy_triple`, `3` bound proxy
+    resources, proxy fallback reason `none`
+- Promotion status stayed `review_packet_passed`, not default promotion,
+  because the packet intentionally covered one stress family and static motion.
+
+Current next work after this checkpoint:
+
+1. Replace reused albedo/normal proxy aliases with generated or authored
+   irradiance, specular prefilter, and visible-background proxy resources.
+2. Run a cross-profile proxy-resource packet once model-scene report/capture
+   separation is clean enough not to hide proxy binding behind device-removal
+   exits.
+3. Continue `LightingShadowV3` attribution and broader `ReflectionV3`
+   auto-resolver coverage before strong `CinematicPostV3` tuning.
+
 Latest LightingShadowV3 source-attribution checkpoint:
 
 - `FullSceneLightingV3` now splits `shadow_source_attribution` by source:

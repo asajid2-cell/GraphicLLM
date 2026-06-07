@@ -513,6 +513,12 @@ def analyze_report(
                     failures.append("payload-ready environment without bindable resource table")
                 if int(v3.get("scene_local_texture_payload_bound_resource_count", 0) or 0) <= 0:
                     failures.append("payload-ready environment without bound payload resources")
+                if v3.get("scene_local_environment_proxy_resource_table_required") is not True:
+                    failures.append("payload-ready environment without required proxy resource table")
+                if v3.get("scene_local_environment_proxy_resource_table_bindable") is not True:
+                    failures.append("payload-ready environment without bindable proxy resource table")
+                if int(v3.get("scene_local_environment_proxy_bound_resource_count", 0) or 0) <= 0:
+                    failures.append("payload-ready environment without bound proxy resources")
         for resource in [
             "scene_local_environment",
             "ambient_lighting",

@@ -1254,6 +1254,11 @@ struct FullSceneShaderPipelineV3FrameContext {
     uint32_t sceneLocalTexturePayloadBoundResourceCount = 0;
     std::string sceneLocalTexturePayloadBindingSource = "none";
     std::string sceneLocalTexturePayloadFallbackReason = "none";
+    bool sceneLocalEnvironmentProxyResourceTableRequired = false;
+    bool sceneLocalEnvironmentProxyResourceTableBindable = false;
+    uint32_t sceneLocalEnvironmentProxyBoundResourceCount = 0;
+    std::string sceneLocalEnvironmentProxyBindingSource = "none";
+    std::string sceneLocalEnvironmentProxyFallbackReason = "none";
     std::string sceneProfileProducer = "unknown";
     std::string sceneProfileOutput = "unknown";
     std::string sceneProfilePolicyOwner = "unknown";
@@ -1874,11 +1879,17 @@ inline FullSceneShaderPipelineV3FrameContext BuildFullSceneShaderPipelineV3Frame
         (contract.environment.sceneLocalPayloadResourceTableRequired &&
          contract.environment.sceneLocalPayloadResourceTableBindable &&
          contract.environment.sceneLocalPayloadBoundResourceCount > 0u);
+    const bool environmentProxyResourceBindingReady =
+        !contract.environment.sceneLocalPayloadReady ||
+        (contract.environment.sceneLocalProxyResourceTableRequired &&
+         contract.environment.sceneLocalProxyResourceTableBindable &&
+         contract.environment.sceneLocalProxyBoundResourceCount > 0u);
     readyEnvironmentChannels += environmentPayloadResourceBindingReady ? 3u : 0u;
+    readyEnvironmentChannels += environmentProxyResourceBindingReady ? 3u : 0u;
     context.sceneLocalEnvironmentReady =
         environmentOwnerKnown &&
         environmentProducerReady &&
-        readyEnvironmentChannels == 18u;
+        readyEnvironmentChannels == 21u;
     context.sceneLocalEnvironmentChannelCount = readyEnvironmentChannels;
     context.sceneLocalEnvironmentMode = environmentMode;
     context.sceneLocalEnvironmentPolicy = environmentPolicy;
@@ -1915,6 +1926,16 @@ inline FullSceneShaderPipelineV3FrameContext BuildFullSceneShaderPipelineV3Frame
         contract.environment.sceneLocalPayloadBindingSource;
     context.sceneLocalTexturePayloadFallbackReason =
         contract.environment.sceneLocalPayloadFallbackReason;
+    context.sceneLocalEnvironmentProxyResourceTableRequired =
+        contract.environment.sceneLocalProxyResourceTableRequired;
+    context.sceneLocalEnvironmentProxyResourceTableBindable =
+        contract.environment.sceneLocalProxyResourceTableBindable;
+    context.sceneLocalEnvironmentProxyBoundResourceCount =
+        contract.environment.sceneLocalProxyBoundResourceCount;
+    context.sceneLocalEnvironmentProxyBindingSource =
+        contract.environment.sceneLocalProxyBindingSource;
+    context.sceneLocalEnvironmentProxyFallbackReason =
+        contract.environment.sceneLocalProxyFallbackReason;
 
     FullSceneShaderPipelineV3DomainEvidence environmentDomain =
         MakeFullSceneShaderPipelineV3DomainEvidence(
@@ -1972,11 +1993,16 @@ inline FullSceneShaderPipelineV3FrameContext BuildFullSceneShaderPipelineV3Frame
                                                : "scene_local_texture_payload_resource_binding_missing",
         context.sceneLocalTexturePayloadBindingSource,
         context.sceneLocalTexturePayloadFallbackReason,
+        environmentProxyResourceBindingReady ? "scene_local_environment_proxy_resource_binding_ready"
+                                             : "scene_local_environment_proxy_resource_binding_missing",
+        context.sceneLocalEnvironmentProxyBindingSource,
+        context.sceneLocalEnvironmentProxyFallbackReason,
     };
     environmentDomain.backingResourceCount =
         readyEnvironmentResources + (environmentConsumesSceneProfilePolicy ? 1u : 0u) +
-        context.sceneLocalTexturePayloadBoundResourceCount;
-    environmentDomain.requiredChannelCount = 18u;
+        context.sceneLocalTexturePayloadBoundResourceCount +
+        context.sceneLocalEnvironmentProxyBoundResourceCount;
+    environmentDomain.requiredChannelCount = 21u;
     environmentDomain.readyChannelCount = readyEnvironmentChannels;
     environmentDomain.missingRequiredChannelCount =
         environmentDomain.requiredChannelCount - environmentDomain.readyChannelCount;

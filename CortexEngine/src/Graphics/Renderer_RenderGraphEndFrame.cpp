@@ -69,6 +69,9 @@ struct SceneLocalEnvironmentV3Context {
     D3D12_GPU_VIRTUAL_ADDRESS frameConstants = 0;
     std::shared_ptr<DX12Texture> payloadAlbedo;
     std::shared_ptr<DX12Texture> payloadNormal;
+    std::shared_ptr<DX12Texture> irradianceProxy;
+    std::shared_ptr<DX12Texture> specularProxy;
+    std::shared_ptr<DX12Texture> visibleBackgroundProxy;
     std::array<D3D12_CPU_DESCRIPTOR_HANDLE, 5> outputRTVs{};
     uint32_t width = 0;
     uint32_t height = 0;
@@ -227,7 +230,7 @@ void FailFullSceneReflectionHistoryV3Copy(const FullSceneReflectionHistoryV3Copy
             builder.Write(context.atmosphere, RGResourceUsage::RenderTarget);
         },
         [context](ID3D12GraphicsCommandList*, const RenderGraph&) {
-            auto payloadTableResult = context.descriptorManager->AllocateTransientCBV_SRV_UAVRange(2);
+            auto payloadTableResult = context.descriptorManager->AllocateTransientCBV_SRV_UAVRange(5);
             if (payloadTableResult.IsErr()) {
                 FailSceneLocalEnvironmentV3(context, "scene_local_environment_v3_payload_descriptor");
                 return;
@@ -235,31 +238,49 @@ void FailFullSceneReflectionHistoryV3Copy(const FullSceneReflectionHistoryV3Copy
             const DescriptorHandle payloadAlbedoSRV = payloadTableResult.Value();
             const DescriptorHandle payloadNormalSRV =
                 context.descriptorManager->GetCBV_SRV_UAVHandle(payloadAlbedoSRV.index + 1u);
-            if (!payloadAlbedoSRV.IsValid() || !payloadNormalSRV.IsValid()) {
+            const DescriptorHandle irradianceProxySRV =
+                context.descriptorManager->GetCBV_SRV_UAVHandle(payloadAlbedoSRV.index + 2u);
+            const DescriptorHandle specularProxySRV =
+                context.descriptorManager->GetCBV_SRV_UAVHandle(payloadAlbedoSRV.index + 3u);
+            const DescriptorHandle visibleBackgroundProxySRV =
+                context.descriptorManager->GetCBV_SRV_UAVHandle(payloadAlbedoSRV.index + 4u);
+            if (!payloadAlbedoSRV.IsValid() ||
+                !payloadNormalSRV.IsValid() ||
+                !irradianceProxySRV.IsValid() ||
+                !specularProxySRV.IsValid() ||
+                !visibleBackgroundProxySRV.IsValid()) {
                 FailSceneLocalEnvironmentV3(context, "scene_local_environment_v3_payload_descriptor_slot");
                 return;
             }
 
-            if (!DescriptorTable::WriteTexture2DSRV(
+            auto writeTextureSRV = [&context](const DescriptorHandle& handle,
+                                              const std::shared_ptr<DX12Texture>& texture) {
+                return DescriptorTable::WriteTexture2DSRV(
                     context.device,
-                    payloadAlbedoSRV,
-                    context.payloadAlbedo && context.payloadAlbedo->GetResource()
-                        ? context.payloadAlbedo->GetResource()
-                        : nullptr,
-                    context.payloadAlbedo ? context.payloadAlbedo->GetFormat() : DXGI_FORMAT_R8G8B8A8_UNORM,
-                    context.payloadAlbedo ? context.payloadAlbedo->GetMipLevels() : 1u)) {
+                    handle,
+                    texture && texture->GetResource() ? texture->GetResource() : nullptr,
+                    texture ? texture->GetFormat() : DXGI_FORMAT_R8G8B8A8_UNORM,
+                    texture ? texture->GetMipLevels() : 1u);
+            };
+
+            if (!writeTextureSRV(payloadAlbedoSRV, context.payloadAlbedo)) {
                 FailSceneLocalEnvironmentV3(context, "scene_local_environment_v3_payload_albedo_srv");
                 return;
             }
-            if (!DescriptorTable::WriteTexture2DSRV(
-                    context.device,
-                    payloadNormalSRV,
-                    context.payloadNormal && context.payloadNormal->GetResource()
-                        ? context.payloadNormal->GetResource()
-                        : nullptr,
-                    context.payloadNormal ? context.payloadNormal->GetFormat() : DXGI_FORMAT_R8G8B8A8_UNORM,
-                    context.payloadNormal ? context.payloadNormal->GetMipLevels() : 1u)) {
+            if (!writeTextureSRV(payloadNormalSRV, context.payloadNormal)) {
                 FailSceneLocalEnvironmentV3(context, "scene_local_environment_v3_payload_normal_srv");
+                return;
+            }
+            if (!writeTextureSRV(irradianceProxySRV, context.irradianceProxy)) {
+                FailSceneLocalEnvironmentV3(context, "scene_local_environment_v3_irradiance_proxy_srv");
+                return;
+            }
+            if (!writeTextureSRV(specularProxySRV, context.specularProxy)) {
+                FailSceneLocalEnvironmentV3(context, "scene_local_environment_v3_specular_proxy_srv");
+                return;
+            }
+            if (!writeTextureSRV(visibleBackgroundProxySRV, context.visibleBackgroundProxy)) {
+                FailSceneLocalEnvironmentV3(context, "scene_local_environment_v3_visible_background_proxy_srv");
                 return;
             }
 
@@ -1453,6 +1474,9 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
             environmentContext.frameConstants = m_constantBuffers.currentFrameGPU;
             environmentContext.payloadAlbedo = payloadBinding.albedo;
             environmentContext.payloadNormal = payloadBinding.normal;
+            environmentContext.irradianceProxy = payloadBinding.irradianceProxy;
+            environmentContext.specularProxy = payloadBinding.specularProxy;
+            environmentContext.visibleBackgroundProxy = payloadBinding.visibleBackgroundProxy;
             environmentContext.outputRTVs = {
                 m_mainTargets.environmentV3.descriptors.sceneLocalEnvironmentRTV.cpu,
                 m_mainTargets.environmentV3.descriptors.ambientLightingRTV.cpu,

@@ -88,6 +88,9 @@ struct SceneLocalPayloadTextureCandidates {
     std::string textureSetId = "none";
     std::string albedoPath;
     std::string normalPath;
+    std::string irradianceProxyPath;
+    std::string specularProxyPath;
+    std::string visibleBackgroundProxyPath;
     bool present = false;
 };
 
@@ -132,6 +135,20 @@ int PayloadTexturePriority(const std::filesystem::path& path) {
         return 1;
     }
     if (filename.find("cube") != std::string::npos) {
+        return 2;
+    }
+    return 3;
+}
+
+int VisibleBackgroundTexturePriority(const std::filesystem::path& path) {
+    const std::string filename = ToLowerAscii(path.filename().string());
+    if (filename.find("wall") != std::string::npos) {
+        return 0;
+    }
+    if (filename.find("cube") != std::string::npos) {
+        return 1;
+    }
+    if (filename.find("floor") != std::string::npos) {
         return 2;
     }
     return 3;
@@ -194,9 +211,21 @@ SceneLocalPayloadTextureCandidates FindSceneLocalPayloadTextureCandidates(const 
     result.present = !albedo.empty() || !normal.empty();
     if (!albedo.empty()) {
         result.albedoPath = albedo.front().generic_string();
+        result.irradianceProxyPath = result.albedoPath;
+        std::vector<std::filesystem::path> visibleBackground = albedo;
+        std::sort(visibleBackground.begin(), visibleBackground.end(), [](const auto& lhs, const auto& rhs) {
+            const int lhsPriority = VisibleBackgroundTexturePriority(lhs);
+            const int rhsPriority = VisibleBackgroundTexturePriority(rhs);
+            if (lhsPriority != rhsPriority) {
+                return lhsPriority < rhsPriority;
+            }
+            return lhs.generic_string() < rhs.generic_string();
+        });
+        result.visibleBackgroundProxyPath = visibleBackground.front().generic_string();
     }
     if (!normal.empty()) {
         result.normalPath = normal.front().generic_string();
+        result.specularProxyPath = result.normalPath;
     }
     return result;
 }
@@ -496,31 +525,61 @@ Renderer::BuildSceneLocalEnvironmentV3PayloadBindingInfo(bool queueMissingUpload
     info.textureSetId = candidates.textureSetId;
     info.albedoPath = candidates.albedoPath;
     info.normalPath = candidates.normalPath;
+    info.irradianceProxyPath = candidates.irradianceProxyPath;
+    info.specularProxyPath = candidates.specularProxyPath;
+    info.visibleBackgroundProxyPath = candidates.visibleBackgroundProxyPath;
     info.resourceTableRequired = candidates.present;
+    info.proxyResourceTableRequired =
+        candidates.present &&
+        (!candidates.irradianceProxyPath.empty() ||
+         !candidates.specularProxyPath.empty() ||
+         !candidates.visibleBackgroundProxyPath.empty());
     if (!candidates.present) {
         info.fallbackReason = "scene_local_payload_set_missing";
+        info.proxyFallbackReason = "scene_local_payload_set_missing";
         return info;
     }
     if (candidates.albedoPath.empty() || candidates.normalPath.empty()) {
         info.fallbackReason = "scene_local_payload_pair_incomplete";
+        info.proxyFallbackReason = "scene_local_proxy_pair_incomplete";
         return info;
     }
 
-    if (TryGetCachedTexture(candidates.albedoPath, true, AssetRegistry::TextureKind::Generic, info.albedo) &&
-        info.albedo && info.albedo->GetResource()) {
-        ++info.boundResourceCount;
-    } else if (queueMissingUploads) {
-        (void)QueueTextureUploadFromFile(candidates.albedoPath, true, AssetRegistry::TextureKind::Generic);
-    }
+    auto bindTexture = [this, queueMissingUploads](const std::string& path,
+                                                   bool useSRGB,
+                                                   std::shared_ptr<DX12Texture>& texture) -> bool {
+        if (path.empty()) {
+            return false;
+        }
+        if (TryGetCachedTexture(path, useSRGB, AssetRegistry::TextureKind::Generic, texture) &&
+            texture &&
+            texture->GetResource()) {
+            return true;
+        }
+        if (queueMissingUploads) {
+            (void)QueueTextureUploadFromFile(path, useSRGB, AssetRegistry::TextureKind::Generic);
+        }
+        return false;
+    };
 
-    if (TryGetCachedTexture(candidates.normalPath, false, AssetRegistry::TextureKind::Generic, info.normal) &&
-        info.normal && info.normal->GetResource()) {
+    if (bindTexture(candidates.albedoPath, true, info.albedo)) {
         ++info.boundResourceCount;
-    } else if (queueMissingUploads) {
-        (void)QueueTextureUploadFromFile(candidates.normalPath, false, AssetRegistry::TextureKind::Generic);
+    }
+    if (bindTexture(candidates.normalPath, false, info.normal)) {
+        ++info.boundResourceCount;
+    }
+    if (bindTexture(candidates.irradianceProxyPath, true, info.irradianceProxy)) {
+        ++info.boundProxyResourceCount;
+    }
+    if (bindTexture(candidates.specularProxyPath, false, info.specularProxy)) {
+        ++info.boundProxyResourceCount;
+    }
+    if (bindTexture(candidates.visibleBackgroundProxyPath, true, info.visibleBackgroundProxy)) {
+        ++info.boundProxyResourceCount;
     }
 
     info.resourceTableBindable = info.boundResourceCount > 0;
+    info.proxyResourceTableBindable = info.boundProxyResourceCount > 0;
     if (info.boundResourceCount >= 2u) {
         info.bindingSource = "cached_scene_local_payload_pair";
         info.fallbackReason = "none";
@@ -530,6 +589,16 @@ Renderer::BuildSceneLocalEnvironmentV3PayloadBindingInfo(bool queueMissingUpload
     } else {
         info.bindingSource = "null_payload_descriptors";
         info.fallbackReason = "payload_textures_not_resident";
+    }
+    if (info.boundProxyResourceCount >= 3u) {
+        info.proxyBindingSource = "cached_scene_local_proxy_triple";
+        info.proxyFallbackReason = "none";
+    } else if (info.boundProxyResourceCount > 0u) {
+        info.proxyBindingSource = "partial_cached_scene_local_proxy";
+        info.proxyFallbackReason = "one_or_more_proxy_textures_not_resident";
+    } else {
+        info.proxyBindingSource = "null_proxy_descriptors";
+        info.proxyFallbackReason = "proxy_textures_not_resident";
     }
     return info;
 }

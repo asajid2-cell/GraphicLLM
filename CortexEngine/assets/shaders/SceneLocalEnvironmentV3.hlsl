@@ -63,6 +63,9 @@ cbuffer FrameConstants : register(b1)
 
 Texture2D<float4> g_SceneLocalPayloadAlbedo : register(t0);
 Texture2D<float4> g_SceneLocalPayloadNormal : register(t1);
+Texture2D<float4> g_SceneLocalIrradianceProxy : register(t2);
+Texture2D<float4> g_SceneLocalSpecularProxy : register(t3);
+Texture2D<float4> g_SceneLocalVisibleBackgroundProxy : register(t4);
 SamplerState g_LinearWrapSampler : register(s0);
 
 struct VSOutput {
@@ -117,12 +120,24 @@ PSOutput PSMain(VSOutput input) {
         max(g_SceneLocalPayloadAlbedo.SampleLevel(g_LinearWrapSampler, payloadUv, 0.0f).rgb, 0.0f.xxx);
     const float3 payloadNormalSample =
         max(g_SceneLocalPayloadNormal.SampleLevel(g_LinearWrapSampler, payloadUv, 0.0f).rgb, 0.0f.xxx);
+    const float3 irradianceProxySample =
+        max(g_SceneLocalIrradianceProxy.SampleLevel(g_LinearWrapSampler, payloadUv * 0.45f, 0.0f).rgb, 0.0f.xxx);
+    const float3 specularProxySample =
+        max(g_SceneLocalSpecularProxy.SampleLevel(g_LinearWrapSampler, payloadUv * 0.65f, 0.0f).rgb, 0.0f.xxx);
+    const float3 visibleProxySample =
+        max(g_SceneLocalVisibleBackgroundProxy.SampleLevel(g_LinearWrapSampler, payloadUv * 0.35f, 0.0f).rgb, 0.0f.xxx);
     const float payloadAlbedoSignal = step(0.002f, Luma(payloadAlbedoSample));
+    const float irradianceProxySignal = step(0.002f, Luma(irradianceProxySample));
+    const float specularProxySignal = step(0.002f, Luma(specularProxySample));
+    const float visibleProxySignal = step(0.002f, Luma(visibleProxySample));
     const float payloadNormalDetail =
         payloadAlbedoSignal * saturate(length(payloadNormalSample.rg * 2.0f - 1.0f) * 0.45f);
     const float payloadResourceInfluence =
         saturate(payloadInfluence * payloadAlbedoSignal * (0.45f + 0.30f * payloadNormalDetail));
     const float3 payloadSampleTint = SafeNormalizeColor(payloadAlbedoSample + 0.015f.xxx);
+    const float3 irradianceProxyTint = SafeNormalizeColor(irradianceProxySample + 0.015f.xxx);
+    const float3 specularProxyTint = SafeNormalizeColor(specularProxySample + 0.015f.xxx);
+    const float3 visibleProxyTint = SafeNormalizeColor(visibleProxySample + 0.015f.xxx);
 
     const float3 skyCool = float3(0.20f, 0.31f, 0.48f);
     const float3 galleryNeutral = float3(0.18f, 0.175f, 0.16f);
@@ -138,12 +153,14 @@ PSOutput PSMain(VSOutput input) {
         lerp(lerp(localPalette * 1.08f,
                   ambientTint * 0.64f + localPalette * 0.58f,
                   payloadTextureRichness),
-             payloadSampleTint,
-             payloadResourceInfluence);
+             lerp(payloadSampleTint, irradianceProxyTint, irradianceProxySignal),
+             saturate(payloadResourceInfluence + irradianceProxySignal * payloadInfluence * 0.25f));
     const float3 payloadVisibleTint =
         lerp(lerp(localPalette, payloadRadianceTint, saturate(0.45f + 0.35f * payloadTextureRichness)),
-             payloadSampleTint,
-             payloadResourceInfluence * 0.75f);
+             lerp(payloadSampleTint, visibleProxyTint, visibleProxySignal),
+             saturate(payloadResourceInfluence * 0.55f + visibleProxySignal * payloadInfluence * 0.35f));
+    const float3 payloadSpecularTint =
+        lerp(payloadRadianceTint, specularProxyTint, specularProxySignal * payloadInfluence);
     const float payloadLocalWeight = saturate(payloadInfluence * (0.55f + 0.30f * payloadTextureRichness));
 
     const float externalBackgroundWeight =
@@ -153,7 +170,7 @@ PSOutput PSMain(VSOutput input) {
     const float3 visibleGradient = visibleColor * lerp(0.62f, 1.24f, uvHorizon);
     const float reflectionLocalWeight = saturate(localBackgroundStrength + localProbeEnabled * 0.35f + payloadInfluence * 0.30f);
     const float3 profileReflection = lerp(localPalette * 0.32f, ambientTint * 0.58f, saturate(specularIBL + probeSpecular));
-    const float3 reflectionPayload = lerp(profileReflection, payloadRadianceTint * 0.70f, payloadLocalWeight);
+    const float3 reflectionPayload = lerp(profileReflection, payloadSpecularTint * 0.70f, payloadLocalWeight);
     const float3 reflectionColor = lerp(ambientTint * 0.18f, reflectionPayload, reflectionLocalWeight);
     const float stageHaze = isStage * saturate(0.35f + 0.45f * fogEnabled + 0.25f * lightCountSignal);
     const float3 fogColor = lerp(ambientTint * 0.22f, visibleColor, saturate(fogEnabled + backgroundExposure + stageHaze));

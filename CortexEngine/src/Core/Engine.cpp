@@ -32,6 +32,7 @@
 #include <glm/gtx/quaternion.hpp>
 #include <glm/gtc/matrix_inverse.hpp>
 #include <algorithm>
+#include <cctype>
 #include <cmath>
 #include <optional>
 #include <filesystem>
@@ -305,6 +306,14 @@ namespace {
                     state.fractalNoiseType      = getOr("fractalNoiseType",     state.fractalNoiseType);
                     state.lightingRig           = getOr("lightingRig",          state.lightingRig);
                     state.rayTracingEnabled     = getOr("rayTracingEnabled",    state.rayTracingEnabled);
+                    state.shadowsEnabled        = getOr("shadowsEnabled",       state.shadowsEnabled);
+                    state.pcssEnabled           = getOr("pcssEnabled",          state.pcssEnabled);
+                    state.fxaaEnabled           = getOr("fxaaEnabled",          state.fxaaEnabled);
+                    state.taaEnabled            = getOr("taaEnabled",           state.taaEnabled);
+                    state.ssrEnabled            = getOr("ssrEnabled",           state.ssrEnabled);
+                    state.ssaoEnabled           = getOr("ssaoEnabled",          state.ssaoEnabled);
+                    state.iblEnabled            = getOr("iblEnabled",           state.iblEnabled);
+                    state.fogEnabled            = getOr("fogEnabled",           state.fogEnabled);
                 }
             }
         } catch (...) {
@@ -336,6 +345,14 @@ namespace {
             j["fractalNoiseType"] = state.fractalNoiseType;
             j["lightingRig"] = state.lightingRig;
             j["rayTracingEnabled"] = state.rayTracingEnabled;
+            j["shadowsEnabled"] = state.shadowsEnabled;
+            j["pcssEnabled"] = state.pcssEnabled;
+            j["fxaaEnabled"] = state.fxaaEnabled;
+            j["taaEnabled"] = state.taaEnabled;
+            j["ssrEnabled"] = state.ssrEnabled;
+            j["ssaoEnabled"] = state.ssaoEnabled;
+            j["iblEnabled"] = state.iblEnabled;
+            j["fogEnabled"] = state.fogEnabled;
 
             std::ofstream out(path);
             if (out) {
@@ -497,11 +514,32 @@ Result<void> Engine::Initialize(const EngineConfig& config) {
             m_cameraMotionSideAmplitude = ReadOptionalEnvFloat("CORTEX_CAMERA_MOTION_SIDE_AMPLITUDE").value_or(0.85f);
             m_cameraMotionForwardAmplitude = ReadOptionalEnvFloat("CORTEX_CAMERA_MOTION_FORWARD_AMPLITUDE").value_or(0.55f);
             m_cameraMotionLookAmplitude = ReadOptionalEnvFloat("CORTEX_CAMERA_MOTION_LOOK_AMPLITUDE").value_or(0.35f);
-            spdlog::info("Smoke automation: camera motion frames={} side={} forward={} look={}",
+            m_cameraMotionLookCycles = ReadOptionalEnvFloat("CORTEX_CAMERA_MOTION_LOOK_CYCLES").value_or(0.0f);
+            m_cameraMotionLiftAmplitude = ReadOptionalEnvFloat("CORTEX_CAMERA_MOTION_LIFT_AMPLITUDE").value_or(0.08f);
+            spdlog::info("Smoke automation: camera motion frames={} side={} forward={} look={} lookCycles={} lift={}",
                          static_cast<unsigned long long>(m_cameraMotionAutomationFrames),
                          m_cameraMotionSideAmplitude,
                          m_cameraMotionForwardAmplitude,
-                         m_cameraMotionLookAmplitude);
+                         m_cameraMotionLookAmplitude,
+                         m_cameraMotionLookCycles,
+                         m_cameraMotionLiftAmplitude);
+        }
+    }
+    if (const auto jitterFrames = ReadOptionalEnvUInt64("CORTEX_CAMERA_MOUSE_JITTER_FRAMES")) {
+        if (*jitterFrames > 0) {
+            m_cameraMouseJitterAutomationEnabled = true;
+            m_cameraMouseJitterAutomationFrames = *jitterFrames;
+            m_cameraMouseJitterYawAmplitude =
+                ReadOptionalEnvFloat("CORTEX_CAMERA_MOUSE_JITTER_YAW_AMPLITUDE").value_or(0.08f);
+            m_cameraMouseJitterPitchAmplitude =
+                ReadOptionalEnvFloat("CORTEX_CAMERA_MOUSE_JITTER_PITCH_AMPLITUDE").value_or(0.0f);
+            m_cameraMouseJitterCycles =
+                ReadOptionalEnvFloat("CORTEX_CAMERA_MOUSE_JITTER_CYCLES").value_or(8.0f);
+            spdlog::info("Smoke automation: mouse-jitter frames={} yaw={} pitch={} cycles={}",
+                         static_cast<unsigned long long>(m_cameraMouseJitterAutomationFrames),
+                         m_cameraMouseJitterYawAmplitude,
+                         m_cameraMouseJitterPitchAmplitude,
+                         m_cameraMouseJitterCycles);
         }
     }
     if (m_maxFrames > 0 || m_exitAfterVisualValidationCapture || m_simulateDeviceRemovedFrame > 0) {
@@ -548,8 +586,13 @@ Result<void> Engine::Initialize(const EngineConfig& config) {
     spdlog::info("  Renderer initialized in {} ms",
         std::chrono::duration_cast<std::chrono::milliseconds>(tAfterRenderer - tAfterWindow).count());
 
-    // Enable GPU culling for GPU-driven rendering (Phase 1 feature)
-    Graphics::ApplyGPUCullingEnabledControl(*m_renderer, true);
+    // Enable GPU culling for GPU-driven rendering unless diagnostics or a
+    // release fallback explicitly request the CPU/direct visibility path.
+    const bool disableGpuCulling = (std::getenv("CORTEX_DISABLE_GPU_CULLING") != nullptr);
+    Graphics::ApplyGPUCullingEnabledControl(*m_renderer, !disableGpuCulling);
+    if (disableGpuCulling) {
+        spdlog::info("GPU culling disabled via CORTEX_DISABLE_GPU_CULLING=1");
+    }
 
     // Create ECS registry
     m_registry = std::make_unique<Scene::ECS_Registry>();
@@ -631,6 +674,12 @@ Result<void> Engine::Initialize(const EngineConfig& config) {
                    sceneLower == "forestcreekshrine" ||
                    sceneLower == "creek_shrine") {
             m_currentScenePreset = ScenePreset::ForestCreekShrine;
+        } else if (sceneLower == "model_authored_scene" ||
+                   sceneLower == "modelauthoredscene" ||
+                   sceneLower == "model_authored" ||
+                   sceneLower == "generated_scene" ||
+                   sceneLower == "prompt_scene") {
+            m_currentScenePreset = ScenePreset::ModelAuthoredScene;
         } else if (sceneLower == "effects_showcase" || sceneLower == "effectsshowcase" || sceneLower == "effects") {
             m_currentScenePreset = ScenePreset::EffectsShowcase;
         } else if (sceneLower == "temporal" ||
@@ -950,7 +999,17 @@ Result<void> Engine::Initialize(const EngineConfig& config) {
 
     if (!config.initialEnvironmentPreset.empty() && m_renderer) {
         Graphics::ApplyEnvironmentPresetControl(*m_renderer, config.initialEnvironmentPreset);
-        Graphics::ApplyFeatureToggleControl(*m_renderer, Graphics::RendererFeatureToggle::IBL, true);
+        std::string lowerEnvironment = config.initialEnvironmentPreset;
+        std::transform(lowerEnvironment.begin(), lowerEnvironment.end(), lowerEnvironment.begin(),
+                       [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+        const bool neutralNoHdriEnvironment =
+            lowerEnvironment == "neutral_procedural" ||
+            lowerEnvironment == "procedural_sky" ||
+            lowerEnvironment == "none";
+        Graphics::ApplyFeatureToggleControl(
+            *m_renderer,
+            Graphics::RendererFeatureToggle::IBL,
+            !neutralNoHdriEnvironment);
         spdlog::info("Startup environment preset applied: '{}'", config.initialEnvironmentPreset);
     }
 
@@ -959,7 +1018,9 @@ Result<void> Engine::Initialize(const EngineConfig& config) {
         m_currentScenePreset == ScenePreset::RainGlassPavilion ||
         m_currentScenePreset == ScenePreset::DesertRelicGallery ||
         m_currentScenePreset == ScenePreset::NeonAlleyMaterialMarket ||
-        m_currentScenePreset == ScenePreset::ForestCreekShrine;
+        m_currentScenePreset == ScenePreset::ForestCreekShrine ||
+        m_currentScenePreset == ScenePreset::ModelAuthoredScene ||
+        m_currentScenePreset == ScenePreset::OutdoorSunsetBeach;
     if (assetLedStartupScene &&
         (!config.initialGraphicsPreset.empty() || !config.initialEnvironmentPreset.empty())) {
         RebuildScene(m_currentScenePreset);
@@ -969,6 +1030,21 @@ Result<void> Engine::Initialize(const EngineConfig& config) {
                          config.initialCameraBookmark);
         }
         spdlog::info("Asset-led scene controls reapplied after startup graphics/environment presets");
+    }
+
+    if (m_renderer && m_currentScenePreset == ScenePreset::DragonOverWater) {
+        // Debug/user settings are applied after the scene is built. Reapply
+        // the Dragon studio lighting contract last so its validated shadow
+        // bias is the active public scene state.
+        Graphics::ApplyDragonWaterStudioSunControls(*m_renderer);
+    }
+    if (m_renderer && m_currentScenePreset == ScenePreset::RTShowcase) {
+        // RT Showcase uses the studio HDRI for lighting/material evaluation,
+        // but the visible HDRI background fights the enclosed gallery geometry
+        // during mouse-look. Reapply the scene contract last so startup/debug
+        // presets cannot re-expose that background.
+        const bool conservative = (m_qualityMode != EngineConfig::QualityMode::Default);
+        Graphics::ApplyRTShowcaseSceneControls(*m_renderer, conservative);
     }
 
     if (const char* startupFocusTarget = std::getenv("CORTEX_FOCUS_TARGET")) {
@@ -1142,6 +1218,9 @@ void Engine::ToggleScenePreset() {
         next = ScenePreset::ForestCreekShrine;
         break;
     case ScenePreset::ForestCreekShrine:
+        next = ScenePreset::ModelAuthoredScene;
+        break;
+    case ScenePreset::ModelAuthoredScene:
         next = ScenePreset::EffectsShowcase;
         break;
     case ScenePreset::EffectsShowcase:
@@ -1158,12 +1237,21 @@ void Engine::ToggleScenePreset() {
 void Engine::Run() {
     spdlog::info("Entering main loop...");
 
+    std::optional<float> fixedDeltaTime = ReadOptionalEnvFloat("CORTEX_FIXED_DELTA_TIME");
+    if (fixedDeltaTime && *fixedDeltaTime <= 0.0f) {
+        spdlog::warn("Ignoring CORTEX_FIXED_DELTA_TIME={} because it must be positive", *fixedDeltaTime);
+        fixedDeltaTime.reset();
+    }
+    if (fixedDeltaTime) {
+        spdlog::info("Smoke automation fixed delta time enabled: {:.6f}s", *fixedDeltaTime);
+    }
+
     while (m_running) {
         // Calculate delta time
         auto currentTime = std::chrono::high_resolution_clock::now();
         std::chrono::duration<double> secs = currentTime.time_since_epoch();
         double nowSeconds = secs.count();
-        float dt = static_cast<float>(nowSeconds - m_lastFrameTimeSeconds);
+        float dt = fixedDeltaTime.value_or(static_cast<float>(nowSeconds - m_lastFrameTimeSeconds));
         m_lastFrameTimeSeconds = nowSeconds;
         m_frameTime = dt;
 
@@ -1795,6 +1883,7 @@ void Engine::WriteFrameDiagnosticsReport(bool shutdownSnapshot) {
         case ScenePreset::DesertRelicGallery: return "desert_relic_gallery";
         case ScenePreset::NeonAlleyMaterialMarket: return "neon_alley_material_market";
         case ScenePreset::ForestCreekShrine: return "forest_creek_shrine";
+        case ScenePreset::ModelAuthoredScene: return "model_authored_scene";
         case ScenePreset::EffectsShowcase: return "effects_showcase";
         case ScenePreset::GodRays: return "god_rays";
         case ScenePreset::TemporalValidation: return "temporal_validation";
@@ -2189,6 +2278,7 @@ void Engine::InitializeScene() {
     case ScenePreset::DesertRelicGallery:
     case ScenePreset::NeonAlleyMaterialMarket:
     case ScenePreset::ForestCreekShrine:
+    case ScenePreset::ModelAuthoredScene:
     case ScenePreset::EffectsShowcase:
     case ScenePreset::GodRays:
     case ScenePreset::TemporalValidation:

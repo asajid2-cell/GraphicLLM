@@ -20,7 +20,6 @@ void Renderer::PopulateFrameLightingAndShadows(FrameConstants& frameData,
                                                Scene::ECS_Registry* registry,
                                                const FrameConstantCameraState& cameraState) {
     const glm::vec3& cameraPos = cameraState.cameraPosition;
-    const glm::vec3& cameraForward = cameraState.cameraForward;
     const float camNear = cameraState.nearPlane;
     const float camFar = cameraState.farPlane;
     const float fovY = cameraState.fovY;
@@ -91,7 +90,9 @@ void Renderer::PopulateFrameLightingAndShadows(FrameConstants& frameData,
         float cosInner = std::cos(innerRad);
         float cosOuter = std::cos(outerRad);
 
-        outLight.direction_cosInner = glm::vec4(dir, cosInner);
+        const float semanticClassId = static_cast<float>(lightComp.semanticClassId);
+        const float directionPayload = type == Scene::LightType::Spot ? cosInner : semanticClassId;
+        outLight.direction_cosInner = glm::vec4(dir, directionPayload);
         outLight.color_range = glm::vec4(radiance, lightComp.range);
 
         // Default to "no local shadow" for this light. We reserve params.y as
@@ -140,7 +141,8 @@ void Renderer::PopulateFrameLightingAndShadows(FrameConstants& frameData,
                 0.5f * glm::max(lightComp.areaSize, glm::vec2(0.0f)) * m_lightingState.areaLightSizeScale;
         }
 
-        outLight.params = glm::vec4(cosOuter, shadowIndex, areaHalfSize.x, areaHalfSize.y);
+        const float paramsZ = type == Scene::LightType::AreaRect ? areaHalfSize.x : semanticClassId;
+        outLight.params = glm::vec4(cosOuter, shadowIndex, paramsZ, areaHalfSize.y);
 
         ++lightCount;
     }
@@ -155,8 +157,14 @@ void Renderer::PopulateFrameLightingAndShadows(FrameConstants& frameData,
 
     frameData.lightCount = glm::uvec4(lightCount, 0u, 0u, 0u);
 
-    // Camera-followed light view for cascades
-    glm::vec3 sceneCenter = cameraPos + cameraForward * ((camNear + camFar) * 0.5f);
+    // Camera-position-followed light view for cascades.
+    //
+    // Do not anchor the shadow camera to cameraForward. Mouse-look changes the
+    // visible frustum orientation every frame; if the light view translates with
+    // that forward vector, shadow-map texels slide across otherwise stationary
+    // walls/floors and create visible flicker. A position anchor keeps the
+    // shadow projection stable while the player rotates in place.
+    glm::vec3 sceneCenter = cameraPos;
     glm::vec3 lightDirFromLightToScene = -dirToLight;
     float lightDistance = camFar;
     glm::vec3 lightPos = sceneCenter - lightDirFromLightToScene * lightDistance;
@@ -215,21 +223,30 @@ void Renderer::PopulateFrameLightingAndShadows(FrameConstants& frameData,
 
         glm::vec3 minLS( std::numeric_limits<float>::max());
         glm::vec3 maxLS(-std::numeric_limits<float>::max());
+        glm::vec3 frustumCornersWS[8] = {};
 
+        uint32_t cornerIndex = 0;
         for (auto& cornerVS : frustumCornersVS) {
             glm::vec4 world = invView * glm::vec4(cornerVS, 1.0f);
+            glm::vec3 world3(world);
+            frustumCornersWS[cornerIndex++] = world3;
             glm::vec3 ls = glm::vec3(m_shadowCascadeState.lightViewMatrix * world);
             minLS = glm::min(minLS, ls);
             maxLS = glm::max(maxLS, ls);
         }
 
-        glm::vec3 extent = (maxLS - minLS) * 0.5f;
-        glm::vec3 centerLS = minLS + extent;
+        float radius = 0.0f;
+        for (const glm::vec3& cornerWS : frustumCornersWS) {
+            radius = std::max(radius, glm::length(cornerWS - cameraPos));
+        }
+        // Stable cascaded shadows: fit each cascade to a sphere instead of the
+        // camera-frustum AABB in light space. The sphere radius depends on the
+        // split range/FOV, not on tiny mouse-look rotations, so the shadow
+        // projection does not resize and shimmer while the camera turns.
+        radius = std::max(0.1f, std::ceil(radius * 16.0f) / 16.0f);
 
-        // Slightly expand the light-space extents so large objects near the
-        // camera frustum edges stay inside the shadow map, reducing edge flicker.
-        extent.x *= 1.1f;
-        extent.y *= 1.1f;
+        glm::vec3 centerLS = glm::vec3(m_shadowCascadeState.lightViewMatrix * glm::vec4(cameraPos, 1.0f));
+        glm::vec3 extent(radius);
 
         // Texel snapping to reduce shimmering (per-cascade resolution scaling)
         float effectiveResX = m_shadowResources.controls.mapSize * m_shadowResources.controls.cascadeResolutionScale[cascadeIndex];
@@ -248,8 +265,8 @@ void Renderer::PopulateFrameLightingAndShadows(FrameConstants& frameData,
         float minY = centerLS.y - extent.y;
         float maxY = centerLS.y + extent.y;
 
-        float minZ = minLS.z;
-        float maxZ = maxLS.z;
+        float minZ = centerLS.z - radius;
+        float maxZ = centerLS.z + radius;
         float nearPlane = std::max(0.0f, minZ);
         float farPlane = maxZ;
 

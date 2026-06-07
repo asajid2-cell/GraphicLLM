@@ -150,6 +150,7 @@ private:
 
     DescriptorHandle m_srvHandle;  // Shader Resource View handle (legacy descriptor table)
     uint32_t m_bindlessIndex = kInvalidBindlessIndex;  // Bindless heap index for SM6.6
+    uint64_t m_bindlessResourceSignature = 0;  // Resource pointer represented by m_bindlessIndex
     bool m_isCubeMap = false;
 
     // Helper for uploading data via upload buffer

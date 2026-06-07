@@ -85,11 +85,13 @@ public:
 
     using FlushCallback = std::function<void()>;
     void SetFlushCallback(FlushCallback callback) { m_flushCallback = std::move(callback); }
+    void SynchronizeForShaderVisibleDescriptorOverwrite(const char* context);
 
     // Allocate descriptors from appropriate heap
     Result<DescriptorHandle> AllocateRTV();  // Render Target View
     Result<DescriptorHandle> AllocateDSV();  // Depth Stencil View
     Result<DescriptorHandle> AllocateCBV_SRV_UAV();  // Constant Buffer / Shader Resource / Unordered Access View (shader-visible)
+    Result<DescriptorHandle> AllocateCBV_SRV_UAVRange(uint32_t count);  // Contiguous persistent shader-visible range
     Result<DescriptorHandle> AllocateStagingCBV_SRV_UAV();  // CPU-only staging descriptors for persistent resources
 
     // Get heaps for binding

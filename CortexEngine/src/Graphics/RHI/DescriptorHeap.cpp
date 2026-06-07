@@ -153,10 +153,19 @@ Result<DescriptorHandle> DescriptorHeapManager::AllocateDSV() {
 }
 
 Result<DescriptorHandle> DescriptorHeapManager::AllocateCBV_SRV_UAV() {
+    return AllocateCBV_SRV_UAVRange(1);
+}
+
+Result<DescriptorHandle> DescriptorHeapManager::AllocateCBV_SRV_UAVRange(uint32_t count) {
+    if (count == 0) {
+        return Result<DescriptorHandle>::Err("Persistent descriptor range allocation requires count > 0");
+    }
+
     uint32_t capacity = m_cbvSrvUavHeap.GetCapacity();
-    if (m_cbvSrvUavPersistentCount >= capacity) {
-        spdlog::error("CBV_SRV_UAV persistent allocation FAILED: heap exhausted at {}/{} (persistent={})",
-                      m_cbvSrvUavPersistentCount, capacity, m_cbvSrvUavPersistentCount);
+    if (m_cbvSrvUavPersistentCount > capacity ||
+        count > capacity - m_cbvSrvUavPersistentCount) {
+        spdlog::error("CBV_SRV_UAV persistent range allocation FAILED: need {} descriptors at {}/{}",
+                      count, m_cbvSrvUavPersistentCount, capacity);
         return Result<DescriptorHandle>::Err("Descriptor heap exhausted");
     }
 
@@ -169,14 +178,15 @@ Result<DescriptorHandle> DescriptorHeapManager::AllocateCBV_SRV_UAV() {
     if (m_cbvSrvUavPersistentReserved == 0) {
         m_cbvSrvUavPersistentReserved = std::min(CBV_SRV_UAV_PERSISTENT_RESERVE, capacity);
     }
-    if (m_cbvSrvUavPersistentCount >= m_cbvSrvUavPersistentReserved) {
+    const uint32_t requiredPersistentCount = m_cbvSrvUavPersistentCount + count;
+    if (requiredPersistentCount > m_cbvSrvUavPersistentReserved) {
         // Growing the persistent reserve changes the start of transient segments.
         // If we've already handed out transient descriptors this frame, growing the
         // reserve would risk aliasing those in-flight transient tables. In that case,
         // force callers (async streaming) to retry on a later frame.
         if (transientUsedThisFrame) {
-            spdlog::warn("CBV_SRV_UAV persistent reserve exhausted mid-frame (used={}, reserve={}); retry next frame to avoid transient aliasing",
-                         m_cbvSrvUavPersistentCount, m_cbvSrvUavPersistentReserved);
+            spdlog::warn("CBV_SRV_UAV persistent reserve exhausted mid-frame (used={}, need={}, reserve={}); retry next frame to avoid transient aliasing",
+                         m_cbvSrvUavPersistentCount, count, m_cbvSrvUavPersistentReserved);
             return Result<DescriptorHandle>::Err("Persistent reserve exhausted after transient allocations");
         }
 
@@ -186,12 +196,12 @@ Result<DescriptorHandle> DescriptorHeapManager::AllocateCBV_SRV_UAV() {
 
         uint32_t newReserve = m_cbvSrvUavPersistentReserved;
         if (newReserve == 0) newReserve = 1;
-        while (newReserve <= m_cbvSrvUavPersistentCount && newReserve < capacity) {
-            newReserve = std::min(capacity, std::max(newReserve * 2u, m_cbvSrvUavPersistentCount + 1u));
+        while (newReserve < requiredPersistentCount && newReserve < capacity) {
+            newReserve = std::min(capacity, std::max(newReserve * 2u, requiredPersistentCount));
         }
-        if (newReserve <= m_cbvSrvUavPersistentCount) {
-            spdlog::error("CBV_SRV_UAV persistent reserve exhausted: used={}, reserve={}, capacity={}",
-                          m_cbvSrvUavPersistentCount, m_cbvSrvUavPersistentReserved, capacity);
+        if (newReserve < requiredPersistentCount) {
+            spdlog::error("CBV_SRV_UAV persistent reserve exhausted: used={}, need={}, reserve={}, capacity={}",
+                          m_cbvSrvUavPersistentCount, count, m_cbvSrvUavPersistentReserved, capacity);
             return Result<DescriptorHandle>::Err("Persistent descriptor reserve exhausted");
         }
 
@@ -210,19 +220,18 @@ Result<DescriptorHandle> DescriptorHeapManager::AllocateCBV_SRV_UAV() {
 
     DescriptorHandle handle = m_cbvSrvUavHeap.GetHandle(m_cbvSrvUavPersistentCount);
     if (!handle.IsValid()) {
-        spdlog::error("CBV_SRV_UAV persistent allocation FAILED: invalid handle at index {}", m_cbvSrvUavPersistentCount);
+        spdlog::error("CBV_SRV_UAV persistent range allocation FAILED: invalid base handle at index {}", m_cbvSrvUavPersistentCount);
         return Result<DescriptorHandle>::Err("Invalid descriptor handle");
     }
 
-    if (handle.index + 1 > m_cbvSrvUavPersistentCount) {
-        m_cbvSrvUavPersistentCount = handle.index + 1;
+    m_cbvSrvUavPersistentCount = requiredPersistentCount;
 
-        // Log persistent descriptor growth (useful for tracking texture loads)
-        if (m_cbvSrvUavPersistentCount % 50 == 0 || m_cbvSrvUavPersistentCount > m_cbvSrvUavHeap.GetCapacity() * 0.8f) {
-            spdlog::info("CBV_SRV_UAV persistent descriptors: {} / {} capacity ({:.1f}% persistent)",
-                         m_cbvSrvUavPersistentCount, m_cbvSrvUavHeap.GetCapacity(),
-                         100.0f * m_cbvSrvUavPersistentCount / m_cbvSrvUavHeap.GetCapacity());
-        }
+    // Log persistent descriptor growth (useful for tracking texture loads)
+    if (m_cbvSrvUavPersistentCount % 50 == 0 ||
+        m_cbvSrvUavPersistentCount > m_cbvSrvUavHeap.GetCapacity() * 0.8f) {
+        spdlog::info("CBV_SRV_UAV persistent descriptors: {} / {} capacity ({:.1f}% persistent)",
+                     m_cbvSrvUavPersistentCount, m_cbvSrvUavHeap.GetCapacity(),
+                     100.0f * m_cbvSrvUavPersistentCount / m_cbvSrvUavHeap.GetCapacity());
     }
 
     if (m_frameActive) {
@@ -253,6 +262,16 @@ Result<DescriptorHandle> DescriptorHeapManager::AllocateStagingCBV_SRV_UAV() {
                       m_stagingCbvSrvUavHeap.GetUsedCount(), m_stagingCbvSrvUavHeap.GetCapacity());
     }
     return result;
+}
+
+void DescriptorHeapManager::SynchronizeForShaderVisibleDescriptorOverwrite(const char* context) {
+    if (!m_flushCallback) {
+        return;
+    }
+
+    spdlog::debug("Synchronizing GPU before shader-visible descriptor overwrite ({})",
+                  context ? context : "unknown");
+    m_flushCallback();
 }
 
 Result<DescriptorHandle> DescriptorHeapManager::AllocateTransientCBV_SRV_UAV() {

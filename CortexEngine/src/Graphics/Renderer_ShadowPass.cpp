@@ -23,7 +23,7 @@ void Renderer::RenderShadowPass(Scene::ECS_Registry* registry) {
         }
         const RendererSceneRenderable& sceneEntry = snapshot->entries[entryIndex];
         if (IsAlphaTestedDepthClass(sceneEntry.depthClass) && sceneEntry.renderable) {
-            EnsureMaterialTextures(*sceneEntry.renderable);
+            PrepareMaterialResources(*sceneEntry.renderable);
         }
     }
 

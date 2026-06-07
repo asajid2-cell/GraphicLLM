@@ -32,21 +32,7 @@ Result<void> Renderer::CreateRTShadowMask() {
         return targetResult;
     }
 
-    if (m_environmentState.shadowAndEnvDescriptors[0].IsValid()) {
-        ID3D12Device* device = m_services.device->GetDevice();
-        device->CopyDescriptorsSimple(
-            1,
-            m_environmentState.shadowAndEnvDescriptors[3].cpu,
-            m_rtShadowTargets.maskSRV.cpu,
-            D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-        if (m_rtShadowTargets.historySRV.IsValid()) {
-            device->CopyDescriptorsSimple(
-                1,
-                m_environmentState.shadowAndEnvDescriptors[4].cpu,
-                m_rtShadowTargets.historySRV.cpu,
-                D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-        }
-    }
+    UpdateEnvironmentDescriptorTable();
 
     InvalidateRTShadowHistory("resource_recreated");
 
@@ -96,21 +82,7 @@ Result<void> Renderer::CreateRTGIResources() {
         return targetResult;
     }
 
-    if (m_environmentState.shadowAndEnvDescriptors[0].IsValid() && m_rtGITargets.srv.IsValid()) {
-        ID3D12Device* device = m_services.device->GetDevice();
-        device->CopyDescriptorsSimple(
-            1,
-            m_environmentState.shadowAndEnvDescriptors[5].cpu,
-            m_rtGITargets.srv.cpu,
-            D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-        if (m_rtGITargets.historySRV.IsValid()) {
-            device->CopyDescriptorsSimple(
-                1,
-                m_environmentState.shadowAndEnvDescriptors[6].cpu,
-                m_rtGITargets.historySRV.cpu,
-                D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-        }
-    }
+    UpdateEnvironmentDescriptorTable();
 
     return Result<void>::Ok();
 }

@@ -15,8 +15,14 @@ RuntimeFrameDebugSwitches LoadRuntimeFrameDebugSwitches() {
             result.disableSSAO = (std::getenv("CORTEX_DISABLE_SSAO") != nullptr);
             result.disableBloom = (std::getenv("CORTEX_DISABLE_BLOOM") != nullptr);
             result.disableTAA = (std::getenv("CORTEX_DISABLE_TAA") != nullptr);
+            result.disableShadows = (std::getenv("CORTEX_DISABLE_SHADOWS") != nullptr);
+            result.disableRayTracing = (std::getenv("CORTEX_DISABLE_RT") != nullptr);
+            result.disableRTReflections = (std::getenv("CORTEX_DISABLE_RT_REFLECTIONS") != nullptr);
+            result.disableRTGI = (std::getenv("CORTEX_DISABLE_RT_GI") != nullptr);
+            result.disableFog = (std::getenv("CORTEX_DISABLE_FOG") != nullptr);
+            result.disableParticles = (std::getenv("CORTEX_DISABLE_PARTICLES") != nullptr);
         } else {
-            spdlog::warn("Renderer: CORTEX_FORCE_ENABLE_FEATURES set; env disables ignored (SSR/SSAO/Bloom/TAA)");
+            spdlog::warn("Renderer: CORTEX_FORCE_ENABLE_FEATURES set; env disables ignored");
         }
 
         result.logVRAM = (std::getenv("CORTEX_LOG_VRAM") != nullptr);
@@ -27,12 +33,20 @@ RuntimeFrameDebugSwitches LoadRuntimeFrameDebugSwitches() {
         result.disablePostProcess = (std::getenv("CORTEX_DISABLE_POST_PROCESS") != nullptr);
         result.useRenderGraphPost = (std::getenv("CORTEX_DISABLE_RG_POST") == nullptr);
 
-        if (result.disableSSR || result.disableSSAO || result.disableBloom || result.disableTAA) {
-            spdlog::info("Renderer: env disables active (SSR={} SSAO={} Bloom={} TAA={})",
+        if (result.disableSSR || result.disableSSAO || result.disableBloom || result.disableTAA ||
+            result.disableShadows || result.disableRayTracing || result.disableRTReflections ||
+            result.disableRTGI || result.disableFog || result.disableParticles) {
+            spdlog::info("Renderer: env disables active (SSR={} SSAO={} Bloom={} TAA={} Shadows={} RT={} RTReflections={} RTGI={} Fog={} Particles={})",
                          result.disableSSR ? "off" : "on",
                          result.disableSSAO ? "off" : "on",
                          result.disableBloom ? "off" : "on",
-                         result.disableTAA ? "off" : "on");
+                         result.disableTAA ? "off" : "on",
+                         result.disableShadows ? "off" : "on",
+                         result.disableRayTracing ? "off" : "on",
+                         result.disableRTReflections ? "off" : "on",
+                         result.disableRTGI ? "off" : "on",
+                         result.disableFog ? "off" : "on",
+                         result.disableParticles ? "off" : "on");
         }
         if (result.logVRAM) {
             spdlog::info("Renderer: CORTEX_LOG_VRAM set; logging DXGI video memory usage periodically");
@@ -64,10 +78,12 @@ FrameFeaturePlan BuildFrameFeaturePlan(const FrameFeaturePlanInputs& inputs) {
     plan.debug = inputs.debug;
 
     plan.planned.rayTracingSupported = inputs.rayTracingSupported;
-    plan.planned.rayTracingEnabled = inputs.rayTracingEnabled;
-    plan.planned.rtReflectionsEnabled = inputs.rtReflectionsEnabled;
-    plan.planned.rtGIEnabled = inputs.rtGIEnabled;
-    plan.planned.shadowsEnabled = inputs.shadowsEnabled;
+    plan.planned.rayTracingEnabled = inputs.rayTracingEnabled && !plan.debug.disableRayTracing;
+    plan.planned.rtReflectionsEnabled =
+        inputs.rtReflectionsEnabled && !plan.debug.disableRayTracing && !plan.debug.disableRTReflections;
+    plan.planned.rtGIEnabled =
+        inputs.rtGIEnabled && !plan.debug.disableRayTracing && !plan.debug.disableRTGI;
+    plan.planned.shadowsEnabled = inputs.shadowsEnabled && !plan.debug.disableShadows;
     plan.planned.gpuCullingEnabled = inputs.gpuCullingEnabled;
     plan.planned.visibilityBufferEnabled = inputs.visibilityBufferEnabled;
     plan.planned.taaEnabled = inputs.taaEnabled && !plan.debug.disableTAA;
@@ -76,8 +92,8 @@ FrameFeaturePlan BuildFrameFeaturePlan(const FrameFeaturePlanInputs& inputs) {
     plan.planned.bloomEnabled = inputs.bloomEnabled && !plan.debug.disableBloom;
     plan.planned.fxaaEnabled = inputs.fxaaEnabled;
     plan.planned.iblEnabled = inputs.iblEnabled;
-    plan.planned.fogEnabled = inputs.fogEnabled;
-    plan.planned.particlesEnabled = inputs.particlesEnabledForScene;
+    plan.planned.fogEnabled = inputs.fogEnabled && !plan.debug.disableFog;
+    plan.planned.particlesEnabled = inputs.particlesEnabledForScene && !plan.debug.disableParticles;
     plan.planned.voxelBackendEnabled = inputs.voxelBackendEnabled;
 
     plan.active = plan.planned;

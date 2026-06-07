@@ -80,7 +80,12 @@ void Engine::ApplyHeroVisualBaseline() {
         return;
     }
 
-    Graphics::ApplyHeroVisualBaselineControls(*m_renderer);
+    if (m_currentScenePreset == ScenePreset::RTShowcase) {
+        const bool conservative = (m_qualityMode != EngineConfig::QualityMode::Default);
+        Graphics::ApplyRTShowcaseSceneControls(*m_renderer, conservative);
+    } else {
+        Graphics::ApplyHeroVisualBaselineControls(*m_renderer);
+    }
 
     // Reflect the new renderer state into the debug menu so sliders stay in sync.
     SyncDebugMenuFromRenderer();
@@ -144,18 +149,60 @@ void Engine::ApplyPerfQualityGovernor() {
         }
     }
 
+    const auto rtState = m_renderer->GetRayTracingState();
+    if (rtState.enabled || rtState.reflectionsEnabled || rtState.giEnabled) {
+        // Runtime render-scale changes recreate the HDR/depth/TAA/RT history
+        // resources. That is acceptable for explicit UI changes, but not for
+        // an automatic FPS governor while DXR temporal histories are active:
+        // the public RT scenes can visibly pop and, on some drivers, hit a
+        // fence timeout during the resize.
+        m_avgFrameTimeMs = 0.0f;
+        return;
+    }
+
     // Startup frames include shader warmup, texture uploads, BLAS/TLAS setup,
     // and optional visual-validation readback. Those are not steady-state
     // rendering cost, so do not let them resize render targets and create the
     // exact hitch/reallocation loop the governor is meant to avoid.
-    constexpr uint64_t kPerfGovernorWarmupFrames = 120;
+    constexpr uint64_t kPerfGovernorWarmupFrames = 300;
     if (m_totalFrameCount < kPerfGovernorWarmupFrames) {
+        m_avgFrameTimeMs = 0.0f;
+        return;
+    }
+
+    const auto& textureUploads = m_renderer->GetTextureUploadQueueStats();
+    const bool textureUploadActivity =
+        textureUploads.pendingJobs > 0 ||
+        textureUploads.submittedJobs != m_perfGovernorObservedTextureUploadSubmitted ||
+        textureUploads.completedJobs != m_perfGovernorObservedTextureUploadCompleted ||
+        textureUploads.failedJobs != m_perfGovernorObservedTextureUploadFailed;
+    if (textureUploadActivity) {
+        m_perfGovernorObservedTextureUploadSubmitted = textureUploads.submittedJobs;
+        m_perfGovernorObservedTextureUploadCompleted = textureUploads.completedJobs;
+        m_perfGovernorObservedTextureUploadFailed = textureUploads.failedJobs;
+        m_perfGovernorLastTextureUploadActivityFrame = m_totalFrameCount;
+        m_avgFrameTimeMs = 0.0f;
+        return;
+    }
+
+    constexpr uint64_t kTextureUploadSettleFrames = 180;
+    if (m_perfGovernorLastTextureUploadActivityFrame != 0 &&
+        m_totalFrameCount - m_perfGovernorLastTextureUploadActivityFrame < kTextureUploadSettleFrames) {
         m_avgFrameTimeMs = 0.0f;
         return;
     }
 
     const float frameMs = m_frameTime * 1000.0f;
     if (frameMs <= 0.0f || !std::isfinite(frameMs)) {
+        return;
+    }
+
+    constexpr float kMaxSteadyStateSampleMs = 100.0f;
+    if (frameMs > kMaxSteadyStateSampleMs) {
+        // A single hitch from windowing, uploads, readback, or OS scheduling is
+        // not a reason to resize every render target in the next frame.
+        m_avgFrameTimeMs = 0.0f;
+        spdlog::debug("Perf governor: ignoring outlier frame {:.2f} ms", frameMs);
         return;
     }
 
@@ -176,11 +223,18 @@ void Engine::ApplyPerfQualityGovernor() {
         return;
     }
 
+    constexpr uint64_t kScaleChangeCooldownFrames = 600;
+    if (m_perfGovernorLastScaleChangeFrame != 0 &&
+        m_totalFrameCount - m_perfGovernorLastScaleChangeFrame < kScaleChangeCooldownFrames) {
+        return;
+    }
+
     const float nextScale = std::max(0.50f, currentScale - 0.05f);
     Graphics::ApplyRenderScaleControl(*m_renderer, nextScale);
     m_perfScaleReduced = (m_renderer->GetRenderScale() < currentScale);
 
     if (m_perfScaleReduced) {
+        m_perfGovernorLastScaleChangeFrame = m_totalFrameCount;
         spdlog::warn("Perf governor: reducing internal render scale {:.2f} -> {:.2f} (avg frame {:.2f} ms)",
                      currentScale, m_renderer->GetRenderScale(), m_avgFrameTimeMs);
         SyncDebugMenuFromRenderer();

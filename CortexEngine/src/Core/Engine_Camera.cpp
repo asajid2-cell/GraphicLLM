@@ -153,6 +153,7 @@ bool Engine::ApplyShowcaseCameraBookmark(const std::string& bookmarkId) {
     case ScenePreset::DesertRelicGallery: sceneId = "desert_relic_gallery"; break;
     case ScenePreset::NeonAlleyMaterialMarket: sceneId = "neon_alley_material_market"; break;
     case ScenePreset::ForestCreekShrine: sceneId = "forest_creek_shrine"; break;
+    case ScenePreset::ModelAuthoredScene: sceneId = "model_authored_scene"; break;
     case ScenePreset::EffectsShowcase: sceneId = "effects_showcase"; break;
     case ScenePreset::GodRays: sceneId = "god_rays"; break;
     case ScenePreset::TemporalValidation: sceneId = "temporal_validation"; break;
@@ -294,8 +295,11 @@ void Engine::UpdateCameraMotionAutomation(float /*deltaTime*/) {
 
     const float side = std::sin(t * kPi * 0.5f) * m_cameraMotionSideAmplitude;
     const float forward = (1.0f - std::cos(t * kPi)) * 0.5f * m_cameraMotionForwardAmplitude;
-    const float lift = std::sin(t * kPi) * 0.08f;
-    const float lookSide = std::sin(t * kPi) * m_cameraMotionLookAmplitude;
+    const float lift = std::sin(t * kPi) * m_cameraMotionLiftAmplitude;
+    const float lookSide =
+        (m_cameraMotionLookCycles > 0.0f)
+            ? std::sin(t * kPi * 2.0f * m_cameraMotionLookCycles) * m_cameraMotionLookAmplitude
+            : std::sin(t * kPi) * m_cameraMotionLookAmplitude;
 
     transform.position =
         m_cameraMotionBasePosition +
@@ -779,9 +783,18 @@ void Engine::InitializeCameraController() {
 
     auto& transform = m_registry->GetComponent<Scene::TransformComponent>(m_activeCameraEntity);
 
-    // Reset to the default position/orientation for the current scene preset
-    // and derive yaw/pitch from the resulting forward vector.
-    SetCameraToSceneDefault(transform);
+    // Model-authored scenes carry their own camera in the seed. Preserve that
+    // camera so generated framing variants can be validated in runtime instead
+    // of being overwritten by the generic scene default.
+    if (m_currentScenePreset != ScenePreset::ModelAuthoredScene) {
+        SetCameraToSceneDefault(transform);
+    } else {
+        glm::vec3 forward = glm::normalize(transform.rotation * glm::vec3(0.0f, 0.0f, 1.0f));
+        m_cameraYaw = std::atan2(forward.x, forward.z);
+        m_cameraPitch = std::asin(glm::clamp(forward.y, -1.0f, 1.0f));
+        const float pitchLimit = glm::radians(89.0f);
+        m_cameraPitch = glm::clamp(m_cameraPitch, -pitchLimit, pitchLimit);
+    }
     m_activeCameraBookmark.clear();
 
     m_cameraControllerInitialized = true;
@@ -809,6 +822,30 @@ void Engine::UpdateCameraController(float deltaTime) {
     }
 
     auto& transform = m_registry->GetComponent<Scene::TransformComponent>(m_activeCameraEntity);
+
+    if (m_cameraMouseJitterAutomationEnabled && m_cameraMouseJitterAutomationFrames > 0) {
+        const float frame = static_cast<float>(std::min<uint64_t>(
+            m_totalFrameCount,
+            m_cameraMouseJitterAutomationFrames));
+        const float denom = std::max(1.0f, static_cast<float>(m_cameraMouseJitterAutomationFrames));
+        const float t = glm::clamp(frame / denom, 0.0f, 1.0f);
+        constexpr float kPi = 3.14159265358979323846f;
+
+        const float phase = t * kPi * 2.0f * std::max(0.0f, m_cameraMouseJitterCycles);
+        const float yawOffset = std::sin(phase) * m_cameraMouseJitterYawAmplitude;
+        const float pitchOffset = std::sin(phase * 0.73f) * m_cameraMouseJitterPitchAmplitude;
+
+        if (m_mouseSensitivity > 1.0e-6f) {
+            m_pendingMouseDeltaX += (yawOffset - m_cameraMouseJitterPreviousYawOffset) / m_mouseSensitivity;
+            m_pendingMouseDeltaY += (pitchOffset - m_cameraMouseJitterPreviousPitchOffset) / m_mouseSensitivity;
+        }
+        m_cameraMouseJitterPreviousYawOffset = yawOffset;
+        m_cameraMouseJitterPreviousPitchOffset = pitchOffset;
+        m_cameraMouseJitterAutomationApplied = true;
+
+        // Force the normal mouse-look path without introducing keyboard motion.
+        m_cameraControlActive = true;
+    }
 
     // Apply mouse look deltas (yaw/pitch) from accumulated motion.
     // Process in both editor camera control mode and play mode.

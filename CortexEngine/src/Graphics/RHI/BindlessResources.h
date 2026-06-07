@@ -20,13 +20,14 @@ namespace Cortex::Graphics {
 class DX12Device;
 
 // Bindless Resource Manager
-// Manages a single large shader-visible descriptor heap for SM6.6 bindless access.
+// Publishes persistent SRV/UAV descriptors into the renderer's global
+// shader-visible CBV/SRV/UAV heap for SM6.6 bindless access.
 // All textures, buffers, and UAVs are registered here and accessed by index.
 //
 // Thread-safe: allocations can happen from any thread (e.g., async texture loading)
 //
 // Usage pattern:
-//   1. Initialize with device at startup
+//   1. Initialize with device + renderer descriptor manager at startup
 //   2. Register textures via AllocateTextureIndex() -> returns uint32_t index
 //   3. Pass indices to shaders via constant buffers
 //   4. Shaders use ResourceDescriptorHeap[index] to access textures
@@ -42,9 +43,12 @@ public:
     BindlessResourceManager(BindlessResourceManager&&) = default;
     BindlessResourceManager& operator=(BindlessResourceManager&&) = default;
 
-    // Initialize the bindless heap. Must be called before any allocations.
-    // Creates a shader-visible CBV/SRV/UAV heap with the specified capacity.
-    Result<void> Initialize(ID3D12Device* device, uint32_t maxTextures = 16384, uint32_t maxBuffers = 8192);
+    // Initialize bindless publishing. Must be called before any allocations.
+    // Uses the same shader-visible CBV/SRV/UAV heap that command lists bind.
+    Result<void> Initialize(ID3D12Device* device,
+                            DescriptorHeapManager* descriptorManager,
+                            uint32_t maxTextures = 16384,
+                            uint32_t maxBuffers = 8192);
 
     // Shutdown and release all resources. Call WaitForGPU before this.
     void Shutdown();
@@ -73,11 +77,11 @@ public:
     // Get the GPU handle for a bindless index
     D3D12_GPU_DESCRIPTOR_HANDLE GetGPUHandle(uint32_t index) const;
 
-    // Get the bindless heap for binding to command lists
-    [[nodiscard]] ID3D12DescriptorHeap* GetHeap() const { return m_bindlessHeap.Get(); }
+    // Get the renderer's shader-visible heap for binding to command lists
+    [[nodiscard]] ID3D12DescriptorHeap* GetHeap() const;
 
     // Get the base GPU handle for the entire heap (for root signature binding)
-    [[nodiscard]] D3D12_GPU_DESCRIPTOR_HANDLE GetHeapGPUStart() const { return m_gpuStart; }
+    [[nodiscard]] D3D12_GPU_DESCRIPTOR_HANDLE GetHeapGPUStart() const { return GetGPUHandle(0); }
 
     // Statistics
     [[nodiscard]] uint32_t GetAllocatedCount() const { return m_allocatedCount; }
@@ -97,18 +101,18 @@ public:
     static constexpr uint32_t kReservedSlots = 4;
 
 private:
-    ComPtr<ID3D12DescriptorHeap> m_bindlessHeap;
     ID3D12Device* m_device = nullptr;
+    DescriptorHeapManager* m_descriptorManager = nullptr;
 
-    uint32_t m_descriptorSize = 0;
     uint32_t m_textureCapacity = 0;     // Slots 0..textureCapacity-1
     uint32_t m_bufferCapacity = 0;      // Slots textureCapacity..totalCapacity-1
     uint32_t m_totalCapacity = 0;
-
-    D3D12_CPU_DESCRIPTOR_HANDLE m_cpuStart = {};
-    D3D12_GPU_DESCRIPTOR_HANDLE m_gpuStart = {};
+    uint32_t m_textureAllocated = 0;
+    uint32_t m_bufferAllocated = 0;
 
     // Free lists for texture and buffer regions
+    // Kept only for future leak diagnostics; released descriptors are not
+    // reused because the global shader-visible heap has in-flight users.
     std::vector<uint32_t> m_textureFreeList;
     std::vector<uint32_t> m_bufferFreeList;
 

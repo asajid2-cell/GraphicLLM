@@ -227,7 +227,7 @@ def format_float(value: float) -> str:
     return f"{value:.6f}f"
 
 
-def write_contract_header(path: Path) -> None:
+def write_contract_header(path: Path, manifest_sets: dict[str, Any]) -> None:
     lines = [
         "#pragma once",
         "",
@@ -242,6 +242,9 @@ def write_contract_header(path: Path) -> None:
         "    float roomOcclusion;",
         "    const char* lightRig;",
         "    float lightAccentStrength;",
+        "    const char* proxyResourceShape;",
+        "    unsigned int filteredOutputCount;",
+        "    float minFilterVariance;",
         "};",
         "",
         f'inline constexpr const char* kSceneLocalProxyDerivationMethod = "{cpp_string(DERIVATION_METHOD)}";',
@@ -252,6 +255,14 @@ def write_contract_header(path: Path) -> None:
         contract = ROOM_LIGHT_CONTRACTS[set_id]
         room = contract["room_shell"]
         light = contract["light_rig"]
+        output_metadata = manifest_sets.get(set_id, {}).get("output_metadata", {})
+        filter_variance = [
+            float(output_metadata.get(role, {}).get("filter", {}).get("variance_score", 0.0) or 0.0)
+            for role in ("irradiance", "specular", "visible_background")
+        ]
+        filtered_output_count = sum(1 for value in filter_variance if value > 0.0)
+        min_filter_variance = min(filter_variance) if filter_variance else 0.0
+        proxy_shape = manifest_sets.get(set_id, {}).get("proxy_resource_shape", "none")
         lines.append(
             "    {"
             f'"{cpp_string(set_id)}", '
@@ -259,7 +270,10 @@ def write_contract_header(path: Path) -> None:
             f'"{cpp_string(str(room["enclosure"]))}", '
             f'{format_float(float(room["local_background_occlusion"]))}, '
             f'"{cpp_string(str(light["mode"]))}", '
-            f'{format_float(float(light["accent_strength"]))}'
+            f'{format_float(float(light["accent_strength"]))}, '
+            f'"{cpp_string(str(proxy_shape))}", '
+            f'{filtered_output_count}u, '
+            f'{format_float(float(min_filter_variance))}'
             "},"
         )
     lines.extend([
@@ -813,7 +827,7 @@ def generate(texture_root: Path, sets: list[str], size: int, overwrite: bool, mi
         runtime_manifest = ROOT / "build" / "bin" / manifest_path.relative_to(ROOT)
         runtime_manifest.parent.mkdir(parents=True, exist_ok=True)
         runtime_manifest.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
-    write_contract_header(GENERATED_CONTRACT_HEADER)
+    write_contract_header(GENERATED_CONTRACT_HEADER, manifest_sets)
     return {
         "schema": "cortex.scene_local_environment_proxy_assets.v1",
         "source": SOURCE_ID,

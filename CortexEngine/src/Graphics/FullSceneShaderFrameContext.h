@@ -1264,6 +1264,9 @@ struct FullSceneShaderPipelineV3FrameContext {
     float sceneLocalEnvironmentProxyRoomOcclusion = 0.0f;
     std::string sceneLocalEnvironmentProxyLightRig = "none";
     float sceneLocalEnvironmentProxyLightAccentStrength = 0.0f;
+    std::string sceneLocalEnvironmentProxyResourceShape = "none";
+    uint32_t sceneLocalEnvironmentProxyFilteredOutputCount = 0;
+    float sceneLocalEnvironmentProxyMinFilterVariance = 0.0f;
     std::string sceneProfileProducer = "unknown";
     std::string sceneProfileOutput = "unknown";
     std::string sceneProfilePolicyOwner = "unknown";
@@ -1951,6 +1954,12 @@ inline FullSceneShaderPipelineV3FrameContext BuildFullSceneShaderPipelineV3Frame
         contract.environment.sceneLocalProxyLightRig;
     context.sceneLocalEnvironmentProxyLightAccentStrength =
         contract.environment.sceneLocalProxyLightAccentStrength;
+    context.sceneLocalEnvironmentProxyResourceShape =
+        contract.environment.sceneLocalProxyResourceShape;
+    context.sceneLocalEnvironmentProxyFilteredOutputCount =
+        contract.environment.sceneLocalProxyFilteredOutputCount;
+    context.sceneLocalEnvironmentProxyMinFilterVariance =
+        contract.environment.sceneLocalProxyMinFilterVariance;
 
     FullSceneShaderPipelineV3DomainEvidence environmentDomain =
         MakeFullSceneShaderPipelineV3DomainEvidence(
@@ -2015,6 +2024,9 @@ inline FullSceneShaderPipelineV3FrameContext BuildFullSceneShaderPipelineV3Frame
         context.sceneLocalEnvironmentProxyDerivationMethod,
         context.sceneLocalEnvironmentProxyRoomShell,
         context.sceneLocalEnvironmentProxyLightRig,
+        context.sceneLocalEnvironmentProxyResourceShape,
+        "scene_local_environment_proxy_filtered_output_count",
+        "scene_local_environment_proxy_min_filter_variance",
     };
     environmentDomain.backingResourceCount =
         readyEnvironmentResources + (environmentConsumesSceneProfilePolicy ? 1u : 0u) +

@@ -126,6 +126,9 @@ struct FrameContract {
         float sceneLocalProxyRoomOcclusion = 0.0f;
         std::string sceneLocalProxyLightRig = "none";
         float sceneLocalProxyLightAccentStrength = 0.0f;
+        std::string sceneLocalProxyResourceShape = "none";
+        uint32_t sceneLocalProxyFilteredOutputCount = 0;
+        float sceneLocalProxyMinFilterVariance = 0.0f;
     };
 
     struct GraphicsPresetInfo {

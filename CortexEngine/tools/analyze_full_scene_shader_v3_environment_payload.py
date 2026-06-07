@@ -137,6 +137,13 @@ def analyze_report(path: Path, proxy_manifest: dict[str, Any]) -> dict[str, Any]
         "runtime_proxy_light_accent_strength": float(
             environment.get("scene_local_proxy_light_accent_strength", -1.0) or -1.0
         ),
+        "runtime_proxy_resource_shape": environment.get("scene_local_proxy_resource_shape", "none"),
+        "runtime_proxy_filtered_output_count": int(
+            environment.get("scene_local_proxy_filtered_output_count", 0) or 0
+        ),
+        "runtime_proxy_min_filter_variance": float(
+            environment.get("scene_local_proxy_min_filter_variance", 0.0) or 0.0
+        ),
         "v3_proxy_resource_table_required": (
             v3.get("scene_local_environment_proxy_resource_table_required") is True
         ),
@@ -156,6 +163,13 @@ def analyze_report(path: Path, proxy_manifest: dict[str, Any]) -> dict[str, Any]
         "v3_proxy_light_rig": v3.get("scene_local_environment_proxy_light_rig", "none"),
         "v3_proxy_light_accent_strength": float(
             v3.get("scene_local_environment_proxy_light_accent_strength", -1.0) or -1.0
+        ),
+        "v3_proxy_resource_shape": v3.get("scene_local_environment_proxy_resource_shape", "none"),
+        "v3_proxy_filtered_output_count": int(
+            v3.get("scene_local_environment_proxy_filtered_output_count", 0) or 0
+        ),
+        "v3_proxy_min_filter_variance": float(
+            v3.get("scene_local_environment_proxy_min_filter_variance", 0.0) or 0.0
         ),
         "proxy_manifest_present": bool(proxy_manifest_set),
         "proxy_resource_shape": proxy_manifest_set.get("proxy_resource_shape", "none")
@@ -264,6 +278,12 @@ def analyze_report(path: Path, proxy_manifest: dict[str, Any]) -> dict[str, Any]
             row["failures"].append("V3 proxy light rig does not match environment value")
         if abs(row["v3_proxy_light_accent_strength"] - row["runtime_proxy_light_accent_strength"]) > 0.001:
             row["failures"].append("V3 proxy light accent strength does not match environment value")
+        if row["v3_proxy_resource_shape"] != row["runtime_proxy_resource_shape"]:
+            row["failures"].append("V3 proxy resource shape does not match environment value")
+        if row["v3_proxy_filtered_output_count"] != row["runtime_proxy_filtered_output_count"]:
+            row["failures"].append("V3 proxy filtered output count does not match environment value")
+        if abs(row["v3_proxy_min_filter_variance"] - row["runtime_proxy_min_filter_variance"]) > 0.001:
+            row["failures"].append("V3 proxy min filter variance does not match environment value")
         if row["proxy_binding_source"] != "cached_explicit_scene_local_proxy_triple":
             row["failures"].append(
                 f"payload ready without explicit generated/authored proxy binding: {row['proxy_binding_source']}"
@@ -284,6 +304,21 @@ def analyze_report(path: Path, proxy_manifest: dict[str, Any]) -> dict[str, Any]
         if row["proxy_min_filter_variance"] <= 0.01:
             row["failures"].append(
                 f"payload ready with effectively flat proxy outputs: {row['proxy_min_filter_variance']:.4f}"
+            )
+        if row["runtime_proxy_resource_shape"] != row["proxy_resource_shape"]:
+            row["failures"].append(
+                "runtime proxy resource shape does not match manifest: "
+                f"{row['runtime_proxy_resource_shape']} vs {row['proxy_resource_shape']}"
+            )
+        if row["runtime_proxy_filtered_output_count"] != row["proxy_filtered_output_count"]:
+            row["failures"].append(
+                "runtime proxy filtered output count does not match manifest: "
+                f"{row['runtime_proxy_filtered_output_count']} vs {row['proxy_filtered_output_count']}"
+            )
+        if abs(row["runtime_proxy_min_filter_variance"] - row["proxy_min_filter_variance"]) > 0.001:
+            row["failures"].append(
+                "runtime proxy min filter variance does not match manifest: "
+                f"{row['runtime_proxy_min_filter_variance']:.4f} vs {row['proxy_min_filter_variance']:.4f}"
             )
         if row["runtime_proxy_derivation_method"] != row["proxy_derivation_method"]:
             row["failures"].append(
@@ -436,9 +471,9 @@ def main() -> int:
         "filtered_proxy_report_count": sum(
             1
             for row in rows
-            if row["proxy_resource_shape"] == EXPECTED_PROXY_RESOURCE_SHAPE
-            and row["proxy_filtered_output_count"] >= 3
-            and row["proxy_min_filter_variance"] > 0.01
+            if row["runtime_proxy_resource_shape"] == EXPECTED_PROXY_RESOURCE_SHAPE
+            and row["runtime_proxy_filtered_output_count"] >= 3
+            and row["runtime_proxy_min_filter_variance"] > 0.01
         ),
         "proxy_manifest": str(PROXY_MANIFEST_PATH),
         "profile_policy_consumed_report_count": sum(1 for row in rows if row["profile_policy_consumed"]),

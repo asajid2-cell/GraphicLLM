@@ -20,6 +20,15 @@ from analyze_full_scene_shader_debug_view_metrics import read_bmp_rgb
 
 
 SOURCE_ID_VIEW = "reflection_source_id"
+DIAGNOSTIC_VIEWS = {
+    "reflection_ssr_source_signal": ("ssr_raw_luma", "ssr_raw_alpha", "ssr_admitted_confidence"),
+    "reflection_rt_source_signal": ("rt_raw_luma", "rt_raw_alpha", "rt_admitted_confidence"),
+    "reflection_rejected_source_mask": ("local_rejected", "ssr_rejected", "rt_or_environment_rejected"),
+    "reflection_temporal_delta": ("inactive_continuous", "forced_unavailable", "history_required_missing"),
+    "reflection_source_suppression": ("history_suppression", "material_suppression", "roughness"),
+    "reflection_history_v3_validity": ("current_active", "source_class", "history_reusable"),
+    "reflection_history_v3_rejection": ("source_switch", "disocclusion_rejection", "high_motion_rejection"),
+}
 
 
 def _first_capture(result: dict[str, Any]) -> Path | None:
@@ -134,6 +143,114 @@ def _measure_source_pair(path_a: Path, path_b: Path, switch_threshold: float) ->
     }
 
 
+def _capture_sequence(result: dict[str, Any] | None) -> list[Path]:
+    if not isinstance(result, dict):
+        return []
+    return [Path(path) for path in result.get("capture_sequence", []) if path]
+
+
+def _summarize_rgb_frame(path: Path) -> dict[str, Any]:
+    width, height, pixels = read_bmp_rgb(path)
+    count = max(len(pixels), 1)
+    sums = [0.0, 0.0, 0.0]
+    active = [0, 0, 0]
+    maxes = [0, 0, 0]
+    for r, g, b in pixels:
+        for index, value in enumerate((r, g, b)):
+            sums[index] += value
+            maxes[index] = max(maxes[index], value)
+            if value > 12:
+                active[index] += 1
+    return {
+        "path": str(path),
+        "width": width,
+        "height": height,
+        "pixel_count": count,
+        "mean_rgb": [value / count / 255.0 for value in sums],
+        "max_rgb": [value / 255.0 for value in maxes],
+        "active_rgb_ratio": [value / count for value in active],
+    }
+
+
+def _measure_rgb_pair(path_a: Path, path_b: Path) -> dict[str, Any]:
+    width_a, height_a, pixels_a = read_bmp_rgb(path_a)
+    width_b, height_b, pixels_b = read_bmp_rgb(path_b)
+    if width_a != width_b or height_a != height_b or len(pixels_a) != len(pixels_b):
+        raise ValueError(f"dimension mismatch: {path_a} vs {path_b}")
+
+    count = max(len(pixels_a), 1)
+    sums = [0.0, 0.0, 0.0]
+    active = [0, 0, 0]
+    maxes = [0, 0, 0]
+    for pixel_a, pixel_b in zip(pixels_a, pixels_b):
+        for index in range(3):
+            delta = abs(pixel_a[index] - pixel_b[index])
+            sums[index] += delta
+            maxes[index] = max(maxes[index], delta)
+            if delta > 12:
+                active[index] += 1
+    return {
+        "a": str(path_a),
+        "b": str(path_b),
+        "mean_abs_rgb_delta": [value / count / 255.0 for value in sums],
+        "max_abs_rgb_delta": [value / 255.0 for value in maxes],
+        "active_rgb_delta_ratio": [value / count for value in active],
+    }
+
+
+def _summarize_rgb_pairs(pairs: list[dict[str, Any]]) -> dict[str, Any]:
+    if not pairs:
+        return {
+            "pair_count": 0,
+            "mean_abs_rgb_delta": [0.0, 0.0, 0.0],
+            "max_abs_rgb_delta": [0.0, 0.0, 0.0],
+            "mean_active_rgb_delta_ratio": [0.0, 0.0, 0.0],
+            "max_active_rgb_delta_ratio": [0.0, 0.0, 0.0],
+        }
+    return {
+        "pair_count": len(pairs),
+        "mean_abs_rgb_delta": [
+            sum(pair["mean_abs_rgb_delta"][index] for pair in pairs) / len(pairs)
+            for index in range(3)
+        ],
+        "max_abs_rgb_delta": [
+            max(pair["max_abs_rgb_delta"][index] for pair in pairs)
+            for index in range(3)
+        ],
+        "mean_active_rgb_delta_ratio": [
+            sum(pair["active_rgb_delta_ratio"][index] for pair in pairs) / len(pairs)
+            for index in range(3)
+        ],
+        "max_active_rgb_delta_ratio": [
+            max(pair["active_rgb_delta_ratio"][index] for pair in pairs)
+            for index in range(3)
+        ],
+    }
+
+
+def _summarize_diagnostic_view(result: dict[str, Any] | None) -> dict[str, Any]:
+    if not isinstance(result, dict):
+        return {"present": False, "reason": "missing_manifest_row"}
+    sequence = _capture_sequence(result)
+    if not sequence:
+        return {"present": False, "reason": "missing_capture_sequence"}
+    missing = [str(path) for path in sequence if not path.exists()]
+    if missing:
+        return {"present": False, "reason": "missing_capture", "missing": missing}
+    first = _summarize_rgb_frame(_first_capture(result) or sequence[0])
+    pairs = [_measure_rgb_pair(path_a, path_b) for path_a, path_b in zip(sequence, sequence[1:])]
+    return {
+        "present": True,
+        "view": str(result.get("view", "")),
+        "debug_view": result.get("debug_view"),
+        "channel_names": DIAGNOSTIC_VIEWS.get(str(result.get("view", "")), ("r", "g", "b")),
+        "capture_count": len(sequence),
+        "first_frame": first,
+        "motion": _summarize_rgb_pairs(pairs),
+        "pairs": pairs,
+    }
+
+
 def _summarize_pairs(pairs: list[dict[str, Any]]) -> dict[str, Any]:
     if not pairs:
         return {
@@ -162,6 +279,75 @@ def _summarize_pairs(pairs: list[dict[str, Any]]) -> dict[str, Any]:
     }
 
 
+def _diagnose_row(summary: dict[str, Any], diagnostics: dict[str, dict[str, Any]]) -> list[str]:
+    diagnoses: list[str] = []
+    source_churn = (
+        summary["max_source_switch_ratio"] > 0.055
+        or summary["max_active_source_switch_ratio"] > 0.18
+    )
+    if not source_churn:
+        return diagnoses
+
+    ssr = diagnostics.get("reflection_ssr_source_signal", {})
+    rejected = diagnostics.get("reflection_rejected_source_mask", {})
+    temporal = diagnostics.get("reflection_temporal_delta", {})
+    suppression = diagnostics.get("reflection_source_suppression", {})
+    validity = diagnostics.get("reflection_history_v3_validity", {})
+    history_rejection = diagnostics.get("reflection_history_v3_rejection", {})
+
+    if ssr.get("present"):
+        ssr_first = ssr["first_frame"]["mean_rgb"]
+        ssr_motion = ssr["motion"]["mean_abs_rgb_delta"]
+        ssr_active_motion = ssr["motion"]["max_active_rgb_delta_ratio"]
+        if max(ssr_motion[:2]) > 0.012 or max(ssr_active_motion[:2]) > 0.08:
+            diagnoses.append("ssr_signal_changes_under_motion")
+        if max(ssr_first[:2]) < 0.08:
+            diagnoses.append("ssr_signal_sparse_or_low_confidence")
+    else:
+        diagnoses.append("ssr_signal_view_missing")
+
+    if rejected.get("present"):
+        rejected_first = rejected["first_frame"]["mean_rgb"]
+        rejected_motion = rejected["motion"]["mean_abs_rgb_delta"]
+        if rejected_first[1] > 0.25:
+            diagnoses.append("ssr_rejection_mask_high")
+        if rejected_motion[1] > 0.010:
+            diagnoses.append("ssr_rejection_changes_under_motion")
+
+    if temporal.get("present"):
+        temporal_first = temporal["first_frame"]["mean_rgb"]
+        temporal_motion = temporal["motion"]["mean_abs_rgb_delta"]
+        if max(temporal_first[1:3]) > 0.04:
+            diagnoses.append("forced_or_history_debt_present")
+        if max(temporal_motion[:3]) > 0.012:
+            diagnoses.append("temporal_delta_tracks_source_churn")
+
+    if suppression.get("present"):
+        suppression_first = suppression["first_frame"]["mean_rgb"]
+        suppression_motion = suppression["motion"]["mean_abs_rgb_delta"]
+        if suppression_first[0] > 0.01 or suppression_motion[0] > 0.006:
+            diagnoses.append("history_suppression_contributes")
+        if suppression_first[1] > 0.01 or suppression_motion[1] > 0.006:
+            diagnoses.append("material_suppression_contributes")
+
+    if validity.get("present"):
+        validity_motion = validity["motion"]["mean_abs_rgb_delta"]
+        if max(validity_motion[:3]) > 0.012:
+            diagnoses.append("history_validity_changes_under_motion")
+
+    if history_rejection.get("present"):
+        rejection_first = history_rejection["first_frame"]["mean_rgb"]
+        rejection_motion = history_rejection["motion"]["mean_abs_rgb_delta"]
+        if max(rejection_first[:3]) > 0.025:
+            diagnoses.append("history_rejection_present")
+        if max(rejection_motion[:3]) > 0.010:
+            diagnoses.append("history_rejection_changes_under_motion")
+
+    if not diagnoses:
+        diagnoses.append("source_churn_unattributed_by_available_debug_views")
+    return diagnoses
+
+
 def build_report(
     manifest_path: Path,
     *,
@@ -174,6 +360,14 @@ def build_report(
     rows: list[dict[str, Any]] = []
     failures: list[str] = []
     warnings: list[str] = []
+    results_by_family_view: dict[str, dict[str, dict[str, Any]]] = {}
+
+    for result in manifest.get("results", []):
+        if not isinstance(result, dict):
+            continue
+        family = str(result.get("family", ""))
+        view = str(result.get("view", ""))
+        results_by_family_view.setdefault(family, {})[view] = result
 
     for result in manifest.get("results", []):
         if not isinstance(result, dict) or str(result.get("view", "")) != SOURCE_ID_VIEW:
@@ -209,6 +403,16 @@ def build_report(
             row_warnings.append("active_source_switch_ratio_above_warning")
         if first_frame["active_source_ratio"] <= 0.001:
             row_warnings.append("source_id_view_has_no_active_reflection_source")
+        diagnostics: dict[str, dict[str, Any]] = {}
+        try:
+            diagnostics = {
+                view: _summarize_diagnostic_view(results_by_family_view.get(family, {}).get(view))
+                for view in DIAGNOSTIC_VIEWS
+            }
+        except Exception as exc:  # noqa: BLE001 - optional diagnostic path.
+            failures.append(f"{family}: failed diagnostic-channel analysis: {exc}")
+            continue
+        diagnosis = _diagnose_row(summary, diagnostics)
         warnings.extend(f"{family}: {warning}" for warning in row_warnings)
 
         rows.append(
@@ -223,6 +427,8 @@ def build_report(
                 "capture_count": len(sequence),
                 "first_frame": first_frame,
                 "summary": summary,
+                "diagnosis": diagnosis,
+                "diagnostics": diagnostics,
                 "pairs": pairs,
                 "warnings": row_warnings,
             }
@@ -258,15 +464,15 @@ def write_markdown(report: dict[str, Any], output: Path) -> None:
         f"- warnings: {len(report['warnings'])}",
         f"- failures: {len(report['failures'])}",
         "",
-        "| Family | Motion | Dominant Source | Active Source | Mean Source Delta | Max Switch | Max Active Switch | Mean Confidence Delta | Warnings |",
-        "|---|---|---|---:|---:|---:|---:|---:|---|",
+        "| Family | Motion | Dominant Source | Active Source | Mean Source Delta | Max Switch | Max Active Switch | Mean Confidence Delta | Diagnosis | Warnings |",
+        "|---|---|---|---:|---:|---:|---:|---:|---|---|",
     ]
     for row in report["rows"]:
         first = row["first_frame"]
         summary = row["summary"]
         lines.append(
             "| {family} | {motion} | {dominant} | {active:.5f} | {source_delta:.6f} | "
-            "{switch:.6f} | {active_switch:.6f} | {confidence_delta:.6f} | {warnings} |".format(
+            "{switch:.6f} | {active_switch:.6f} | {confidence_delta:.6f} | {diagnosis} | {warnings} |".format(
                 family=row["family"],
                 motion=row["stability_motion_mode"],
                 dominant=first["dominant_source"],
@@ -275,9 +481,34 @@ def write_markdown(report: dict[str, Any], output: Path) -> None:
                 switch=summary["max_source_switch_ratio"],
                 active_switch=summary["max_active_source_switch_ratio"],
                 confidence_delta=summary["mean_confidence_delta"],
+                diagnosis=", ".join(row["diagnosis"]),
                 warnings=", ".join(row["warnings"]),
             )
         )
+    if report["rows"]:
+        lines.extend(["", "## Diagnostic Channels", ""])
+        for row in report["rows"]:
+            lines.append(f"### {row['family']}")
+            lines.append("")
+            lines.append("| View | Mean RGB | Motion RGB Delta | Active Motion RGB |")
+            lines.append("|---|---:|---:|---:|")
+            for view, diagnostic in row["diagnostics"].items():
+                if not diagnostic.get("present"):
+                    lines.append(f"| {view} | missing | missing | missing |")
+                    continue
+                first = diagnostic["first_frame"]
+                motion = diagnostic["motion"]
+                lines.append(
+                    "| {view} | {mean} | {delta} | {active} |".format(
+                        view=view,
+                        mean=", ".join(f"{value:.5f}" for value in first["mean_rgb"]),
+                        delta=", ".join(f"{value:.5f}" for value in motion["mean_abs_rgb_delta"]),
+                        active=", ".join(
+                            f"{value:.5f}" for value in motion["mean_active_rgb_delta_ratio"]
+                        ),
+                    )
+                )
+            lines.append("")
     if report["warnings"]:
         lines.extend(["", "## Warnings", ""])
         lines.extend(f"- {warning}" for warning in report["warnings"])

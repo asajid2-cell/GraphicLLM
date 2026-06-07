@@ -113,6 +113,77 @@ Current next work:
 3. Promote auto source-resolver evidence from one stress family into a bounded
    cross-family reflection packet after model-scene capture/report separation.
 
+Latest ReflectionV3 forced-source diagnosis checkpoint:
+
+- Extended `tools\analyze_reflection_v3_source_resolver.py` beyond categorical
+  source-id churn.
+- The analyzer now also summarizes diagnostic debug views when present:
+  - `reflection_ssr_source_signal`
+  - `reflection_rt_source_signal`
+  - `reflection_rejected_source_mask`
+  - `reflection_temporal_delta`
+  - `reflection_source_suppression`
+  - `reflection_history_v3_validity`
+  - `reflection_history_v3_rejection`
+- The markdown now includes a per-family diagnosis list and a diagnostic-channel
+  table with mean RGB, motion RGB delta, and active motion RGB ratio.
+- Updated the V3 static validator so this richer source-resolver diagnostic
+  surface is checked.
+
+Validation for forced-source diagnosis:
+
+```powershell
+python -m py_compile tools\analyze_reflection_v3_source_resolver.py
+python tools\analyze_reflection_v3_source_resolver.py --manifest build\captures\v3_reflection_source_hysteresis_forced_ssr_focus_20260607\manifest.json --output-json build\captures\v3_reflection_source_hysteresis_forced_ssr_focus_20260607\v3_reflection_source_resolver_diagnostic.json --output-md build\captures\v3_reflection_source_hysteresis_forced_ssr_focus_20260607\v3_reflection_source_resolver_diagnostic.md
+python tools\analyze_reflection_v3_source_resolver.py --manifest build\captures\v3_reflection_source_hysteresis_focus_20260607\manifest.json --output-json build\captures\v3_reflection_source_hysteresis_focus_20260607\v3_reflection_source_resolver_diagnostic.json --output-md build\captures\v3_reflection_source_hysteresis_focus_20260607\v3_reflection_source_resolver_diagnostic.md
+python tools\validate_full_scene_shader_pipeline_v3_plan.py
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_reflection_v3_motion_focus_packet.ps1 -NoBuild -OutputRoot build\captures\v3_reflection_source_diagnostic_auto_focus_20260607 -SourceOverride auto -SmokeFrames 18 -CaptureFrame 9 -CaptureSequenceCount 2 -MotionFrames 72 -MotionLookAmplitude 0.025 -MotionLookCycles 6.0
+```
+
+Evidence:
+
+- Fresh integrated auto packet:
+  `build\captures\v3_reflection_source_diagnostic_auto_focus_20260607`
+  - runner passed end to end
+  - generic reflection motion analyzer: `13` view sequences, `0` warnings,
+    `0` failures
+  - source resolver analyzer: `1` family, `0` warnings, `0` failures
+  - dominant source `local`, active source `1.00000`, mean source delta
+    `0.000151`, max source switch `0.000442`, max active source switch
+    `0.000442`, mean confidence delta `0.002472`
+- Auto-source packet remained clean:
+  `build\captures\v3_reflection_source_hysteresis_focus_20260607`
+  - warnings `0`
+  - max source switch `0.000442`
+  - max active source switch `0.000442`
+- Forced-SSR packet remained intentionally noisy:
+  `build\captures\v3_reflection_source_hysteresis_forced_ssr_focus_20260607`
+  - warnings `2`
+  - max source switch `0.101157`
+  - max active source switch `0.261804`
+  - diagnosis:
+    `ssr_signal_changes_under_motion`,
+    `ssr_rejection_mask_high`,
+    `ssr_rejection_changes_under_motion`,
+    `forced_or_history_debt_present`,
+    `temporal_delta_tracks_source_churn`,
+    `material_suppression_contributes`,
+    `history_validity_changes_under_motion`
+- Interpretation:
+  - The forced-SSR instability is not an unexplained material flicker anymore.
+  - It is SSR-provider churn/holes plus rejection and temporal/material debt.
+  - Do not make forced SSR the production path for this view.
+  - Auto resolver/hysteresis is the correct production gate until better SSR
+    continuity or probe/RT provider evidence exists.
+
+Current next work after this checkpoint:
+
+1. Add an explicit SSR continuity/coverage debug lane if we need pixel-level
+   hole attribution beyond RGB packet summaries.
+2. Add local-probe or RT fallback confidence proof so auto mode has richer
+   alternatives than local/environment fallback on glossy surfaces.
+3. Promote `ReflectionV3` auto resolver packet evidence across more families.
+
 - Added the authoritative
   `2026-06-07 Full Scene Shader Refactor Blueprint` section to
   `docs\FULL_SCENE_SHADER_AAA_REFACTOR_PLAN.md`.

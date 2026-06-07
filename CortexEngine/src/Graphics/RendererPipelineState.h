@@ -26,6 +26,7 @@ struct RendererPipelineReadiness {
     bool shadowAlphaDoubleSided = false;
 
     bool postProcess = false;
+    bool sceneLocalEnvironmentV3 = false;
     bool fullSceneCompositeV3 = false;
     bool fullSceneReflectionResolverV3 = false;
     bool fullSceneReflectionHistoryV3 = false;
@@ -74,6 +75,7 @@ struct RendererPipelineState {
     std::unique_ptr<DX12Pipeline> shadowAlphaDoubleSided;
 
     std::unique_ptr<DX12Pipeline> postProcess;
+    std::unique_ptr<DX12Pipeline> sceneLocalEnvironmentV3;
     std::unique_ptr<DX12Pipeline> fullSceneCompositeV3;
     std::unique_ptr<DX12Pipeline> fullSceneReflectionResolverV3;
     std::unique_ptr<DX12Pipeline> fullSceneReflectionHistoryV3;
@@ -118,6 +120,7 @@ struct RendererPipelineState {
         readiness.shadowAlpha = shadowAlpha != nullptr;
         readiness.shadowAlphaDoubleSided = shadowAlphaDoubleSided != nullptr;
         readiness.postProcess = postProcess != nullptr;
+        readiness.sceneLocalEnvironmentV3 = sceneLocalEnvironmentV3 != nullptr;
         readiness.fullSceneCompositeV3 = fullSceneCompositeV3 != nullptr;
         readiness.fullSceneReflectionResolverV3 = fullSceneReflectionResolverV3 != nullptr;
         readiness.fullSceneReflectionHistoryV3 = fullSceneReflectionHistoryV3 != nullptr;
@@ -159,6 +162,7 @@ struct RendererPipelineState {
         shadowAlpha.reset();
         shadowAlphaDoubleSided.reset();
         postProcess.reset();
+        sceneLocalEnvironmentV3.reset();
         fullSceneCompositeV3.reset();
         fullSceneReflectionResolverV3.reset();
         fullSceneReflectionHistoryV3.reset();

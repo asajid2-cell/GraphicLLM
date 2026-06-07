@@ -221,6 +221,13 @@
         "reflection_background",
         "visible_background",
         "atmosphere"
+      ],
+      "packet_debug_views": [
+        "scene_local_environment",
+        "ambient_lighting",
+        "visible_background",
+        "reflection_background",
+        "atmosphere"
       ]
     },
     "composite": {

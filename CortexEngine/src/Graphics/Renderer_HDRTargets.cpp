@@ -57,6 +57,15 @@ Result<void> Renderer::CreateHDRTarget() {
         spdlog::warn("{}", lightingV3Result.Error());
     }
 
+    auto environmentV3Result = m_mainTargets.environmentV3.CreateTargets(
+        m_services.device->GetDevice(),
+        m_services.descriptorManager.get(),
+        width,
+        height);
+    if (environmentV3Result.IsErr()) {
+        spdlog::warn("{}", environmentV3Result.Error());
+    }
+
     auto reflectionV3Result = m_mainTargets.reflectionV3.CreateTargets(
         m_services.device->GetDevice(),
         m_services.descriptorManager.get(),

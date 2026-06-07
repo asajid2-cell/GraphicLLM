@@ -27,6 +27,10 @@ REQUIRED_OUTPUTS = {
     "reflection_history_v3_validity",
     "reflection_history_v3_rejection",
     "scene_local_environment",
+    "ambient_lighting",
+    "visible_background",
+    "reflection_background",
+    "atmosphere",
     "hdr_scene_color",
     "candidate_hdr_scene_color",
     "energy_clamp_policy",
@@ -437,6 +441,7 @@ def analyze_report(
     environment_domain = domain_by_id.get("environment")
     environment_ready = v3.get("scene_local_environment_ready") is True
     if environment_ready:
+        environment_pass = find_frame_pass(report, "SceneLocalEnvironmentV3")
         if not isinstance(environment_domain, dict):
             failures.append("scene_local_environment_ready=true but environment domain is missing")
         else:
@@ -453,6 +458,36 @@ def analyze_report(
             mode = v3.get("scene_local_environment_mode")
             if mode not in {"enclosed_room", "open_exterior", "stage", "neutral_lab"}:
                 failures.append(f"environment domain ready with invalid mode: {mode}")
+        for resource in [
+            "scene_local_environment",
+            "ambient_lighting",
+            "visible_background",
+            "reflection_background",
+            "atmosphere",
+        ]:
+            environment_resource = find_frame_resource(report, resource)
+            if not isinstance(environment_resource, dict) or environment_resource.get("valid") is not True:
+                failures.append(f"SceneLocalEnvironmentV3 ready without valid {resource} resource")
+            elif environment_resource.get("size_matches_contract") is not True:
+                failures.append(f"{resource} size does not match render contract")
+        if not isinstance(environment_pass, dict):
+            failures.append("scene_local_environment_ready=true but SceneLocalEnvironmentV3 pass is missing")
+        else:
+            writes = set(environment_pass.get("writes") or [])
+            missing_environment_writes = sorted(
+                {
+                    "scene_local_environment",
+                    "ambient_lighting",
+                    "visible_background",
+                    "reflection_background",
+                    "atmosphere",
+                }
+                - writes
+            )
+            if missing_environment_writes:
+                failures.append(
+                    "SceneLocalEnvironmentV3 missing writes: " + ", ".join(missing_environment_writes)
+                )
 
     reflection_domain = domain_by_id.get("reflection")
     reflection_ready = v3.get("reflection_v3_ready") is True
@@ -668,6 +703,7 @@ def analyze_report(
                     "reflection_radiance",
                     "reflection_confidence",
                     "vb_gbuffer_albedo",
+                    "scene_local_environment",
                 ]:
                     if resource not in composite_pass.get("reads", []):
                         failures.append(f"FullSceneCompositeV3 pass does not read {resource}")

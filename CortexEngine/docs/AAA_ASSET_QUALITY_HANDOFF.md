@@ -69,6 +69,105 @@ Near-term work order:
 Do not mark the goal complete from this plan. The next concrete checkpoint is
 a pushed `SceneLocalEnvironmentV3` infrastructure commit plus packet evidence.
 
+## 2026-06-07 SceneLocalEnvironmentV3 Producer Slice
+
+Implemented:
+
+- Added `assets/shaders/SceneLocalEnvironmentV3.hlsl`.
+- Added persistent target resources and descriptors for:
+  - `scene_local_environment`.
+  - `ambient_lighting`.
+  - `visible_background`.
+  - `reflection_background`.
+  - `atmosphere`.
+- Added `SceneLocalEnvironmentV3` shader compilation and PSO setup.
+- Added a render-graph pass that reads:
+  `frame_constants`, `scene_visual_contract`, and `environment_state`.
+- Added frame-report resources and pass ownership for the five environment
+  outputs.
+- Added debug views:
+  - `83` `SceneLocalEnvironmentV3Aggregate`.
+  - `84` `SceneLocalEnvironmentV3AmbientLighting`.
+  - `85` `SceneLocalEnvironmentV3VisibleBackground`.
+  - `86` `SceneLocalEnvironmentV3ReflectionBackground`.
+  - `87` `SceneLocalEnvironmentV3Atmosphere`.
+- Added packet aliases:
+  `scene_local_environment`, `ambient_lighting`, `visible_background`,
+  `reflection_background`, and `atmosphere`.
+- Updated V3 analyzers and contract JSON so environment readiness requires the
+  five real resources and the `SceneLocalEnvironmentV3` pass.
+- `FullSceneCompositeV3` now reads `scene_local_environment` as an owned
+  candidate-composite input.
+
+Validation:
+
+```powershell
+python -m py_compile tools\analyze_full_scene_shader_v3_placeholders.py tools\check_full_scene_shader_pipeline_v2_frame_report.py
+$files = @('tools\run_scene_local_cinematic_renderer_v1_packets.ps1','tools\run_full_scene_shader_pipeline_v3_packet.ps1')
+foreach ($file in $files) {
+  $tokens = $null
+  $errors = $null
+  [System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path $file), [ref]$tokens, [ref]$errors) | Out-Null
+  if ($errors.Count -gt 0) { $errors | Format-List; exit 1 }
+}
+git -c submodule.recurse=false diff --check -- <focused SceneLocalEnvironmentV3 files>
+cmd.exe /d /c "call ""C:\Program Files\Microsoft Visual Studio\18\Community\Common7\Tools\VsDevCmd.bat"" -arch=x64 -host_arch=x64 >nul && set ""CORTEX_SKIP_ASSET_SYNC=1"" && ""C:\Program Files\Ninja\ninja.exe"" -C build CortexEngine -j 8"
+python tools\analyze_full_scene_shader_debug_view_metrics.py --manifest build\captures\v3_scene_local_environment_v3_env_only_20260607\manifest.json --output-json build\captures\v3_scene_local_environment_v3_env_only_20260607\debug_view_metrics.json --output-md build\captures\v3_scene_local_environment_v3_env_only_20260607\debug_view_metrics.md
+python tools\analyze_full_scene_shader_v3_placeholders.py --input build\captures\v3_scene_local_environment_v3_env_only_20260607 --signal-output build\captures\v3_scene_local_environment_v3_env_only_20260607\v3_signal.json --stability-output build\captures\v3_scene_local_environment_v3_env_only_20260607\v3_stability.json
+python tools\analyze_full_scene_shader_v3_placeholders.py --input build\captures\v3_scene_local_environment_v3_full_stress_20260607_rerun --signal-output build\captures\v3_scene_local_environment_v3_full_stress_20260607_rerun\v3_signal.json --stability-output build\captures\v3_scene_local_environment_v3_full_stress_20260607_rerun\v3_stability.json
+```
+
+Evidence:
+
+- environment-only packet:
+  `build\captures\v3_scene_local_environment_v3_env_only_20260607`.
+- full short stress packet:
+  `build\captures\v3_scene_local_environment_v3_full_stress_20260607_rerun`.
+- environment debug metrics:
+  - 5 captured views.
+  - 5 measured views.
+  - 0 failures.
+  - all five environment views had `nonblack=1.0000`.
+- environment-only placeholder analyzer:
+  - passed.
+  - reports: `5`.
+- full short stress placeholder analyzer:
+  - passed.
+  - reports: `50`.
+- promotion decision for the full short stress packet:
+  - `review_packet_passed`.
+  - `default_beauty_promotable=false`.
+  - environment ready reports: `37`.
+  - composite ready reports: `37`.
+
+Frame-report ownership proof:
+
+- `SceneLocalEnvironmentV3` executed and wrote:
+  `scene_local_environment`, `ambient_lighting`, `visible_background`,
+  `reflection_background`, and `atmosphere`.
+- `FullSceneCompositeV3` executed and read:
+  `direct_lighting`, `indirect_lighting`, `shadow_visibility`, `hdr_color`,
+  `reflection_radiance`, `reflection_confidence`, `vb_gbuffer_albedo`, and
+  `scene_local_environment`.
+
+Current limitation:
+
+- This is infrastructure and ownership, not visual promotion.
+- The full packet is a short static stress subset only. Missing promotion
+  families remain:
+  `concert`, `gallery`, `gym`, `kitchen`, `office`, `red_room`, and
+  `stadium`.
+- Missing motion rows remain:
+  `camera_sweep` and `mouse_jitter`.
+
+Next:
+
+1. Commit and push this slice.
+2. Add `SceneProfileV3` so environment, lighting, reflection, and post policy
+   are selected from scene intent instead of ad hoc global toggles.
+3. Add environment-focused packets for old-office IBL, enclosed kitchen,
+   concert stage, and exterior water/vegetation.
+
 ## Goal
 
 Move beyond stable blockout scenes into a reusable asset-quality architecture

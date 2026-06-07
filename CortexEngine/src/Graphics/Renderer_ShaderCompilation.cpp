@@ -76,6 +76,15 @@ Result<RendererCompiledShaders> Renderer::CompileRendererPipelineShaders() {
     }
     shaders.postPS = std::move(postPsResult).Value();
 
+    auto sceneLocalEnvironmentV3PsResult =
+        ShaderCompiler::CompileFromFile("assets/shaders/SceneLocalEnvironmentV3.hlsl", "PSMain", "ps_5_1");
+    if (sceneLocalEnvironmentV3PsResult.IsOk()) {
+        shaders.sceneLocalEnvironmentV3PS = std::move(sceneLocalEnvironmentV3PsResult).Value();
+    } else {
+        spdlog::warn("Failed to compile SceneLocalEnvironmentV3 pixel shader: {}",
+                     sceneLocalEnvironmentV3PsResult.Error());
+    }
+
     auto fullSceneCompositeV3PsResult =
         ShaderCompiler::CompileFromFile("assets/shaders/FullSceneCompositeV3.hlsl", "PSMain", "ps_5_1");
     if (fullSceneCompositeV3PsResult.IsOk()) {

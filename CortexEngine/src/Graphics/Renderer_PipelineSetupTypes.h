@@ -20,6 +20,7 @@ struct RendererCompiledShaders {
 
     ShaderBytecode postVS;
     ShaderBytecode postPS;
+    std::optional<ShaderBytecode> sceneLocalEnvironmentV3PS;
     std::optional<ShaderBytecode> fullSceneCompositeV3PS;
     std::optional<ShaderBytecode> fullSceneReflectionResolverV3PS;
     std::optional<ShaderBytecode> fullSceneReflectionHistoryV3PS;

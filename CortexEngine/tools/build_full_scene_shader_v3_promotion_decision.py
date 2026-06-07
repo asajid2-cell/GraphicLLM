@@ -9,6 +9,7 @@ from typing import Any
 
 
 REQUIRED_DOMAINS = {
+    "scene_profile",
     "material",
     "lighting",
     "environment",
@@ -89,6 +90,7 @@ def make_decision(
     signal_path = packet_root / "v3_signal.json"
     stability_path = packet_root / "v3_stability.json"
     lighting_motion_path = packet_root / "v3_lighting_motion.json"
+    scene_profile_path = packet_root / "v3_scene_profile.json"
     material_payload_path = packet_root / "v3_material_payload.json"
 
     failures: list[str] = []
@@ -98,6 +100,7 @@ def make_decision(
         "signal": str(signal_path),
         "stability": str(stability_path),
         "lighting_motion": str(lighting_motion_path) if lighting_motion_path.exists() else None,
+        "scene_profile": str(scene_profile_path) if scene_profile_path.exists() else None,
         "material_payload": str(material_payload_path) if material_payload_path.exists() else None,
     }
 
@@ -123,6 +126,7 @@ def make_decision(
     signal = load_json(signal_path)
     stability = load_json(stability_path)
     lighting_motion = load_json(lighting_motion_path) if lighting_motion_path.exists() else None
+    scene_profile = load_json(scene_profile_path) if scene_profile_path.exists() else None
     material_payload = load_json(material_payload_path) if material_payload_path.exists() else None
 
     signal_failures = [str(item) for item in signal.get("failures", [])]
@@ -143,6 +147,11 @@ def make_decision(
     else:
         failures.extend(str(item) for item in material_payload.get("failures", []))
         warnings.extend(str(item) for item in material_payload.get("warnings", []))
+    if scene_profile is None:
+        failures.append("missing v3_scene_profile.json")
+    else:
+        failures.extend(str(item) for item in scene_profile.get("failures", []))
+        warnings.extend(str(item) for item in scene_profile.get("warnings", []))
 
     report_count = int(stability.get("report_count", 0) or 0)
     full_pipeline_report_count = int(stability.get("full_pipeline_report_count", report_count) or 0)
@@ -163,6 +172,7 @@ def make_decision(
         failures.append("lighting signal metrics are not ready")
 
     required_count_fields = {
+        "scene_profile": "scene_profile_ready_report_count",
         "material": "material_ready_report_count",
         "lighting": "lighting_split_ready_report_count",
         "environment": "scene_local_environment_ready_report_count",

@@ -1185,6 +1185,8 @@ struct FullSceneShaderPipelineV3FrameContext {
     bool runtimePlaceholdersReady = true;
     bool contractGrounded = true;
     bool packetGateReady = false;
+    bool sceneProfileReady = false;
+    uint32_t sceneProfilePolicyCount = 0;
     bool materialAttributesReady = false;
     bool lightingAdapterReady = false;
     bool lightingSplitResourcesAllocated = false;
@@ -1226,6 +1228,8 @@ struct FullSceneShaderPipelineV3FrameContext {
     uint32_t compositeV3ChannelCount = 0;
     uint32_t cinematicPostV3ChannelCount = 0;
     std::string sceneLocalEnvironmentMode = "unknown";
+    std::string sceneProfileProducer = "unknown";
+    std::string sceneProfileOutput = "unknown";
     std::string reflectionV3SourceContract = "unknown";
     std::string compositeV3Producer = "unknown";
     std::string cinematicPostV3Producer = "unknown";
@@ -1370,6 +1374,83 @@ inline FullSceneShaderPipelineV3FrameContext BuildFullSceneShaderPipelineV3Frame
             contract,
             "FullSceneCandidateBeautyV3Display",
             "back_buffer");
+
+    const bool sceneProfileActive = contract.sceneVisual.active;
+    const bool sceneProfilePolicyReady =
+        sceneProfileActive &&
+        FullSceneShaderKnownContractString(contract.sceneVisual.profileId) &&
+        FullSceneShaderKnownContractString(contract.sceneVisual.environmentOwner) &&
+        FullSceneShaderKnownContractString(contract.sceneVisual.reflectionOwner) &&
+        FullSceneShaderKnownContractString(contract.sceneVisual.lightRigId) &&
+        FullSceneShaderKnownContractString(contract.sceneVisual.shadowPolicyId) &&
+        FullSceneShaderKnownContractString(contract.sceneVisual.exposurePolicyId) &&
+        FullSceneShaderKnownContractString(contract.sceneVisual.materialPaletteId) &&
+        FullSceneShaderKnownContractString(contract.sceneVisual.lightingScriptId) &&
+        FullSceneShaderKnownContractString(contract.sceneVisual.materialClassSetId) &&
+        FullSceneShaderKnownContractString(contract.sceneVisual.materialLayerSetId) &&
+        FullSceneShaderKnownContractString(contract.sceneVisual.temporalPolicyId) &&
+        FullSceneShaderKnownContractString(contract.sceneVisual.postPolicyId) &&
+        FullSceneShaderKnownContractString(contract.sceneVisual.postQualitySetId) &&
+        FullSceneShaderKnownContractString(contract.sceneVisual.toneMapperPreset) &&
+        !contract.sceneVisual.invalidExternalHDRI;
+    context.sceneProfileReady = sceneProfilePolicyReady;
+    context.sceneProfileProducer = sceneProfileActive ? "SceneCinematicProfileV1Adapter" : "none";
+    context.sceneProfileOutput = sceneProfileActive ? "scene_visual_contract" : "none";
+
+    FullSceneShaderPipelineV3DomainEvidence sceneProfileDomain =
+        MakeFullSceneShaderPipelineV3DomainEvidence(
+            "scene_profile",
+            context.sceneProfileProducer,
+            context.sceneProfileOutput,
+            "scene_visual_contract",
+            sceneProfilePolicyReady
+                ? "SceneProfileV3 policy is adapted from SceneCinematicProfile scene_visual_contract"
+                : "SceneProfileV3 policy is missing required scene_visual_contract ownership fields");
+    sceneProfileDomain.enabled = sceneProfileActive;
+    sceneProfileDomain.ready = sceneProfilePolicyReady;
+    sceneProfileDomain.promotionState = sceneProfilePolicyReady ? "instrumented" : "planned";
+    sceneProfileDomain.backingResources = {
+        "scene_visual_contract",
+        "SceneCinematicProfile",
+        "RendererSceneProfile",
+    };
+    sceneProfileDomain.debugViews = {
+        "scene_visual_contract",
+        "reflection_owner",
+        "surface_policy",
+        "material_family",
+        "reflection_policy",
+        "temporal_policy",
+        "post_sensitivity",
+    };
+    sceneProfileDomain.channels = {
+        "profile_id",
+        "family",
+        "enclosure_mode",
+        "environment_owner",
+        "reflection_owner",
+        "light_rig_id",
+        "shadow_policy_id",
+        "exposure_policy_id",
+        "material_palette_id",
+        "lighting_script_id",
+        "material_class_set_id",
+        "material_layer_set_id",
+        "temporal_policy_id",
+        "post_policy_id",
+        "post_quality_set_id",
+        "tone_mapper_preset",
+        "visible_external_hdri_policy",
+        "lighting_balance_policy",
+    };
+    sceneProfileDomain.backingResourceCount = sceneProfileActive ? 3u : 0u;
+    sceneProfileDomain.requiredChannelCount = static_cast<uint32_t>(sceneProfileDomain.channels.size());
+    context.sceneProfilePolicyCount =
+        sceneProfilePolicyReady ? sceneProfileDomain.requiredChannelCount : 0u;
+    sceneProfileDomain.readyChannelCount =
+        sceneProfilePolicyReady ? sceneProfileDomain.requiredChannelCount : 0u;
+    sceneProfileDomain.missingRequiredChannelCount =
+        sceneProfileDomain.requiredChannelCount - sceneProfileDomain.readyChannelCount;
 
     const std::vector<std::string> materialBackingResources = {
         "vb_gbuffer_albedo",
@@ -2214,6 +2295,7 @@ inline FullSceneShaderPipelineV3FrameContext BuildFullSceneShaderPipelineV3Frame
             "v3_resource_registry",
             "v3_resource_ownership",
             "V3 render-graph resources are planned but not allocated"),
+        sceneProfileDomain,
         materialDomain,
         lightingDomain,
         reflectionDomain,

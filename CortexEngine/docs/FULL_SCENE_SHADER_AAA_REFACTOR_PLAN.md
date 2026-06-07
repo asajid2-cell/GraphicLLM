@@ -3109,3 +3109,43 @@ Next material payload slice:
 - Create a real missing-channel-mask resource/debug view or a stricter
   equivalent frame-contract gate so missing texture/channel ownership is
   visible before lighting, reflections, composite, or post consume materials.
+
+### SceneProfileV3 Policy Evidence - 2026-06-07
+
+Implemented refactor slice:
+
+- `SceneProfileV3` is now a first-class V3 evidence domain adapted from the
+  existing `SceneCinematicProfile` / `scene_visual_contract`.
+- The frame contract serializes `scene_profile_ready`,
+  `scene_profile_policy_count`, `scene_profile_producer`, and
+  `scene_profile_output`.
+- The V3 contract requires the `scene_profile` domain, `v3_scene_profile.json`,
+  `scene_profile_policy_ready`, and
+  `scene_profile_family_differences_present`.
+- New analyzer: `tools/analyze_full_scene_shader_v3_scene_profile.py`.
+- New narrow packet harness: `tools/run_scene_profile_v3_focus_packet.ps1`.
+- The standard V3 packet runner and promotion-decision builder now include
+  scene-profile evidence.
+
+Validated evidence:
+
+- Static plan validation passed with `10` V3 domains and `29` required outputs.
+- Native target rebuilt successfully.
+- Cross-family scene-profile proof:
+  `build/captures/scene_profile_v3_focus_2fam_beauty_20260607`.
+  Manual analyzer result:
+  `families=2`, `profiles=2`, `light rigs=2`,
+  `material palettes=2`, `failures=0`, `warnings=0`.
+- Integrated stress packet:
+  `build/captures/v3_scene_profile_full_stress_20260607`.
+  Scene-profile analyzer passed with `54` reports and no failures/warnings.
+
+Important boundary:
+
+- `SceneProfileV3` is not enough by itself to promote default beauty. The
+  current promotion decision remains blocked because CompositeV3 and
+  CinematicPostV3 readiness are only present on the six candidate
+  composite/post views, while the full-pipeline report set has `41` reports.
+- Next refactor step is to make composite/post readiness coverage coherent
+  across full-pipeline debug views, then continue into texture-backed
+  `SceneLocalEnvironmentV3`.

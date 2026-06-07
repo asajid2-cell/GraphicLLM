@@ -55,6 +55,61 @@
         "packet_gate"
       ]
     },
+    "scene_profile": {
+      "producer": "SceneCinematicProfileV1Adapter",
+      "output_resource": "scene_visual_contract",
+      "output_contract": "frame_contract.scene_visual_contract",
+      "required_fields": [
+        "profile_id",
+        "family",
+        "enclosed_scene",
+        "environment_owner",
+        "reflection_owner",
+        "local_reflection_probe_rig_id",
+        "light_rig_id",
+        "shadow_policy_id",
+        "exposure_policy_id",
+        "material_palette_id",
+        "lighting_script_id",
+        "material_class_set_id",
+        "material_layer_set_id",
+        "temporal_policy_id",
+        "post_policy_id",
+        "post_quality_set_id",
+        "tone_mapper_preset",
+        "visible_external_hdri_allowed",
+        "invalid_external_hdri"
+      ],
+      "required_policy_channels": [
+        "enclosure_mode",
+        "environment_policy",
+        "lighting_policy",
+        "reflection_policy",
+        "exposure_policy",
+        "material_policy",
+        "temporal_policy",
+        "post_policy",
+        "motion_stability_policy"
+      ],
+      "required_debug_views": [
+        "reflection_owner",
+        "surface_policy",
+        "material_family",
+        "reflection_policy",
+        "temporal_policy",
+        "post_sensitivity"
+      ],
+      "packet_debug_views": [
+        "beauty",
+        "reflection_owner",
+        "surface_policy",
+        "material_family",
+        "reflection_policy",
+        "temporal_policy",
+        "post_sensitivity"
+      ],
+      "promotion_rule": "SceneProfileV3 is ready only when scene_visual_contract owns the policy fields that drive environment, lighting, reflection, exposure, material, temporal, and post behavior; no parallel profile stack may be introduced."
+    },
     "material": {
       "producer": "FullSceneMaterialResolveV3",
       "output_resource": "material_attributes",
@@ -319,6 +374,7 @@
       "required_artifacts": [
         "frame_report_shutdown.json",
         "debug_view_metrics.json",
+        "v3_scene_profile.json",
         "v3_material_payload.json",
         "v3_signal.json",
         "v3_stability.json",
@@ -327,6 +383,8 @@
       ],
       "required_gates": [
         "no_missing_required_resource",
+        "scene_profile_policy_ready",
+        "scene_profile_family_differences_present",
         "no_missing_required_material_channel",
         "material_payload_debug_views_present",
         "material_payload_ranges_valid",

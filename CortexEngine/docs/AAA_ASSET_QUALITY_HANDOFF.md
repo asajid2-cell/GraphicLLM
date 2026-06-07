@@ -8669,3 +8669,80 @@ Current next work:
 2. Continue material payload enrichment after environment split:
    texture-backed scalar maps, provider provenance, and broader family/motion
    packet coverage.
+
+### SceneProfileV3 Adapter / Policy Evidence Slice - 2026-06-07
+
+Implemented:
+
+- Added the `scene_profile` V3 domain to
+  `FullSceneShaderPipelineV3FrameContext`.
+- The domain adapts the existing `SceneCinematicProfile` /
+  `scene_visual_contract`; it does not introduce a parallel profile stack.
+- Frame reports now expose:
+  - `scene_profile_ready`
+  - `scene_profile_policy_count`
+  - `scene_profile_producer`
+  - `scene_profile_output`
+- The V3 contract now requires `v3_scene_profile.json` and the
+  `scene_profile_policy_ready` /
+  `scene_profile_family_differences_present` gates.
+- Added `tools/analyze_full_scene_shader_v3_scene_profile.py`.
+- Added `tools/run_scene_profile_v3_focus_packet.ps1`.
+- Updated the placeholder analyzer, V3 packet runner, plan validator, and
+  promotion-decision builder to account for the new domain.
+
+Validation:
+
+```powershell
+python -m py_compile tools\analyze_full_scene_shader_v3_scene_profile.py tools\analyze_full_scene_shader_v3_placeholders.py tools\build_full_scene_shader_v3_promotion_decision.py tools\validate_full_scene_shader_pipeline_v3_plan.py
+$files=@('tools\run_scene_profile_v3_focus_packet.ps1','tools\run_full_scene_shader_pipeline_v3_packet.ps1'); foreach ($file in $files) { $tokens=$null; $errors=$null; [System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path $file), [ref]$tokens, [ref]$errors) | Out-Null; if ($errors.Count -gt 0) { Write-Host $file; $errors | Format-List; exit 1 } }
+python tools\validate_full_scene_shader_pipeline_v3_plan.py
+git -c submodule.recurse=false diff --check -- src\Graphics\FullSceneShaderFrameContext.h src\Graphics\FrameContractJson.cpp assets\final_art\full_scene_shader_pipeline_v3_contract.json tools\analyze_full_scene_shader_v3_scene_profile.py tools\run_scene_profile_v3_focus_packet.ps1 tools\run_full_scene_shader_pipeline_v3_packet.ps1 tools\analyze_full_scene_shader_v3_placeholders.py tools\build_full_scene_shader_v3_promotion_decision.py tools\validate_full_scene_shader_pipeline_v3_plan.py
+cmd.exe /d /c "call ""C:\Program Files\Microsoft Visual Studio\18\Community\Common7\Tools\VsDevCmd.bat"" -arch=x64 -host_arch=x64 >nul && set ""CORTEX_SKIP_ASSET_SYNC=1"" && ""C:\Program Files\Ninja\ninja.exe"" -C build CortexEngine -j 8"
+Copy-Item -LiteralPath assets\final_art\full_scene_shader_pipeline_v3_contract.json -Destination build\bin\assets\final_art\full_scene_shader_pipeline_v3_contract.json -Force
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_scene_profile_v3_focus_packet.ps1 -NoBuild -OutputRoot build\captures\scene_profile_v3_focus_2fam_beauty_20260607 -FamilyFilter gallery,kitchen -ViewFilter beauty -SmokeFrames 8 -CaptureFrame 4 -CaptureSequenceCount 1 -MinFamilyCount 2
+python tools\analyze_full_scene_shader_v3_scene_profile.py --manifest build\captures\scene_profile_v3_focus_2fam_beauty_20260607\manifest.json --output-json build\captures\scene_profile_v3_focus_2fam_beauty_20260607\v3_scene_profile_manual.json --output-md build\captures\scene_profile_v3_focus_2fam_beauty_20260607\v3_scene_profile_manual.md --min-family-count 2
+$env:CORTEX_V3_REFLECTION_SOURCE_OVERRIDE='ssr'
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_full_scene_shader_pipeline_v3_packet.ps1 -NoBuild -SkipSceneAnalyzers -StressSceneOnly -StressSceneFilter rt_showcase:reflection_closeup -SmokeFrames 16 -CaptureFrame 8 -CaptureSequenceCount 1 -StabilityMotionMode static -OutputRoot build\captures\v3_scene_profile_full_stress_20260607
+Remove-Item Env:\CORTEX_V3_REFLECTION_SOURCE_OVERRIDE -ErrorAction SilentlyContinue
+```
+
+Evidence:
+
+- Plan validator passed with `10` V3 domains and `29` required outputs.
+- Native target rebuilt successfully; the existing trailing `vswhere.exe`
+  warning printed after success.
+- Two-family scene-profile proof:
+  `build\captures\scene_profile_v3_focus_2fam_beauty_20260607`.
+  - The wrapper reported kitchen `exit_code=1` due to a DX12 device-hung
+    renderer failure at frame 0 after HZB setup.
+  - The run still wrote both frame reports and a manifest.
+  - Manual scene-profile analysis passed:
+    `families=2`, `profiles=2`, `light rigs=2`,
+    `material palettes=2`, `failures=0`, `warnings=0`.
+- Integrated full V3 stress packet:
+  `build\captures\v3_scene_profile_full_stress_20260607`.
+  - Scene-local packet run passed.
+  - V2 evidence passed.
+  - V3 placeholder artifacts passed with `54` reports.
+  - Scene-profile analyzer passed with `54` reports, `0` failures, and
+    `0` warnings.
+  - Material payload and CompositeV3 diagnostics passed.
+  - Promotion decision remains `blocked`: `scene_profile`, material,
+    lighting, environment, and reflection are ready for the full-pipeline
+    reports, but `composite` and `cinematic_post` are ready only on `6`
+    reports while full-pipeline reports are `41`.
+
+Current next work:
+
+1. Do not treat `SceneProfileV3` as the blocker. The policy domain is wired,
+   serialized, analyzer-covered, and packet-measurable.
+2. Fix CompositeV3 / CinematicPostV3 readiness coverage so all full-pipeline
+   debug views either carry the candidate composite/post domain correctly or
+   are excluded by an explicit contract rule.
+3. Keep the kitchen DX12 device-hung failure as a separate renderer stability
+   issue. It is not a scene-profile contract failure, but it blocks reliable
+   cross-family packets.
+4. After composite/post coverage is coherent, continue the full scene shader
+   refactor into texture-backed `SceneLocalEnvironmentV3` and richer
+   material/environment payloads.

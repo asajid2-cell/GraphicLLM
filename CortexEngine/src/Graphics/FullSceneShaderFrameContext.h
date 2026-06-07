@@ -1208,6 +1208,8 @@ struct FullSceneShaderPipelineV3FrameContext {
     bool compositeInputsReady = false;
     bool compositeEnergyPolicyReady = false;
     bool compositeOverbrightDiagnosticsReady = false;
+    bool compositeContributionMapReady = false;
+    bool compositeLegacyRescueUsageReady = false;
     bool cinematicPostV3Ready = false;
     bool ldrCinematicOutputReady = false;
     bool exposureMeterReady = false;
@@ -1265,6 +1267,8 @@ struct FullSceneShaderPipelineV3FrameContext {
         "candidate_hdr_scene_color",
         "energy_clamp_policy",
         "overbright_diagnostics",
+        "composite_contribution_map",
+        "legacy_rescue_usage",
         "ldr_cinematic_output",
         "candidate_ldr_cinematic_output",
     };
@@ -1892,6 +1896,12 @@ inline FullSceneShaderPipelineV3FrameContext BuildFullSceneShaderPipelineV3Frame
     const bool candidateOverbrightDiagnosticsReady =
         FullSceneShaderHasResource(contract, "overbright_diagnostics") &&
         FullSceneShaderPassWritesResource(contract, "FullSceneCompositeV3", "overbright_diagnostics");
+    const bool candidateContributionMapReady =
+        FullSceneShaderHasResource(contract, "composite_contribution_map") &&
+        FullSceneShaderPassWritesResource(contract, "FullSceneCompositeV3", "composite_contribution_map");
+    const bool candidateLegacyRescueUsageReady =
+        FullSceneShaderHasResource(contract, "legacy_rescue_usage") &&
+        FullSceneShaderPassWritesResource(contract, "FullSceneCompositeV3", "legacy_rescue_usage");
     const bool compositeReadsV3Inputs =
         FullSceneShaderPassReadsResource(contract, "FullSceneCompositeV3", "direct_lighting") &&
         FullSceneShaderPassReadsResource(contract, "FullSceneCompositeV3", "indirect_lighting") &&
@@ -1905,6 +1915,8 @@ inline FullSceneShaderPipelineV3FrameContext BuildFullSceneShaderPipelineV3Frame
         candidateHdrSceneColorReady &&
         candidateEnergyClampPolicyReady &&
         candidateOverbrightDiagnosticsReady &&
+        candidateContributionMapReady &&
+        candidateLegacyRescueUsageReady &&
         compositeReadsV3Inputs;
     context.hdrSceneColorReady = candidateHdrSceneColorReady || legacyHdrSceneColorReady;
     context.compositeInputsReady =
@@ -1924,13 +1936,17 @@ inline FullSceneShaderPipelineV3FrameContext BuildFullSceneShaderPipelineV3Frame
         contract.materials.materialPostExposureProtected > 0 ||
         contract.materials.materialPostBloomEmitter > 0 ||
         contract.cinematicPost.bloomPlanned;
+    context.compositeContributionMapReady = candidateContributionMapReady;
+    context.compositeLegacyRescueUsageReady = candidateLegacyRescueUsageReady;
     uint32_t readyCompositeChannels = 0;
     readyCompositeChannels += context.hdrSceneColorReady ? 1u : 0u;
     readyCompositeChannels += context.compositeInputsReady ? 1u : 0u;
     readyCompositeChannels += context.compositeEnergyPolicyReady ? 1u : 0u;
     readyCompositeChannels += context.compositeOverbrightDiagnosticsReady ? 1u : 0u;
+    readyCompositeChannels += context.compositeContributionMapReady ? 1u : 0u;
+    readyCompositeChannels += context.compositeLegacyRescueUsageReady ? 1u : 0u;
     context.compositeV3ChannelCount = readyCompositeChannels;
-    context.compositeV3Ready = readyCompositeChannels == 4u;
+    context.compositeV3Ready = readyCompositeChannels == 6u;
     context.compositeV3Producer =
         context.compositeV3Ready
             ? (realCompositeV3ProducerReady ? "FullSceneCompositeV3" : "FullSceneCompositeV3Adapter")
@@ -1946,7 +1962,7 @@ inline FullSceneShaderPipelineV3FrameContext BuildFullSceneShaderPipelineV3Frame
                 ? (realCompositeV3ProducerReady
                        ? "FullSceneCompositeV3 writes candidate HDR scene color from V3 lighting and ReflectionResolverV3 radiance resources"
                        : "FullSceneCompositeV3 adapter maps current HDR output to named HDR scene color and owns energy/overbright policy evidence")
-                : "FullSceneCompositeV3 is missing HDR output, input, energy, or overbright ownership evidence");
+                : "FullSceneCompositeV3 is missing HDR output, input, energy, overbright, contribution, or legacy-rescue ownership evidence");
     compositeDomain.enabled = contract.sceneVisual.active;
     compositeDomain.ready = context.compositeV3Ready;
     compositeDomain.promotionState =
@@ -1957,6 +1973,8 @@ inline FullSceneShaderPipelineV3FrameContext BuildFullSceneShaderPipelineV3Frame
         realCompositeV3ProducerReady ? "candidate_hdr_scene_color" : "hdr_color",
         realCompositeV3ProducerReady ? "energy_clamp_policy" : "energy_clamp_policy_adapter",
         realCompositeV3ProducerReady ? "overbright_diagnostics" : "overbright_diagnostics_adapter",
+        realCompositeV3ProducerReady ? "composite_contribution_map" : "composite_contribution_map_missing",
+        realCompositeV3ProducerReady ? "legacy_rescue_usage" : "legacy_rescue_usage_missing",
         "hdr_color",
         "vb_gbuffer_albedo",
         "reflection_radiance",
@@ -1972,6 +1990,8 @@ inline FullSceneShaderPipelineV3FrameContext BuildFullSceneShaderPipelineV3Frame
         "overbright_mask",
         "energy_clamp_policy",
         "overbright_diagnostics",
+        "composite_contribution_map",
+        "legacy_rescue_usage",
     };
     compositeDomain.channels = {
         realCompositeV3ProducerReady
@@ -1986,9 +2006,15 @@ inline FullSceneShaderPipelineV3FrameContext BuildFullSceneShaderPipelineV3Frame
         candidateOverbrightDiagnosticsReady
             ? "overbright_diagnostics_owned_by_full_scene_composite_v3"
             : (context.compositeOverbrightDiagnosticsReady ? "overbright_diagnostics_owned" : "overbright_diagnostics_missing"),
+        candidateContributionMapReady
+            ? "composite_contribution_map_owned_by_full_scene_composite_v3"
+            : "composite_contribution_map_missing",
+        candidateLegacyRescueUsageReady
+            ? "legacy_rescue_usage_owned_by_full_scene_composite_v3"
+            : "legacy_rescue_usage_missing",
     };
     compositeDomain.backingResourceCount = readyCompositeChannels;
-    compositeDomain.requiredChannelCount = 4u;
+    compositeDomain.requiredChannelCount = 6u;
     compositeDomain.readyChannelCount = readyCompositeChannels;
     compositeDomain.missingRequiredChannelCount =
         compositeDomain.requiredChannelCount - compositeDomain.readyChannelCount;

@@ -34,6 +34,8 @@ struct FullSceneCompositeV3Context {
     RGResourceHandle output;
     RGResourceHandle energyClampPolicy;
     RGResourceHandle overbrightDiagnostics;
+    RGResourceHandle compositeContributionMap;
+    RGResourceHandle legacyRescueUsage;
     ID3D12Device* device = nullptr;
     DescriptorHeapManager* descriptorManager = nullptr;
     ID3D12GraphicsCommandList* commandList = nullptr;
@@ -45,7 +47,7 @@ struct FullSceneCompositeV3Context {
     DescriptorHandle shadowVisibilitySRV;
     DescriptorHandle legacyHdrSRV;
     DescriptorHandle sceneLocalEnvironmentSRV;
-    std::array<D3D12_CPU_DESCRIPTOR_HANDLE, 3> outputRTVs{};
+    std::array<D3D12_CPU_DESCRIPTOR_HANDLE, 5> outputRTVs{};
     uint32_t width = 0;
     uint32_t height = 0;
     bool* ran = nullptr;
@@ -257,6 +259,8 @@ void FailFullSceneReflectionHistoryV3Copy(const FullSceneReflectionHistoryV3Copy
         !context.output.IsValid() ||
         !context.energyClampPolicy.IsValid() ||
         !context.overbrightDiagnostics.IsValid() ||
+        !context.compositeContributionMap.IsValid() ||
+        !context.legacyRescueUsage.IsValid() ||
         !context.device ||
         !context.descriptorManager ||
         !context.commandList ||
@@ -302,6 +306,8 @@ void FailFullSceneReflectionHistoryV3Copy(const FullSceneReflectionHistoryV3Copy
             builder.Write(context.output, RGResourceUsage::RenderTarget);
             builder.Write(context.energyClampPolicy, RGResourceUsage::RenderTarget);
             builder.Write(context.overbrightDiagnostics, RGResourceUsage::RenderTarget);
+            builder.Write(context.compositeContributionMap, RGResourceUsage::RenderTarget);
+            builder.Write(context.legacyRescueUsage, RGResourceUsage::RenderTarget);
         },
         [context](ID3D12GraphicsCommandList*, const RenderGraph& graph) {
             auto tableResult = context.descriptorManager->AllocateTransientCBV_SRV_UAVRange(8);
@@ -901,12 +907,18 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
         m_mainTargets.compositeV3.resources.hdrSceneColor &&
         m_mainTargets.compositeV3.resources.energyClampPolicy &&
         m_mainTargets.compositeV3.resources.overbrightDiagnostics &&
+        m_mainTargets.compositeV3.resources.compositeContributionMap &&
+        m_mainTargets.compositeV3.resources.legacyRescueUsage &&
         m_mainTargets.compositeV3.descriptors.hdrSceneColorRTV.IsValid() &&
         m_mainTargets.compositeV3.descriptors.hdrSceneColorSRV.IsValid() &&
         m_mainTargets.compositeV3.descriptors.energyClampPolicyRTV.IsValid() &&
         m_mainTargets.compositeV3.descriptors.energyClampPolicySRV.IsValid() &&
         m_mainTargets.compositeV3.descriptors.overbrightDiagnosticsRTV.IsValid() &&
         m_mainTargets.compositeV3.descriptors.overbrightDiagnosticsSRV.IsValid() &&
+        m_mainTargets.compositeV3.descriptors.compositeContributionMapRTV.IsValid() &&
+        m_mainTargets.compositeV3.descriptors.compositeContributionMapSRV.IsValid() &&
+        m_mainTargets.compositeV3.descriptors.legacyRescueUsageRTV.IsValid() &&
+        m_mainTargets.compositeV3.descriptors.legacyRescueUsageSRV.IsValid() &&
         m_mainTargets.lightingV3.resources.directLighting &&
         m_mainTargets.lightingV3.resources.indirectLighting &&
         m_mainTargets.lightingV3.resources.shadowVisibility &&
@@ -941,11 +953,15 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
         wantsCompositeV3ThisFrame &&
         (m_debugViewState.mode == 67u ||
          m_debugViewState.mode == 80u ||
-         m_debugViewState.mode == 81u) &&
+         m_debugViewState.mode == 81u ||
+         m_debugViewState.mode == 88u ||
+         m_debugViewState.mode == 89u) &&
         m_pipelineState.candidateBeautyDisplay &&
         m_mainTargets.compositeV3.descriptors.hdrSceneColorSRV.IsValid() &&
         m_mainTargets.compositeV3.descriptors.energyClampPolicySRV.IsValid() &&
-        m_mainTargets.compositeV3.descriptors.overbrightDiagnosticsSRV.IsValid();
+        m_mainTargets.compositeV3.descriptors.overbrightDiagnosticsSRV.IsValid() &&
+        m_mainTargets.compositeV3.descriptors.compositeContributionMapSRV.IsValid() &&
+        m_mainTargets.compositeV3.descriptors.legacyRescueUsageSRV.IsValid();
     const bool wantsReflectionResolverV3ThisFrame =
         wantsRgPostThisFrame &&
         m_pipelineState.fullSceneReflectionResolverV3 &&
@@ -1067,6 +1083,8 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
     RGResourceHandle candidateHdrSceneColorHandle{};
     RGResourceHandle energyClampPolicyHandle{};
     RGResourceHandle overbrightDiagnosticsHandle{};
+    RGResourceHandle compositeContributionMapHandle{};
+    RGResourceHandle legacyRescueUsageHandle{};
     RGResourceHandle candidateBeautyHandle{};
     std::array<RGResourceHandle, kBloomLevels> bloomA{};
     std::array<RGResourceHandle, kBloomLevels> bloomB{};
@@ -1278,6 +1296,14 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
                 m_mainTargets.compositeV3.resources.overbrightDiagnostics.Get(),
                 m_mainTargets.compositeV3.resources.overbrightDiagnosticsState,
                 "OverbrightDiagnostics");
+            compositeContributionMapHandle = m_services.renderGraph->ImportResource(
+                m_mainTargets.compositeV3.resources.compositeContributionMap.Get(),
+                m_mainTargets.compositeV3.resources.compositeContributionMapState,
+                "CompositeContributionMap");
+            legacyRescueUsageHandle = m_services.renderGraph->ImportResource(
+                m_mainTargets.compositeV3.resources.legacyRescueUsage.Get(),
+                m_mainTargets.compositeV3.resources.legacyRescueUsageState,
+                "LegacyRescueUsage");
         }
         if (wantsReflectionResolverV3ThisFrame) {
             reflectionRadianceHandle = m_services.renderGraph->ImportResource(
@@ -1637,6 +1663,8 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
             candidateHdrSceneColorHandle.IsValid() &&
             energyClampPolicyHandle.IsValid() &&
             overbrightDiagnosticsHandle.IsValid() &&
+            compositeContributionMapHandle.IsValid() &&
+            legacyRescueUsageHandle.IsValid() &&
             albedoHandle.IsValid() &&
             sceneLocalEnvironmentHandle.IsValid()) {
             FullSceneCompositeV3Context compositeContext{};
@@ -1655,6 +1683,8 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
             compositeContext.output = candidateHdrSceneColorHandle;
             compositeContext.energyClampPolicy = energyClampPolicyHandle;
             compositeContext.overbrightDiagnostics = overbrightDiagnosticsHandle;
+            compositeContext.compositeContributionMap = compositeContributionMapHandle;
+            compositeContext.legacyRescueUsage = legacyRescueUsageHandle;
             compositeContext.device = m_services.device ? m_services.device->GetDevice() : nullptr;
             compositeContext.descriptorManager = m_services.descriptorManager.get();
             compositeContext.commandList = m_commandResources.graphicsList.Get();
@@ -1671,6 +1701,8 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
                 m_mainTargets.compositeV3.descriptors.hdrSceneColorRTV.cpu,
                 m_mainTargets.compositeV3.descriptors.energyClampPolicyRTV.cpu,
                 m_mainTargets.compositeV3.descriptors.overbrightDiagnosticsRTV.cpu,
+                m_mainTargets.compositeV3.descriptors.compositeContributionMapRTV.cpu,
+                m_mainTargets.compositeV3.descriptors.legacyRescueUsageRTV.cpu,
             };
             compositeContext.width = GetInternalRenderWidth();
             compositeContext.height = GetInternalRenderHeight();
@@ -1757,6 +1789,12 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
             } else if (m_debugViewState.mode == 81u && overbrightDiagnosticsHandle.IsValid()) {
                 compositeDebugHandle = overbrightDiagnosticsHandle;
                 compositeDebugSRV = m_mainTargets.compositeV3.descriptors.overbrightDiagnosticsSRV;
+            } else if (m_debugViewState.mode == 88u && compositeContributionMapHandle.IsValid()) {
+                compositeDebugHandle = compositeContributionMapHandle;
+                compositeDebugSRV = m_mainTargets.compositeV3.descriptors.compositeContributionMapSRV;
+            } else if (m_debugViewState.mode == 89u && legacyRescueUsageHandle.IsValid()) {
+                compositeDebugHandle = legacyRescueUsageHandle;
+                compositeDebugSRV = m_mainTargets.compositeV3.descriptors.legacyRescueUsageSRV;
             }
             CandidateBeautyDisplayContext debugContext{};
             debugContext.passName = "FullSceneCompositeV3DebugView";
@@ -2048,6 +2086,14 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
             m_mainTargets.compositeV3.resources.overbrightDiagnosticsState =
                 m_services.renderGraph->GetResourceState(overbrightDiagnosticsHandle);
         }
+        if (compositeContributionMapHandle.IsValid()) {
+            m_mainTargets.compositeV3.resources.compositeContributionMapState =
+                m_services.renderGraph->GetResourceState(compositeContributionMapHandle);
+        }
+        if (legacyRescueUsageHandle.IsValid()) {
+            m_mainTargets.compositeV3.resources.legacyRescueUsageState =
+                m_services.renderGraph->GetResourceState(legacyRescueUsageHandle);
+        }
         if (sceneLocalEnvironmentHandle.IsValid()) {
             m_mainTargets.environmentV3.resources.sceneLocalEnvironmentState =
                 m_services.renderGraph->GetResourceState(sceneLocalEnvironmentHandle);
@@ -2213,7 +2259,8 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
                                 {"direct_lighting", "indirect_lighting", "shadow_visibility", "hdr_color",
                                  "reflection_radiance", "reflection_confidence", "vb_gbuffer_albedo",
                                  "scene_local_environment"},
-                                {"candidate_hdr_scene_color", "energy_clamp_policy", "overbright_diagnostics"},
+                                {"candidate_hdr_scene_color", "energy_clamp_policy", "overbright_diagnostics",
+                                 "composite_contribution_map", "legacy_rescue_usage"},
                                 false,
                                 nullptr,
                                 true);
@@ -2224,7 +2271,8 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
                                 result.ranCompositeV3 ? 1u : 0u,
                                 {"direct_lighting", "indirect_lighting", "shadow_visibility", "hdr_color",
                                  "local_reflection_radiance", "vb_gbuffer_albedo", "scene_local_environment"},
-                                {"candidate_hdr_scene_color", "energy_clamp_policy", "overbright_diagnostics"},
+                                {"candidate_hdr_scene_color", "energy_clamp_policy", "overbright_diagnostics",
+                                 "composite_contribution_map", "legacy_rescue_usage"},
                                 false,
                                 nullptr,
                                 true);
@@ -2235,7 +2283,8 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
                                 result.ranCompositeV3 ? 1u : 0u,
                                 {"direct_lighting", "indirect_lighting", "shadow_visibility", "hdr_color",
                                  "vb_gbuffer_albedo", "scene_local_environment"},
-                                {"candidate_hdr_scene_color", "energy_clamp_policy", "overbright_diagnostics"},
+                                {"candidate_hdr_scene_color", "energy_clamp_policy", "overbright_diagnostics",
+                                 "composite_contribution_map", "legacy_rescue_usage"},
                                 false,
                                 nullptr,
                                 true);
@@ -2272,6 +2321,8 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
             const char* readResource =
                 m_debugViewState.mode == 80u ? "energy_clamp_policy" :
                 m_debugViewState.mode == 81u ? "overbright_diagnostics" :
+                m_debugViewState.mode == 88u ? "composite_contribution_map" :
+                m_debugViewState.mode == 89u ? "legacy_rescue_usage" :
                 "candidate_hdr_scene_color";
             RecordFramePass("FullSceneCompositeV3DebugView",
                             true,
@@ -2333,7 +2384,7 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
                          "velocity", "rt_reflection", "vb_gbuffer_material_ext1",
                          "vb_gbuffer_material_ext2", "hzb"},
                         wantsCompositeV3ThisFrame
-                            ? std::initializer_list<const char*>{"hzb", "back_buffer", "candidate_hdr_scene_color", "energy_clamp_policy", "overbright_diagnostics", "candidate_ldr_cinematic_output", "reflection_history_v3_prev"}
+                            ? std::initializer_list<const char*>{"hzb", "back_buffer", "candidate_hdr_scene_color", "energy_clamp_policy", "overbright_diagnostics", "composite_contribution_map", "legacy_rescue_usage", "candidate_ldr_cinematic_output", "reflection_history_v3_prev"}
                             : std::initializer_list<const char*>{"hzb", "back_buffer", "candidate_ldr_cinematic_output"});
     } else {
         RecordFramePass("RenderGraphEndFrame", true, true, result.ranPostProcess ? 1u : 0u,

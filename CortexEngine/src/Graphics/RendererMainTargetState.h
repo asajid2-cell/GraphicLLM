@@ -128,19 +128,27 @@ struct FullSceneCompositeV3TargetResources {
     ComPtr<ID3D12Resource> hdrSceneColor;
     ComPtr<ID3D12Resource> energyClampPolicy;
     ComPtr<ID3D12Resource> overbrightDiagnostics;
+    ComPtr<ID3D12Resource> compositeContributionMap;
+    ComPtr<ID3D12Resource> legacyRescueUsage;
     D3D12_RESOURCE_STATES state = D3D12_RESOURCE_STATE_COMMON;
     D3D12_RESOURCE_STATES hdrSceneColorState = D3D12_RESOURCE_STATE_COMMON;
     D3D12_RESOURCE_STATES energyClampPolicyState = D3D12_RESOURCE_STATE_COMMON;
     D3D12_RESOURCE_STATES overbrightDiagnosticsState = D3D12_RESOURCE_STATE_COMMON;
+    D3D12_RESOURCE_STATES compositeContributionMapState = D3D12_RESOURCE_STATE_COMMON;
+    D3D12_RESOURCE_STATES legacyRescueUsageState = D3D12_RESOURCE_STATE_COMMON;
 
     void Reset() {
         hdrSceneColor.Reset();
         energyClampPolicy.Reset();
         overbrightDiagnostics.Reset();
+        compositeContributionMap.Reset();
+        legacyRescueUsage.Reset();
         state = D3D12_RESOURCE_STATE_COMMON;
         hdrSceneColorState = D3D12_RESOURCE_STATE_COMMON;
         energyClampPolicyState = D3D12_RESOURCE_STATE_COMMON;
         overbrightDiagnosticsState = D3D12_RESOURCE_STATE_COMMON;
+        compositeContributionMapState = D3D12_RESOURCE_STATE_COMMON;
+        legacyRescueUsageState = D3D12_RESOURCE_STATE_COMMON;
     }
 };
 
@@ -151,6 +159,10 @@ struct FullSceneCompositeV3TargetDescriptors {
     DescriptorHandle energyClampPolicySRV;
     DescriptorHandle overbrightDiagnosticsRTV;
     DescriptorHandle overbrightDiagnosticsSRV;
+    DescriptorHandle compositeContributionMapRTV;
+    DescriptorHandle compositeContributionMapSRV;
+    DescriptorHandle legacyRescueUsageRTV;
+    DescriptorHandle legacyRescueUsageSRV;
 
     void Reset() {
         hdrSceneColorRTV = {};
@@ -159,6 +171,10 @@ struct FullSceneCompositeV3TargetDescriptors {
         energyClampPolicySRV = {};
         overbrightDiagnosticsRTV = {};
         overbrightDiagnosticsSRV = {};
+        compositeContributionMapRTV = {};
+        compositeContributionMapSRV = {};
+        legacyRescueUsageRTV = {};
+        legacyRescueUsageSRV = {};
     }
 };
 
@@ -696,10 +712,24 @@ struct FullSceneCompositeV3TargetState {
                                        descriptors.overbrightDiagnosticsSRV);
         if (overbright.IsErr()) return overbright;
 
+        auto contribution = createTarget("composite_contribution_map",
+                                         resources.compositeContributionMap,
+                                         descriptors.compositeContributionMapRTV,
+                                         descriptors.compositeContributionMapSRV);
+        if (contribution.IsErr()) return contribution;
+
+        auto rescue = createTarget("legacy_rescue_usage",
+                                   resources.legacyRescueUsage,
+                                   descriptors.legacyRescueUsageRTV,
+                                   descriptors.legacyRescueUsageSRV);
+        if (rescue.IsErr()) return rescue;
+
         resources.state = D3D12_RESOURCE_STATE_RENDER_TARGET;
         resources.hdrSceneColorState = D3D12_RESOURCE_STATE_RENDER_TARGET;
         resources.energyClampPolicyState = D3D12_RESOURCE_STATE_RENDER_TARGET;
         resources.overbrightDiagnosticsState = D3D12_RESOURCE_STATE_RENDER_TARGET;
+        resources.compositeContributionMapState = D3D12_RESOURCE_STATE_RENDER_TARGET;
+        resources.legacyRescueUsageState = D3D12_RESOURCE_STATE_RENDER_TARGET;
 
         return Result<void>::Ok();
     }

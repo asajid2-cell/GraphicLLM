@@ -72,6 +72,8 @@ void Renderer::RecordFramePass(const char* name,
         if (resource == "candidate_hdr_scene_color") return resourceBytes(m_mainTargets.compositeV3.resources.hdrSceneColor.Get());
         if (resource == "energy_clamp_policy") return resourceBytes(m_mainTargets.compositeV3.resources.energyClampPolicy.Get());
         if (resource == "overbright_diagnostics") return resourceBytes(m_mainTargets.compositeV3.resources.overbrightDiagnostics.Get());
+        if (resource == "composite_contribution_map") return resourceBytes(m_mainTargets.compositeV3.resources.compositeContributionMap.Get());
+        if (resource == "legacy_rescue_usage") return resourceBytes(m_mainTargets.compositeV3.resources.legacyRescueUsage.Get());
         if (resource == "candidate_ldr_cinematic_output") return resourceBytes(m_mainTargets.candidateBeautyV3.resources.ldrOutput.Get());
         if (resource == "direct_lighting") return resourceBytes(m_mainTargets.lightingV3.resources.directLighting.Get());
         if (resource == "direct_lighting_unshadowed") return resourceBytes(m_mainTargets.lightingV3.resources.directLightingUnshadowed.Get());
@@ -125,6 +127,8 @@ void Renderer::RecordFramePass(const char* name,
                 write == "candidate_hdr_scene_color" ||
                 write == "energy_clamp_policy" ||
                 write == "overbright_diagnostics" ||
+                write == "composite_contribution_map" ||
+                write == "legacy_rescue_usage" ||
                 write == "candidate_ldr_cinematic_output" ||
                 write == "reflection_radiance" || write == "reflection_confidence" ||
                 write == "reflection_source_id" || write == "reflection_rejected_source_mask" ||

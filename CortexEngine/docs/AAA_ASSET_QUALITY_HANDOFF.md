@@ -100,6 +100,113 @@ Next concrete feature boundary:
 Do not mark the goal complete from this plan. The next concrete checkpoint is
 a pushed `SceneLocalEnvironmentV3` infrastructure commit plus packet evidence.
 
+## 2026-06-07 CompositeV3 Contribution Diagnostics Slice
+
+Purpose:
+
+- Make `FullSceneCompositeV3` explain where candidate HDR comes from.
+- Promote legacy `hdr_color` usage from a hidden rescue branch into an explicit
+  measured diagnostic lane.
+- Keep this as candidate-only infrastructure; this is not default-beauty
+  promotion and not a post/blur visual tuning pass.
+
+Implemented:
+
+- Expanded `FullSceneCompositeV3.hlsl` from 3 MRTs to 5 MRTs:
+  - `candidate_hdr_scene_color`.
+  - `energy_clamp_policy`.
+  - `overbright_diagnostics`.
+  - `composite_contribution_map`.
+  - `legacy_rescue_usage`.
+- `composite_contribution_map` RGB currently encodes:
+  - direct contribution ratio.
+  - indirect/environment/material-fill contribution ratio.
+  - reflection contribution ratio.
+  - alpha stores legacy rescue used for resource inspection.
+- `legacy_rescue_usage` RGB currently encodes:
+  - explicit legacy rescue used.
+  - fallback HDR luma.
+  - rescue weight.
+  - alpha stores pre-rescue split luma.
+- Added persistent resources, RTV/SRV descriptors, render-graph imports,
+  writes, state handoff, frame-report resources, pass write ownership, and
+  debug view routing for:
+  - `composite_contribution_map`.
+  - `legacy_rescue_usage`.
+- Expanded `FullSceneCompositeV3` PSO MRT count from `3` to `5`.
+- Added debug views:
+  - `88` `FullSceneCompositeV3ContributionMap`.
+  - `89` `FullSceneCompositeV3LegacyRescueUsage`.
+- Raised renderer debug view max mode from `87` to `89`.
+- Updated V3 frame context so CompositeV3 readiness requires six channels:
+  HDR, inputs, energy policy, overbright diagnostics, contribution map, and
+  legacy rescue usage.
+- Updated frame-report JSON with:
+  - `composite_contribution_map_ready`.
+  - `composite_legacy_rescue_usage_ready`.
+- Updated packet aliases, plan validator, placeholder analyzer, composite
+  diagnostics analyzer, and contract JSON.
+
+Validation:
+
+```powershell
+python -m py_compile tools\analyze_full_scene_shader_v3_composite_diagnostics.py tools\analyze_full_scene_shader_v3_placeholders.py tools\check_full_scene_shader_pipeline_v2_frame_report.py tools\validate_full_scene_shader_pipeline_v3_plan.py
+$files = @('tools\run_scene_local_cinematic_renderer_v1_packets.ps1','tools\run_full_scene_shader_pipeline_v3_packet.ps1','tools\run_scene_local_cinematic_renderer_v1_contract_tests.ps1')
+foreach ($file in $files) {
+  $tokens = $null
+  $errors = $null
+  [System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path $file), [ref]$tokens, [ref]$errors) | Out-Null
+  if ($errors.Count -gt 0) { $errors | Format-List; exit 1 }
+}
+git -c submodule.recurse=false diff --check -- <focused CompositeV3 files>
+python tools\validate_full_scene_shader_pipeline_v3_plan.py
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_scene_local_cinematic_renderer_v1_contract_tests.ps1
+cmd.exe /d /c "call ""C:\Program Files\Microsoft Visual Studio\18\Community\Common7\Tools\VsDevCmd.bat"" -arch=x64 -host_arch=x64 >nul && set ""CORTEX_SKIP_ASSET_SYNC=1"" && ""C:\Program Files\Ninja\ninja.exe"" -C build CortexEngine -j 8"
+Copy-Item assets\shaders\FullSceneCompositeV3.hlsl build\bin\assets\shaders\FullSceneCompositeV3.hlsl -Force
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_scene_local_cinematic_renderer_v1_packets.ps1 -NoBuild -SkipOwnerAnalysis -SkipMaterialAnalysis -SkipStabilityAnalysis -SkipVisualQualityAnalysis -StressSceneOnly -StressSceneFilter rt_showcase:reflection_closeup -ViewFilter candidate_hdr_scene_color,energy_clamp_policy,overbright_diagnostics,composite_contribution_map,legacy_rescue_usage -SmokeFrames 14 -CaptureFrame 7 -CaptureSequenceCount 1 -OutputRoot build\captures\v3_composite_contribution_diagnostics_20260607
+python tools\analyze_full_scene_shader_debug_view_metrics.py --manifest build\captures\v3_composite_contribution_diagnostics_20260607\manifest.json --output-json build\captures\v3_composite_contribution_diagnostics_20260607\debug_view_metrics.json --output-md build\captures\v3_composite_contribution_diagnostics_20260607\debug_view_metrics.md
+python tools\analyze_full_scene_shader_v3_composite_diagnostics.py --manifest build\captures\v3_composite_contribution_diagnostics_20260607\manifest.json --output-json build\captures\v3_composite_contribution_diagnostics_20260607\v3_composite_diagnostics.json --output-md build\captures\v3_composite_contribution_diagnostics_20260607\v3_composite_diagnostics.md
+python tools\analyze_full_scene_shader_v3_placeholders.py --input build\captures\v3_composite_contribution_diagnostics_20260607 --signal-output build\captures\v3_composite_contribution_diagnostics_20260607\v3_signal.json --stability-output build\captures\v3_composite_contribution_diagnostics_20260607\v3_stability.json
+```
+
+Evidence:
+
+- focused packet:
+  `build\captures\v3_composite_contribution_diagnostics_20260607`.
+- debug-view metrics:
+  - captured views: `5`.
+  - measured views: `5`.
+  - failures: `0`.
+- CompositeV3 diagnostics:
+  - ready: `true`.
+  - failures: `0`.
+  - warnings: `1`.
+  - mean clamp mask: `0.000000`.
+  - mean clamp ratio: `0.000000`.
+  - mean legacy rescue: `0.000000`.
+  - mean explicit legacy rescue: `0.000000`.
+  - mean reflection contribution: `0.065433`.
+  - warning: underlit mean `0.647383` is elevated in the focused stress view.
+- V3 placeholder analyzer:
+  - passed.
+  - reports: `5`.
+
+Current limitation:
+
+- The focused packet proves the new CompositeV3 diagnostic resources render and
+  analyze, but the V3 report still shows `composite_v3_ready=false` in this
+  stress slice because upstream lighting split readiness is not fully promoted
+  in that packet.
+- Do not treat this as final candidate beauty readiness.
+
+Next:
+
+1. Commit and push this CompositeV3 diagnostic slice.
+2. Continue with `LightingShadowV3` split-resource ownership/readiness so
+   CompositeV3 can become ready without relying on adapter-era lighting debt.
+3. Then move to `ReflectionV3` source resolver stability before increasing
+   reflection strength or cinematic post.
+
 ## 2026-06-07 SceneLocalEnvironmentV3 Producer Slice
 
 Implemented:

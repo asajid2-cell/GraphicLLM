@@ -399,6 +399,8 @@ json FullSceneShaderPipelineV3ToJson(const FrameContract& contract) {
         {"composite_inputs_ready", context.compositeInputsReady},
         {"composite_energy_policy_ready", context.compositeEnergyPolicyReady},
         {"composite_overbright_diagnostics_ready", context.compositeOverbrightDiagnosticsReady},
+        {"composite_contribution_map_ready", context.compositeContributionMapReady},
+        {"composite_legacy_rescue_usage_ready", context.compositeLegacyRescueUsageReady},
         {"composite_v3_producer", context.compositeV3Producer},
         {"cinematic_post_v3_ready", context.cinematicPostV3Ready},
         {"ldr_cinematic_output_ready", context.ldrCinematicOutputReady},

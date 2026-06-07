@@ -35,6 +35,8 @@ REQUIRED_OUTPUTS = {
     "candidate_hdr_scene_color",
     "energy_clamp_policy",
     "overbright_diagnostics",
+    "composite_contribution_map",
+    "legacy_rescue_usage",
     "ldr_cinematic_output",
     "candidate_ldr_cinematic_output",
 }
@@ -675,7 +677,7 @@ def analyze_report(
                 failures.append(f"composite domain must expose {expected_output} debug view")
             if composite_domain.get("default_beauty_affects") is not False:
                 failures.append("composite domain must not affect default beauty yet")
-            if composite_domain.get("ready_channel_count", 0) < 4:
+            if composite_domain.get("ready_channel_count", 0) < 6:
                 failures.append("composite domain ready without all required channels")
             if composite_domain.get("missing_required_channel_count", 1) != 0:
                 failures.append("composite domain ready with missing required channels")
@@ -684,6 +686,8 @@ def analyze_report(
                 "candidate_hdr_scene_color",
                 "energy_clamp_policy",
                 "overbright_diagnostics",
+                "composite_contribution_map",
+                "legacy_rescue_usage",
             ]:
                 composite_resource = find_frame_resource(report, resource)
                 if not isinstance(composite_resource, dict) or composite_resource.get("valid") is not True:
@@ -711,6 +715,8 @@ def analyze_report(
                     "candidate_hdr_scene_color",
                     "energy_clamp_policy",
                     "overbright_diagnostics",
+                    "composite_contribution_map",
+                    "legacy_rescue_usage",
                 ]:
                     if resource not in composite_pass.get("writes", []):
                         failures.append(f"FullSceneCompositeV3 pass does not write {resource}")
@@ -719,6 +725,8 @@ def analyze_report(
             "composite_inputs_ready",
             "composite_energy_policy_ready",
             "composite_overbright_diagnostics_ready",
+            "composite_contribution_map_ready",
+            "composite_legacy_rescue_usage_ready",
         ]:
             if v3.get(key) is not True:
                 failures.append(f"composite_v3_ready=true but {key} is not true")
@@ -879,6 +887,8 @@ def analyze_report(
         "composite_inputs_ready": v3.get("composite_inputs_ready"),
         "composite_energy_policy_ready": v3.get("composite_energy_policy_ready"),
         "composite_overbright_diagnostics_ready": v3.get("composite_overbright_diagnostics_ready"),
+        "composite_contribution_map_ready": v3.get("composite_contribution_map_ready"),
+        "composite_legacy_rescue_usage_ready": v3.get("composite_legacy_rescue_usage_ready"),
         "composite_v3_producer": v3.get("composite_v3_producer"),
         "cinematic_post_v3_ready": v3.get("cinematic_post_v3_ready"),
         "ldr_cinematic_output_ready": v3.get("ldr_cinematic_output_ready"),

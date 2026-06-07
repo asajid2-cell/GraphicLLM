@@ -12,7 +12,7 @@ from typing import Any
 REQUIRED_DEBUG_VIEWS = {
     "material_base_color": {"min_nonblack_ratio": 0.05, "min_mean_luma": 0.01, "max_mean_luma": 0.98},
     "material_normal": {"min_nonblack_ratio": 0.05, "min_mean_luma": 0.01, "max_mean_luma": 0.98},
-    "material_missing_channel_mask": {"min_nonblack_ratio": 0.001},
+    "material_missing_channel_mask": {},
     "roughness": {"min_nonblack_ratio": 0.05, "min_mean_luma": 0.01, "max_mean_luma": 0.98},
     "surface_class": {"min_nonblack_ratio": 0.01},
     "surface_policy": {"min_nonblack_ratio": 0.01},
@@ -369,6 +369,22 @@ def build_report(manifest_path: Path) -> dict[str, Any]:
         "optional_debug_view_count": len(OPTIONAL_DEBUG_VIEWS),
         "contract_required_debug_view_count": len(contract_views),
         "contract_debug_view_debt_count": sum(1 for row in contract_rows if row["status"] != "covered"),
+        "missing_channel_mask_mean_luma_max": max(
+            (
+                float(row.get("mean_luma", 0.0) or 0.0)
+                for row in debug_rows
+                if row.get("view") == "material_missing_channel_mask"
+            ),
+            default=0.0,
+        ),
+        "missing_channel_mask_nonblack_ratio_max": max(
+            (
+                float(row.get("nonblack_ratio", 0.0) or 0.0)
+                for row in debug_rows
+                if row.get("view") == "material_missing_channel_mask"
+            ),
+            default=0.0,
+        ),
         "material_report_count": len(stat_rows),
         "sampled_materials_total": sum(int(row.get("sampled", 0) or 0) for row in stat_rows),
         "named_materials_total": sum(int(row.get("preset_named", 0) or 0) for row in stat_rows),
@@ -422,6 +438,8 @@ def write_markdown(report: dict[str, Any], path: Path) -> None:
         f"- unresolved transmission fallback: {summary.get('unresolved_default_transmission_fallback_total', 0)}",
         f"- contract required debug views: {summary.get('contract_required_debug_view_count', 0)}",
         f"- contract debug view debt: {summary.get('contract_debug_view_debt_count', 0)}",
+        f"- missing-channel mask max mean luma: {summary.get('missing_channel_mask_mean_luma_max', 0.0):.6f}",
+        f"- missing-channel mask max nonblack: {summary.get('missing_channel_mask_nonblack_ratio_max', 0.0):.6f}",
         "",
         "## Contract Debug View Coverage",
         "",

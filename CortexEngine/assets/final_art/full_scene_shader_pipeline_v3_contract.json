@@ -81,7 +81,8 @@
         "anisotropy",
         "ior",
         "thickness",
-        "material_class"
+        "material_class",
+        "missing_channel_mask"
       ],
       "required_debug_views": [
         "material_base_color",

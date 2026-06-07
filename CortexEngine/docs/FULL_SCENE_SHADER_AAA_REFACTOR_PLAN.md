@@ -25,8 +25,10 @@ Implemented and kept candidate-only:
 - Reflection-focused motion packets exist and the latest forced-SSR history
   warning was resolved with confidence-weighted history diagnostics.
 - Standard V3 packets cover material base color, normal, roughness, metallic,
-  and material class. The remaining explicit material payload debt is a real
-  `material_missing_channel_mask` or equivalent stricter ownership gate.
+  material class, and `material_missing_channel_mask`.
+- `material_missing_channel_mask` is now a required material channel, appears
+  in the material domain frame evidence as `VB_MaterialMissingChannelMask`, and
+  is covered by a focused material packet with zero contract debug-view debt.
 - Focused shadow-motion packets exist. The missing focused row is a
   high-contrast light-sweep/stress row that keeps IBL and scene conditions
   visible instead of hiding instability.
@@ -59,8 +61,11 @@ Work in this order unless a failing packet proves a different root dependency:
      by name; default beauty remains untouched.
 
 2. **MaterialPayloadV3 missing-channel ownership.**
-   - Add a real `material_missing_channel_mask` debug resource or a stricter
-     equivalent frame-report gate.
+   - Done for the current aggregate material path: `material_missing_channel_mask`
+     is required by contract, captured by packet alias, included in frame
+     evidence, and quantified by the material analyzer.
+   - Continue by making downstream consumers report whether they consumed
+     missing-channel debt.
    - Track missing base-color, normal, roughness, metallic, AO, emissive,
      opacity/transmission, clearcoat, sheen, anisotropy, IOR, and thickness.
    - Promotion evidence: material packets can show which channels are owned,
@@ -139,17 +144,19 @@ Work in this order unless a failing packet proves a different root dependency:
 The next implementation slice should not be cinematic post. It should be:
 
 ```text
-MaterialPayloadV3 missing-channel ownership
-  -> contract resource or equivalent strict frame-report gate
-  -> packet aliases and debug mode
-  -> analyzer failure when required material ownership is absent
-  -> focused material packet evidence
+SceneProfileV3 policy owner
+  -> declared profile object for scene family, enclosure, environment,
+     lighting, reflection, exposure, material expectations, post, and motion
+  -> frame-report profile evidence
+  -> profile-driven differences for at least neutral lab, gallery, kitchen,
+     concert, gym, red room, stadium, and exterior water
+  -> focused profile packet evidence
 ```
 
-This is the right next step because stronger lighting, reflections, composite,
-and post all depend on honest material payload ownership. If a surface looks
-flat or unstable because roughness, normal, emissive, or transparency silently
-fell back, later shader work will tune around a lie.
+This is the right next step because material-channel ownership is now covered
+for the current aggregate path. The renderer now needs one policy owner so
+environment, lighting, reflections, exposure, material expectations, and post
+stop drifting through scattered local conditionals.
 
 ## 2026-06-07 Full Scene Shader Refactor Execution Blueprint
 

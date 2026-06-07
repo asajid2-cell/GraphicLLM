@@ -1,4 +1,4 @@
-# FullSceneShaderPipeline V3 Refactor Plan and Ledger
+﻿# FullSceneShaderPipeline V3 Refactor Plan and Ledger
 
 Status: planned, not promoted.
 
@@ -1995,3 +1995,46 @@ Current limitation:
 - The missing-channel-mask resource/view is now explicit debt. The next
   material payload slice should create a real missing-channel mask or a
   stronger frame-contract equivalent instead of leaving it as a warning.
+
+### LightingShadowV3 Source Attribution Split - 2026-06-07
+
+Implemented:
+
+- `FullSceneLightingV3` now encodes shadow-source attribution as:
+  - red: directional/sun shadow-loss ratio.
+  - green: local fixture shadow-loss ratio.
+  - blue: shadow-map path enabled.
+  - alpha: PCSS/filter path enabled.
+- Added `tools/analyze_full_scene_shader_v3_shadow_attribution.py`.
+  It validates source attribution against `v3_shadow_loss`,
+  `v3_shadow_visibility`, and `v3_lighting_energy_budget` captures.
+- `tools/run_lighting_v3_shadow_motion_focus_packet.ps1` now runs the
+  shadow-attribution analyzer and produces `v3_shadow_attribution.json/md`.
+- `tools/analyze_full_scene_shader_v3_lighting_motion.py --focus shadow` now
+  measures only shadow-owned views; `v3_indirect_lighting` is covered by
+  broader lighting packets.
+
+Validation:
+
+```powershell
+python -m py_compile tools\analyze_full_scene_shader_v3_shadow_attribution.py tools\analyze_full_scene_shader_v3_lighting_motion.py tools\validate_full_scene_shader_pipeline_v3_plan.py
+python tools\validate_full_scene_shader_pipeline_v3_plan.py
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_lighting_v3_shadow_motion_focus_packet.ps1 -NoBuild -OutputRoot build\captures\v3_lighting_shadow_source_split_focus_pass2_20260607 -SmokeFrames 16 -CaptureFrame 8 -CaptureSequenceCount 2 -MotionFrames 64 -MotionLookAmplitude 0.025 -MotionLookCycles 5.0
+```
+
+Evidence:
+
+- Packet:
+  `build/captures/v3_lighting_shadow_source_split_focus_pass2_20260607`.
+- Motion analyzer: `11` view sequences, `0` warnings, `0` failures.
+- Shadow-attribution analyzer: `1` family, `0` warnings, `0` failures.
+- Attribution row for `stress_rt_showcase_reflection_closeup`:
+  sun loss `0.339516`, local loss `0.007993`, source active `0.464322`,
+  shadow-loss active `0.839763`, visibility occlusion `1.000000`,
+  shadow-map enabled `1.000000`, energy active `1.000000`.
+
+Current limitation:
+
+- This is a focused mouse-jitter proof. The next LightingShadowV3 step is a
+  scripted high-contrast light-sweep row and, if needed, cascade/slice/RT-mask
+  attribution.

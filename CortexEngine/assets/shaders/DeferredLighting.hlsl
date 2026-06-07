@@ -1201,8 +1201,12 @@ float4 PSMain(VSOutput input) : SV_Target0 {
         NdotV,
         NdotL,
         sunLdotH);
-    float3 directLightUnshadowed = sunBrdf * g_SunRadiance.rgb * NdotL;
-    float3 directLight = directLightUnshadowed * shadow;
+    float3 sunDirectLightUnshadowed = sunBrdf * g_SunRadiance.rgb * NdotL;
+    float3 sunDirectLight = sunDirectLightUnshadowed * shadow;
+    float3 localDirectLightUnshadowed = 0.0f.xxx;
+    float3 localDirectLight = 0.0f.xxx;
+    float3 directLightUnshadowed = sunDirectLightUnshadowed;
+    float3 directLight = sunDirectLight;
 
     // Clustered local lights.
     if (g_ClusterParams.z > 0u) {
@@ -1374,8 +1378,11 @@ float4 PSMain(VSOutput input) : SV_Target0 {
                 fixtureNdotLl,
                 localLdotH);
             float3 localDirectUnshadowed = localBrdf * radiance * fixtureNdotLl;
+            float3 localDirectShadowed = localDirectUnshadowed * shadowLocal;
+            localDirectLightUnshadowed += localDirectUnshadowed;
+            localDirectLight += localDirectShadowed;
             directLightUnshadowed += localDirectUnshadowed;
-            directLight += localDirectUnshadowed * shadowLocal;
+            directLight += localDirectShadowed;
         }
     }
 
@@ -1760,8 +1767,12 @@ FullSceneLightingV3Output PSMainV3LightingSplit(VSOutput input) {
         NdotV,
         NdotL,
         sunLdotH);
-    float3 directLightUnshadowed = sunBrdf * g_SunRadiance.rgb * NdotL;
-    float3 directLight = directLightUnshadowed * shadow;
+    float3 sunDirectLightUnshadowed = sunBrdf * g_SunRadiance.rgb * NdotL;
+    float3 sunDirectLight = sunDirectLightUnshadowed * shadow;
+    float3 localDirectLightUnshadowed = 0.0f.xxx;
+    float3 localDirectLight = 0.0f.xxx;
+    float3 directLightUnshadowed = sunDirectLightUnshadowed;
+    float3 directLight = sunDirectLight;
 
     if (g_ClusterParams.z > 0u) {
         uint width = g_ScreenAndCluster.x;
@@ -1886,8 +1897,11 @@ FullSceneLightingV3Output PSMainV3LightingSplit(VSOutput input) {
                 fixtureNdotLl,
                 localLdotH);
             float3 localDirectUnshadowed = localBrdf * radiance * fixtureNdotLl;
+            float3 localDirectShadowed = localDirectUnshadowed * shadowLocal;
+            localDirectLightUnshadowed += localDirectUnshadowed;
+            localDirectLight += localDirectShadowed;
             directLightUnshadowed += localDirectUnshadowed;
-            directLight += localDirectUnshadowed * shadowLocal;
+            directLight += localDirectShadowed;
         }
     }
 
@@ -2089,8 +2103,14 @@ FullSceneLightingV3Output PSMainV3LightingSplit(VSOutput input) {
     const float3 lumaWeights = float3(0.2126f, 0.7152f, 0.0722f);
     float directUnshadowedLuma = max(dot(max(directLightUnshadowed, 0.0f.xxx), lumaWeights), 0.0f);
     float directShadowedLuma = max(dot(max(directLight, 0.0f.xxx), lumaWeights), 0.0f);
+    float sunUnshadowedLuma = max(dot(max(sunDirectLightUnshadowed, 0.0f.xxx), lumaWeights), 0.0f);
+    float sunShadowedLuma = max(dot(max(sunDirectLight, 0.0f.xxx), lumaWeights), 0.0f);
+    float localUnshadowedLuma = max(dot(max(localDirectLightUnshadowed, 0.0f.xxx), lumaWeights), 0.0f);
+    float localShadowedLuma = max(dot(max(localDirectLight, 0.0f.xxx), lumaWeights), 0.0f);
     float indirectLuma = max(dot(max(ambient, 0.0f.xxx), lumaWeights), 0.0f);
     float shadowLossLuma = max(directUnshadowedLuma - directShadowedLuma, 0.0f);
+    float sunShadowLossLuma = max(sunUnshadowedLuma - sunShadowedLuma, 0.0f);
+    float localShadowLossLuma = max(localUnshadowedLuma - localShadowedLuma, 0.0f);
     float totalLightingLuma = max(directUnshadowedLuma + indirectLuma, 1e-4f);
     output.lightingEnergyBudget = float4(
         saturate(directUnshadowedLuma / 16.0f),
@@ -2098,8 +2118,8 @@ FullSceneLightingV3Output PSMainV3LightingSplit(VSOutput input) {
         saturate(indirectLuma / 16.0f),
         saturate(shadowLossLuma / totalLightingLuma));
     output.shadowSourceAttribution = float4(
-        saturate(1.0f - shadow),
-        saturate(shadowLossLuma / max(directUnshadowedLuma, 1e-4f)),
+        saturate(sunShadowLossLuma / max(sunUnshadowedLuma, 1e-4f)),
+        saturate(localShadowLossLuma / max(localUnshadowedLuma, 1e-4f)),
         (g_ShadowParams.z > 0.5f) ? 1.0f : 0.0f,
         (g_ShadowParams.w > 0.5f) ? 1.0f : 0.0f);
     return output;

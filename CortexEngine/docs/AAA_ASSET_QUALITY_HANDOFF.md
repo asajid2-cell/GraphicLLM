@@ -1,4 +1,4 @@
-# AAA Asset Quality Handoff
+﻿# AAA Asset Quality Handoff
 
 This is the living handoff for the AAA asset-quality goal.
 Read this after compaction before continuing.
@@ -174,6 +174,68 @@ Current next work after this checkpoint:
    `ReflectionV3` provider resolver hardening.
 3. Later replace alias payload packs with proper per-family texture/proxy
    generation for true scene-local irradiance/specular/background resources.
+
+Latest LightingShadowV3 source-attribution checkpoint:
+
+- `FullSceneLightingV3` now splits `shadow_source_attribution` by source:
+  - red: directional/sun shadow-loss ratio
+  - green: local fixture shadow-loss ratio
+  - blue: shadow-map path enabled
+  - alpha: PCSS/filter path enabled
+- Added `tools\analyze_full_scene_shader_v3_shadow_attribution.py`.
+  It validates that the attribution view is active and consistent with
+  `v3_shadow_loss`, `v3_shadow_visibility`, and
+  `v3_lighting_energy_budget`.
+- The focused shadow-motion runner now calls the attribution analyzer and
+  writes:
+  - `v3_shadow_attribution.json`
+  - `v3_shadow_attribution.md`
+- The focused shadow harness no longer requires/captures
+  `v3_indirect_lighting`; that view is not part of shadow-source attribution
+  and was a flaky unrelated failure path.
+- The V3 static validator now includes the shadow-attribution analyzer,
+  focused runner, deferred lighting shader, and split source tokens.
+
+Validation for LightingShadowV3 source split:
+
+```powershell
+python -m py_compile tools\analyze_full_scene_shader_v3_shadow_attribution.py tools\analyze_full_scene_shader_v3_lighting_motion.py tools\validate_full_scene_shader_pipeline_v3_plan.py
+$tokens=$null; $errors=$null; [System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path tools\run_lighting_v3_shadow_motion_focus_packet.ps1), [ref]$tokens, [ref]$errors) | Out-Null; if ($errors.Count -gt 0) { $errors | Format-List; exit 1 }
+python tools\validate_full_scene_shader_pipeline_v3_plan.py
+cmd.exe /d /c "call ""C:\Program Files\Microsoft Visual Studio\18\Community\Common7\Tools\VsDevCmd.bat"" -arch=x64 -host_arch=x64 >nul && set ""CORTEX_SKIP_ASSET_SYNC=1"" && ""C:\Program Files\Ninja\ninja.exe"" -C build CortexEngine -j 8"
+Copy-Item -LiteralPath assets\shaders\DeferredLighting.hlsl -Destination build\bin\assets\shaders\DeferredLighting.hlsl -Force
+Copy-Item -LiteralPath assets\final_art\full_scene_shader_pipeline_v3_contract.json -Destination build\bin\assets\final_art\full_scene_shader_pipeline_v3_contract.json -Force
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_lighting_v3_shadow_motion_focus_packet.ps1 -NoBuild -OutputRoot build\captures\v3_lighting_shadow_source_split_focus_pass2_20260607 -SmokeFrames 16 -CaptureFrame 8 -CaptureSequenceCount 2 -MotionFrames 64 -MotionLookAmplitude 0.025 -MotionLookCycles 5.0
+```
+
+Evidence:
+
+- Fresh focused packet:
+  `build\captures\v3_lighting_shadow_source_split_focus_pass2_20260607`.
+- Packet wrapper passed end to end.
+- Motion analyzer:
+  `11` view sequences, `0` warnings, `0` failures.
+- Attribution analyzer:
+  `1` family, `0` warnings, `0` failures.
+- Attribution row:
+  - family `stress_rt_showcase_reflection_closeup`
+  - sun loss `0.339516`
+  - local loss `0.007993`
+  - source active `0.464322`
+  - shadow-loss active `0.839763`
+  - visibility occlusion `1.000000`
+  - shadow-map enabled `1.000000`
+  - energy active `1.000000`
+
+Current next work after this checkpoint:
+
+1. Add a true high-contrast light-sweep stress mode or scripted light-rig
+   variation; the current packet is still mouse-jitter focused.
+2. Add optional deeper attribution channels if instability remains:
+   directional cascade index, local shadow slice index, RT shadow mask, and
+   filter/PCSS radius.
+3. Continue `ReflectionV3` provider resolver hardening after this
+   LightingShadowV3 source split is saved.
 
 Authoritative plan:
 

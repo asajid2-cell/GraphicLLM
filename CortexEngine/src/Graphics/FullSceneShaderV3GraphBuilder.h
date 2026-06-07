@@ -30,6 +30,42 @@ public:
         bool* ran = nullptr;
     };
 
+    struct CompositeCommon {
+        ID3D12Device* device = nullptr;
+        DescriptorHeapManager* descriptorManager = nullptr;
+        ID3D12GraphicsCommandList* commandList = nullptr;
+        DX12RootSignature* rootSignature = nullptr;
+        DX12Pipeline* pipeline = nullptr;
+        D3D12_GPU_VIRTUAL_ADDRESS frameConstants = 0;
+        uint32_t width = 0;
+        uint32_t height = 0;
+        bool* failed = nullptr;
+        const char** stage = nullptr;
+    };
+
+    struct CompositeSubmission {
+        RGResourceHandle directLighting;
+        RGResourceHandle indirectLighting;
+        RGResourceHandle shadowVisibility;
+        RGResourceHandle legacyHdr;
+        RGResourceHandle localReflectionRadiance;
+        RGResourceHandle reflectionConfidence;
+        RGResourceHandle materialAlbedo;
+        RGResourceHandle sceneLocalEnvironment;
+        RGResourceHandle output;
+        RGResourceHandle energyClampPolicy;
+        RGResourceHandle overbrightDiagnostics;
+        RGResourceHandle compositeContributionMap;
+        RGResourceHandle legacyRescueUsage;
+        DescriptorHandle directLightingSRV;
+        DescriptorHandle indirectLightingSRV;
+        DescriptorHandle shadowVisibilitySRV;
+        DescriptorHandle legacyHdrSRV;
+        DescriptorHandle sceneLocalEnvironmentSRV;
+        std::array<D3D12_CPU_DESCRIPTOR_HANDLE, 5> outputRTVs{};
+        bool* ran = nullptr;
+    };
+
     struct SceneLocalEnvironmentCommon {
         ID3D12Device* device = nullptr;
         ID3D12GraphicsCommandList* commandList = nullptr;
@@ -71,6 +107,8 @@ public:
         const FullSceneShaderV3Passes::FullSceneReflectionHistoryV3CopyContext& context);
     [[nodiscard]] bool SubmitComposite(
         const FullSceneShaderV3Passes::FullSceneCompositeV3Context& context);
+    [[nodiscard]] bool SubmitComposite(const CompositeCommon& common,
+                                       const CompositeSubmission& submission);
     [[nodiscard]] bool SubmitDisplay(
         const FullSceneShaderV3Passes::CandidateBeautyDisplayContext& context);
     [[nodiscard]] bool SubmitDisplay(const DisplayCommon& common,

@@ -1852,3 +1852,75 @@ Remaining limitation:
 
 - The only reflection diagnostic warnings left in this packet are
   `reflection_history_v3_validity` and `reflection_history_v3_rejection`.
+
+### ReflectionV3 Confidence-Weighted History Diagnostics - 2026-06-07
+
+Implemented:
+
+- Added `tools/run_reflection_v3_motion_focus_packet.ps1` as a compact
+  ReflectionV3 motion harness.
+- Added `--focus reflection` to
+  `tools/analyze_full_scene_shader_v3_lighting_motion.py` so focused packets
+  gate only reflection diagnostics plus beauty baseline instead of reporting
+  unrelated missing lighting/composite views.
+- `FullSceneReflectionHistoryV3.hlsl` now emits confidence-weighted continuous
+  history diagnostics:
+  - current active uses reflection confidence directly instead of a thresholded
+    activity mask.
+  - history reusable uses previous history confidence times reprojection
+    acceptance instead of a near-binary previous-history availability mask.
+  - source-switch, disocclusion, high-motion, and out-of-bounds rejection are
+    gated by current/previous reflection history support.
+
+Why:
+
+- The remaining forced-SSR mouse-jitter warnings were not in the resolver
+  source signals anymore. They were in history validity/rejection diagnostics
+  that treated low-support geometry/depth changes as reflection-history debt.
+- That made the diagnostic masks move more than beauty even though
+  reflection confidence, source ID, rejected-source mask, temporal delta, SSR
+  source signal, RT source signal, and source suppression were already stable.
+
+Validation:
+
+```powershell
+Copy-Item -LiteralPath assets\shaders\FullSceneReflectionHistoryV3.hlsl -Destination build\bin\assets\shaders\FullSceneReflectionHistoryV3.hlsl -Force
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_reflection_v3_motion_focus_packet.ps1 -NoBuild -OutputRoot build\captures\v3_reflection_history_confidence_weighted_focus_20260607
+$env:CORTEX_V3_REFLECTION_SOURCE_OVERRIDE='ssr'
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_full_scene_shader_pipeline_v3_packet.ps1 -NoBuild -SkipSceneAnalyzers -StressSceneOnly -StressSceneFilter rt_showcase:reflection_closeup -SmokeFrames 24 -CaptureFrame 12 -CaptureSequenceCount 2 -StabilityMotionMode mouse_jitter -OutputRoot build\captures\v3_reflection_history_confidence_weighted_full_20260607
+```
+
+Evidence:
+
+- focused baseline:
+  `build/captures/v3_reflection_motion_focus_forced_ssr_mouse_jitter_20260607`.
+- focused after:
+  `build/captures/v3_reflection_history_confidence_weighted_focus_20260607`.
+- full after:
+  `build/captures/v3_reflection_history_confidence_weighted_full_20260607`.
+- focused before:
+  - `reflection_history_v3_validity`: `0.05262983`,
+    `1.979x` beauty, warning.
+  - `reflection_history_v3_rejection`: `0.06179731`,
+    `2.324x` beauty, warning.
+- focused after:
+  - `reflection_history_v3_validity`: `0.03415736`,
+    `1.284x` beauty, ok.
+  - `reflection_history_v3_rejection`: `0.00473161`,
+    `0.178x` beauty, ok.
+- full stress packet:
+  - V2 packet evidence passed.
+  - V3 placeholder packet passed.
+  - V3 lighting motion measured `24` view sequences with `0` warnings and
+    `0` failures.
+  - V3 material payload diagnostics passed.
+  - CompositeV3 diagnostics passed.
+  - promotion decision: `review_packet_passed`.
+
+Current limitation:
+
+- This is still a stress-only packet. Promotion remains intentionally blocked
+  for missing families and motion modes in the promotion decision.
+- The next renderer slice should move from this now-stable reflection history
+  base into material payload hardening or the scene-local environment split,
+  not default-beauty promotion.

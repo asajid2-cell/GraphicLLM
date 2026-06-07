@@ -111,20 +111,23 @@ PSOutput PSMain(VSOutput input) {
 
     float confidence = saturate(radiance.a);
     float currentActivity = confidence;
-    float active = smoothstep(0.001f, 0.025f, currentActivity);
+    float active = currentActivity;
     float sourceClass = saturate(sourceId.r);
     float prevConfidence = saturate(historyPrev.a);
     float previousHistoryStrength = prevConfidence;
     float previousHistoryAvailable = smoothstep(0.001f, 0.025f, previousHistoryStrength);
+    float historySupport = saturate(max(confidence, previousHistoryStrength));
     float historyRequiredButMissing = saturate(temporalDelta.b);
     float forcedUnavailable = saturate(temporalDelta.g);
-    float historyReusable = previousHistoryAvailable * reprojectionAcceptance;
-    float reprojectionRejected = 1.0f - reprojectionAcceptance;
+    float historyReusable = previousHistoryStrength * reprojectionAcceptance;
+    float reprojectionRejected = historySupport * (1.0f - reprojectionAcceptance);
     float previousSourceClass = saturate(historyPrevSourceId.r);
     float previousSourceAvailable = smoothstep(0.001f, 0.025f, saturate(historyPrevSourceId.a + previousSourceClass));
-    float sourceSwitch = previousSourceAvailable * previousHistoryAvailable *
+    float sourceSwitch = previousSourceAvailable * previousHistoryStrength *
         smoothstep(0.04f, 0.16f, abs(sourceClass - previousSourceClass));
-    float outOfBoundsRejection = 1.0f - boundsAcceptance;
+    disocclusionRejection *= historySupport;
+    highMotionRejection *= historySupport;
+    float outOfBoundsRejection = historySupport * (1.0f - boundsAcceptance);
 
     PSOutput output;
     output.historyCurr = float4(max(radiance.rgb, 0.0f.xxx), confidence);

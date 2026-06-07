@@ -2329,3 +2329,19 @@ powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_reflection_v3_moti
 
 This is a harness and root-cause tool. It is not a promotion packet. Full V3
 packets remain required before any candidate beauty promotion.
+
+Follow-up result:
+
+- The focused packet reproduced the two remaining reflection-history warnings
+  in `build/captures/v3_reflection_motion_focus_forced_ssr_mouse_jitter_20260607`.
+- `FullSceneReflectionHistoryV3.hlsl` was changed to use confidence-weighted
+  continuous history diagnostics.
+- The focused after packet
+  `build/captures/v3_reflection_history_confidence_weighted_focus_20260607`
+  passed with `0` warnings and `0` failures.
+- The full stress packet
+  `build/captures/v3_reflection_history_confidence_weighted_full_20260607`
+  passed V2 evidence, V3 packet checks, V3 lighting motion, material payload,
+  CompositeV3 diagnostics, and review-packet promotion decision.
+- Default beauty is still not promotable; the passing packet is stress-only,
+  not the required cross-family and cross-motion promotion matrix.

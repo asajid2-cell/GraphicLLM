@@ -7657,8 +7657,13 @@ Latest harness status:
 
 - `tools/analyze_full_scene_shader_v3_lighting_motion.py` supports
   `--focus reflection`.
-- The focused runner exists but has not yet been exercised with a real capture
-  in this slice because `Z:` had only about `0.51 GB` free before validation.
+- The focused runner has been exercised with real captures.
+- Old generated capture folders pruned from `build/captures` after resolving
+  paths inside the capture root:
+  - `scene_local_cinematic_renderer_v1_targeted_micro_jitter_20260604`.
+  - `scene_local_cinematic_renderer_v1_final_broad_audit_20260605`.
+  - `scene_local_cinematic_renderer_v1_local_probe_procedural_radiance_20260604`.
+- Free space after full validation was about `7.56 GB`.
 - Lightweight validation to run after edits:
 
 ```powershell
@@ -7668,3 +7673,51 @@ $tokens = $errors = $null
 if ($errors.Count -gt 0) { $errors | Format-List; exit 1 }
 git -c submodule.recurse=false diff --check -- tools\run_reflection_v3_motion_focus_packet.ps1 tools\analyze_full_scene_shader_v3_lighting_motion.py docs\FULL_SCENE_SHADER_AAA_REFACTOR_PLAN.md docs\AAA_ASSET_QUALITY_HANDOFF.md
 ```
+
+## 2026-06-07 ReflectionV3 History Stability Resume Point
+
+Implemented after the focused harness:
+
+- `assets/shaders/FullSceneReflectionHistoryV3.hlsl` now emits
+  confidence-weighted continuous history diagnostics.
+- Current active history uses reflection confidence directly.
+- History reusable uses previous history confidence times reprojection
+  acceptance.
+- Source-switch, disocclusion, high-motion, and out-of-bounds rejection are
+  gated by current/previous reflection support, so non-reflective or
+  low-history pixels stop becoming reflection-history debt.
+
+Validation evidence:
+
+- focused baseline:
+  `build/captures/v3_reflection_motion_focus_forced_ssr_mouse_jitter_20260607`.
+- focused after:
+  `build/captures/v3_reflection_history_confidence_weighted_focus_20260607`.
+- full after:
+  `build/captures/v3_reflection_history_confidence_weighted_full_20260607`.
+- focused before:
+  - `reflection_history_v3_validity`: `0.05262983`,
+    `1.979x` beauty, warning.
+  - `reflection_history_v3_rejection`: `0.06179731`,
+    `2.324x` beauty, warning.
+- focused after:
+  - `reflection_history_v3_validity`: `0.03415736`,
+    `1.284x` beauty, ok.
+  - `reflection_history_v3_rejection`: `0.00473161`,
+    `0.178x` beauty, ok.
+- full stress packet:
+  - V2 evidence passed.
+  - V3 placeholder packet passed.
+  - V3 lighting motion passed with `24` view sequences, `0` warnings,
+    `0` failures.
+  - V3 material payload passed.
+  - CompositeV3 diagnostics passed.
+  - promotion decision: `review_packet_passed`.
+
+Current next work:
+
+1. Do not promote default beauty; the full packet was stress-only and still
+   reports missing families and motion modes.
+2. Next renderer layer should be material payload hardening or the
+   scene-local environment split, unless a new user-visible smooth/metal
+   regression appears.

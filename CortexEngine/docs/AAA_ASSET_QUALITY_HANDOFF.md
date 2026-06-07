@@ -8787,21 +8787,26 @@ Evidence:
 - Default beauty remains non-promotable because the packet is stress-only,
   single-family, and static-only.
 
-Blocked follow-up:
+Fresh integrated packet:
 
-- A fresh integrated V3 packet rerun to
-  `build\captures\v3_candidate_scope_full_stress_20260607` failed while
-  writing packet stdout because `Z:` had insufficient disk space.
-- The failed partial packet directory was deleted after verifying the resolved
-  path was under `build\captures`.
-- Remaining free space after cleanup was about `108 MB`, so do not run more
-  rendered packet sweeps until capture artifacts are archived or cleaned.
+- Deleted 55 generated `20260604` capture directories under `build\captures`
+  after verifying each resolved path was under the capture root.
+- Free space increased from about `108 MB` to about `33 GB`.
+- Reran the integrated V3 packet:
+  `build\captures\v3_candidate_scope_full_stress_20260607`.
+- The packet passed end to end:
+  - scene-local packet run passed.
+  - V2 evidence passed.
+  - V3 placeholder packet passed with `54` reports.
+  - `v3_scene_profile.json`, `v3_material_payload.json`, and
+    `v3_composite_diagnostics.json` passed.
+  - promotion decision passed as `review_packet_passed`.
 
 Current next work:
 
-1. Free or archive capture space before running more rendered validation.
-2. Use the candidate-scope gate as the correct promotion contract: do not force
+1. Use the candidate-scope gate as the correct promotion contract: do not force
    candidate composite/post resources onto upstream debug views.
-3. Resume the full shader refactor with texture-backed
+2. Resume the full shader refactor with texture-backed
    `SceneLocalEnvironmentV3`, richer material payloads, and cross-family /
-   motion packets once disk space is available.
+   motion packets.
+3. Keep monitoring capture size; generated packet output can fill `Z:` quickly.

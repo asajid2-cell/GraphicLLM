@@ -27,6 +27,21 @@ REQUIRED_SCENE_VISUAL_FIELDS = [
     "tone_mapper_preset",
 ]
 
+REQUIRED_POLICY_CONTRACT_FIELDS = [
+    "owner",
+    "contract_id",
+    "family",
+    "enclosure_mode",
+    "environment_policy",
+    "lighting_policy",
+    "reflection_policy",
+    "exposure_policy",
+    "material_policy",
+    "temporal_policy",
+    "post_policy",
+    "motion_stability_policy",
+]
+
 
 def load_json(path: Path) -> dict[str, Any]:
     return json.loads(path.read_text(encoding="utf-8-sig"))
@@ -85,6 +100,10 @@ def analyze_report(path: Path) -> tuple[dict[str, Any], list[str], list[str]]:
     if not isinstance(scene_profile, dict):
         failures.append(f"{path}: V3 scene_profile domain missing")
         scene_profile = {}
+    policy_contract = v3.get("scene_profile_policy_contract")
+    if not isinstance(policy_contract, dict):
+        failures.append(f"{path}: V3 scene_profile_policy_contract missing")
+        policy_contract = {}
 
     status = "ok"
     if scene_visual.get("active") is not True:
@@ -101,8 +120,21 @@ def analyze_report(path: Path) -> tuple[dict[str, Any], list[str], list[str]]:
     if v3.get("scene_profile_ready") is not True:
         failures.append(f"{path}: full_scene_shader_pipeline_v3.scene_profile_ready is not true")
         status = "failed"
+    if v3.get("scene_profile_policy_contract_ready") is not True:
+        failures.append(f"{path}: full_scene_shader_pipeline_v3.scene_profile_policy_contract_ready is not true")
+        status = "failed"
     if int(v3.get("scene_profile_policy_count", 0) or 0) <= 0:
         failures.append(f"{path}: full_scene_shader_pipeline_v3.scene_profile_policy_count is zero")
+        status = "failed"
+    for field in REQUIRED_POLICY_CONTRACT_FIELDS:
+        if not known(policy_contract.get(field)):
+            failures.append(f"{path}: scene_profile_policy_contract.{field} is not owned/known")
+            status = "failed"
+    if policy_contract.get("owner") != "SceneProfileV3":
+        failures.append(f"{path}: scene_profile_policy_contract owner is {policy_contract.get('owner')!r}")
+        status = "failed"
+    if policy_contract.get("family") != scene_visual.get("family"):
+        failures.append(f"{path}: scene_profile_policy_contract family does not match scene_visual_contract")
         status = "failed"
 
     if scene_profile.get("enabled") is not True:
@@ -111,10 +143,10 @@ def analyze_report(path: Path) -> tuple[dict[str, Any], list[str], list[str]]:
     if scene_profile.get("ready") is not True:
         failures.append(f"{path}: V3 scene_profile domain is not ready")
         status = "failed"
-    if scene_profile.get("producer") != "SceneCinematicProfileV1Adapter":
+    if scene_profile.get("producer") != "SceneProfileV3":
         failures.append(f"{path}: V3 scene_profile producer is {scene_profile.get('producer')!r}")
         status = "failed"
-    if scene_profile.get("output_resource") != "scene_visual_contract":
+    if scene_profile.get("output_resource") != "scene_profile_policy_contract":
         failures.append(f"{path}: V3 scene_profile output is {scene_profile.get('output_resource')!r}")
         status = "failed"
     if int(scene_profile.get("missing_required_channel_count", 0) or 0) != 0:
@@ -142,7 +174,19 @@ def analyze_report(path: Path) -> tuple[dict[str, Any], list[str], list[str]]:
         "tone_mapper_preset": scene_visual.get("tone_mapper_preset", ""),
         "profile_light_fixture_count": int(scene_visual.get("profile_light_fixture_count", 0) or 0),
         "v3_scene_profile_ready": bool(v3.get("scene_profile_ready", False)),
+        "v3_scene_profile_policy_contract_ready": bool(v3.get("scene_profile_policy_contract_ready", False)),
         "v3_scene_profile_policy_count": int(v3.get("scene_profile_policy_count", 0) or 0),
+        "policy_contract_id": policy_contract.get("contract_id", ""),
+        "policy_owner": policy_contract.get("owner", ""),
+        "policy_enclosure_mode": policy_contract.get("enclosure_mode", ""),
+        "policy_environment": policy_contract.get("environment_policy", ""),
+        "policy_lighting": policy_contract.get("lighting_policy", ""),
+        "policy_reflection": policy_contract.get("reflection_policy", ""),
+        "policy_exposure": policy_contract.get("exposure_policy", ""),
+        "policy_material": policy_contract.get("material_policy", ""),
+        "policy_temporal": policy_contract.get("temporal_policy", ""),
+        "policy_post": policy_contract.get("post_policy", ""),
+        "policy_motion_stability": policy_contract.get("motion_stability_policy", ""),
     }
     return row, failures, warnings
 
@@ -165,11 +209,16 @@ def build_report(manifest_path: Path, min_family_count: int) -> dict[str, Any]:
     reflection_owners = {str(row.get("reflection_owner", "")) for row in rows if known(row.get("reflection_owner"))}
     light_rigs = {str(row.get("light_rig_id", "")) for row in rows if known(row.get("light_rig_id"))}
     material_palettes = {str(row.get("material_palette_id", "")) for row in rows if known(row.get("material_palette_id"))}
+    policy_contracts = {str(row.get("policy_contract_id", "")) for row in rows if known(row.get("policy_contract_id"))}
+    environment_policies = {str(row.get("policy_environment", "")) for row in rows if known(row.get("policy_environment"))}
+    reflection_policies = {str(row.get("policy_reflection", "")) for row in rows if known(row.get("policy_reflection"))}
 
     if len(families) < min_family_count:
         failures.append(f"captured family count {len(families)} below required {min_family_count}")
     if len(profile_ids) < min_family_count:
         failures.append(f"distinct profile_id count {len(profile_ids)} below required {min_family_count}")
+    if len(policy_contracts) < min_family_count:
+        failures.append(f"distinct scene_profile_policy_contract count {len(policy_contracts)} below required {min_family_count}")
     if len(light_rigs) < 2 and min_family_count > 1:
         failures.append("scene profile light_rig_id does not vary across captured families")
     if len(material_palettes) < 2 and min_family_count > 1:
@@ -183,6 +232,9 @@ def build_report(manifest_path: Path, min_family_count: int) -> dict[str, Any]:
         "reflection_owner_count": len(reflection_owners),
         "light_rig_count": len(light_rigs),
         "material_palette_count": len(material_palettes),
+        "policy_contract_count": len(policy_contracts),
+        "environment_policy_count": len(environment_policies),
+        "reflection_policy_count": len(reflection_policies),
     }
     return {
         "schema": "cortex.full_scene_shader_pipeline_v3.scene_profile.v1",
@@ -207,21 +259,23 @@ def write_markdown(report: dict[str, Any], path: Path) -> None:
         f"- reports: {summary.get('report_count', 0)}",
         f"- families: {summary.get('family_count', 0)}",
         f"- profiles: {summary.get('profile_id_count', 0)}",
+        f"- policy contracts: {summary.get('policy_contract_count', 0)}",
         f"- light rigs: {summary.get('light_rig_count', 0)}",
         f"- material palettes: {summary.get('material_palette_count', 0)}",
         "",
-        "| Family | Profile | Environment | Reflection | Light Rig | Material Palette | Fixture Count | Status |",
-        "|---|---|---|---|---|---|---:|---|",
+        "| Family | Profile | Policy Contract | Environment Policy | Reflection Policy | Light Rig | Material Policy | Fixture Count | Status |",
+        "|---|---|---|---|---|---|---|---:|---|",
     ]
     for row in report.get("rows", []):
         lines.append(
-            "| {family} | {profile} | {environment} | {reflection} | {light_rig} | {palette} | {fixtures} | {status} |".format(
+            "| {family} | {profile} | {policy} | {environment} | {reflection} | {light_rig} | {material} | {fixtures} | {status} |".format(
                 family=row.get("family", ""),
                 profile=row.get("profile_id", ""),
-                environment=row.get("environment_owner", ""),
-                reflection=row.get("reflection_owner", ""),
+                policy=row.get("policy_contract_id", ""),
+                environment=row.get("policy_environment", ""),
+                reflection=row.get("policy_reflection", ""),
                 light_rig=row.get("light_rig_id", ""),
-                palette=row.get("material_palette_id", ""),
+                material=row.get("policy_material", ""),
                 fixtures=int(row.get("profile_light_fixture_count", 0) or 0),
                 status=row.get("status", ""),
             )

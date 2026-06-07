@@ -1187,6 +1187,7 @@ struct FullSceneShaderPipelineV3FrameContext {
     bool packetGateReady = false;
     bool sceneProfileReady = false;
     uint32_t sceneProfilePolicyCount = 0;
+    bool sceneProfilePolicyContractReady = false;
     bool materialAttributesReady = false;
     bool lightingAdapterReady = false;
     bool lightingSplitResourcesAllocated = false;
@@ -1239,6 +1240,18 @@ struct FullSceneShaderPipelineV3FrameContext {
     std::string sceneLocalTextureSetId = "none";
     std::string sceneProfileProducer = "unknown";
     std::string sceneProfileOutput = "unknown";
+    std::string sceneProfilePolicyOwner = "unknown";
+    std::string sceneProfilePolicyContractId = "unknown";
+    std::string sceneProfilePolicyFamily = "unknown";
+    std::string sceneProfilePolicyEnclosureMode = "unknown";
+    std::string sceneProfilePolicyEnvironment = "unknown";
+    std::string sceneProfilePolicyLighting = "unknown";
+    std::string sceneProfilePolicyReflection = "unknown";
+    std::string sceneProfilePolicyExposure = "unknown";
+    std::string sceneProfilePolicyMaterial = "unknown";
+    std::string sceneProfilePolicyTemporal = "unknown";
+    std::string sceneProfilePolicyPost = "unknown";
+    std::string sceneProfilePolicyMotionStability = "unknown";
     std::string reflectionV3SourceContract = "unknown";
     std::string compositeV3Producer = "unknown";
     std::string cinematicPostV3Producer = "unknown";
@@ -1363,6 +1376,76 @@ inline std::string FullSceneShaderPipelineV3EnvironmentMode(const FrameContract&
     return "open_exterior";
 }
 
+inline std::string FullSceneShaderPipelineV3EnvironmentPolicy(const FrameContract& contract) {
+    const std::string environmentMode = FullSceneShaderPipelineV3EnvironmentMode(contract);
+    return !contract.sceneVisual.active ? "inactive" :
+        contract.sceneVisual.enclosedScene && !contract.sceneVisual.visibleExternalHDRIAllowed
+            ? "enclosed_scene_local_only"
+            : contract.sceneVisual.externalHDRIVisible && contract.sceneVisual.visibleExternalHDRIAllowed
+                  ? "authorized_external_visible_background"
+                  : environmentMode == "open_exterior"
+                        ? "open_exterior_scene_environment"
+                        : "scene_local_neutral_background";
+}
+
+inline std::string FullSceneShaderPipelineV3LightingPolicy(const FrameContract& contract) {
+    if (!contract.sceneVisual.active) {
+        return "inactive";
+    }
+    if (contract.sceneVisual.lightingBalancePolicyActive &&
+        FullSceneShaderKnownContractString(contract.sceneVisual.lightingBalancePolicyId)) {
+        return contract.sceneVisual.lightingBalancePolicyId;
+    }
+    if (FullSceneShaderKnownContractString(contract.sceneVisual.lightRigId)) {
+        return contract.sceneVisual.lightRigId;
+    }
+    return contract.lighting.lightCount > 0 ? "scene_light_records" : "unowned_lighting";
+}
+
+inline std::string FullSceneShaderPipelineV3ReflectionPolicy(const FrameContract& contract) {
+    if (!contract.sceneVisual.active) {
+        return "inactive";
+    }
+    if (contract.environment.localReflectionProbeRadianceEnabled &&
+        FullSceneShaderKnownContractString(contract.sceneVisual.localReflectionProbeRigId)) {
+        return "local_probe_priority";
+    }
+    if (contract.features.rtReflectionsEnabled) {
+        return "ray_query_priority";
+    }
+    if (contract.features.ssrEnabled) {
+        return "screen_space_priority";
+    }
+    if (FullSceneShaderKnownContractString(contract.sceneVisual.reflectionOwner)) {
+        return contract.sceneVisual.reflectionOwner;
+    }
+    return "unowned_reflection";
+}
+
+inline std::string FullSceneShaderPipelineV3MaterialPolicy(const FrameContract& contract) {
+    if (!contract.sceneVisual.active) {
+        return "inactive";
+    }
+    if (FullSceneShaderKnownContractString(contract.sceneVisual.materialPaletteId) &&
+        FullSceneShaderKnownContractString(contract.sceneVisual.materialClassSetId)) {
+        return contract.sceneVisual.materialPaletteId + ":" + contract.sceneVisual.materialClassSetId;
+    }
+    if (FullSceneShaderKnownContractString(contract.sceneVisual.materialPaletteId)) {
+        return contract.sceneVisual.materialPaletteId;
+    }
+    return "unowned_material_policy";
+}
+
+inline std::string FullSceneShaderPipelineV3MotionStabilityPolicy(const FrameContract& contract) {
+    if (!contract.sceneVisual.active) {
+        return "inactive";
+    }
+    if (FullSceneShaderKnownContractString(contract.sceneVisual.temporalPolicyId)) {
+        return contract.sceneVisual.temporalPolicyId + ":motion_stability";
+    }
+    return "unowned_motion_stability";
+}
+
 inline FullSceneShaderPipelineV3FrameContext BuildFullSceneShaderPipelineV3FrameContext(
     const FrameContract& contract) {
     FullSceneShaderPipelineV3FrameContext context;
@@ -1402,24 +1485,60 @@ inline FullSceneShaderPipelineV3FrameContext BuildFullSceneShaderPipelineV3Frame
         FullSceneShaderKnownContractString(contract.sceneVisual.postQualitySetId) &&
         FullSceneShaderKnownContractString(contract.sceneVisual.toneMapperPreset) &&
         !contract.sceneVisual.invalidExternalHDRI;
-    context.sceneProfileReady = sceneProfilePolicyReady;
-    context.sceneProfileProducer = sceneProfileActive ? "SceneCinematicProfileV1Adapter" : "none";
-    context.sceneProfileOutput = sceneProfileActive ? "scene_visual_contract" : "none";
+    const std::string sceneProfileEnclosureMode = FullSceneShaderPipelineV3EnvironmentMode(contract);
+    const std::string sceneProfileEnvironmentPolicy = FullSceneShaderPipelineV3EnvironmentPolicy(contract);
+    const std::string sceneProfileLightingPolicy = FullSceneShaderPipelineV3LightingPolicy(contract);
+    const std::string sceneProfileReflectionPolicy = FullSceneShaderPipelineV3ReflectionPolicy(contract);
+    const std::string sceneProfileMaterialPolicy = FullSceneShaderPipelineV3MaterialPolicy(contract);
+    const std::string sceneProfileMotionStabilityPolicy = FullSceneShaderPipelineV3MotionStabilityPolicy(contract);
+    const bool sceneProfilePolicyContractReady =
+        sceneProfilePolicyReady &&
+        FullSceneShaderKnownContractString(sceneProfileEnclosureMode) &&
+        FullSceneShaderKnownContractString(sceneProfileEnvironmentPolicy) &&
+        FullSceneShaderKnownContractString(sceneProfileLightingPolicy) &&
+        FullSceneShaderKnownContractString(sceneProfileReflectionPolicy) &&
+        FullSceneShaderKnownContractString(contract.sceneVisual.exposurePolicyId) &&
+        FullSceneShaderKnownContractString(sceneProfileMaterialPolicy) &&
+        FullSceneShaderKnownContractString(contract.sceneVisual.temporalPolicyId) &&
+        FullSceneShaderKnownContractString(contract.sceneVisual.postPolicyId) &&
+        FullSceneShaderKnownContractString(sceneProfileMotionStabilityPolicy);
+    context.sceneProfileReady = sceneProfilePolicyContractReady;
+    context.sceneProfilePolicyContractReady = sceneProfilePolicyContractReady;
+    context.sceneProfileProducer = sceneProfileActive ? "SceneProfileV3" : "none";
+    context.sceneProfileOutput = sceneProfileActive ? "scene_profile_policy_contract" : "none";
+    context.sceneProfilePolicyOwner = context.sceneProfileProducer;
+    context.sceneProfilePolicyContractId =
+        sceneProfileActive ? contract.sceneVisual.profileId + ":policy_v3" : "none";
+    context.sceneProfilePolicyFamily = sceneProfileActive ? contract.sceneVisual.family : "none";
+    context.sceneProfilePolicyEnclosureMode = sceneProfileEnclosureMode;
+    context.sceneProfilePolicyEnvironment = sceneProfileEnvironmentPolicy;
+    context.sceneProfilePolicyLighting = sceneProfileLightingPolicy;
+    context.sceneProfilePolicyReflection = sceneProfileReflectionPolicy;
+    context.sceneProfilePolicyExposure =
+        sceneProfileActive ? contract.sceneVisual.exposurePolicyId : "none";
+    context.sceneProfilePolicyMaterial = sceneProfileMaterialPolicy;
+    context.sceneProfilePolicyTemporal =
+        sceneProfileActive ? contract.sceneVisual.temporalPolicyId : "none";
+    context.sceneProfilePolicyPost =
+        sceneProfileActive ? contract.sceneVisual.postPolicyId : "none";
+    context.sceneProfilePolicyMotionStability = sceneProfileMotionStabilityPolicy;
 
     FullSceneShaderPipelineV3DomainEvidence sceneProfileDomain =
         MakeFullSceneShaderPipelineV3DomainEvidence(
             "scene_profile",
             context.sceneProfileProducer,
             context.sceneProfileOutput,
-            "scene_visual_contract",
-            sceneProfilePolicyReady
-                ? "SceneProfileV3 policy is adapted from SceneCinematicProfile scene_visual_contract"
-                : "SceneProfileV3 policy is missing required scene_visual_contract ownership fields");
+            "scene_profile_policy_contract",
+            sceneProfilePolicyContractReady
+                ? "SceneProfileV3 owns a declared policy contract derived from scene_visual_contract"
+                : "SceneProfileV3 policy contract is missing required ownership fields");
     sceneProfileDomain.enabled = sceneProfileActive;
-    sceneProfileDomain.ready = sceneProfilePolicyReady;
-    sceneProfileDomain.promotionState = sceneProfilePolicyReady ? "instrumented" : "planned";
+    sceneProfileDomain.ready = sceneProfilePolicyContractReady;
+    sceneProfileDomain.promotionState = sceneProfilePolicyContractReady ? "instrumented" : "planned";
     sceneProfileDomain.backingResources = {
+        "scene_profile_policy_contract",
         "scene_visual_contract",
+        "SceneCinematicProfileV1Adapter",
         "SceneCinematicProfile",
         "RendererSceneProfile",
     };
@@ -1433,9 +1552,19 @@ inline FullSceneShaderPipelineV3FrameContext BuildFullSceneShaderPipelineV3Frame
         "post_sensitivity",
     };
     sceneProfileDomain.channels = {
+        "policy_owner",
+        "policy_contract_id",
         "profile_id",
         "family",
         "enclosure_mode",
+        "environment_policy",
+        "lighting_policy",
+        "reflection_policy",
+        "exposure_policy",
+        "material_policy",
+        "temporal_policy",
+        "post_policy",
+        "motion_stability_policy",
         "environment_owner",
         "reflection_owner",
         "light_rig_id",
@@ -1452,12 +1581,12 @@ inline FullSceneShaderPipelineV3FrameContext BuildFullSceneShaderPipelineV3Frame
         "visible_external_hdri_policy",
         "lighting_balance_policy",
     };
-    sceneProfileDomain.backingResourceCount = sceneProfileActive ? 3u : 0u;
+    sceneProfileDomain.backingResourceCount = sceneProfileActive ? 5u : 0u;
     sceneProfileDomain.requiredChannelCount = static_cast<uint32_t>(sceneProfileDomain.channels.size());
     context.sceneProfilePolicyCount =
-        sceneProfilePolicyReady ? sceneProfileDomain.requiredChannelCount : 0u;
+        sceneProfilePolicyContractReady ? sceneProfileDomain.requiredChannelCount : 0u;
     sceneProfileDomain.readyChannelCount =
-        sceneProfilePolicyReady ? sceneProfileDomain.requiredChannelCount : 0u;
+        sceneProfilePolicyContractReady ? sceneProfileDomain.requiredChannelCount : 0u;
     sceneProfileDomain.missingRequiredChannelCount =
         sceneProfileDomain.requiredChannelCount - sceneProfileDomain.readyChannelCount;
 
@@ -1652,15 +1781,7 @@ inline FullSceneShaderPipelineV3FrameContext BuildFullSceneShaderPipelineV3Frame
         FullSceneShaderPassWritesResource(contract, "SceneLocalEnvironmentV3", "visible_background") &&
         FullSceneShaderPassWritesResource(contract, "SceneLocalEnvironmentV3", "reflection_background") &&
         FullSceneShaderPassWritesResource(contract, "SceneLocalEnvironmentV3", "atmosphere");
-    const std::string environmentPolicy =
-        !contract.sceneVisual.active ? "inactive" :
-        contract.sceneVisual.enclosedScene && !contract.sceneVisual.visibleExternalHDRIAllowed
-            ? "enclosed_scene_local_only"
-            : contract.sceneVisual.externalHDRIVisible && contract.sceneVisual.visibleExternalHDRIAllowed
-                  ? "authorized_external_visible_background"
-                  : environmentMode == "open_exterior"
-                        ? "open_exterior_scene_environment"
-                        : "scene_local_neutral_background";
+    const std::string environmentPolicy = FullSceneShaderPipelineV3EnvironmentPolicy(contract);
     const std::string visibleBackgroundSource =
         !contract.sceneVisual.active ? "inactive" :
         contract.sceneVisual.invalidExternalHDRI ? "invalid_external_hdri_rejected" :

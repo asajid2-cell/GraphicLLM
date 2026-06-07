@@ -8,6 +8,7 @@ Texture2D<float4> g_ShadowVisibility : register(t2);
 Texture2D<float4> g_LegacyHDRFallback : register(t3);
 Texture2D<float4> g_ReflectionRadiance : register(t4);
 Texture2D<float4> g_ReflectionConfidence : register(t5);
+Texture2D<float4> g_MaterialAlbedo : register(t6);
 SamplerState g_LinearClamp : register(s0);
 
 struct VSOutput {
@@ -33,6 +34,7 @@ PSOutput PSMain(VSOutput input) {
     float4 reflectionSample = g_ReflectionRadiance.Sample(g_LinearClamp, input.texCoord);
     float3 reflection = max(reflectionSample.rgb, 0.0f.xxx);
     float reflectionConfidence = saturate(max(reflectionSample.a, g_ReflectionConfidence.Sample(g_LinearClamp, input.texCoord).r));
+    float3 albedo = saturate(g_MaterialAlbedo.Sample(g_LinearClamp, input.texCoord).rgb);
 
     // V3 direct lighting is already shadowed; shadow is still sampled here as
     // an explicit ownership input and to keep a bounded rescue path for early
@@ -41,6 +43,14 @@ PSOutput PSMain(VSOutput input) {
     composite += reflection * (0.10f * reflectionConfidence);
 
     float splitLuma = Luma(composite);
+    if (splitLuma < 0.002f) {
+        float albedoLuma = Luma(albedo);
+        float3 materialFill = albedo * 0.035f;
+        float3 sceneLocalFloor = float3(0.018f, 0.020f, 0.024f);
+        composite = max(composite, max(materialFill, sceneLocalFloor * (1.0f - saturate(albedoLuma * 4.0f))));
+        splitLuma = Luma(composite);
+    }
+
     float fallbackLuma = Luma(fallback);
     float legacyFallbackUsed = 0.0f;
     if (splitLuma < 0.002f && fallbackLuma > 0.002f) {

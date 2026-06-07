@@ -1876,7 +1876,8 @@ inline FullSceneShaderPipelineV3FrameContext BuildFullSceneShaderPipelineV3Frame
         FullSceneShaderPassReadsResource(contract, "FullSceneCompositeV3", "shadow_visibility") &&
         FullSceneShaderPassReadsResource(contract, "FullSceneCompositeV3", "hdr_color") &&
         FullSceneShaderPassReadsResource(contract, "FullSceneCompositeV3", "reflection_radiance") &&
-        FullSceneShaderPassReadsResource(contract, "FullSceneCompositeV3", "reflection_confidence");
+        FullSceneShaderPassReadsResource(contract, "FullSceneCompositeV3", "reflection_confidence") &&
+        FullSceneShaderPassReadsResource(contract, "FullSceneCompositeV3", "vb_gbuffer_albedo");
     const bool realCompositeV3ProducerReady =
         candidateHdrSceneColorReady &&
         candidateEnergyClampPolicyReady &&
@@ -1934,6 +1935,7 @@ inline FullSceneShaderPipelineV3FrameContext BuildFullSceneShaderPipelineV3Frame
         realCompositeV3ProducerReady ? "energy_clamp_policy" : "energy_clamp_policy_adapter",
         realCompositeV3ProducerReady ? "overbright_diagnostics" : "overbright_diagnostics_adapter",
         "hdr_color",
+        "vb_gbuffer_albedo",
         "reflection_radiance",
         "material_attributes",
         "lighting_split",
@@ -1953,6 +1955,7 @@ inline FullSceneShaderPipelineV3FrameContext BuildFullSceneShaderPipelineV3Frame
             ? "candidate_hdr_scene_color_owned_by_full_scene_composite_v3"
             : (context.hdrSceneColorReady ? "hdr_scene_color_owned" : "hdr_scene_color_missing"),
         compositeReadsV3Inputs ? "v3_lighting_and_reflection_inputs_read" : "v3_lighting_and_reflection_inputs_missing",
+        compositeReadsV3Inputs ? "material_albedo_input_read" : "material_albedo_input_missing",
         context.compositeInputsReady ? "composite_inputs_owned" : "composite_inputs_missing",
         candidateEnergyClampPolicyReady
             ? "energy_clamp_policy_owned_by_full_scene_composite_v3"

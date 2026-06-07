@@ -648,6 +648,7 @@ def analyze_report(
                     "hdr_color",
                     "reflection_radiance",
                     "reflection_confidence",
+                    "vb_gbuffer_albedo",
                 ]:
                     if resource not in composite_pass.get("reads", []):
                         failures.append(f"FullSceneCompositeV3 pass does not read {resource}")

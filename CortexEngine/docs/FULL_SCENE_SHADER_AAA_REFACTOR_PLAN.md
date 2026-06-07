@@ -4,6 +4,202 @@ Status: planning ledger.
 
 Default beauty stays unchanged until a separate promotion gate passes.
 
+## 2026-06-06 Goal Feature Refactor Decision
+
+The next goal feature is not a single shader, post effect, or IBL setting. It
+is an opt-in AAA candidate renderer path with explicit ownership from scene
+facts to final pixels.
+
+The engine is currently close enough to prove V3 resources, but not close
+enough to promote beauty. The important shift is:
+
+```text
+old path:
+  legacy beauty + adapters + debug captures + local visual fixes
+
+new path:
+  scene contract + owned V3 resources + source-aware composition +
+  cinematic post + promotion packet
+```
+
+This matters because Unreal-style visuals come from a coherent stack:
+materials, light transport, shadows, reflections, local environment, HDR
+composition, and post all agreeing on the same physical inputs. A bloom pass
+or a sharper reflection cannot fix the image if material ranges, shadow
+ownership, reflection source selection, or environment ownership are unstable.
+
+### Feature Boundary
+
+Build `FullSceneCandidateBeautyV3` as a candidate-only renderer.
+
+It must:
+
+- consume V3 material, lighting, reflection, scene-local environment,
+  transparency/media, and post resources through named render-graph edges.
+- keep legacy `hdr_color` only as a comparison or explicitly reported rescue
+  input.
+- expose raw HDR, per-domain channels, rejection masks, energy diagnostics,
+  post diagnostics, and final LDR output.
+- pass packet evidence before any default-beauty switch is allowed.
+
+It must not:
+
+- make default beauty prettier by hiding IBL/reflection/shadow instability.
+- blur or disable an effect as the proof of correctness.
+- promote a feature that lacks a resource, frame-report owner, debug view,
+  analyzer metric, and contact-sheet evidence.
+
+### Target Frame Contract
+
+The promoted candidate path should eventually look like this:
+
+```text
+VisibilityV3
+  -> depth
+  -> velocity
+  -> object_id
+  -> material_id
+
+MaterialPayloadV3
+  -> base_color
+  -> normal_world
+  -> roughness_metallic_specular_ao
+  -> emissive_opacity
+  -> transmission_clearcoat_anisotropy
+  -> material_class
+  -> material_missing_channel_mask
+
+SceneLocalEnvironmentV3
+  -> visible_background
+  -> diffuse_irradiance
+  -> specular_prefilter
+  -> reflection_background
+  -> local_probe_rig
+  -> atmosphere_terms
+  -> environment_ownership_mask
+
+LightingShadowV3
+  -> direct_lighting
+  -> direct_lighting_unshadowed
+  -> shadow_visibility
+  -> shadow_loss
+  -> indirect_diffuse
+  -> emissive_indirect
+  -> lighting_energy_budget
+
+ReflectionV3
+  -> reflection_radiance
+  -> reflection_confidence
+  -> reflection_source_id
+  -> reflection_rejected_source_mask
+  -> reflection_temporal_delta
+  -> reflection_history_validity
+  -> reflection_source_signal_ssr
+  -> reflection_source_signal_rt
+
+TransparencyMediaV3
+  -> glass_radiance
+  -> water_radiance
+  -> transparent_accumulation
+  -> volumetric_inscatter
+  -> volumetric_transmittance
+
+CompositeV3
+  -> candidate_hdr_scene_color
+  -> overbright_mask
+  -> underlit_mask
+  -> invalid_energy_mask
+  -> composition_debug
+
+CinematicPostV3
+  -> exposure_meter
+  -> bloom_extract
+  -> bloom_resolved
+  -> tone_mapped_ldr
+  -> color_grade_delta
+  -> candidate_ldr_cinematic_output
+```
+
+### Implementation Order For The Goal Feature
+
+1. Contract freeze.
+   - Update the JSON contract, frame context, render-graph names, debug view
+     registry, packet schema, and promotion decision around the target
+     `FullSceneCandidateBeautyV3` shape.
+   - Add hard gates that fail candidate promotion when a required V3 resource
+     is missing, stale, blank, legacy-owned, or silently rescued.
+
+2. Reflection and smooth-surface stability.
+   - Finish `ReflectionHistoryV3` source-ID hysteresis, disocclusion rejection,
+     motion/depth/normal validity, and rejection counters.
+   - Keep SSR/RT/local/environment source signals inspectable separately.
+   - Do not increase reflection influence in candidate beauty until smooth and
+     metallic stress packets prove stable source selection under motion.
+
+3. Material payload promotion.
+   - Replace ad hoc material reads with a concrete PBR payload consumed by
+     lighting, reflection, composite, transparency, and post.
+   - Normalize material ranges at the payload boundary.
+   - Report missing channels and invalid ranges as candidate gate debt.
+
+4. Scene-local environment ownership.
+   - Split visible background from lighting and reflection environments.
+   - Build texture-backed enclosed-room ambient/specular resources so indoor
+     scenes can use useful IBL lighting without panorama leakage.
+   - Keep old-office IBL and sharp-reflection stress cases as explicit tests.
+
+5. Lighting and shadow rebuild.
+   - Make direct, unshadowed direct, shadow visibility, shadow loss, indirect,
+     emissive indirect, and lighting budget concrete resources.
+   - Validate with locked exposure so auto exposure cannot hide flicker.
+   - Add semantic light rigs for daylight rooms, warm interiors, gyms,
+     concerts, red rooms, exteriors, and water/vegetation scenes.
+
+6. Transparency, water, glass, decals, and media.
+   - Stop forcing transparent or layered materials through the opaque
+     reflection path.
+   - Give water, glass, transparent accumulation, decals, and volumetrics
+     separate owned resources before composite.
+
+7. Real HDR composite.
+   - Make `FullSceneCompositeV3` assemble candidate HDR from V3 resources, not
+     from legacy beauty.
+   - Keep legacy `hdr_color` as a named reference/rescue lane with measured
+     usage.
+   - Emit overbright, underlit, invalid-energy, and composition diagnostics.
+
+8. Cinematic post.
+   - Build locked/manual exposure first, then bounded auto exposure.
+   - Source bloom/glare from real HDR/emissive masks.
+   - Add filmic tone mapping, color grade, sharpening, optional DOF, and
+     bypass views.
+
+9. Cross-family proof.
+   - Run gallery, kitchen, office, gym, classroom, concert, red room, stadium,
+     bathroom, bedroom, workshop, store, street, and exterior water/vegetation.
+   - Required motion rows: static, mouse jitter, camera sweep, close-surface
+     orbit, reflective-object orbit, and high-contrast light sweep.
+   - Produce default/candidate contact sheets, raw debug contact sheets,
+     metrics JSON/MD, frame-report summaries, and promotion decision.
+
+### First Slice After Planning
+
+The first implementation slice should be contract and candidate-path
+scaffolding, not prettier post:
+
+```text
+FullSceneCandidateBeautyV3 contract
+  -> explicit target resource names
+  -> candidate-only render graph ownership
+  -> promotion gate rejects missing/legacy-owned resources
+  -> packet output contains candidate HDR, candidate LDR, and domain evidence
+```
+
+That gives every later visual improvement a stable place to land. Once the
+candidate path can honestly say which V3 terms are real and which are still
+debt, we can add stronger shading without repeating the old cycle of guessing
+from screenshots.
+
 ## 2026-06-06 Full Scene Shader Refactor Blueprint
 
 This is the current refactor decision record before implementing the next

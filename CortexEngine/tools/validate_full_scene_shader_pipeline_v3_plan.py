@@ -370,6 +370,8 @@ def main() -> int:
         "FullSceneCompositeV3",
         "FullSceneCompositeV3Adapter",
         "candidate_hdr_scene_color",
+        "vb_gbuffer_albedo",
+        "material_albedo_input_read",
         "candidate_hdr_scene_color_owned_by_full_scene_composite_v3",
         "v3_lighting_and_reflection_inputs_read",
         "hdr_scene_color_owned",

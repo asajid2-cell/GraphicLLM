@@ -6819,3 +6819,38 @@ Next aligned work:
   Fresnel.
 - Fix the material-lab diagnostic wrapper so it can run material stress without
   requiring full lighting-split promotion readiness.
+
+### ReflectionV3 Material Stress Water Ownership Correction - 2026-06-06
+
+Implemented:
+
+- `tools/analyze_reflection_v3_material_stress.py` now reports center-ROI
+  metrics for debug-view captures.
+- Water targets now use `frame_contract.water.roughness` when
+  `frame_contract.water.surface_count > 0`.
+- The analyzer still reports opaque G-buffer roughness, but it no longer fails
+  a water-pass target because the opaque G-buffer center is rough.
+
+Reason:
+
+- `glass_water_courtyard:water_closeup` showed opaque roughness center
+  `0.75008`, but the frame contract proved the water pass owned the target:
+  `water.surface_count=1`, `water.roughness=0.03`.
+- The previous warning was therefore a harness ownership bug, not a water BRDF
+  failure.
+
+Validation:
+
+```powershell
+python -m py_compile tools\analyze_reflection_v3_material_stress.py
+python tools\analyze_reflection_v3_material_stress.py --manifest build\captures\reflection_v3_material_policy_water_after_pixel_loads_20260606\manifest.json --output-json build\captures\reflection_v3_material_policy_water_after_pixel_loads_20260606\reflection_v3_material_stress.json --output-md build\captures\reflection_v3_material_policy_water_after_pixel_loads_20260606\reflection_v3_material_stress.md
+python tools\analyze_reflection_v3_material_stress.py --manifest build\captures\reflection_v3_material_policy_metal_glass_after_pixel_loads_20260606\manifest.json --output-json build\captures\reflection_v3_material_policy_metal_glass_after_pixel_loads_20260606\reflection_v3_material_stress.json --output-md build\captures\reflection_v3_material_policy_metal_glass_after_pixel_loads_20260606\reflection_v3_material_stress.md
+```
+
+Results:
+
+- water packet now passes with `warnings=0`; row reports
+  `Rough Center=0.75008` and `Target Rough=0.03000`.
+- metal/glass packet still passes with `warnings=0`.
+- Next actual renderer work remains source/BRDF quality, but this harness gate
+  now respects pass ownership.

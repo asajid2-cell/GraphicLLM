@@ -1849,3 +1849,13 @@ Evidence:
 - water remains high roughness despite smooth-class coverage, so the next
   refactor should target water/glass BRDF roughness policy and source
   admission, not descriptor plumbing.
+
+Update:
+
+- The water warning was reclassified as a harness ownership issue. Water
+  targets now use `frame_contract.water.roughness` when the water pass owns the
+  target surface.
+- `glass_water_courtyard:water_closeup` now reports opaque center roughness
+  `0.75008`, target roughness `0.03000`, and no material-stress warnings.
+- Continue renderer work on BRDF/source quality, but do not use opaque
+  G-buffer roughness as the water-pass admission gate.

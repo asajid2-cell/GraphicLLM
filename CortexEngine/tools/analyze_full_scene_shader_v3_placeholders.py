@@ -16,6 +16,7 @@ REQUIRED_OUTPUTS = {
     "shadow_loss",
     "lighting_energy_budget",
     "shadow_source_attribution",
+    "local_reflection_radiance",
     "reflection_radiance",
     "reflection_confidence",
     "reflection_source_id",
@@ -586,6 +587,7 @@ def analyze_report(
     reflection_domain = domain_by_id.get("reflection")
     reflection_ready = v3.get("reflection_v3_ready") is True
     if reflection_ready:
+        local_reflection_pass = find_frame_pass(report, "LocalReflectionRadiance")
         reflection_pass = find_frame_pass(report, "FullSceneReflectionV3")
         if v3.get("scene_local_environment_ready") is not True:
             failures.append("reflection_v3_ready=true before scene_local_environment_ready")
@@ -635,6 +637,12 @@ def analyze_report(
         if not isinstance(reflection_pass, dict):
             failures.append("reflection domain produced by FullSceneReflectionV3 but pass is missing")
         else:
+            if not isinstance(local_reflection_pass, dict):
+                failures.append("FullSceneReflectionV3 reads local_reflection_radiance but producer pass is missing")
+            elif local_reflection_pass.get("executed") is not True:
+                failures.append("LocalReflectionRadiance pass did not execute")
+            elif "local_reflection_radiance" not in local_reflection_pass.get("writes", []):
+                failures.append("LocalReflectionRadiance pass does not write local_reflection_radiance")
             if reflection_pass.get("executed") is not True:
                 failures.append("FullSceneReflectionV3 pass did not execute")
             if "local_reflection_radiance" not in reflection_pass.get("reads", []):

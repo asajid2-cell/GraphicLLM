@@ -135,6 +135,10 @@ RGResourceHandle AddToGraph(RenderGraph& graph, const GraphContext& context) {
         [context, output](ID3D12GraphicsCommandList* commandList, const RenderGraph& graph) {
             if (!Dispatch(commandList, graph, context, *output)) {
                 Fail(context, "local_reflection_radiance_dispatch");
+                return;
+            }
+            if (context.status.ran) {
+                *context.status.ran = true;
             }
         });
 

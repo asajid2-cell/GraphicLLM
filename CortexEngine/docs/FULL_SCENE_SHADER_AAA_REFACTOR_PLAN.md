@@ -248,9 +248,10 @@ foundation that makes later visual work faster:
    pass counts, read/write resource counts, missing producer counts, pass names,
    read resources, written resources, and missing producer resources. The V3
    `render_graph` domain now reports `RenderGraphV3Inventory` instead of a
-   planned empty placeholder. The first focused packet exposes one remaining
-   producer debt, `local_reflection_radiance`, which should feed the next
-   ReflectionV3/local-probe provider slice.
+   planned empty placeholder. The first follow-up producer slice records
+   `LocalReflectionRadiance` as the runtime writer for
+   `local_reflection_radiance`, removing the render-graph missing-producer debt
+   for ReflectionV3.
 3. Add a static validator rule that every V3 shader/debug view has an owning
    domain, contract field, and analyzer mention.
 4. Add an explicit "candidate path debt" section to frame JSON:

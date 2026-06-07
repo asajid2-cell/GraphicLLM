@@ -236,6 +236,12 @@ foundation that makes later visual work faster:
 
 1. Finish the current `SceneLocalEnvironmentV3` runtime reporting slice so
    filtered proxy shape/variance are visible in frame reports and analyzers.
+   This slice is now implemented at the contract/source level: generated proxy
+   records carry resource shape, filtered output count, and minimum filter
+   variance through runtime binding, frame contract, V3 context, JSON, analyzer,
+   and static validator paths. Focused and cross-profile packets validated that
+   runtime reports expose `filtered_directional_bc1_v1`, three filtered proxy
+   outputs, non-flat minimum variance, and zero analyzer failures.
 2. Add `RenderGraphV3` pass/resource inventory to the frame contract.
 3. Add a static validator rule that every V3 shader/debug view has an owning
    domain, contract field, and analyzer mention.

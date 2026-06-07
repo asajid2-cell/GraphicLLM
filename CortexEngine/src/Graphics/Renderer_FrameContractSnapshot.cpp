@@ -408,6 +408,12 @@ void Renderer::UpdateFrameContractSnapshot(Scene::ECS_Registry* registry,
         sceneLocalPayloadBinding.proxyLightRig;
     contract.environment.sceneLocalProxyLightAccentStrength =
         sceneLocalPayloadBinding.proxyLightAccentStrength;
+    contract.environment.sceneLocalProxyResourceShape =
+        sceneLocalPayloadBinding.proxyResourceShape;
+    contract.environment.sceneLocalProxyFilteredOutputCount =
+        sceneLocalPayloadBinding.proxyFilteredOutputCount;
+    contract.environment.sceneLocalProxyMinFilterVariance =
+        sceneLocalPayloadBinding.proxyMinFilterVariance;
 
     contract.plannedFeatures = featurePlan.planned;
     contract.executedFeatures = featurePlan.active;

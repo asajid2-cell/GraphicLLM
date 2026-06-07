@@ -573,6 +573,9 @@ Renderer::BuildSceneLocalEnvironmentV3PayloadBindingInfo(bool queueMissingUpload
         info.proxyRoomOcclusion = proxyContract->roomOcclusion;
         info.proxyLightRig = proxyContract->lightRig;
         info.proxyLightAccentStrength = proxyContract->lightAccentStrength;
+        info.proxyResourceShape = proxyContract->proxyResourceShape;
+        info.proxyFilteredOutputCount = proxyContract->filteredOutputCount;
+        info.proxyMinFilterVariance = proxyContract->minFilterVariance;
     }
     info.resourceTableRequired = candidates.present;
     info.proxyResourceTableRequired =

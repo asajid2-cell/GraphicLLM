@@ -332,7 +332,10 @@
         "scene_local_proxy_room_shell",
         "scene_local_proxy_room_occlusion",
         "scene_local_proxy_light_rig",
-        "scene_local_proxy_light_accent_strength"
+        "scene_local_proxy_light_accent_strength",
+        "scene_local_proxy_resource_shape",
+        "scene_local_proxy_filtered_output_count",
+        "scene_local_proxy_min_filter_variance"
       ],
       "required_debug_views": [
         "environment_mode",

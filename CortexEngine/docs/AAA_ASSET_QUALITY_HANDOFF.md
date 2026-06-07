@@ -43,6 +43,75 @@ Latest planning checkpoint:
   evidence, pass cross-family and motion packets, and satisfy user beauty
   review.
 
+Latest runtime proxy contract checkpoint:
+
+- Continued the first implementation slice from the renderer blueprint:
+  finish `SceneLocalEnvironmentV3` runtime reporting for filtered generated
+  proxy resources.
+- `tools\generate_scene_local_environment_proxies.py` now writes
+  `proxyResourceShape`, `filteredOutputCount`, and `minFilterVariance` into
+  `src\Graphics\Generated\SceneLocalProxyContracts.generated.h`.
+- Runtime propagation now covers:
+  `Generated::SceneLocalProxyContractRecord ->
+  Renderer::SceneLocalEnvironmentV3PayloadBindingInfo ->
+  FrameContract::EnvironmentInfo ->
+  FullSceneShaderPipelineV3FrameContext -> FrameContractJson`.
+- New JSON fields:
+  - top-level V3:
+    `scene_local_environment_proxy_resource_shape`,
+    `scene_local_environment_proxy_filtered_output_count`,
+    `scene_local_environment_proxy_min_filter_variance`
+  - nested environment:
+    `scene_local_proxy_resource_shape`,
+    `scene_local_proxy_filtered_output_count`,
+    `scene_local_proxy_min_filter_variance`
+- `tools\analyze_full_scene_shader_v3_environment_payload.py` now fails
+  payload-ready reports if runtime, V3, and manifest proxy shape/filter stats do
+  not agree. Its `filtered_proxy_report_count` is runtime-based now.
+- `tools\validate_full_scene_shader_pipeline_v3_plan.py` and
+  `assets\final_art\full_scene_shader_pipeline_v3_contract.json` now require
+  these proxy filter fields.
+
+Validation commands for this checkpoint:
+
+```powershell
+python -m py_compile tools\generate_scene_local_environment_proxies.py tools\analyze_full_scene_shader_v3_environment_payload.py tools\validate_full_scene_shader_pipeline_v3_plan.py
+python tools\validate_full_scene_shader_pipeline_v3_plan.py
+cmd.exe /d /c "call ""C:\Program Files\Microsoft Visual Studio\18\Community\Common7\Tools\VsDevCmd.bat"" -arch=x64 -host_arch=x64 >nul && set ""CORTEX_SKIP_ASSET_SYNC=1"" && ""C:\Program Files\Ninja\ninja.exe"" -C build CortexEngine -j 8"
+```
+
+Evidence:
+
+- Static validation passed:
+  - Python compile for proxy generator, environment payload analyzer, and V3
+    plan validator
+  - `python tools\validate_full_scene_shader_pipeline_v3_plan.py`
+  - `git diff --check` on focused files
+- Native `CortexEngine` target built successfully with
+  `CORTEX_SKIP_ASSET_SYNC=1`; the known trailing `vswhere.exe` warning printed
+  after link.
+- Focused packet:
+  `build\captures\v3_scene_local_runtime_filter_proxy_fresh_smoke_20260607`
+  - reports `54`
+  - payload ready `54`
+  - runtime filtered proxy reports `54`
+  - explicit proxy binding reports `54`
+  - scene-contract proxy reports `54`
+  - failures `0`
+  - runtime shape `filtered_directional_bc1_v1`
+  - minimum runtime filter variance `0.014379`
+- Cross-profile packet:
+  `build\captures\v3_scene_local_runtime_filter_proxy_cross_profile_20260607`
+  - families `gallery,office,concert,stadium`
+  - reports `4`
+  - payload ready `4`
+  - runtime filtered proxy reports `4`
+  - explicit proxy binding reports `4`
+  - scene-contract proxy reports `4`
+  - failures `0`
+  - runtime shape `filtered_directional_bc1_v1`
+  - minimum runtime filter variance `0.014379`
+
 Current planning checkpoint:
 
 - Latest implementation moved `SceneLocalEnvironmentV3` proxy generation from

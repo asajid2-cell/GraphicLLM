@@ -453,6 +453,12 @@ json FullSceneShaderPipelineV3ToJson(const FrameContract& contract) {
          context.sceneLocalEnvironmentProxyLightRig},
         {"scene_local_environment_proxy_light_accent_strength",
          context.sceneLocalEnvironmentProxyLightAccentStrength},
+        {"scene_local_environment_proxy_resource_shape",
+         context.sceneLocalEnvironmentProxyResourceShape},
+        {"scene_local_environment_proxy_filtered_output_count",
+         context.sceneLocalEnvironmentProxyFilteredOutputCount},
+        {"scene_local_environment_proxy_min_filter_variance",
+         context.sceneLocalEnvironmentProxyMinFilterVariance},
         {"reflection_v3_ready", context.reflectionV3Ready},
         {"reflection_radiance_ready", context.reflectionRadianceReady},
         {"reflection_confidence_ready", context.reflectionConfidenceReady},
@@ -625,7 +631,13 @@ json FrameContractToJson(const FrameContract& contract) {
             {"scene_local_proxy_light_rig",
              contract.environment.sceneLocalProxyLightRig},
             {"scene_local_proxy_light_accent_strength",
-             contract.environment.sceneLocalProxyLightAccentStrength}
+             contract.environment.sceneLocalProxyLightAccentStrength},
+            {"scene_local_proxy_resource_shape",
+             contract.environment.sceneLocalProxyResourceShape},
+            {"scene_local_proxy_filtered_output_count",
+             contract.environment.sceneLocalProxyFilteredOutputCount},
+            {"scene_local_proxy_min_filter_variance",
+             contract.environment.sceneLocalProxyMinFilterVariance}
         }},
         {"graphics_preset", {
             {"id", contract.graphicsPreset.id},

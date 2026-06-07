@@ -595,6 +595,9 @@ private:
         float proxyRoomOcclusion = 0.0f;
         std::string proxyLightRig = "none";
         float proxyLightAccentStrength = 0.0f;
+        std::string proxyResourceShape = "none";
+        uint32_t proxyFilteredOutputCount = 0;
+        float proxyMinFilterVariance = 0.0f;
     };
     [[nodiscard]] SceneLocalEnvironmentV3PayloadBindingInfo BuildSceneLocalEnvironmentV3PayloadBindingInfo(
         bool queueMissingUploads);

@@ -150,6 +150,7 @@ set(CORTEX_SOURCES
     src/Graphics/Passes/ForwardTargetBindingPass.cpp
     src/Graphics/Passes/FullscreenPass.cpp
     src/Graphics/Passes/HZBPass.cpp
+    src/Graphics/Passes/FullSceneShaderV3Passes.cpp
     src/Graphics/Passes/IndirectMeshDrawPass.cpp
     src/Graphics/Passes/LocalReflectionRadiancePass.cpp
     src/Graphics/Passes/MainPassTargetPass.cpp
@@ -423,6 +424,7 @@ set(CORTEX_HEADERS
     src/Graphics/Passes/DescriptorTable.h
     src/Graphics/Passes/EndFrameShaderResourcePass.h
     src/Graphics/Passes/FullscreenPass.h
+    src/Graphics/Passes/FullSceneShaderV3Passes.h
     src/Graphics/Passes/HZBPass.h
     src/Graphics/Passes/MainPassTargetPass.h
     src/Graphics/Passes/MeshUploadCopyPass.h

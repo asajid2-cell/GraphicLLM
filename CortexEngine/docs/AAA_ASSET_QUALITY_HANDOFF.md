@@ -3,6 +3,103 @@
 This is the living handoff for the AAA asset-quality goal.
 Read this after compaction before continuing.
 
+## 2026-06-07 V3 Pass Helper Extraction Checkpoint
+
+Latest pushed work before this section:
+
+- Commit `82272ae` planned the full-scene shader renderer refactor and made
+  structural extraction the next implementation slice.
+
+Implemented after that:
+
+- Added `src\Graphics\Passes\FullSceneShaderV3Passes.h`.
+- Added `src\Graphics\Passes\FullSceneShaderV3Passes.cpp`.
+- Moved the non-trivial V3 pass contexts and pass-add helpers out of
+  `src\Graphics\Renderer_RenderGraphEndFrame.cpp`:
+  - `SceneLocalEnvironmentV3Context`
+  - `FullSceneReflectionResolverV3Context`
+  - `FullSceneReflectionHistoryV3Context`
+  - `FullSceneReflectionHistoryV3CopyContext`
+  - `FullSceneCompositeV3Context`
+  - `CandidateBeautyDisplayContext`
+  - `AddSceneLocalEnvironmentV3Pass`
+  - `AddFullSceneReflectionResolverV3Pass`
+  - `AddFullSceneReflectionHistoryV3Pass`
+  - `AddFullSceneReflectionHistoryV3CopyPass`
+  - `AddFullSceneCompositeV3Pass`
+  - `AddCandidateBeautyDisplayPass`
+- `Renderer_RenderGraphEndFrame.cpp` now keeps the end-frame orchestration and
+  imports `FullSceneShaderV3Passes` instead of owning those implementation
+  details.
+- Registered the new source/header in `CMakeLists.txt`.
+- Extended `tools\validate_full_scene_shader_pipeline_v3_plan.py` so the
+  static V3 validator enforces this boundary:
+  - the new helper files must exist
+  - `Renderer_RenderGraphEndFrame.cpp` must include the helper module
+  - the extracted context structs must not live in end-frame
+  - the helper header/source must carry the V3 pass contexts/functions
+  - CMake must compile `FullSceneShaderV3Passes.cpp`
+
+Validation:
+
+```powershell
+python -m py_compile tools\validate_full_scene_shader_pipeline_v3_plan.py
+python tools\validate_full_scene_shader_pipeline_v3_plan.py
+cmd.exe /d /c "call ""C:\Program Files\Microsoft Visual Studio\18\Community\Common7\Tools\VsDevCmd.bat"" -arch=x64 -host_arch=x64 >nul && set ""CORTEX_SKIP_ASSET_SYNC=1"" && cmake --build build --config Release --target CortexEngine --parallel 8"
+git diff --check -- CMakeLists.txt src\Graphics\Renderer_RenderGraphEndFrame.cpp src\Graphics\Passes\FullSceneShaderV3Passes.h src\Graphics\Passes\FullSceneShaderV3Passes.cpp tools\validate_full_scene_shader_pipeline_v3_plan.py docs\AAA_ASSET_QUALITY_HANDOFF.md
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_full_scene_shader_pipeline_v3_packet.ps1 -NoBuild -SkipSceneAnalyzers -StressSceneOnly -StressSceneFilter rt_showcase:reflection_closeup -SmokeFrames 8 -CaptureFrame 4 -CaptureSequenceCount 1 -StabilityMotionMode static -OutputRoot build\captures\v3_pass_helper_extraction_smoke_20260607
+python tools\analyze_full_scene_shader_v3_scene_profile.py --manifest build\captures\v3_pass_helper_extraction_smoke_20260607\manifest.json --output-json build\captures\v3_pass_helper_extraction_smoke_20260607\v3_scene_profile.json --output-md build\captures\v3_pass_helper_extraction_smoke_20260607\v3_scene_profile.md --min-family-count 1
+python tools\analyze_full_scene_shader_v3_environment_payload.py --manifest build\captures\v3_pass_helper_extraction_smoke_20260607\manifest.json --output-json build\captures\v3_pass_helper_extraction_smoke_20260607\v3_environment_payload.json --output-md build\captures\v3_pass_helper_extraction_smoke_20260607\v3_environment_payload.md
+python tools\analyze_full_scene_shader_v3_material_payload.py --manifest build\captures\v3_pass_helper_extraction_smoke_20260607\manifest.json --output-json build\captures\v3_pass_helper_extraction_smoke_20260607\v3_material_payload.json --output-md build\captures\v3_pass_helper_extraction_smoke_20260607\v3_material_payload.md
+python tools\analyze_full_scene_shader_v3_composite_diagnostics.py --manifest build\captures\v3_pass_helper_extraction_smoke_20260607\manifest.json --output-json build\captures\v3_pass_helper_extraction_smoke_20260607\v3_composite_diagnostics.json --output-md build\captures\v3_pass_helper_extraction_smoke_20260607\v3_composite_diagnostics.md
+python tools\build_full_scene_shader_v3_promotion_decision.py --packet-root build\captures\v3_pass_helper_extraction_smoke_20260607 --output-json build\captures\v3_pass_helper_extraction_smoke_20260607\promotion_decision.json --output-md build\captures\v3_pass_helper_extraction_smoke_20260607\promotion_decision.md --allow-subset-review
+python tools\build_full_scene_shader_v3_matrix_decision.py --packet-root build\captures\v3_pass_helper_extraction_smoke_20260607 --required-families stress_rt_showcase_reflection_closeup --required-motion-modes static --output-json build\captures\v3_pass_helper_extraction_smoke_20260607\v3_matrix_single_packet_decision.json --output-md build\captures\v3_pass_helper_extraction_smoke_20260607\v3_matrix_single_packet_decision.md
+```
+
+Results:
+
+- Python compile passed.
+- V3 plan validator passed.
+- Native build under `VsDevCmd` reported `ninja: no work to do`; the generated
+  build graph contains `FullSceneShaderV3Passes.cpp.obj`.
+- `git diff --check` passed.
+- Running `cmake --build` outside `VsDevCmd` failed with missing standard
+  header `memory`; treat that as an environment invocation issue, not a code
+  failure.
+- The packet wrapper exceeded a 5-minute tool timeout after capture/analyzer
+  artifacts were written. The leftover `CortexEngine` process was stopped.
+- Captured packet root:
+  `build\captures\v3_pass_helper_extraction_smoke_20260607`.
+- Evidence present:
+  - `54` frame reports
+  - `debug_view_metrics.json/md`
+  - `v2_frame_report_evidence_summary.json/md`
+  - `v3_signal.json`
+  - `v3_stability.json`
+  - `v3_scene_profile.json/md`
+  - `v3_environment_payload.json/md`
+  - `v3_material_payload.json/md`
+  - `v3_composite_diagnostics.json/md`
+  - `promotion_decision.json/md`
+  - `v3_matrix_single_packet_decision.json/md`
+- Focused analyzer reruns passed:
+  scene profile with `--min-family-count 1`, environment payload, material
+  payload, and CompositeV3 diagnostics.
+- Promotion decision passed with
+  `status=review_packet_passed`.
+- Single-packet matrix passed for
+  `stress_rt_showcase_reflection_closeup/static`.
+
+Current next work:
+
+1. Continue the structural refactor by introducing a small
+   `FullSceneShaderV3GraphBuilder` façade around the V3 pass calls.
+2. Keep behavior-preserving validation: focused candidate-beauty packet,
+   promotion decision, and single-packet matrix after each structural move.
+3. Only after that, resume resource-quality work: scene-local environment
+   diffuse/specular/background resources, true LightingShadowV3 ownership, and
+   stronger ReflectionV3 provider fusion.
+
 ## 2026-06-07 Full Refactor Plan Before Goal Feature
 
 User direction:

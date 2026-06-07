@@ -3,6 +3,81 @@
 This is the living handoff for the AAA asset-quality goal.
 Read this after compaction before continuing.
 
+## 2026-06-07 V3 Graph Builder Facade Checkpoint
+
+Latest pushed work before this section:
+
+- Commit `714dff6` extracted non-trivial V3 pass helpers from
+  `Renderer_RenderGraphEndFrame.cpp` into `FullSceneShaderV3Passes`.
+
+Implemented after that:
+
+- Added `src\Graphics\FullSceneShaderV3GraphBuilder.h`.
+- Added `src\Graphics\FullSceneShaderV3GraphBuilder.cpp`.
+- Registered the builder source/header in `CMakeLists.txt`.
+- `Renderer_RenderGraphEndFrame.cpp` now creates one
+  `FullSceneShaderV3GraphBuilder fullSceneShaderV3` after render-graph
+  `BeginFrame()`.
+- End-frame no longer directly calls low-level V3 helper functions:
+  `AddSceneLocalEnvironmentV3Pass`, `AddFullSceneReflectionResolverV3Pass`,
+  `AddFullSceneReflectionHistoryV3Pass`,
+  `AddFullSceneReflectionHistoryV3CopyPass`, `AddFullSceneCompositeV3Pass`,
+  or `AddCandidateBeautyDisplayPass`.
+- End-frame still builds the same context structs in this slice. The builder is
+  a submission façade only; later slices can move context construction into the
+  builder without changing pass behavior.
+- Extended `tools\validate_full_scene_shader_pipeline_v3_plan.py` so it now
+  checks:
+  - builder header/source existence
+  - builder tokens and submit methods
+  - CMake compilation of `FullSceneShaderV3GraphBuilder.cpp`
+  - end-frame includes/constructs the builder
+  - end-frame does not call low-level V3 pass helpers directly
+
+Validation:
+
+```powershell
+python -m py_compile tools\validate_full_scene_shader_pipeline_v3_plan.py
+python tools\validate_full_scene_shader_pipeline_v3_plan.py
+cmd.exe /d /c "call ""C:\Program Files\Microsoft Visual Studio\18\Community\Common7\Tools\VsDevCmd.bat"" -arch=x64 -host_arch=x64 >nul && set ""CORTEX_SKIP_ASSET_SYNC=1"" && cmake --build build --config Release --target CortexEngine --parallel 8"
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_full_scene_shader_pipeline_v3_packet.ps1 -NoBuild -SkipSceneAnalyzers -StressSceneOnly -StressSceneFilter rt_showcase:reflection_closeup -ViewFilter "beauty,candidate_beauty_v3,candidate_hdr_scene_color,scene_local_environment,reflection_radiance,reflection_confidence,reflection_source_id,v3_direct_lighting,v3_direct_lighting_unshadowed,v3_shadow_visibility,v3_shadow_loss,v3_indirect_lighting,v3_lighting_energy_budget,v3_shadow_source_attribution,direct_light,direct_light_unshadowed,direct_light_shadow_loss,shadow_factor,ambient_ibl,energy_clamp_policy,overbright_diagnostics,composite_contribution_map,legacy_rescue_usage,material_base_color,material_normal,material_missing_channel_mask,roughness,metallic,surface_class,surface_policy,material_family,reflection_policy,temporal_policy,post_sensitivity,material_id,object_id" -SmokeFrames 8 -CaptureFrame 4 -CaptureSequenceCount 1 -StabilityMotionMode static -OutputRoot build\captures\v3_graph_builder_smoke4_20260607
+python tools\build_full_scene_shader_v3_matrix_decision.py --packet-root build\captures\v3_graph_builder_smoke4_20260607 --required-families stress_rt_showcase_reflection_closeup --required-motion-modes static --output-json build\captures\v3_graph_builder_smoke4_20260607\v3_matrix_single_packet_decision.json --output-md build\captures\v3_graph_builder_smoke4_20260607\v3_matrix_single_packet_decision.md
+```
+
+Results:
+
+- Python compile passed.
+- Static V3 plan validator passed.
+- Native build under `VsDevCmd` configured, built
+  `FullSceneShaderV3GraphBuilder.cpp.obj`, rebuilt
+  `Renderer_RenderGraphEndFrame.cpp.obj`, and linked `bin\CortexEngine.exe`.
+- Known trailing `vswhere.exe` warning still appears after the successful
+  build.
+- Focused packet
+  `build\captures\v3_graph_builder_smoke4_20260607` passed end to end:
+  - `36` reports
+  - V2 frame-report evidence passed
+  - V3 placeholder artifacts passed
+  - V3 scene profile passed
+  - V3 environment payload passed
+  - V3 material payload passed
+  - CompositeV3 diagnostics passed
+  - promotion decision status `review_packet_passed`
+- Single-packet matrix passed for
+  `stress_rt_showcase_reflection_closeup/static`.
+
+Current next work:
+
+1. Move one narrow context-construction family into
+   `FullSceneShaderV3GraphBuilder` without changing behavior. Best first
+   candidate: display/debug display submission because it is repeated for
+   candidate beauty, composite debug, environment debug, and reflection debug.
+2. Keep each structural move validated with static validator, native build, and
+   focused V3 packet evidence.
+3. After builder owns repeated context construction, resume resource-quality
+   work: scene-local diffuse/specular/background generation, true
+   LightingShadowV3 ownership, and ReflectionV3 provider fusion.
+
 ## 2026-06-07 V3 Pass Helper Extraction Checkpoint
 
 Latest pushed work before this section:

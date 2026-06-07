@@ -18,6 +18,7 @@ V3_PROMOTION_DECISION_PATH = ROOT / "tools" / "build_full_scene_shader_v3_promot
 V3_MATERIAL_PAYLOAD_ANALYZER_PATH = ROOT / "tools" / "analyze_full_scene_shader_v3_material_payload.py"
 V3_SCENE_PROFILE_ANALYZER_PATH = ROOT / "tools" / "analyze_full_scene_shader_v3_scene_profile.py"
 V3_ENVIRONMENT_PAYLOAD_ANALYZER_PATH = ROOT / "tools" / "analyze_full_scene_shader_v3_environment_payload.py"
+V3_ENVIRONMENT_PROFILE_ANALYZER_PATH = ROOT / "tools" / "analyze_full_scene_shader_v3_environment_profiles.py"
 SCENE_LOCAL_ENVIRONMENT_V3_SHADER_PATH = ROOT / "assets" / "shaders" / "SceneLocalEnvironmentV3.hlsl"
 
 
@@ -158,6 +159,11 @@ def main() -> int:
         f"Missing V3 environment payload analyzer: {V3_ENVIRONMENT_PAYLOAD_ANALYZER_PATH}",
     )
     require(
+        V3_ENVIRONMENT_PROFILE_ANALYZER_PATH.exists(),
+        errors,
+        f"Missing V3 environment profile analyzer: {V3_ENVIRONMENT_PROFILE_ANALYZER_PATH}",
+    )
+    require(
         SCENE_LOCAL_ENVIRONMENT_V3_SHADER_PATH.exists(),
         errors,
         f"Missing SceneLocalEnvironmentV3 shader: {SCENE_LOCAL_ENVIRONMENT_V3_SHADER_PATH}",
@@ -178,6 +184,7 @@ def main() -> int:
     material_payload_source = V3_MATERIAL_PAYLOAD_ANALYZER_PATH.read_text(encoding="utf-8")
     scene_profile_source = V3_SCENE_PROFILE_ANALYZER_PATH.read_text(encoding="utf-8")
     environment_payload_source = V3_ENVIRONMENT_PAYLOAD_ANALYZER_PATH.read_text(encoding="utf-8")
+    environment_profile_source = V3_ENVIRONMENT_PROFILE_ANALYZER_PATH.read_text(encoding="utf-8")
     scene_local_environment_v3_shader = SCENE_LOCAL_ENVIRONMENT_V3_SHADER_PATH.read_text(encoding="utf-8")
     runtime_surface = "\n".join(
         [
@@ -190,6 +197,7 @@ def main() -> int:
             material_payload_source,
             scene_profile_source,
             environment_payload_source,
+            environment_profile_source,
             scene_local_environment_v3_shader,
         ]
     )

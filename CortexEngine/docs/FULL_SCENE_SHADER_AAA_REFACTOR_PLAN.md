@@ -3620,3 +3620,47 @@ Next refactor direction:
 - Keep CinematicPostV3 tuning blocked until SceneLocalEnvironmentV3,
   LightingShadowV3, ReflectionV3, and CompositeV3 ownership evidence is
   materially stronger.
+
+### SceneLocalEnvironmentV3 Cross-Profile Analyzer - 2026-06-07
+
+Implemented:
+
+- Added `tools/analyze_full_scene_shader_v3_environment_profiles.py` as a
+  bounded proof harness for profile-driven environment selection.
+- The analyzer reads one or more manifests, extracts V3 frame-report shader
+  profile lanes, and can require:
+  - minimum ready environment reports
+  - minimum distinct shader profiles
+  - minimum distinct shader modes
+  - named profile/mode pairs such as `gallery_neutral=1`,
+    `enclosed_room=2`, and `stage=3`
+- Missing reports remain failures by default. Diagnostic packets from known
+  crash paths can opt into `--allow-missing-reports`.
+- The V3 plan validator now includes this analyzer in the checked runtime
+  surface.
+
+Validated evidence:
+
+- Static compile and V3 plan validation passed.
+- A diagnostic model-family packet was run for
+  `kitchen,gym,concert,red_room,stadium` using only the
+  `scene_local_environment` view. It returned nonzero because the known
+  model-scene crash path still affected kitchen/gym/red-room captures, but
+  shutdown reports were written for the usable rows.
+- Cross-profile analysis combined the passing gallery stress packet with the
+  diagnostic model-family manifest:
+  `build/captures/v3_environment_profiles_model_family_probe_20260607/v3_environment_profiles_cross_probe.json`.
+- Result:
+  - reports `58`
+  - environment-ready reports `57`
+  - shader profiles:
+    `enclosed_room`, `gallery_neutral`, `open_exterior`, `stage`
+  - shader modes: `1.0`, `2.0`, `3.0`, `4.0`
+  - failures `0`
+
+Next refactor direction:
+
+- Promote this from diagnostic evidence into regular matrix evidence after
+  model-scene capture stability is separated from frame-report availability.
+- Replace the current profile-palette approximation with texture/resource
+  payloads for each profile family.

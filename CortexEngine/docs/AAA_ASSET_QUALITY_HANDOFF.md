@@ -12753,3 +12753,102 @@ Interpretation:
   fresh successful build and keep `-ContinueOnPacketFailure` enabled so any
   packet crash still leaves a ranked matrix instead of losing the blocker
   state.
+
+### V3 Promotion Suite View Packs and Reflection Smoke - 2026-06-09
+
+Problem:
+
+- The first promotion suite shape was explicit about scenarios, but still too
+  opaque about packet cost. It was easy to trigger hundreds of engine launches
+  without seeing the view/family multiplier before the run.
+- Stress-scene-only packets exposed two harness bugs:
+  - the suite passed an empty `-FamilyFilter`, which PowerShell rejected before
+    launching the engine;
+  - the reflection scenario view set omitted `reflection_owner`, so the
+    reflection-owner analyzer failed even though the intent was to validate
+    ReflectionV3 provider ownership.
+- A later smoke exposed stale V2 checker debt: the renderer debug range had
+  advanced to `kMaxDebugViewMode = 92u`, while the V2 frame-report checker still
+  required `91u`.
+
+Implemented:
+
+- `tools/run_full_scene_shader_pipeline_v3_promotion_suite.ps1` now has
+  `-ViewProfile promotion_core|full`.
+- The suite defines scenario-local view packs:
+  - `reflection_core`: material, composite, environment, lighting, and full
+    ReflectionV3 provider/owner/stability/resolver views;
+  - `enclosed_core`: material, composite, environment, lighting, and compact
+    reflection signal views;
+  - `heavy_light_core`: same compact pack as enclosed, with the heavy-lighting
+    scenario family.
+- `suite_packet_status.json/md` now records `view_profile`, `view_pack`,
+  `view_filter`, `view_count`, `family_count`, per-scenario
+  `estimated_engine_runs`, and suite-level `estimated_engine_runs`.
+- Stress-only scenarios only pass `-FamilyFilter` when the scenario actually has
+  a family filter.
+- The reflection pack includes `reflection_probe_weight`, `reflection_owner`,
+  and `reflection_stability_policy`.
+- `tools/check_full_scene_shader_pipeline_v2_frame_report.py` now matches the
+  current renderer debug range, `kMaxDebugViewMode = 92u`.
+- `tools/validate_full_scene_shader_pipeline_v3_plan.py` now requires the
+  promotion view-pack and cost-accounting tokens so this behavior remains part
+  of the V3 contract surface.
+
+Evidence:
+
+- Final plan-only probe:
+  `build\captures\v3_promotion_suite_viewpack_plan_probe2_20260609`
+  reported the default `promotion_core` suite cost as `744` estimated engine
+  runs:
+  - reflection static: `57` views x `1` family = `57`;
+  - reflection mouse jitter: `57`;
+  - enclosed static: `42` views x `4` families = `168`;
+  - enclosed mouse jitter: `168`;
+  - enclosed camera sweep: `168`;
+  - heavy light sweep: `42` views x `3` families = `126`.
+- Full reflection-static smoke:
+  `build\captures\v3_promotion_suite_reflection_static_smoke7_20260609`
+  ran `reflection_static` with `promotion_core`, `57` views, `SmokeFrames=2`,
+  `CaptureFrame=1`, `CaptureSequenceCount=1`, `-NoBuild`,
+  `-SkipSceneAnalyzers`, and `-ContinueOnPacketFailure`.
+  It passed:
+  - scene-local cinematic packet generation;
+  - V2 frame-report evidence;
+  - V3 placeholder/stability artifacts with `reports=57`;
+  - scene profile, environment payload, scene-local resource contract, material
+    payload, and composite diagnostics;
+  - promotion decision with status `review_packet_passed`;
+  - one-packet V3 matrix with `full matrix ready: true`,
+    `passed packet count: 1`, family `stress_rt_showcase_reflection_closeup`,
+    motion mode `static`, and material quality min score `1.0000`.
+- Reduced 11-view smoke:
+  `build\captures\v3_promotion_suite_reflection_static_smoke6_20260609`
+  proved the suite wrapper and stale checker fix but intentionally failed the
+  V3 matrix because missing lighting/reflection/composite debug metrics make the
+  promotion analyzers incomplete. Do not use that reduced view set as promotion
+  evidence.
+
+Validation:
+
+- PowerShell parser passed for
+  `tools\run_full_scene_shader_pipeline_v3_promotion_suite.ps1`.
+- `python -m py_compile tools\check_full_scene_shader_pipeline_v2_frame_report.py tools\validate_full_scene_shader_pipeline_v3_plan.py`.
+- `python tools\check_full_scene_shader_pipeline_v2_frame_report.py`.
+- `python tools\validate_full_scene_shader_pipeline_v3_plan.py`.
+- Plan-only probe and full reflection-static smoke listed above.
+
+Interpretation:
+
+- The promotion suite is now cost-visible and scenario-aware, not cheap. The
+  default full suite is still a long run at `744` estimated engine launches.
+- The reflection-closeup V3 harness path is proven for the static scenario with
+  the full promotion-core view pack.
+- This does not prove enclosed/heavy-lighting families are promotion-ready yet.
+  The next coherent evidence slice should run one enclosed or heavy-lighting
+  scenario packet and preserve any failures through the matrix instead of
+  falling back to single-scene visual judgment.
+- Stress-only visual-quality analyzers still have compatibility debt when
+  scene analyzers are enabled: they can expect canonical gallery/kitchen/office
+  families on stress-only manifests. Keep `-SkipSceneAnalyzers` for
+  reflection-only V3 harness smoke until that analyzer is made stress-aware.

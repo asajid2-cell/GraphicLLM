@@ -3,6 +3,8 @@ param(
     [string]$Scenarios = "reflection_static,reflection_mouse_jitter,enclosed_static,enclosed_mouse_jitter,enclosed_camera_sweep,heavy_light_sweep",
     [string]$RequiredFamilies = "stress_rt_showcase_reflection_closeup,gallery,kitchen,office,gym,concert,red_room,stadium",
     [string]$RequiredMotionModes = "static,mouse_jitter,camera_sweep,light_sweep",
+    [ValidateSet("promotion_core", "full")]
+    [string]$ViewProfile = "promotion_core",
     [string]$ViewFilter = "",
     [int]$SmokeFrames = 30,
     [int]$CaptureFrame = 15,
@@ -39,7 +41,138 @@ function Split-Csv([string]$Value) {
     return $items
 }
 
-function New-Scenario([string]$Name, [string]$FamilyFilter, [string]$MotionMode, [string]$StressSceneFilter, [bool]$StressSceneOnly, [bool]$NoStressScene) {
+function Join-ViewPack([string[]]$Views) {
+    $ordered = New-Object System.Collections.Generic.List[string]
+    $seen = New-Object 'System.Collections.Generic.HashSet[string]' ([System.StringComparer]::OrdinalIgnoreCase)
+    foreach ($view in $Views) {
+        if (-not [string]::IsNullOrWhiteSpace($view) -and $seen.Add($view)) {
+            $ordered.Add($view) | Out-Null
+        }
+    }
+    return ($ordered.ToArray() -join ",")
+}
+
+function Get-ViewPacks {
+    $material = @(
+        "material_base_color",
+        "material_normal",
+        "material_missing_channel_mask",
+        "roughness",
+        "metallic",
+        "surface_class",
+        "surface_policy",
+        "material_family",
+        "reflection_policy",
+        "temporal_policy",
+        "post_sensitivity",
+        "material_id",
+        "object_id"
+    )
+    $composite = @(
+        "beauty",
+        "candidate_beauty_v3",
+        "candidate_hdr_scene_color",
+        "energy_clamp_policy",
+        "overbright_diagnostics",
+        "composite_contribution_map",
+        "legacy_rescue_usage"
+    )
+    $environment = @(
+        "scene_local_environment",
+        "ambient_lighting",
+        "visible_background",
+        "reflection_background",
+        "atmosphere"
+    )
+    $lighting = @(
+        "direct_light",
+        "direct_light_unshadowed",
+        "direct_light_shadow_loss",
+        "shadow_factor",
+        "ambient_ibl",
+        "v3_direct_lighting",
+        "v3_direct_lighting_unshadowed",
+        "v3_shadow_visibility",
+        "v3_shadow_loss",
+        "v3_indirect_lighting",
+        "v3_lighting_energy_budget",
+        "v3_shadow_source_attribution"
+    )
+    $reflection = @(
+        "reflection_probe_weight",
+        "reflection_owner",
+        "local_reflection_radiance",
+        "reflection_stability_policy",
+        "reflection_radiance",
+        "reflection_confidence",
+        "reflection_source_id",
+        "reflection_rejected_source_mask",
+        "reflection_temporal_delta",
+        "reflection_ssr_source_signal",
+        "reflection_rt_source_signal",
+        "reflection_source_suppression",
+        "reflection_history_v3_curr",
+        "reflection_history_v3_prev",
+        "reflection_history_v3_validity",
+        "reflection_history_v3_rejection",
+        "reflection_source_authority",
+        "reflection_source_weights",
+        "reflection_resolver_candidate",
+        "reflection_resolver_candidate_delta"
+    )
+    return @{
+        material = $material
+        composite = $composite
+        environment = $environment
+        lighting = $lighting
+        reflection = $reflection
+        full = Join-ViewPack @($material + $composite + $environment + $lighting + $reflection)
+        reflection_core = Join-ViewPack @($material + $composite + $environment + $lighting + $reflection)
+        enclosed_core = Join-ViewPack @($material + $composite + $environment + $lighting + @(
+            "local_reflection_radiance",
+            "reflection_radiance",
+            "reflection_confidence",
+            "reflection_source_id",
+            "reflection_temporal_delta"
+        ))
+        heavy_light_core = Join-ViewPack @($material + $composite + $environment + $lighting + @(
+            "local_reflection_radiance",
+            "reflection_radiance",
+            "reflection_confidence",
+            "reflection_source_id",
+            "reflection_temporal_delta"
+        ))
+    }
+}
+
+function Resolve-ScenarioViewFilter([object]$Scenario, [hashtable]$ViewPacks) {
+    if (-not [string]::IsNullOrWhiteSpace($script:ViewFilter)) {
+        return $script:ViewFilter
+    }
+    if ($script:ViewProfile -eq "full") {
+        return $ViewPacks.full
+    }
+    if ($Scenario.view_pack -eq "reflection") {
+        return $ViewPacks.reflection_core
+    }
+    if ($Scenario.view_pack -eq "heavy_light") {
+        return $ViewPacks.heavy_light_core
+    }
+    return $ViewPacks.enclosed_core
+}
+
+function Count-FilterItems([string]$Filter) {
+    return @(Split-Csv $Filter).Count
+}
+
+function Count-FamiliesForScenario([object]$Scenario) {
+    if ($Scenario.stress_scene_only) {
+        return 1
+    }
+    return [Math]::Max(1, @(Split-Csv $Scenario.family_filter).Count)
+}
+
+function New-Scenario([string]$Name, [string]$FamilyFilter, [string]$MotionMode, [string]$StressSceneFilter, [bool]$StressSceneOnly, [bool]$NoStressScene, [string]$ViewPack) {
     return [pscustomobject]@{
         name = $Name
         family_filter = $FamilyFilter
@@ -47,6 +180,7 @@ function New-Scenario([string]$Name, [string]$FamilyFilter, [string]$MotionMode,
         stress_scene_filter = $StressSceneFilter
         stress_scene_only = $StressSceneOnly
         no_stress_scene = $NoStressScene
+        view_pack = $ViewPack
         packet_root = (Join-Path $OutputRoot $Name)
     }
 }
@@ -59,49 +193,56 @@ function Get-ScenarioCatalog {
         -MotionMode "static" `
         -StressSceneFilter "rt_showcase:reflection_closeup" `
         -StressSceneOnly $true `
-        -NoStressScene $false
+        -NoStressScene $false `
+        -ViewPack "reflection"
     $catalog["reflection_mouse_jitter"] = New-Scenario `
         -Name "reflection_mouse_jitter" `
         -FamilyFilter "" `
         -MotionMode "mouse_jitter" `
         -StressSceneFilter "rt_showcase:reflection_closeup" `
         -StressSceneOnly $true `
-        -NoStressScene $false
+        -NoStressScene $false `
+        -ViewPack "reflection"
     $catalog["enclosed_static"] = New-Scenario `
         -Name "enclosed_static" `
         -FamilyFilter "gallery,kitchen,office,gym" `
         -MotionMode "static" `
         -StressSceneFilter "" `
         -StressSceneOnly $false `
-        -NoStressScene $true
+        -NoStressScene $true `
+        -ViewPack "enclosed"
     $catalog["enclosed_mouse_jitter"] = New-Scenario `
         -Name "enclosed_mouse_jitter" `
         -FamilyFilter "gallery,kitchen,office,gym" `
         -MotionMode "mouse_jitter" `
         -StressSceneFilter "" `
         -StressSceneOnly $false `
-        -NoStressScene $true
+        -NoStressScene $true `
+        -ViewPack "enclosed"
     $catalog["enclosed_camera_sweep"] = New-Scenario `
         -Name "enclosed_camera_sweep" `
         -FamilyFilter "gallery,kitchen,office,gym" `
         -MotionMode "camera_sweep" `
         -StressSceneFilter "" `
         -StressSceneOnly $false `
-        -NoStressScene $true
+        -NoStressScene $true `
+        -ViewPack "enclosed"
     $catalog["heavy_static"] = New-Scenario `
         -Name "heavy_static" `
         -FamilyFilter "concert,red_room,stadium" `
         -MotionMode "static" `
         -StressSceneFilter "" `
         -StressSceneOnly $false `
-        -NoStressScene $true
+        -NoStressScene $true `
+        -ViewPack "heavy_light"
     $catalog["heavy_light_sweep"] = New-Scenario `
         -Name "heavy_light_sweep" `
         -FamilyFilter "concert,red_room,stadium" `
         -MotionMode "light_sweep" `
         -StressSceneFilter "" `
         -StressSceneOnly $false `
-        -NoStressScene $true
+        -NoStressScene $true `
+        -ViewPack "heavy_light"
     return $catalog
 }
 
@@ -114,6 +255,7 @@ if (-not (Test-Path $matrixAnalyzer)) {
 
 New-Item -ItemType Directory -Force -Path $outputPath | Out-Null
 $catalog = Get-ScenarioCatalog
+$viewPacks = Get-ViewPacks
 $selectedScenarios = @()
 foreach ($scenarioName in (Split-Csv $Scenarios)) {
     if (-not $catalog.ContainsKey($scenarioName)) {
@@ -127,6 +269,8 @@ if ($selectedScenarios.Count -eq 0) {
 
 $packetRoots = @()
 $statusRows = @()
+$ranAnyPacket = $false
+$estimatedEngineRuns = 0
 
 foreach ($scenario in $selectedScenarios) {
     $packetRoots += $scenario.packet_root
@@ -135,18 +279,23 @@ foreach ($scenario in $selectedScenarios) {
     $continuedAfterFailure = $false
     $packetPath = Join-Path $root $scenario.packet_root
     $manifestPath = Join-Path $packetPath "manifest.json"
+    $scenarioViewFilter = Resolve-ScenarioViewFilter $scenario $viewPacks
+    $scenarioViewCount = Count-FilterItems $scenarioViewFilter
+    $scenarioFamilyCount = Count-FamiliesForScenario $scenario
+    $scenarioEstimatedRuns = $scenarioViewCount * $scenarioFamilyCount
+    $estimatedEngineRuns += $scenarioEstimatedRuns
 
     if (-not $PlanOnly -and -not $SummarizeExisting) {
         $packetArgs = @(
             "-OutputRoot", $scenario.packet_root,
-            "-FamilyFilter", $scenario.family_filter,
+            "-ViewFilter", $scenarioViewFilter,
             "-SmokeFrames", [string]$SmokeFrames,
             "-CaptureFrame", [string]$CaptureFrame,
             "-CaptureSequenceCount", [string]$CaptureSequenceCount,
             "-StabilityMotionMode", $scenario.motion_mode
         )
-        if (-not [string]::IsNullOrWhiteSpace($ViewFilter)) {
-            $packetArgs += @("-ViewFilter", $ViewFilter)
+        if (-not [string]::IsNullOrWhiteSpace($scenario.family_filter)) {
+            $packetArgs += @("-FamilyFilter", $scenario.family_filter)
         }
         if (-not [string]::IsNullOrWhiteSpace($scenario.stress_scene_filter)) {
             $packetArgs += @("-StressSceneFilter", $scenario.stress_scene_filter)
@@ -182,6 +331,12 @@ foreach ($scenario in $selectedScenarios) {
         stress_scene_filter = $scenario.stress_scene_filter
         stress_scene_only = $scenario.stress_scene_only
         no_stress_scene = $scenario.no_stress_scene
+        view_profile = $ViewProfile
+        view_pack = $scenario.view_pack
+        view_filter = $scenarioViewFilter
+        view_count = $scenarioViewCount
+        family_count = $scenarioFamilyCount
+        estimated_engine_runs = $scenarioEstimatedRuns
         ran_packet = $ranPacket
         exit_code = $packetExit
         continued_after_failure = $continuedAfterFailure
@@ -202,6 +357,9 @@ $statusDoc = [pscustomobject]@{
     continue_on_packet_failure = [bool]$ContinueOnPacketFailure
     summarize_existing = [bool]$SummarizeExisting
     plan_only = [bool]$PlanOnly
+    view_profile = $ViewProfile
+    override_view_filter = $ViewFilter
+    estimated_engine_runs = $estimatedEngineRuns
     packet_roots = @($packetRoots)
     packet_status = @($statusRows)
 }
@@ -213,12 +371,14 @@ $statusLines = @(
     "Plan only: ``$([bool]$PlanOnly)``",
     "Summarize existing: ``$([bool]$SummarizeExisting)``",
     "Continue on packet failure: ``$([bool]$ContinueOnPacketFailure)``",
+    "View profile: ``$ViewProfile``",
+    "Estimated engine runs: ``$estimatedEngineRuns``",
     "",
-    "| Scenario | Packet | Families | Motion | Stress | Ran | Exit | Continued |",
-    "|---|---|---|---|---|---:|---:|---:|"
+    "| Scenario | Packet | Families | Motion | View Pack | Views | Est. Runs | Stress | Ran | Exit | Continued |",
+    "|---|---|---|---|---|---:|---:|---|---:|---:|---:|"
 )
 foreach ($row in $statusRows) {
-    $statusLines += "| $($row.scenario) | $($row.packet_root) | $($row.family_filter) | $($row.motion_mode) | $($row.stress_scene_filter) | $($row.ran_packet) | $($row.exit_code) | $($row.continued_after_failure) |"
+    $statusLines += "| $($row.scenario) | $($row.packet_root) | $($row.family_filter) | $($row.motion_mode) | $($row.view_pack) | $($row.view_count) | $($row.estimated_engine_runs) | $($row.stress_scene_filter) | $($row.ran_packet) | $($row.exit_code) | $($row.continued_after_failure) |"
 }
 $statusLines | Set-Content -Encoding UTF8 $suiteStatusMd
 

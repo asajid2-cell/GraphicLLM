@@ -12676,3 +12676,80 @@ Interpretation:
 - It gives future enclosed/heavy-lighting scene packets a concrete material
   blocker vocabulary instead of making material weakness a manual visual
   judgment after the fact.
+
+### V3 Promotion Suite Orchestration - 2026-06-09
+
+Problem:
+
+- The full V3 promotion target needs reflection-closeup evidence plus
+  enclosed-family and heavy-lighting scene evidence, but running one enormous
+  all-family/all-view packet is too brittle and expensive.
+- `run_full_scene_shader_pipeline_v3_matrix.ps1` could aggregate packet roots,
+  but there was no first-class suite that defined the promotion-grade scenario
+  groups, motion modes, and expected coverage.
+- The lower-level scene-local runner supported `light_sweep`, but
+  `run_full_scene_shader_pipeline_v2_packet.ps1` rejected it, so full V3
+  promotion packets could not exercise heavy-lighting motion through the normal
+  V3 packet path.
+
+Implemented:
+
+- Added `tools/run_full_scene_shader_pipeline_v3_promotion_suite.ps1`.
+- Default suite scenarios:
+  - `reflection_static`: RT Showcase reflection closeup, static.
+  - `reflection_mouse_jitter`: RT Showcase reflection closeup, mouse jitter.
+  - `enclosed_static`: gallery, kitchen, office, and gym, static.
+  - `enclosed_mouse_jitter`: gallery, kitchen, office, and gym, mouse jitter.
+  - `enclosed_camera_sweep`: gallery, kitchen, office, and gym, camera sweep.
+  - `heavy_light_sweep`: concert, red room, and stadium, light sweep.
+- Default suite matrix requirements now include families
+  `stress_rt_showcase_reflection_closeup,gallery,kitchen,office,gym,concert,red_room,stadium`
+  and motion modes `static,mouse_jitter,camera_sweep,light_sweep`.
+- The suite writes `suite_packet_status.json/md`, then feeds those packet roots
+  into `build_full_scene_shader_v3_matrix_decision.py`.
+- The suite supports:
+  - `-PlanOnly` for verifying scenario coverage without launching the engine.
+  - `-SummarizeExisting` for rebuilding matrix reports from already-rendered
+    scenario roots.
+  - `-ContinueOnPacketFailure` so interrupted or failed long runs still produce
+    a matrix with named missing packets/families/motion modes.
+- `run_full_scene_shader_pipeline_v2_packet.ps1` now allows
+  `-StabilityMotionMode light_sweep`, matching the underlying scene-local
+  packet runner.
+- `tools/validate_full_scene_shader_pipeline_v3_plan.py` now requires the
+  promotion suite runner and its scenario/motion tokens.
+
+Evidence:
+
+- Plan-only probe:
+  `build\captures\v3_promotion_suite_plan_probe2_20260609`
+  wrote `suite_packet_status.json/md` with all six default scenarios and the
+  final required family/motion set.
+- Missing-packet preservation probe:
+  `build\captures\v3_promotion_suite_missing_packet_report_probe2_20260609`
+  used `-SummarizeExisting -ContinueOnPacketFailure`.
+  It wrote `suite_packet_status.json/md` and `v3_matrix_decision.json/md`
+  with:
+  - `packet_count=6`;
+  - `passed_packet_count=0`;
+  - named failures for every missing scenario packet root;
+  - missing required families:
+    `concert,gallery,gym,kitchen,office,red_room,stadium,stress_rt_showcase_reflection_closeup`;
+  - missing required motion modes:
+    `camera_sweep,light_sweep,mouse_jitter,static`.
+
+Validation:
+
+- PowerShell parser passed for
+  `tools\run_full_scene_shader_pipeline_v3_promotion_suite.ps1`.
+- `python tools\validate_full_scene_shader_pipeline_v3_plan.py`.
+- Plan-only and missing-packet preservation probes listed above.
+
+Interpretation:
+
+- This is the suite-level harness needed for the next real evidence run. It
+  does not prove the scenes or shaders are promotion-ready yet.
+- The next promotion-grade run should execute the suite with `-NoBuild` after a
+  fresh successful build and keep `-ContinueOnPacketFailure` enabled so any
+  packet crash still leaves a ranked matrix instead of losing the blocker
+  state.

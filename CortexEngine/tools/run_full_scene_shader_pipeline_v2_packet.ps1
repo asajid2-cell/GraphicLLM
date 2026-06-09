@@ -6,7 +6,7 @@ param(
     [int]$SmokeFrames = 140,
     [int]$CaptureFrame = 60,
     [int]$CaptureSequenceCount = 1,
-    [ValidateSet("static", "mouse_jitter", "camera_sweep")]
+    [ValidateSet("static", "mouse_jitter", "camera_sweep", "light_sweep")]
     [string]$StabilityMotionMode = "static",
     [switch]$NoBuild,
     [switch]$StressSceneOnly,

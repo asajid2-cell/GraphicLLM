@@ -23,6 +23,7 @@ CMAKE_PATH = ROOT / "CMakeLists.txt"
 V3_PLACEHOLDER_ANALYZER_PATH = ROOT / "tools" / "analyze_full_scene_shader_v3_placeholders.py"
 V3_PACKET_RUNNER_PATH = ROOT / "tools" / "run_full_scene_shader_pipeline_v3_packet.ps1"
 V3_MATRIX_RUNNER_PATH = ROOT / "tools" / "run_full_scene_shader_pipeline_v3_matrix.ps1"
+V3_PROMOTION_SUITE_RUNNER_PATH = ROOT / "tools" / "run_full_scene_shader_pipeline_v3_promotion_suite.ps1"
 SCENE_LOCAL_PACKET_RUNNER_PATH = ROOT / "tools" / "run_scene_local_cinematic_renderer_v1_packets.ps1"
 V3_PROMOTION_DECISION_PATH = ROOT / "tools" / "build_full_scene_shader_v3_promotion_decision.py"
 V3_MATRIX_DECISION_PATH = ROOT / "tools" / "build_full_scene_shader_v3_matrix_decision.py"
@@ -177,6 +178,11 @@ def main() -> int:
         f"Missing V3 matrix runner: {V3_MATRIX_RUNNER_PATH}",
     )
     require(
+        V3_PROMOTION_SUITE_RUNNER_PATH.exists(),
+        errors,
+        f"Missing V3 promotion suite runner: {V3_PROMOTION_SUITE_RUNNER_PATH}",
+    )
+    require(
         SCENE_LOCAL_PACKET_RUNNER_PATH.exists(),
         errors,
         f"Missing scene-local packet runner: {SCENE_LOCAL_PACKET_RUNNER_PATH}",
@@ -289,6 +295,7 @@ def main() -> int:
     analyzer_source = V3_PLACEHOLDER_ANALYZER_PATH.read_text(encoding="utf-8")
     packet_source = V3_PACKET_RUNNER_PATH.read_text(encoding="utf-8")
     matrix_runner_source = V3_MATRIX_RUNNER_PATH.read_text(encoding="utf-8")
+    promotion_suite_runner_source = V3_PROMOTION_SUITE_RUNNER_PATH.read_text(encoding="utf-8")
     scene_local_packet_source = SCENE_LOCAL_PACKET_RUNNER_PATH.read_text(encoding="utf-8")
     promotion_source = V3_PROMOTION_DECISION_PATH.read_text(encoding="utf-8")
     matrix_source = V3_MATRIX_DECISION_PATH.read_text(encoding="utf-8")
@@ -323,6 +330,7 @@ def main() -> int:
             analyzer_source,
             packet_source,
             matrix_runner_source,
+            promotion_suite_runner_source,
             scene_local_packet_source,
             promotion_source,
             matrix_source,
@@ -1311,6 +1319,13 @@ def main() -> int:
         "ContinueOnPacketFailure",
         "packet_run_status.json",
         "packet_run_status.md",
+        "run_full_scene_shader_pipeline_v3_promotion_suite.ps1",
+        "cortex.full_scene_shader_pipeline_v3.promotion_suite.v1",
+        "reflection_static",
+        "enclosed_mouse_jitter",
+        "enclosed_camera_sweep",
+        "heavy_light_sweep",
+        "light_sweep",
         "cortex.full_scene_shader_pipeline_v3.matrix_packet_run_status.v1",
         "continued_after_failure",
         "packet_exit_code",

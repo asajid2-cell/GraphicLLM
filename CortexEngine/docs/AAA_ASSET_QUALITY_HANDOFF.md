@@ -13844,3 +13844,100 @@ Interpretation:
   set.
 - The default-beauty aggregate remains blocked only by promoted motion coverage:
   `camera_sweep` and `mouse_jitter`.
+
+### V3 Promoted Default Motion Coverage Complete - 2026-06-09
+
+Scope:
+
+- Added promoted-default evidence for the remaining motion modes:
+  `camera_sweep` and `mouse_jitter`.
+- Rebuilt the aggregate mixed matrix with promoted family coverage and promoted
+  motion coverage together.
+
+Validation:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine\tools\run_full_scene_shader_pipeline_v3_packet.ps1 `
+  -NoBuild -NoStressScene -SkipSceneAnalyzers `
+  -FamilyFilter gallery `
+  -SmokeFrames 63 -CaptureFrame 60 -CaptureSequenceCount 2 `
+  -StabilityMotionMode camera_sweep -PromoteCandidateBeautyV3ToDefault `
+  -OutputRoot build\captures\v3_default_beauty_promotion_gallery_camera_sweep_seq1_20260609
+
+powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine\tools\run_full_scene_shader_pipeline_v3_packet.ps1 `
+  -NoBuild -NoStressScene -SkipSceneAnalyzers `
+  -FamilyFilter gallery `
+  -SmokeFrames 63 -CaptureFrame 60 -CaptureSequenceCount 2 `
+  -StabilityMotionMode mouse_jitter -PromoteCandidateBeautyV3ToDefault `
+  -OutputRoot build\captures\v3_default_beauty_promotion_gallery_mouse_jitter_seq1_20260609
+
+python CortexEngine\tools\build_full_scene_shader_v3_matrix_decision.py `
+  --packet-root CortexEngine\build\captures\v3_promotion_suite_reflection_static_smoke7_20260609\reflection_static `
+  --packet-root CortexEngine\build\captures\v3_promotion_suite_reflection_mouse_jitter_seq1_20260609\reflection_mouse_jitter `
+  --packet-root CortexEngine\build\captures\v3_promotion_suite_enclosed_static_smoke6_20260609\enclosed_static `
+  --packet-root CortexEngine\build\captures\v3_promotion_suite_enclosed_mouse_jitter_seq2_20260609\enclosed_mouse_jitter `
+  --packet-root CortexEngine\build\captures\v3_promotion_suite_enclosed_camera_sweep_seq1_20260609\enclosed_camera_sweep `
+  --packet-root CortexEngine\build\captures\v3_promotion_suite_heavy_light_sweep_smoke2_20260609\heavy_light_sweep `
+  --packet-root CortexEngine\build\captures\v3_default_beauty_promotion_gallery_smoke1_20260609 `
+  --packet-root CortexEngine\build\captures\v3_default_beauty_promotion_kitchen_static_smoke1_20260609 `
+  --packet-root CortexEngine\build\captures\v3_default_beauty_promotion_reflection_static_smoke1_20260609 `
+  --packet-root CortexEngine\build\captures\v3_default_beauty_promotion_office_gym_static_smoke1_20260609 `
+  --packet-root CortexEngine\build\captures\v3_default_beauty_promotion_heavy_light_sweep_seq1_20260609 `
+  --packet-root CortexEngine\build\captures\v3_default_beauty_promotion_gallery_camera_sweep_seq1_20260609 `
+  --packet-root CortexEngine\build\captures\v3_default_beauty_promotion_gallery_mouse_jitter_seq1_20260609 `
+  --required-families stress_rt_showcase_reflection_closeup,gallery,kitchen,office,gym,concert,red_room,stadium `
+  --required-motion-modes static,mouse_jitter,camera_sweep,light_sweep `
+  --output-json CortexEngine\build\captures\v3_default_beauty_promotion_mixed_matrix6_20260609\v3_matrix_decision.json `
+  --output-md CortexEngine\build\captures\v3_default_beauty_promotion_mixed_matrix6_20260609\v3_matrix_decision.md
+```
+
+Evidence:
+
+- Camera-sweep promoted packet:
+  `build\captures\v3_default_beauty_promotion_gallery_camera_sweep_seq1_20260609`.
+  - `v3_stability.json`: `report_count=54`,
+    `default_beauty_affects_any=true`, `promoted_report_count=2`.
+  - packet log: lighting motion passed with `26` view sequences across `1`
+    family.
+  - `promotion_decision.json`: `status=review_packet_passed`,
+    `default_beauty_promotion_allowed=true`, blockers
+    `["full_coverage_not_ready"]`.
+- Mouse-jitter promoted packet:
+  `build\captures\v3_default_beauty_promotion_gallery_mouse_jitter_seq1_20260609`.
+  - `v3_stability.json`: `report_count=54`,
+    `default_beauty_affects_any=true`, `promoted_report_count=2`.
+  - packet log: lighting motion passed with `26` view sequences across `1`
+    family.
+  - `promotion_decision.json`: `status=review_packet_passed`,
+    `default_beauty_promotion_allowed=true`, blockers
+    `["full_coverage_not_ready"]`.
+- Final mixed matrix for this checkpoint:
+  `build\captures\v3_default_beauty_promotion_mixed_matrix6_20260609\v3_matrix_decision.md/json`.
+  - `packet_count=13`;
+  - `passed_packet_count=13`;
+  - `full_matrix_ready=true`;
+  - `candidate_beauty_review_ready=true`;
+  - `default_beauty_promotable=true`;
+  - `promoted_packet_count=7`;
+  - `promoted_report_count=20`;
+  - observed promoted families:
+    `concert,gallery,gym,kitchen,office,red_room,stadium,stress_rt_showcase_reflection_closeup`;
+  - missing promoted families: none;
+  - observed promoted motion modes:
+    `camera_sweep,light_sweep,mouse_jitter,static`;
+  - missing promoted motion modes: none;
+  - candidate beauty is ready `172/172`;
+  - default promotion blocker counts: `{}`.
+
+Interpretation:
+
+- The V3 promoted-default evidence matrix is now complete for the required
+  family and motion set.
+- This proves the analyzable default-beauty promotion path is no longer only a
+  gallery/static smoke path. It has cross-family and cross-motion packet
+  evidence.
+- Do not equate this with the entire AAA shader overhaul being complete. It is
+  a major gate inside the broader goal. Before goal completion, run an explicit
+  requirement audit against scene-local resource contracts, ReflectionV3,
+  LightingShadowV3 diagnostics, material gates, render artifacts, and release
+  visual expectations.

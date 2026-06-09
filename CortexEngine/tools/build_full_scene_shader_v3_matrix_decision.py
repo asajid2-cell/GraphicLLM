@@ -89,6 +89,7 @@ def packet_row(packet_root: Path, packet_status: dict[str, Any] | None = None) -
         "candidate_beauty_ready_report_count", 0
     )
     row["candidate_beauty_predicates"] = promotion.get("candidate_beauty_predicates", {})
+    row["material_quality_gate"] = promotion.get("material_quality_gate", {})
     row["failures"].extend(str(item) for item in promotion.get("failures", []))
     row["warnings"].extend(str(item) for item in promotion.get("warnings", []))
     if not row["review_packet_passed"]:
@@ -127,6 +128,8 @@ def build_matrix(
     warnings: list[str] = []
     aggregate_candidate_blockers: dict[str, int] = {}
     aggregate_requested_candidate_blockers: dict[str, int] = {}
+    aggregate_material_quality_blockers: dict[str, int] = {}
+    material_quality_scores: list[float] = []
     for row in rows:
         for failure in row.get("failures", []):
             failures.append(f"{row.get('packet_root')}: {failure}")
@@ -145,6 +148,16 @@ def build_matrix(
                 for key, value in requested_blockers.items():
                     aggregate_requested_candidate_blockers[str(key)] = (
                         aggregate_requested_candidate_blockers.get(str(key), 0) + int(value or 0)
+                    )
+        material_quality = row.get("material_quality_gate", {})
+        if isinstance(material_quality, dict):
+            material_quality_scores.append(float(material_quality.get("score", 0.0) or 0.0))
+            blockers = material_quality.get("blockers", [])
+            if isinstance(blockers, list):
+                for blocker in blockers:
+                    key = str(blocker)
+                    aggregate_material_quality_blockers[key] = (
+                        aggregate_material_quality_blockers.get(key, 0) + 1
                     )
 
     missing_families = sorted(set(required_families) - set(observed_families))
@@ -170,6 +183,8 @@ def build_matrix(
         "candidate_beauty_requested_blocker_counts": dict(
             sorted(aggregate_requested_candidate_blockers.items())
         ),
+        "material_quality_min_score": min(material_quality_scores) if material_quality_scores else 0.0,
+        "material_quality_blocker_counts": dict(sorted(aggregate_material_quality_blockers.items())),
         "packets": rows,
         "failures": failures,
         "warnings": warnings,
@@ -190,9 +205,11 @@ def write_markdown(path: Path, matrix: dict[str, Any]) -> None:
         f"- missing motion modes: `{', '.join(matrix['missing_motion_modes'])}`",
         f"- candidate blocker counts: `{json.dumps(matrix.get('candidate_beauty_blocker_counts', {}), sort_keys=True)}`",
         f"- requested candidate blocker counts: `{json.dumps(matrix.get('candidate_beauty_requested_blocker_counts', {}), sort_keys=True)}`",
+        f"- material quality min score: `{float(matrix.get('material_quality_min_score', 0.0) or 0.0):.4f}`",
+        f"- material quality blocker counts: `{json.dumps(matrix.get('material_quality_blocker_counts', {}), sort_keys=True)}`",
         "",
-        "| Packet | Motion | Families | Exit | Passed | Status | Candidate Ready | Candidate Blockers |",
-        "|---|---|---|---:|---|---|---:|---|",
+        "| Packet | Motion | Families | Exit | Passed | Status | Material Score | Candidate Ready | Candidate Blockers |",
+        "|---|---|---|---:|---|---|---:|---:|---|",
     ]
     for row in matrix["packets"]:
         predicates = row.get("candidate_beauty_predicates", {})
@@ -201,6 +218,10 @@ def write_markdown(path: Path, matrix: dict[str, Any]) -> None:
         blocker_counts = predicates.get("blocker_counts", {})
         if not isinstance(blocker_counts, dict):
             blocker_counts = {}
+        material_quality = row.get("material_quality_gate", {})
+        material_score = 0.0
+        if isinstance(material_quality, dict):
+            material_score = float(material_quality.get("score", 0.0) or 0.0)
         lines.append(
             "| "
             + " | ".join(
@@ -211,6 +232,7 @@ def write_markdown(path: Path, matrix: dict[str, Any]) -> None:
                     f"`{row.get('packet_exit_code')}`",
                     f"`{str(row.get('review_packet_passed')).lower()}`",
                     f"`{row.get('promotion_status', 'unknown')}`",
+                    f"`{material_score:.4f}`",
                     f"`{row.get('candidate_beauty_ready_report_count', 0)}/{row.get('candidate_beauty_requested_report_count', 0)}`",
                     f"`{json.dumps(blocker_counts, sort_keys=True)}`",
                 ]

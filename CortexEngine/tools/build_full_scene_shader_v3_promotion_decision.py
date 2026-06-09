@@ -34,6 +34,15 @@ DEFAULT_REQUIRED_FAMILIES = [
 
 DEFAULT_REQUIRED_MOTION_MODES = ["static", "mouse_jitter", "camera_sweep"]
 
+MATERIAL_QUALITY_THRESHOLDS = {
+    "min_named_material_ratio": 0.95,
+    "min_advanced_feature_ratio": 0.20,
+    "min_reflection_eligible_ratio": 0.05,
+    "max_contract_debug_view_debt": 0,
+    "max_unresolved_default_fallback": 0,
+    "min_missing_channel_mask_nonblack": 0.001,
+}
+
 
 def load_json(path: pathlib.Path) -> dict[str, Any]:
     return json.loads(path.read_text(encoding="utf-8-sig"))
@@ -149,6 +158,99 @@ def candidate_predicate_summary(signal: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def material_quality_gate(material_payload: dict[str, Any] | None) -> dict[str, Any]:
+    if material_payload is None:
+        return {
+            "ready": False,
+            "score": 0.0,
+            "blockers": ["missing_material_payload"],
+            "warnings": [],
+            "thresholds": MATERIAL_QUALITY_THRESHOLDS,
+        }
+
+    summary = material_payload.get("summary", {})
+    if not isinstance(summary, dict):
+        summary = {}
+
+    sampled = int(summary.get("sampled_materials_total", 0) or 0)
+    named = int(summary.get("named_materials_total", 0) or 0)
+    advanced = int(summary.get("advanced_feature_materials_total", 0) or 0)
+    reflection_eligible = int(summary.get("reflection_eligible_total", 0) or 0)
+    material_report_count = int(summary.get("material_report_count", 0) or 0)
+    family_count = int(summary.get("family_count", 0) or 0)
+    contract_debt = int(summary.get("contract_debug_view_debt_count", 0) or 0)
+    unresolved_roughness = int(summary.get("unresolved_default_roughness_fallback_total", 0) or 0)
+    unresolved_transmission = int(summary.get("unresolved_default_transmission_fallback_total", 0) or 0)
+    missing_channel_mask_nonblack = float(
+        summary.get("missing_channel_mask_nonblack_ratio_max", 0.0) or 0.0
+    )
+
+    named_ratio = named / sampled if sampled else 0.0
+    advanced_ratio = advanced / sampled if sampled else 0.0
+    reflection_eligible_ratio = reflection_eligible / sampled if sampled else 0.0
+
+    blockers: list[str] = []
+    warnings: list[str] = []
+    predicates = {
+        "material_payload_ready": material_payload.get("ready") is True,
+        "material_reports_present": material_report_count > 0,
+        "families_present": family_count > 0,
+        "sampled_materials_present": sampled > 0,
+        "named_material_ratio_ok": named_ratio >= MATERIAL_QUALITY_THRESHOLDS["min_named_material_ratio"],
+        "advanced_feature_ratio_ok": advanced_ratio >= MATERIAL_QUALITY_THRESHOLDS["min_advanced_feature_ratio"],
+        "reflection_eligible_ratio_ok": (
+            reflection_eligible_ratio >= MATERIAL_QUALITY_THRESHOLDS["min_reflection_eligible_ratio"]
+        ),
+        "contract_debug_views_complete": contract_debt <= MATERIAL_QUALITY_THRESHOLDS["max_contract_debug_view_debt"],
+        "unresolved_default_fallback_clear": (
+            unresolved_roughness + unresolved_transmission
+            <= MATERIAL_QUALITY_THRESHOLDS["max_unresolved_default_fallback"]
+        ),
+        "missing_channel_mask_debug_present": (
+            missing_channel_mask_nonblack >= MATERIAL_QUALITY_THRESHOLDS["min_missing_channel_mask_nonblack"]
+        ),
+    }
+
+    for predicate, passed in predicates.items():
+        if not passed:
+            blockers.append(predicate)
+
+    class_roughness = int(summary.get("class_authored_default_roughness_total", 0) or 0)
+    class_transmission = int(summary.get("class_authored_default_transmission_total", 0) or 0)
+    if class_roughness or class_transmission:
+        warnings.append(
+            "material class-authored defaults still present: "
+            f"roughness={class_roughness} transmission={class_transmission}"
+        )
+
+    score = sum(1 for passed in predicates.values() if passed) / max(1, len(predicates))
+    return {
+        "ready": not blockers,
+        "score": score,
+        "blockers": blockers,
+        "warnings": warnings,
+        "thresholds": MATERIAL_QUALITY_THRESHOLDS,
+        "predicate_count": len(predicates),
+        "ready_predicate_count": sum(1 for passed in predicates.values() if passed),
+        "predicates": predicates,
+        "summary": {
+            "family_count": family_count,
+            "material_report_count": material_report_count,
+            "sampled_materials_total": sampled,
+            "named_materials_total": named,
+            "advanced_feature_materials_total": advanced,
+            "reflection_eligible_total": reflection_eligible,
+            "named_material_ratio": named_ratio,
+            "advanced_feature_ratio": advanced_ratio,
+            "reflection_eligible_ratio": reflection_eligible_ratio,
+            "contract_debug_view_debt_count": contract_debt,
+            "unresolved_default_roughness_fallback_total": unresolved_roughness,
+            "unresolved_default_transmission_fallback_total": unresolved_transmission,
+            "missing_channel_mask_nonblack_ratio_max": missing_channel_mask_nonblack,
+        },
+    }
+
+
 def make_decision(
     *,
     packet_root: pathlib.Path,
@@ -236,6 +338,12 @@ def make_decision(
     else:
         failures.extend(str(item) for item in material_payload.get("failures", []))
         warnings.extend(str(item) for item in material_payload.get("warnings", []))
+    material_quality = material_quality_gate(material_payload)
+    if material_quality.get("ready") is not True:
+        blockers = material_quality.get("blockers", [])
+        blocker_text = ", ".join(str(item) for item in blockers) if isinstance(blockers, list) else "unknown"
+        failures.append(f"Material quality gate is not ready: {blocker_text}")
+    warnings.extend(str(item) for item in material_quality.get("warnings", []))
     if scene_profile is None:
         failures.append("missing v3_scene_profile.json")
     else:
@@ -448,6 +556,7 @@ def make_decision(
         "candidate_beauty_requested_report_count": candidate_beauty_requested_count,
         "candidate_beauty_ready_report_count": candidate_beauty_ready_count,
         "candidate_beauty_predicates": candidate_predicates,
+        "material_quality_gate": material_quality,
         "composite_v3_diagnostics": {
             "mean_explicit_legacy_rescue": mean_explicit_legacy_rescue,
             "mean_legacy_rescue": mean_legacy_rescue,
@@ -507,6 +616,30 @@ def write_markdown(path: pathlib.Path, decision: dict[str, Any]) -> None:
                 f"- max ready predicates: `{candidate_predicates.get('max_ready_predicate_count', 0)}`",
                 f"- blocker counts: `{json.dumps(blocker_counts, sort_keys=True)}`",
                 f"- requested blocker counts: `{json.dumps(requested_blocker_counts, sort_keys=True)}`",
+            ]
+        )
+    material_quality = decision.get("material_quality_gate", {})
+    if isinstance(material_quality, dict):
+        material_summary = material_quality.get("summary", {})
+        if not isinstance(material_summary, dict):
+            material_summary = {}
+        lines.extend(
+            [
+                "",
+                "## Material Quality Gate",
+                "",
+                f"- ready: `{str(material_quality.get('ready')).lower()}`",
+                f"- score: `{float(material_quality.get('score', 0.0) or 0.0):.4f}`",
+                f"- ready predicates: `{material_quality.get('ready_predicate_count', 0)}/{material_quality.get('predicate_count', 0)}`",
+                f"- blockers: `{json.dumps(material_quality.get('blockers', []), sort_keys=True)}`",
+                f"- sampled materials: `{material_summary.get('sampled_materials_total', 0)}`",
+                f"- named material ratio: `{float(material_summary.get('named_material_ratio', 0.0) or 0.0):.4f}`",
+                f"- advanced feature ratio: `{float(material_summary.get('advanced_feature_ratio', 0.0) or 0.0):.4f}`",
+                f"- reflection eligible ratio: `{float(material_summary.get('reflection_eligible_ratio', 0.0) or 0.0):.4f}`",
+                f"- contract debug-view debt: `{material_summary.get('contract_debug_view_debt_count', 0)}`",
+                f"- unresolved roughness fallback: `{material_summary.get('unresolved_default_roughness_fallback_total', 0)}`",
+                f"- unresolved transmission fallback: `{material_summary.get('unresolved_default_transmission_fallback_total', 0)}`",
+                f"- missing-channel mask max nonblack: `{float(material_summary.get('missing_channel_mask_nonblack_ratio_max', 0.0) or 0.0):.4f}`",
             ]
         )
     composite = decision.get("composite_v3_diagnostics", {})

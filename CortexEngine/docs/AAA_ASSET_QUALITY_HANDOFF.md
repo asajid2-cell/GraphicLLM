@@ -12605,3 +12605,74 @@ Interpretation:
 - It makes failed and incomplete promotion runs inspectable, so the next
   cross-scene rendering slices can rank real blockers instead of stopping at
   the first child-process failure.
+
+### V3 Material Quality Promotion Gate - 2026-06-09
+
+Problem:
+
+- `v3_material_payload.json` already checked material debug views and frame
+  contract material stats, but promotion and matrix reports did not expose a
+  compact material-quality decision.
+- A packet could be reviewed without a single field saying whether material
+  evidence was AAA-relevant: named material coverage, advanced material
+  richness, reflection eligibility, unresolved fallback debt, and required
+  material debug-view coverage were spread across lower-level artifacts.
+
+Implemented:
+
+- `tools/build_full_scene_shader_v3_promotion_decision.py` now emits
+  `material_quality_gate` with thresholds, predicates, score, blockers,
+  warnings, and material summary ratios.
+- The gate fails promotion when:
+  - named material coverage is below `0.95`;
+  - advanced-feature material ratio is below `0.20`;
+  - reflection-eligible material ratio is below `0.05`;
+  - contract material debug-view debt is nonzero;
+  - unresolved roughness/transmission fallback debt is nonzero;
+  - the material missing-channel-mask debug view is absent/nonactive.
+- Class-authored default roughness/transmission remains a warning, not a
+  blocker, because those are authored material-class defaults rather than
+  unresolved fallback.
+- `tools/build_full_scene_shader_v3_matrix_decision.py` now aggregates
+  `material_quality_min_score` and `material_quality_blocker_counts`, and the
+  matrix markdown shows per-packet material score.
+- `tools/validate_full_scene_shader_pipeline_v3_plan.py` now requires the
+  material-quality gate and matrix aggregation tokens.
+
+Evidence:
+
+- Synthetic weak-material probe:
+  direct `material_quality_gate(...)` invocation produced blockers
+  `named_material_ratio_ok`, `advanced_feature_ratio_ok`,
+  `reflection_eligible_ratio_ok`, `contract_debug_views_complete`, and
+  `missing_channel_mask_debug_present`.
+- Real packet promotion probe:
+  `build\captures\v3_material_quality_gate_probe_20260609`
+  reported:
+  - `review_packet_passed=true`;
+  - `material_quality_gate.ready=true`;
+  - score `1.0000`;
+  - named material ratio `1.0000`;
+  - advanced feature ratio `0.5333`;
+  - reflection eligible ratio `0.3000`;
+  - contract debug-view debt `0`;
+  - unresolved roughness/transmission fallback `0/0`.
+- Matrix probe:
+  `build\captures\v3_material_quality_matrix_probe_20260609`
+  over the stress reflection closeup/static packet reported
+  `full_matrix_ready=true`, `material_quality_min_score=1.0`, and empty
+  `material_quality_blocker_counts`.
+
+Validation:
+
+- `python -m py_compile tools\build_full_scene_shader_v3_promotion_decision.py tools\build_full_scene_shader_v3_matrix_decision.py tools\validate_full_scene_shader_pipeline_v3_plan.py`
+- `python tools\validate_full_scene_shader_pipeline_v3_plan.py`
+- `powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_full_scene_shader_pipeline_v3_matrix.ps1 -OutputRoot build\captures\v3_material_quality_matrix_probe_20260609 -PacketRoots build\captures\v3_runtime_scene_local_resource_contract_smoke_20260609 -RequiredFamilies stress_rt_showcase_reflection_closeup -RequiredMotionModes static`
+
+Interpretation:
+
+- This is a promotion/harness hardening slice. It does not change default
+  beauty and does not claim the final AAA look is solved.
+- It gives future enclosed/heavy-lighting scene packets a concrete material
+  blocker vocabulary instead of making material weakness a manual visual
+  judgment after the fact.

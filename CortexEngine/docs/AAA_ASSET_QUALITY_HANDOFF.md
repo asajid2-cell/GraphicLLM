@@ -13007,3 +13007,86 @@ Interpretation:
   `enclosed_mouse_jitter` and `enclosed_camera_sweep`; those should use
   `CaptureSequenceCount >= 2` so motion/temporal stability evidence is not only
   a single-frame smoke.
+
+### V3 Enclosed Mouse-Jitter Warmed Packet - 2026-06-09
+
+Initial failed run:
+
+- `build\captures\v3_promotion_suite_enclosed_mouse_jitter_seq1_20260609`
+  ran `enclosed_mouse_jitter` for `gallery,kitchen,office,gym` with
+  `SmokeFrames=3`, `CaptureFrame=1`, `CaptureSequenceCount=2`,
+  `promotion_core`, `44` views, and `176` engine launches.
+- The packet runner exited `1` through the visual-quality gate because
+  `packet_stability_analysis.json` reported `hard_gate_warning_count=9`.
+- The warnings were localized to gallery:
+  `beauty`, `candidate_beauty_v3`, `material_base_color`, `direct_light`,
+  `direct_light_unshadowed`, `v3_direct_lighting`,
+  `v3_direct_lighting_unshadowed`, and `candidate_hdr_scene_color`.
+- Focused diff evidence:
+  `build\captures\v3_promotion_suite_enclosed_mouse_jitter_seq1_20260609\gallery_motion_diff_contact_sheet.png`
+  showed the gallery cylinder/cube changing base material between frame `1`
+  and frame `2`. That was startup material/resource settling, not a steady-state
+  mouse-jitter reflection or lighting regression.
+
+Warm-frame diagnosis:
+
+- Focused probe:
+  `build\captures\gallery_mouse_jitter_warm_capture_probe_20260609`
+  captured gallery `beauty,material_base_color,direct_light,object_id` at
+  `SmokeFrames=62`, `CaptureFrame=60`, `CaptureSequenceCount=2`, and
+  `mouse_jitter`.
+- Manual `analyze_scene_local_packet_stability.py` on that probe passed with:
+  `failure_count=0`, `warning_count=0`, `hard_gate_warning_count=0`,
+  `max_motion_stable_core_mean_abs_luma_delta=1.477194`, and
+  `max_motion_stable_core_large_changed_pixel_ratio=0.0`.
+
+Harness root fix:
+
+- `tools/run_full_scene_shader_pipeline_v3_promotion_suite.ps1` now has
+  `MotionWarmupCaptureFrame` defaulting to `60`.
+- For non-static scenarios with `CaptureSequenceCount > 1`, the suite computes
+  an effective capture contract:
+  - `effective_capture_frame = max(CaptureFrame, MotionWarmupCaptureFrame)`;
+  - `effective_smoke_frames` is extended to include the whole sequence;
+  - `suite_packet_status.json/md` records requested/effective capture frames,
+    requested/effective smoke frames, whether the contract was adjusted, and
+    the reason.
+- This prevents promotion evidence from accidentally comparing startup frame
+  churn while preserving the actual motion sequence gate.
+
+Final warmed mouse-jitter evidence:
+
+- `build\captures\v3_promotion_suite_enclosed_mouse_jitter_seq2_20260609`
+  reran the same requested command shape with `SmokeFrames=3`,
+  `CaptureFrame=1`, and `CaptureSequenceCount=2`.
+- The suite status recorded the effective contract:
+  `Capture=60`, `Smoke=62`, `motion_warmup+sequence_extent (1->60)`.
+- The packet passed scene-local cinematic generation, V2 packet evidence, V3
+  placeholder/signal/stability, V3 lighting motion, scene profile ownership,
+  environment payload diagnostics, scene-local resource contract V1, material
+  payload diagnostics, CompositeV3 diagnostics, promotion decision, and the V3
+  matrix.
+- `packet_stability_analysis.json` reported `status=PASS`,
+  `failure_count=0`, `warning_count=0`, and `hard_gate_warning_count=0`.
+- `visual_quality_analysis.json` reported `REVIEW_REQUIRED` only because
+  gallery saturation was `0.139382 < 0.140000`; there were no hard visual
+  failures.
+- `promotion_decision.md` reported `status=review_packet_passed`,
+  `report count=176`, `candidate beauty ready reports=24`, material quality
+  score `1.0000`, scene-local resource contract `176/176` ready reports, and
+  captured families `gallery,gym,kitchen,office`.
+- `v3_matrix_decision.md` reported packet count `1`, passed packet count `1`,
+  `full matrix ready: true`, observed motion `mouse_jitter`, observed families
+  `gallery,gym,kitchen,office`, and material quality min score `1.0000`.
+
+Interpretation:
+
+- Enclosed mouse-jitter V3 proof is now present for
+  `gallery,kitchen,office,gym` with real two-frame warmed sequence evidence.
+- The first-frame material swap remains useful evidence that startup captures
+  are not steady-state motion proof. If public first-frame material popping
+  becomes a release blocker, handle that as a separate startup-readiness issue;
+  do not use frame `1 -> 2` as the motion-stability promotion gate.
+- The full goal remains incomplete. Remaining high-value proof packets include
+  `enclosed_camera_sweep` and the reflection-closeup motion/static packets if
+  current evidence for those slices is not already present in the worktree.

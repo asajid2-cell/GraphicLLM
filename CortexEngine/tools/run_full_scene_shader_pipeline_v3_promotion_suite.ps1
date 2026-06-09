@@ -9,6 +9,7 @@ param(
     [int]$SmokeFrames = 30,
     [int]$CaptureFrame = 15,
     [int]$CaptureSequenceCount = 2,
+    [int]$MotionWarmupCaptureFrame = 60,
     [switch]$NoBuild,
     [switch]$SkipSceneAnalyzers,
     [switch]$ContinueOnPacketFailure,
@@ -176,6 +177,42 @@ function Count-FamiliesForScenario([object]$Scenario) {
     return [Math]::Max(1, @(Split-Csv $Scenario.family_filter).Count)
 }
 
+function Get-EffectiveCaptureContract([object]$Scenario) {
+    $effectiveCaptureFrame = $script:CaptureFrame
+    $effectiveSmokeFrames = $script:SmokeFrames
+    $reason = "requested"
+    $motionSequence = (
+        $Scenario.motion_mode -ne "static" -and
+        $script:CaptureSequenceCount -gt 1
+    )
+
+    if ($motionSequence -and $script:MotionWarmupCaptureFrame -gt $effectiveCaptureFrame) {
+        $effectiveCaptureFrame = $script:MotionWarmupCaptureFrame
+        $reason = "motion_warmup"
+    }
+
+    $requiredSmokeFrames = $effectiveCaptureFrame + [Math]::Max(0, $script:CaptureSequenceCount - 1) + 1
+    if ($effectiveSmokeFrames -lt $requiredSmokeFrames) {
+        $effectiveSmokeFrames = $requiredSmokeFrames
+        if ($reason -eq "requested") {
+            $reason = "sequence_extent"
+        } else {
+            $reason = "$reason+sequence_extent"
+        }
+    }
+
+    return [pscustomobject]@{
+        requested_capture_frame = $script:CaptureFrame
+        requested_smoke_frames = $script:SmokeFrames
+        effective_capture_frame = $effectiveCaptureFrame
+        effective_smoke_frames = $effectiveSmokeFrames
+        capture_sequence_count = $script:CaptureSequenceCount
+        motion_warmup_capture_frame = $script:MotionWarmupCaptureFrame
+        adjusted = ($effectiveCaptureFrame -ne $script:CaptureFrame -or $effectiveSmokeFrames -ne $script:SmokeFrames)
+        reason = $reason
+    }
+}
+
 function New-Scenario([string]$Name, [string]$FamilyFilter, [string]$MotionMode, [string]$StressSceneFilter, [bool]$StressSceneOnly, [bool]$NoStressScene, [string]$ViewPack) {
     return [pscustomobject]@{
         name = $Name
@@ -287,14 +324,15 @@ foreach ($scenario in $selectedScenarios) {
     $scenarioViewCount = Count-FilterItems $scenarioViewFilter
     $scenarioFamilyCount = Count-FamiliesForScenario $scenario
     $scenarioEstimatedRuns = $scenarioViewCount * $scenarioFamilyCount
+    $captureContract = Get-EffectiveCaptureContract $scenario
     $estimatedEngineRuns += $scenarioEstimatedRuns
 
     if (-not $PlanOnly -and -not $SummarizeExisting) {
         $packetArgs = @(
             "-OutputRoot", $scenario.packet_root,
             "-ViewFilter", $scenarioViewFilter,
-            "-SmokeFrames", [string]$SmokeFrames,
-            "-CaptureFrame", [string]$CaptureFrame,
+            "-SmokeFrames", [string]$captureContract.effective_smoke_frames,
+            "-CaptureFrame", [string]$captureContract.effective_capture_frame,
             "-CaptureSequenceCount", [string]$CaptureSequenceCount,
             "-StabilityMotionMode", $scenario.motion_mode
         )
@@ -341,6 +379,13 @@ foreach ($scenario in $selectedScenarios) {
         view_count = $scenarioViewCount
         family_count = $scenarioFamilyCount
         estimated_engine_runs = $scenarioEstimatedRuns
+        requested_smoke_frames = $captureContract.requested_smoke_frames
+        requested_capture_frame = $captureContract.requested_capture_frame
+        effective_smoke_frames = $captureContract.effective_smoke_frames
+        effective_capture_frame = $captureContract.effective_capture_frame
+        capture_sequence_count = $captureContract.capture_sequence_count
+        capture_contract_adjusted = $captureContract.adjusted
+        capture_contract_reason = $captureContract.reason
         ran_packet = $ranPacket
         exit_code = $packetExit
         continued_after_failure = $continuedAfterFailure
@@ -358,6 +403,7 @@ $statusDoc = [pscustomobject]@{
     scenarios = @($selectedScenarios)
     required_families = @(Split-Csv $RequiredFamilies)
     required_motion_modes = @(Split-Csv $RequiredMotionModes)
+    motion_warmup_capture_frame = $MotionWarmupCaptureFrame
     continue_on_packet_failure = [bool]$ContinueOnPacketFailure
     summarize_existing = [bool]$SummarizeExisting
     plan_only = [bool]$PlanOnly
@@ -376,13 +422,19 @@ $statusLines = @(
     "Summarize existing: ``$([bool]$SummarizeExisting)``",
     "Continue on packet failure: ``$([bool]$ContinueOnPacketFailure)``",
     "View profile: ``$ViewProfile``",
+    "Motion warmup capture frame: ``$MotionWarmupCaptureFrame``",
     "Estimated engine runs: ``$estimatedEngineRuns``",
     "",
-    "| Scenario | Packet | Families | Motion | View Pack | Views | Est. Runs | Stress | Ran | Exit | Continued |",
-    "|---|---|---|---|---|---:|---:|---|---:|---:|---:|"
+    "| Scenario | Packet | Families | Motion | View Pack | Views | Est. Runs | Capture | Smoke | Capture Contract | Stress | Ran | Exit | Continued |",
+    "|---|---|---|---|---|---:|---:|---:|---:|---|---|---:|---:|---:|"
 )
 foreach ($row in $statusRows) {
-    $statusLines += "| $($row.scenario) | $($row.packet_root) | $($row.family_filter) | $($row.motion_mode) | $($row.view_pack) | $($row.view_count) | $($row.estimated_engine_runs) | $($row.stress_scene_filter) | $($row.ran_packet) | $($row.exit_code) | $($row.continued_after_failure) |"
+    $contractLabel = if ($row.capture_contract_adjusted) {
+        "$($row.capture_contract_reason) ($($row.requested_capture_frame)->$($row.effective_capture_frame))"
+    } else {
+        $row.capture_contract_reason
+    }
+    $statusLines += "| $($row.scenario) | $($row.packet_root) | $($row.family_filter) | $($row.motion_mode) | $($row.view_pack) | $($row.view_count) | $($row.estimated_engine_runs) | $($row.effective_capture_frame) | $($row.effective_smoke_frames) | $contractLabel | $($row.stress_scene_filter) | $($row.ran_packet) | $($row.exit_code) | $($row.continued_after_failure) |"
 }
 $statusLines | Set-Content -Encoding UTF8 $suiteStatusMd
 

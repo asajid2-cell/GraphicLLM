@@ -13185,3 +13185,72 @@ Interpretation:
 - The main remaining proof gap is an aggregate matrix/suite status that combines
   the already proven reflection, enclosed, and heavy-light packet roots into a
   single release-facing decision artifact.
+
+### V3 Full Existing-Packet Aggregate Matrix - 2026-06-09
+
+Aggregate artifact:
+
+- `build\captures\v3_promotion_suite_full_existing_matrix_20260609\v3_matrix_decision.md`
+- `build\captures\v3_promotion_suite_full_existing_matrix_20260609\v3_matrix_decision.json`
+
+Included packet roots:
+
+- `build\captures\v3_promotion_suite_reflection_static_smoke7_20260609\reflection_static`
+- `build\captures\v3_promotion_suite_reflection_mouse_jitter_seq1_20260609\reflection_mouse_jitter`
+- `build\captures\v3_promotion_suite_enclosed_static_smoke6_20260609\enclosed_static`
+- `build\captures\v3_promotion_suite_enclosed_mouse_jitter_seq2_20260609\enclosed_mouse_jitter`
+- `build\captures\v3_promotion_suite_enclosed_camera_sweep_seq1_20260609\enclosed_camera_sweep`
+- `build\captures\v3_promotion_suite_heavy_light_sweep_smoke2_20260609\heavy_light_sweep`
+
+Required matrix:
+
+- Families:
+  `stress_rt_showcase_reflection_closeup,gallery,kitchen,office,gym,concert,red_room,stadium`.
+- Motion modes:
+  `static,mouse_jitter,camera_sweep,light_sweep`.
+
+Result:
+
+- `packet count: 6`.
+- `passed packet count: 6`.
+- `full matrix ready: true`.
+- Observed families:
+  `concert,gallery,gym,kitchen,office,red_room,stadium,stress_rt_showcase_reflection_closeup`.
+- Missing families: none.
+- Observed motion modes:
+  `camera_sweep,light_sweep,mouse_jitter,static`.
+- Missing motion modes: none.
+- Material quality min score: `1.0000`.
+- Material quality blocker counts: `{}`.
+- Candidate beauty ready reports:
+  - reflection static: `6/6`;
+  - reflection mouse-jitter: `6/6`;
+  - enclosed static: `24/24`;
+  - enclosed mouse-jitter: `24/24`;
+  - enclosed camera-sweep: `24/24`;
+  - heavy light-sweep: `18/18`.
+
+Important caveats:
+
+- `default_beauty_promotable` is still `false`. The current V3 evidence proves
+  the review-packet path, candidate beauty readiness where requested, resource
+  contracts, material quality gates, and cross-family/motion coverage. It does
+  not yet prove flipping default beauty to the V3 candidate output.
+- The aggregate warning list includes per-packet "missing families/motion
+  modes" because each packet covers only one scenario/family subset. The
+  aggregate itself has no missing required families or motion modes.
+- Static packets and heavy light-sweep use single-frame evidence and still emit
+  the analyzer warning that motion promotion evidence requires
+  `CaptureSequenceCount >= 2`. That warning is expected for static/heavy
+  packets in this aggregate; mouse-jitter and camera-sweep enclosed packets and
+  reflection mouse-jitter use warmed two-frame sequence evidence.
+- Material payload analyzers still report authored-default warning counts
+  (`roughness`, `transmission`) even though the material quality gate is ready
+  and has no blockers.
+
+Interpretation:
+
+- The requested V3 promotion evidence now exists across reflection-closeup,
+  enclosed scenes, and heavy-lighting scenes in a single aggregate matrix.
+- The remaining engineering decision is whether the next goal is default-beauty
+  promotion, visual-quality/art pass, or startup-readiness/material-pop cleanup.

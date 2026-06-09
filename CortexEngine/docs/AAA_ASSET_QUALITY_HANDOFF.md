@@ -12148,3 +12148,52 @@ Next pass:
      specular ownership for that receiver;
    - if foreground is stable but background is noisy, work on visible-HDRI
      temporal/background presentation rather than material BRDF.
+
+### RT Showcase Masked Owner Packet Wrapper - 2026-06-09
+
+Implemented:
+
+- Added `tools/run_rt_showcase_wall_floor_masked_owner_packet.ps1`.
+- The wrapper captures aligned deterministic passes:
+  - `beauty`
+  - `mask_normal_roughness36`
+  - `specular9`
+  - `ownership92`
+- It then emits:
+  - `beauty_foreground/background`
+  - `specular_foreground/background`
+  - `ownership_foreground/background`
+  - `masked_owner_packet_summary.json`
+  - `masked_owner_packet_summary.md`
+
+Smoke command:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass `
+  -File tools\run_rt_showcase_wall_floor_masked_owner_packet.ps1 `
+  -NoBuild `
+  -OutputRoot Z:\328\CMPUT328-A2\codexworks\301\graphics\CortexEngine\build\captures\rt_showcase_wall_floor_masked_owner_packet_wrapper_smoke2_20260609 `
+  -CaptureCount 2 `
+  -MotionFrames 75 `
+  -MotionLookCycles 4.0
+```
+
+Smoke result:
+
+- Passed wrapper execution and wrote summary:
+  `build\captures\rt_showcase_wall_floor_masked_owner_packet_wrapper_smoke2_20260609\masked_owner_packet_summary.md`
+- Each child capture still exits `1` because the existing underlying smoke
+  treats known frame-contract warnings as failures:
+  - `visibility_buffer_rendered_without_visibility_motion_vectors`
+  - `rtv_descriptor_heap_high_water`
+  - debug view `36` also reports the existing local probe table warning
+- The wrapper records those child exits but still succeeds if captures and
+  analyses are produced.
+
+Next pass:
+
+- Convert the wrapper from a packet generator into a true gate:
+  - separate "capture produced with known warnings" from "owner metric failed";
+  - add thresholds for foreground-only opaque receiver ROIs;
+  - leave broad/full-frame instability as diagnostic context, not as the
+    material-flicker verdict.

@@ -12248,3 +12248,63 @@ Next pass:
   - if foreground wall/floor metrics fail, fix material/lighting ownership;
   - if only background metrics fail, work on visible HDRI/background temporal
     stability instead of opaque BRDF.
+
+### RT Showcase Foreground Floor Gate - 2026-06-09
+
+Implemented:
+
+- `tools/run_rt_showcase_wall_floor_flicker_stability_smoke.ps1` now accepts
+  `-CameraBookmark` instead of hardcoding `reported_wall_floor_flicker`.
+- `tools/run_rt_showcase_wall_floor_masked_owner_packet.ps1` now accepts:
+  - `-CameraBookmark`
+  - `-CustomRois` as `name:x0,y0,x1,y1`
+- `tools/analyze_rt_showcase_wall_floor_roi_stability.py` now accepts repeated
+  `--roi name:x0,y0,x1,y1` entries, which add or override packet ROIs.
+
+Foreground floor probe:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass `
+  -File tools\run_rt_showcase_wall_floor_masked_owner_packet.ps1 `
+  -NoBuild `
+  -CameraBookmark hero `
+  -CustomRois "hero_floor_foreground:210,510,1120,650" `
+  -ForegroundGateRois hero_floor_foreground `
+  -OutputRoot Z:\328\CMPUT328-A2\codexworks\301\graphics\CortexEngine\build\captures\rt_showcase_foreground_floor_gate_hero_20260609 `
+  -CaptureCount 2 `
+  -MotionFrames 75 `
+  -MotionLookCycles 4.0
+```
+
+Result:
+
+- Wrapper exit: `0`
+- Summary:
+  `build\captures\rt_showcase_foreground_floor_gate_hero_20260609\masked_owner_packet_summary.md`
+- Gate rows:
+  - `beauty_foreground / hero_floor_foreground`: mean `0.8038`,
+    changed `0.0062`, large `0.0002`, coverage `1.0000`, passed
+  - `specular_foreground / hero_floor_foreground`: mean `1.5430`,
+    changed `0.0328`, large `0.0127`, coverage `1.0000`, passed
+
+Interpretation:
+
+- The RT Showcase `hero` bookmark has a valid foreground-owned gallery floor
+  ROI. The mask confirms `hero_floor_foreground` is `100%` foreground under
+  debug view `36`.
+- This does not prove the original user-reported view is solved. It proves the
+  opaque VB floor receiver can be stable when measured as owned geometry.
+- The original `reported_wall_floor_flicker` view still needs separate
+  treatment because the old floor/platform ROIs are dominated by depth-miss
+  visible HDRI/background and silhouette parallax.
+
+Next pass:
+
+1. Add a second foreground-owned ROI on the user-reported bookmark if possible,
+   or create a dedicated `reported_wall_floor_foreground_probe` bookmark that
+   frames the same material receiver without depth-miss contamination.
+2. If foreground-owned floor/wall remains stable, stop chasing opaque BRDF
+   policy for that repro and move to visible-HDRI/background temporal
+   presentation or transparent/aux compositing.
+3. Keep the old broad/background metrics as diagnostic context only; do not use
+   them as the final opaque material flicker gate.

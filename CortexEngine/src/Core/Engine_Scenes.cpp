@@ -4219,7 +4219,7 @@ void Engine::BuildRTShowcaseScene() {
     auto hubFloor     = Utils::MeshGenerator::CreatePlane(16.0f, 12.0f);
     auto wallPlane    = Utils::MeshGenerator::CreatePlane(6.0f, 4.0f);
     auto tallWall     = Utils::MeshGenerator::CreatePlane(8.0f, 12.0f);
-    auto poolPlane    = Utils::MeshGenerator::CreatePlane(8.0f, 8.0f);
+    auto poolWaterPlane = Utils::MeshGenerator::CreatePlane(5.7f, 5.7f);
     auto quadPanel    = Utils::MeshGenerator::CreateQuad(2.0f, 2.0f);
     auto sphereMesh   = Utils::MeshGenerator::CreateSphere(0.5f, 32);
     auto smallSphere  = Utils::MeshGenerator::CreateSphere(0.25f, 24);
@@ -4248,7 +4248,7 @@ void Engine::BuildRTShowcaseScene() {
             !uploadMesh(hubFloor,     "RTShowcase hub floor") ||
             !uploadMesh(wallPlane,    "RTShowcase wall") ||
             !uploadMesh(tallWall,     "RTShowcase tall wall") ||
-            !uploadMesh(poolPlane,    "RTShowcase pool") ||
+            !uploadMesh(poolWaterPlane, "RTShowcase pool water") ||
             !uploadMesh(quadPanel,    "RTShowcase quad panel") ||
             !uploadMesh(sphereMesh,   "RTShowcase sphere") ||
             !uploadMesh(smallSphere,  "RTShowcase small sphere") ||
@@ -4834,34 +4834,50 @@ void Engine::BuildRTShowcaseScene() {
         r.doubleSided = true;
     }
 
-    if (poolPlane && poolPlane->gpuBuffers) {
-        // Pool rim
-        entt::entity rim = m_registry->CreateEntity();
-        m_registry->AddComponent<Scene::TagComponent>(rim, "Courtyard_PoolRim");
-        auto& rt = m_registry->AddComponent<Scene::TransformComponent>(rim);
-        // Keep the deck definitively above Courtyard_Floor. The old 0.002f
-        // offset was below the practical grazing-depth separation for the
-        // forced-VB path and produced dark/light ownership changes when the
-        // camera was jiggled across the white platform.
-        rt.position = glm::vec3(0.0f, 0.035f, courtyardZ);
+    if (poolWaterPlane && poolWaterPlane->gpuBuffers) {
+        // The courtyard pool is an explicit contained assembly. The old setup
+        // used a full 8x8 white plane and another full 8x8 transparent water
+        // plane only 0.01 units apart, which left surface ownership ambiguous
+        // under grazing mouse-look in the visibility-buffer path.
+        if (cubeMesh && cubeMesh->gpuBuffers) {
+            struct RimStrip {
+                const char* tag;
+                glm::vec3 position;
+                glm::vec3 scale;
+            };
+            const RimStrip rimStrips[] = {
+                {"Courtyard_PoolRim_Front", glm::vec3(0.0f, 0.035f, courtyardZ - 3.425f), glm::vec3(8.0f, 0.07f, 1.15f)},
+                {"Courtyard_PoolRim_Back",  glm::vec3(0.0f, 0.035f, courtyardZ + 3.425f), glm::vec3(8.0f, 0.07f, 1.15f)},
+                {"Courtyard_PoolRim_Left",  glm::vec3(-3.425f, 0.035f, courtyardZ), glm::vec3(1.15f, 0.07f, 5.7f)},
+                {"Courtyard_PoolRim_Right", glm::vec3( 3.425f, 0.035f, courtyardZ), glm::vec3(1.15f, 0.07f, 5.7f)},
+            };
 
-        auto& rr = m_registry->AddComponent<Scene::RenderableComponent>(rim);
-        rr.mesh = poolPlane;
-        rr.albedoColor = glm::vec4(0.9f, 0.9f, 0.92f, 1.0f);
-        rr.metallic = 0.0f;
-        rr.roughness = 0.75f;
-        rr.ao = 1.0f;
-        rr.presetName = "concrete";
-        rr.doubleSided = true;
+            for (const auto& strip : rimStrips) {
+                entt::entity rim = m_registry->CreateEntity();
+                m_registry->AddComponent<Scene::TagComponent>(rim, strip.tag);
+                auto& rt = m_registry->AddComponent<Scene::TransformComponent>(rim);
+                rt.position = strip.position;
+                rt.scale = strip.scale;
 
-        // Water surface
+                auto& rr = m_registry->AddComponent<Scene::RenderableComponent>(rim);
+                rr.mesh = cubeMesh;
+                rr.albedoColor = glm::vec4(0.9f, 0.9f, 0.92f, 1.0f);
+                rr.metallic = 0.0f;
+                rr.roughness = 0.75f;
+                rr.ao = 1.0f;
+                rr.presetName = "concrete";
+            }
+        }
+
+        // Water surface: smaller than the rim footprint and below the rim top,
+        // so it can reflect the IBL without competing for the same broad pixels.
         entt::entity water = m_registry->CreateEntity();
         m_registry->AddComponent<Scene::TagComponent>(water, "Courtyard_WaterSurface");
         auto& wt = m_registry->AddComponent<Scene::TransformComponent>(water);
-        wt.position = glm::vec3(0.0f, 0.045f, courtyardZ);
+        wt.position = glm::vec3(0.0f, 0.052f, courtyardZ);
 
         auto& wr = m_registry->AddComponent<Scene::RenderableComponent>(water);
-        wr.mesh = poolPlane;
+        wr.mesh = poolWaterPlane;
         wr.albedoColor = glm::vec4(0.05f, 0.18f, 0.24f, 0.62f);
         wr.metallic = 0.0f;
         wr.roughness = 0.06f;

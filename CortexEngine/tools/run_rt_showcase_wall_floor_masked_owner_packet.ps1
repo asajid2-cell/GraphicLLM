@@ -6,6 +6,8 @@ param(
     [double]$MotionLookAmplitude = 0.025,
     [double]$MotionLookCycles = 6.0,
     [double]$FixedDeltaTime = 0.008333333,
+    [string]$CameraBookmark = "reported_wall_floor_flicker",
+    [string[]]$CustomRois = @(),
     [string[]]$ForegroundGateRois = @("left_wall_panel_clean"),
     [double]$MaxForegroundMeanLumaDelta = 8.0,
     [double]$MaxForegroundChangedRatio = 0.12,
@@ -48,6 +50,7 @@ function Run-CaptureCase([string]$Name, [string]$DebugView, [bool]$DisableAux) {
         "-ExecutionPolicy", "Bypass",
         "-File", (Join-Path $PSScriptRoot "run_rt_showcase_wall_floor_flicker_stability_smoke.ps1"),
         "-LogDir", $caseDir,
+        "-CameraBookmark", $CameraBookmark,
         "-CaptureStartFrame", [string]$CaptureStartFrame,
         "-CaptureCount", [string]$CaptureCount,
         "-MotionFrames", [string]$MotionFrames,
@@ -91,6 +94,11 @@ function Run-Analysis([string]$Name, [string]$CaptureDir, [string]$MaskDir, [boo
     )
     if ($InvertMask) {
         $analysisArgs += "--invert-mask"
+    }
+    foreach ($roi in $CustomRois) {
+        if (-not [string]::IsNullOrWhiteSpace($roi)) {
+            $analysisArgs += @("--roi", $roi)
+        }
     }
     & python @analysisArgs | ForEach-Object { Write-Host $_ }
     if ($LASTEXITCODE -ne 0) {
@@ -205,6 +213,8 @@ try {
     $summary = [pscustomobject]@{
         schema = "cortex.rt_showcase.wall_floor_masked_owner_packet.v1"
         output_root = $OutputRoot
+        camera_bookmark = $CameraBookmark
+        custom_rois = $CustomRois
         captures = $captures
         analyses = $analysis
         gate = [pscustomobject]@{
@@ -226,6 +236,10 @@ try {
         "# RT Showcase Wall/Floor Masked Owner Packet",
         "",
         "Output root: ``$OutputRoot``",
+        "",
+        "Camera bookmark: ``$CameraBookmark``",
+        "",
+        "Custom ROIs: ``$($CustomRois -join ', ')``",
         "",
         "## Captures",
         "",

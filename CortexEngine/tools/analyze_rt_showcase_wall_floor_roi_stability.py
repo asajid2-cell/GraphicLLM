@@ -38,6 +38,30 @@ DEFAULT_ROIS: Dict[str, Roi] = {
 }
 
 
+def parse_roi(value: str) -> Tuple[str, Roi]:
+    if ":" not in value:
+        raise argparse.ArgumentTypeError(
+            f"ROI '{value}' must use name:x0,y0,x1,y1")
+    name, coords_text = value.split(":", 1)
+    name = name.strip()
+    if not name:
+        raise argparse.ArgumentTypeError("custom ROI name cannot be empty")
+    parts = [part.strip() for part in coords_text.split(",")]
+    if len(parts) != 4:
+        raise argparse.ArgumentTypeError(
+            f"ROI '{value}' must provide exactly four coordinates")
+    try:
+        coords = tuple(int(part) for part in parts)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError(
+            f"ROI '{value}' contains a non-integer coordinate") from exc
+    x0, y0, x1, y1 = coords
+    if x1 <= x0 or y1 <= y0:
+        raise argparse.ArgumentTypeError(
+            f"ROI '{value}' must have x1>x0 and y1>y0")
+    return name, coords
+
+
 def read_bmp(path: Path) -> Tuple[int, int, int, bytes, int, int]:
     data = path.read_bytes()
     if len(data) < 54 or data[:2] != b"BM":
@@ -194,6 +218,8 @@ def main() -> int:
                         help="Reference pixel Y for not-reference-color mode")
     parser.add_argument("--invert-mask", action="store_true",
                         help="Measure pixels rejected by the foreground mask instead of accepted pixels")
+    parser.add_argument("--roi", action="append", type=parse_roi, default=[],
+                        help="Add or override a fixed ROI as name:x0,y0,x1,y1")
     parser.add_argument("--output-json", required=True, type=Path)
     parser.add_argument("--output-md", required=True, type=Path)
     args = parser.parse_args()
@@ -211,6 +237,10 @@ def main() -> int:
             raise SystemExit(
                 f"mask dir {args.mask_dir} is missing {len(missing)} aligned frames, first={missing[0]}")
 
+    rois = dict(DEFAULT_ROIS)
+    for name, roi in args.roi:
+        rois[name] = roi
+
     rows = []
     aggregate = {
         name: {
@@ -219,7 +249,7 @@ def main() -> int:
             "max_large_changed_pixel_ratio": 0.0,
             "max_mask_coverage": 0.0,
         }
-        for name in DEFAULT_ROIS
+        for name in rois
     }
     for left, right in iter_pairs(captures):
         a = read_bmp(left)
@@ -237,7 +267,7 @@ def main() -> int:
             ref_y = max(0, min(mask[1] - 1, args.mask_reference_y))
             reference_rgb = pixel_rgb(mask, ref_x, ref_y)
         roi_rows = {}
-        for name, roi in DEFAULT_ROIS.items():
+        for name, roi in rois.items():
             stats = measure_roi(
                 a,
                 b,
@@ -271,7 +301,7 @@ def main() -> int:
         "mask_mode": args.mask_mode,
         "invert_mask": args.invert_mask,
         "pair_count": len(rows),
-        "rois": {name: list(roi) for name, roi in DEFAULT_ROIS.items()},
+        "rois": {name: list(roi) for name, roi in rois.items()},
         "aggregate": aggregate,
         "pairs": rows,
     }

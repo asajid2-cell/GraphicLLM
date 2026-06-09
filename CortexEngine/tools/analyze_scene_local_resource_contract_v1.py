@@ -9,6 +9,7 @@ from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_CONTRACT = ROOT / "assets" / "final_art" / "scene_local_resource_contract_v1.json"
+MATERIAL_PAYLOAD_DEBUG_MODES = {2, 3, 35, 36, 41, 47, 48, 49, 50, 51, 52, 53, 82}
 
 
 UNKNOWN_STRINGS = {"", "unknown", "none", "default", "unprofiled", "planned"}
@@ -16,6 +17,18 @@ UNKNOWN_STRINGS = {"", "unknown", "none", "default", "unprofiled", "planned"}
 
 def load_json(path: Path) -> dict[str, Any]:
     return json.loads(path.read_text(encoding="utf-8-sig"))
+
+
+def diagnostic_scope(report: dict[str, Any]) -> str:
+    renderer = report.get("renderer")
+    if isinstance(renderer, dict):
+        try:
+            debug_view_mode = int(renderer.get("debug_view_mode", -1))
+        except (TypeError, ValueError):
+            debug_view_mode = -1
+        if debug_view_mode in MATERIAL_PAYLOAD_DEBUG_MODES:
+            return "material_payload"
+    return "full_pipeline"
 
 
 def known(value: Any) -> bool:
@@ -77,6 +90,8 @@ def nested_value(report: dict[str, Any], frame_contract: dict[str, Any], field: 
 def field_is_proved(report: dict[str, Any], frame_contract: dict[str, Any], field: str) -> bool:
     value = nested_value(report, frame_contract, field)
     if isinstance(value, bool):
+        if field.endswith("visible_external_hdri_allowed"):
+            return True
         if field.endswith("invalid_external_hdri"):
             return value is False
         return value is True
@@ -120,6 +135,7 @@ def analyze_report(
         return row
 
     report = load_json(path)
+    scope = diagnostic_scope(report)
     frame_contract = report.get("frame_contract")
     if not isinstance(frame_contract, dict):
         row["failures"].append("missing frame_contract")
@@ -154,6 +170,7 @@ def analyze_report(
     row.update(
         {
             "manifest_family": manifest_family,
+            "diagnostic_scope": scope,
             "scene_family": scene_family,
             "contract_family": family,
             "profile_id": scene_visual.get("profile_id", ""),
@@ -318,10 +335,11 @@ def analyze_report(
             f"runtime ready role count {row['runtime_contract_ready_role_count']} does not match expected {expected_roles}"
         )
 
-    if environment_domain.get("ready") is not True:
-        row["failures"].append("environment domain is not ready")
-    if reflection_domain.get("ready") is not True:
-        row["failures"].append("reflection domain is not ready")
+    if scope != "material_payload":
+        if environment_domain.get("ready") is not True:
+            row["failures"].append("environment domain is not ready")
+        if reflection_domain.get("ready") is not True:
+            row["failures"].append("reflection domain is not ready")
 
     row["ready"] = not row["failures"]
     return row

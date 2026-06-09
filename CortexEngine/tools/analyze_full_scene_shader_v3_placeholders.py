@@ -103,6 +103,43 @@ def find_debug_view_metrics(input_path: pathlib.Path) -> pathlib.Path | None:
     return metrics_path if metrics_path.exists() else None
 
 
+def aggregate_debug_view_metric_rows(metric_rows: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
+    grouped: dict[str, list[dict[str, Any]]] = {}
+    for row in metric_rows:
+        if not isinstance(row, dict) or not isinstance(row.get("view"), str):
+            continue
+        grouped.setdefault(row["view"], []).append(row)
+
+    aggregated: dict[str, dict[str, Any]] = {}
+    for view, view_rows in grouped.items():
+        metric_values = [
+            row.get("metrics")
+            for row in view_rows
+            if isinstance(row.get("metrics"), dict)
+        ]
+        if not metric_values:
+            aggregated[view] = {"view": view, "metrics": None, "family_count": len(view_rows)}
+            continue
+        count = len(metric_values)
+        families = sorted({
+            str(row.get("family"))
+            for row in view_rows
+            if isinstance(row.get("family"), str) and row.get("family")
+        })
+        aggregated[view] = {
+            "view": view,
+            "family_count": len(families) if families else count,
+            "families": families,
+            "metrics": {
+                "mean_luma": sum(float(m.get("mean_luma", 0.0) or 0.0) for m in metric_values) / count,
+                "nonblack_ratio": sum(float(m.get("nonblack_ratio", 0.0) or 0.0) for m in metric_values) / count,
+                "hot_pixel_ratio": sum(float(m.get("hot_pixel_ratio", 0.0) or 0.0) for m in metric_values) / count,
+                "max_luma": max(float(m.get("max_luma", 0.0) or 0.0) for m in metric_values),
+            },
+        }
+    return aggregated
+
+
 def analyze_lighting_signal_metrics(input_path: pathlib.Path) -> dict[str, Any]:
     metrics_path = find_debug_view_metrics(input_path)
     failures: list[str] = []
@@ -122,11 +159,7 @@ def analyze_lighting_signal_metrics(input_path: pathlib.Path) -> dict[str, Any]:
     if metrics_report.get("failures"):
         failures.extend(f"debug_view_metrics failure: {failure}" for failure in metrics_report["failures"])
 
-    rows_by_view = {
-        row.get("view"): row
-        for row in metrics_report.get("rows", [])
-        if isinstance(row, dict) and isinstance(row.get("view"), str)
-    }
+    rows_by_view = aggregate_debug_view_metric_rows(metrics_report.get("rows", []))
 
     for view, thresholds in LIGHTING_SIGNAL_THRESHOLDS.items():
         row = rows_by_view.get(view)
@@ -173,6 +206,8 @@ def analyze_lighting_signal_metrics(input_path: pathlib.Path) -> dict[str, Any]:
                 "max_luma": max_luma,
                 "nonblack_ratio": nonblack_ratio,
                 "hot_pixel_ratio": hot_pixel_ratio,
+                "family_count": row.get("family_count", 1),
+                "families": row.get("families", []),
             }
         )
 

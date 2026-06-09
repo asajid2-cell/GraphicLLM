@@ -12852,3 +12852,82 @@ Interpretation:
   scene analyzers are enabled: they can expect canonical gallery/kitchen/office
   families on stress-only manifests. Keep `-SkipSceneAnalyzers` for
   reflection-only V3 harness smoke until that analyzer is made stress-aware.
+
+### V3 Enclosed Static Cross-Family Packet - 2026-06-09
+
+Scope:
+
+- Target repo/path: `graphics\CortexEngine`; do not edit the separate
+  `3d\VENPOD` tree. The runtime executable/log labels may still say VENPOD,
+  but this slice is CortexEngine-only.
+- Scenario: `enclosed_static`.
+- Families: `gallery,kitchen,office,gym`.
+- Motion: `static`.
+- View profile: `promotion_core`.
+
+Rooted harness fixes from the enclosed-static packet:
+
+- Compact enclosed/heavy view packs were missing `reflection_owner`, so the
+  reflection-owner analyzer could not prove provider ownership for those
+  packets. Added `reflection_owner` to both compact packs.
+- Compact enclosed/heavy view packs were missing
+  `reflection_source_suppression`, so the scene-local resource contract could
+  not prove the reflection-background role. Added the suppression view to both
+  compact packs.
+- `tools/analyze_scene_local_visual_quality.py` still expected the legacy
+  canonical family set and incorrectly failed filtered packets with
+  `concert:beauty_view_missing`. It now derives expected families from the
+  packet manifest `family_filter`, falling back to observed families before the
+  legacy list.
+- `tools/analyze_full_scene_shader_v3_placeholders.py` previously keyed debug
+  metrics by view only, so multi-family packets kept only the last family row.
+  Lighting signal checks now aggregate metric rows by view across families.
+- `tools/analyze_scene_local_resource_contract_v1.py` was applying full
+  environment/reflection domain-readiness checks to material-payload debug
+  views. Material-payload views are now diagnostic-scoped and still prove their
+  resource fields without requiring full-pipeline reflection/environment domain
+  readiness.
+
+Current plan cost after the compact-pack repair:
+
+- Plan-only probe:
+  `build\captures\v3_promotion_suite_viewpack_plan_probe4_20260609`
+  reported `774` estimated engine runs for the default promotion matrix:
+  - reflection static: `57` views x `1` family = `57`;
+  - reflection mouse jitter: `57`;
+  - enclosed static: `44` views x `4` families = `176`;
+  - enclosed mouse jitter: `176`;
+  - enclosed camera sweep: `176`;
+  - heavy light sweep: `44` views x `3` families = `132`.
+
+Final enclosed-static evidence:
+
+- `build\captures\v3_promotion_suite_enclosed_static_smoke6_20260609`
+  ran `enclosed_static` with `promotion_core`, `44` views, `4` families,
+  `SmokeFrames=2`, `CaptureFrame=1`, `CaptureSequenceCount=1`, `-NoBuild`,
+  and `-ContinueOnPacketFailure`.
+- `suite_packet_status.md/json` reported exit `0` and `176` estimated engine
+  runs for the single enclosed-static packet.
+- The packet passed scene-local cinematic generation, V2 packet evidence, V3
+  placeholder/stability analysis, V3 scene profile policy ownership, V3
+  environment payload diagnostics, scene-local resource contract V1, V3
+  material payload diagnostics, CompositeV3 diagnostics, and promotion decision.
+- `v3_matrix_decision.md/json` reported packet count `1`, passed packet count
+  `1`, `full matrix ready: true`, families `gallery,gym,kitchen,office`, motion
+  `static`, and material quality min score `1.0000`.
+- Scene-local resource contract report:
+  `build\captures\v3_promotion_suite_enclosed_static_smoke6_20260609\enclosed_static\scene_local_resource_contract_v1.md`
+  reported `ready: true`, `reports: 176`, `ready reports: 176`, and proved all
+  expected scene-local roles across the four families.
+
+Interpretation:
+
+- Reflection-closeup static and enclosed static family packets are now proven
+  through the V3 promotion harness.
+- This still does not prove the full goal. Remaining unproven promotion slices
+  include `enclosed_mouse_jitter`, `enclosed_camera_sweep`, and
+  `heavy_light_sweep` across `concert,red_room,stadium`.
+- Next coherent slice should run either `heavy_light_sweep` to exercise
+  high-contrast lighting ownership or `enclosed_mouse_jitter` to exercise
+  temporal/reflection stability under motion. Preserve packet failures through
+  the matrix instead of judging individual screenshots manually.

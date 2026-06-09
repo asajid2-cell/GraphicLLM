@@ -129,17 +129,21 @@ function Get-ViewPacks {
         full = Join-ViewPack @($material + $composite + $environment + $lighting + $reflection)
         reflection_core = Join-ViewPack @($material + $composite + $environment + $lighting + $reflection)
         enclosed_core = Join-ViewPack @($material + $composite + $environment + $lighting + @(
+            "reflection_owner",
             "local_reflection_radiance",
             "reflection_radiance",
             "reflection_confidence",
             "reflection_source_id",
+            "reflection_source_suppression",
             "reflection_temporal_delta"
         ))
         heavy_light_core = Join-ViewPack @($material + $composite + $environment + $lighting + @(
+            "reflection_owner",
             "local_reflection_radiance",
             "reflection_radiance",
             "reflection_confidence",
             "reflection_source_id",
+            "reflection_source_suppression",
             "reflection_temporal_delta"
         ))
     }

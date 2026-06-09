@@ -164,6 +164,38 @@ def analyze_report(
             "environment_policy": policy_contract.get("environment_policy", ""),
             "reflection_policy": policy_contract.get("reflection_policy", ""),
             "reflection_source_contract": v3.get("reflection_v3_source_contract", ""),
+            "runtime_contract_ready": bool(v3.get("scene_local_resource_contract_ready", False)),
+            "runtime_contract_id": v3.get("scene_local_resource_contract_id", ""),
+            "runtime_contract_family": v3.get("scene_local_resource_contract_family", ""),
+            "runtime_contract_status": v3.get("scene_local_resource_contract_status", ""),
+            "runtime_contract_unsafe_reason": v3.get("scene_local_resource_contract_unsafe_reason", ""),
+            "runtime_contract_visible_external_hdri_allowed": bool(
+                v3.get("scene_local_resource_contract_visible_external_hdri_allowed", False)
+            ),
+            "runtime_contract_external_hdri_safe": bool(
+                v3.get("scene_local_resource_contract_external_hdri_safe", False)
+            ),
+            "runtime_contract_environment_policy_allowed": bool(
+                v3.get("scene_local_resource_contract_environment_policy_allowed", False)
+            ),
+            "runtime_contract_reflection_policy_allowed": bool(
+                v3.get("scene_local_resource_contract_reflection_policy_allowed", False)
+            ),
+            "runtime_contract_reflection_source_allowed": bool(
+                v3.get("scene_local_resource_contract_reflection_source_allowed", False)
+            ),
+            "runtime_contract_proxy_resources_ready": bool(
+                v3.get("scene_local_resource_contract_proxy_resources_ready", False)
+            ),
+            "runtime_contract_payload_resources_ready": bool(
+                v3.get("scene_local_resource_contract_payload_resources_ready", False)
+            ),
+            "runtime_contract_role_count": int(
+                v3.get("scene_local_resource_contract_role_count", 0) or 0
+            ),
+            "runtime_contract_ready_role_count": int(
+                v3.get("scene_local_resource_contract_ready_role_count", 0) or 0
+            ),
             "scene_local_environment_ready": bool(v3.get("scene_local_environment_ready", False)),
             "reflection_v3_ready": bool(v3.get("reflection_v3_ready", False)),
             "proxy_bound_resource_count": int(
@@ -175,6 +207,21 @@ def analyze_report(
             "proved_roles": [],
         }
     )
+
+    if row["runtime_contract_id"] != "SceneLocalResourceContractV1":
+        row["failures"].append("runtime did not report SceneLocalResourceContractV1")
+    if row["runtime_contract_family"] != family:
+        row["failures"].append(
+            f"runtime contract family {row['runtime_contract_family']!r} does not match analyzer family {family!r}"
+        )
+    if row["runtime_contract_status"] != "ready":
+        row["failures"].append(f"runtime contract status is {row['runtime_contract_status']!r}")
+    if row["runtime_contract_unsafe_reason"] != "none":
+        row["failures"].append(
+            f"runtime contract unsafe reason is {row['runtime_contract_unsafe_reason']!r}"
+        )
+    if row["runtime_contract_ready"] is not True:
+        row["failures"].append("runtime scene_local_resource_contract_ready is false")
 
     required_views: set[str] = set()
     role_contracts = contract.get("role_contracts", {})
@@ -242,11 +289,34 @@ def analyze_report(
             row["failures"].append(
                 f"proxy bound resource count {row['proxy_bound_resource_count']} below contract minimum {min_proxy}"
             )
+        if row["runtime_contract_proxy_resources_ready"] is not True:
+            row["failures"].append("runtime proxy resources are not contract-ready")
         min_payload = int(family_contract.get("min_payload_resource_count", 0) or 0)
         if row["payload_bound_resource_count"] < min_payload:
             row["failures"].append(
                 f"payload bound resource count {row['payload_bound_resource_count']} below contract minimum {min_payload}"
             )
+        if row["runtime_contract_payload_resources_ready"] is not True:
+            row["failures"].append("runtime payload resources are not contract-ready")
+
+    runtime_checks = [
+        ("external HDRI", row["runtime_contract_external_hdri_safe"]),
+        ("environment policy", row["runtime_contract_environment_policy_allowed"]),
+        ("reflection policy", row["runtime_contract_reflection_policy_allowed"]),
+        ("reflection source", row["runtime_contract_reflection_source_allowed"]),
+    ]
+    for label, passed in runtime_checks:
+        if passed is not True:
+            row["failures"].append(f"runtime {label} contract check failed")
+    expected_roles = len(contract.get("required_roles", []))
+    if row["runtime_contract_role_count"] != expected_roles:
+        row["failures"].append(
+            f"runtime role count {row['runtime_contract_role_count']} does not match expected {expected_roles}"
+        )
+    if row["runtime_contract_ready_role_count"] != expected_roles:
+        row["failures"].append(
+            f"runtime ready role count {row['runtime_contract_ready_role_count']} does not match expected {expected_roles}"
+        )
 
     if environment_domain.get("ready") is not True:
         row["failures"].append("environment domain is not ready")
@@ -340,8 +410,8 @@ def write_markdown(report: dict[str, Any], path: Path) -> None:
     lines.extend(
         [
             "",
-            "| Report | Family | Ready | External HDRI | Reflection Source | Proxy/Texture Resources |",
-            "|---|---|---|---|---|---|",
+        "| Report | Family | Ready | Runtime | External HDRI | Reflection Source | Proxy/Texture Resources |",
+        "|---|---|---|---|---|---|---|",
         ]
     )
     for row in report.get("rows", []):
@@ -353,6 +423,10 @@ def write_markdown(report: dict[str, Any], path: Path) -> None:
             f"invalid={str(row.get('invalid_external_hdri')).lower()}"
         )
         resources = f"{row.get('proxy_bound_resource_count', 0)}/{row.get('payload_bound_resource_count', 0)}"
+        runtime = (
+            f"{row.get('runtime_contract_status', '')}:"
+            f"{row.get('runtime_contract_unsafe_reason', '')}"
+        )
         lines.append(
             "| "
             + " | ".join(
@@ -360,6 +434,7 @@ def write_markdown(report: dict[str, Any], path: Path) -> None:
                     f"`{Path(str(row.get('report', ''))).name}`",
                     f"`{row.get('contract_family', '')}`",
                     f"`{str(row.get('ready')).lower()}`",
+                    f"`{runtime}`",
                     f"`{external}`",
                     f"`{row.get('reflection_source_contract', '')}`",
                     f"`{resources}`",

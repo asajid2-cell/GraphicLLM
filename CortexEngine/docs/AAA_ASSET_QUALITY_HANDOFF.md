@@ -3,6 +3,107 @@
 This is the living handoff for the AAA asset-quality goal.
 Read this after compaction before continuing.
 
+## 2026-06-09 Runtime SceneLocalResourceContractV1 Checkpoint
+
+Latest pushed work before this section:
+
+- Commit `748fd81` added the packet-side
+  `SceneLocalResourceContractV1` gate.
+
+Implemented after that:
+
+- Added runtime `SceneLocalResourceContractV1` interpretation to
+  `FullSceneShaderFrameContext.h`.
+- Runtime frame reports now expose:
+  - `scene_local_resource_contract_ready`
+  - `scene_local_resource_contract_id`
+  - `scene_local_resource_contract_family`
+  - `scene_local_resource_contract_status`
+  - `scene_local_resource_contract_unsafe_reason`
+  - `scene_local_resource_contract_visible_external_hdri_allowed`
+  - `scene_local_resource_contract_external_hdri_safe`
+  - `scene_local_resource_contract_environment_policy_allowed`
+  - `scene_local_resource_contract_reflection_policy_allowed`
+  - `scene_local_resource_contract_reflection_source_allowed`
+  - `scene_local_resource_contract_proxy_resources_ready`
+  - `scene_local_resource_contract_payload_resources_ready`
+  - `scene_local_resource_contract_role_count`
+  - `scene_local_resource_contract_ready_role_count`
+- Extended `FrameContractJson.cpp` to serialize those runtime fields.
+- Extended `tools/analyze_scene_local_resource_contract_v1.py` so packet
+  review now requires the renderer's own runtime contract verdict, not only
+  Python-side re-derivation.
+- Updated `assets/final_art/full_scene_shader_pipeline_v3_contract.json` with
+  the required runtime fields.
+- Updated `assets/final_art/scene_local_resource_contract_v1.json` to include
+  renderer vocabulary such as `enclosed_scene_local_only`,
+  `screen_space_reflection`, and `ray_query_reflection`.
+- Extended `tools/validate_full_scene_shader_pipeline_v3_plan.py` to require
+  the runtime contract fields and helper functions.
+
+Validation:
+
+```powershell
+python -m py_compile tools\analyze_scene_local_resource_contract_v1.py tools\validate_full_scene_shader_pipeline_v3_plan.py
+python tools\validate_full_scene_shader_pipeline_v3_plan.py
+cmd.exe /d /c "call ""C:\Program Files\Microsoft Visual Studio\18\Community\Common7\Tools\VsDevCmd.bat"" -arch=x64 -host_arch=x64 >nul && set ""CORTEX_SKIP_ASSET_SYNC=1"" && cmake --build build --config Release --target CortexEngine --parallel 8"
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_full_scene_shader_pipeline_v3_packet.ps1 -NoBuild -SkipSceneAnalyzers -StressSceneOnly -StressSceneFilter rt_showcase:reflection_closeup -ViewFilter "beauty,candidate_beauty_v3,candidate_hdr_scene_color,scene_local_environment,ambient_lighting,visible_background,reflection_background,atmosphere,reflection_radiance,reflection_confidence,reflection_source_id,reflection_source_suppression,ambient_ibl,energy_clamp_policy,overbright_diagnostics,composite_contribution_map,legacy_rescue_usage,material_base_color,material_normal,material_missing_channel_mask,roughness,metallic,surface_class,surface_policy,material_family,reflection_policy,temporal_policy,post_sensitivity,material_id,object_id,direct_light,direct_light_unshadowed,direct_light_shadow_loss,shadow_factor,v3_direct_lighting,v3_direct_lighting_unshadowed,v3_shadow_visibility,v3_shadow_loss,v3_indirect_lighting,v3_lighting_energy_budget,v3_shadow_source_attribution" -SmokeFrames 8 -CaptureFrame 4 -CaptureSequenceCount 1 -StabilityMotionMode static -OutputRoot build\captures\v3_runtime_scene_local_resource_contract_smoke_20260609
+python tools\build_full_scene_shader_v3_matrix_decision.py --packet-root build\captures\v3_runtime_scene_local_resource_contract_smoke_20260609 --required-families stress_rt_showcase_reflection_closeup --required-motion-modes static --output-json build\captures\v3_runtime_scene_local_resource_contract_smoke_20260609\v3_matrix_single_packet_decision.json --output-md build\captures\v3_runtime_scene_local_resource_contract_smoke_20260609\v3_matrix_single_packet_decision.md
+```
+
+Results:
+
+- Python compile passed.
+- Static V3 validator passed.
+- Native Release build linked `bin\CortexEngine.exe`.
+- Known trailing `vswhere.exe` warning still appears after successful builds.
+- Focused runtime packet passed:
+  - packet root
+    `build\captures\v3_runtime_scene_local_resource_contract_smoke_20260609`
+  - `41` reports
+  - scene-local resource contract passed `41/41`
+  - runtime sample: `ready=true`, `family=gallery`, `status=ready`,
+    `unsafe=none`, `roles=6/6`, `source=local_probe`
+  - promotion decision status `review_packet_passed`
+  - single-packet matrix passed for
+    `stress_rt_showcase_reflection_closeup/static`
+
+Enclosed-scene probe:
+
+- A kitchen packet attempt timed out before manifest assembly, but produced
+  direct frame reports under
+  `build\captures\v3_runtime_scene_local_resource_contract_kitchen_smoke_20260609`.
+- Sample kitchen report:
+  - `sceneFamily=home_kitchen_lantern`
+  - `profile=kitchen_morning_warm_scene_local_v1`
+  - `enclosed=true`
+  - `externalVisible=false`
+  - `visibleExternalHDRIAllowed=false`
+  - `invalidExternalHDRI=false`
+  - `contractFamily=kitchen`
+  - `contractReady=false`
+  - `status=unsafe`
+  - `unsafe=proxy_resources_below_contract`
+  - `roles=4/6`
+- Interpretation: the runtime is now correctly refusing to mark kitchen as
+  final-art resource-ready. This is the next real rendering-quality blocker:
+  kitchen needs scene-local proxy/payload resources that satisfy the contract.
+
+Current next work:
+
+1. Make at least one enclosed non-gallery family pass
+   `SceneLocalResourceContractV1`, preferably kitchen.
+2. Add or bind kitchen scene-local proxy/payload resources so runtime reports:
+   - `scene_local_resource_contract_proxy_resources_ready=true`
+   - `scene_local_resource_contract_payload_resources_ready=true`
+   - `scene_local_resource_contract_ready_role_count=6`
+   - `scene_local_resource_contract_ready=true`
+3. Then run a cross-packet matrix with:
+   - `stress_rt_showcase_reflection_closeup/static`
+   - `kitchen/static`
+4. Do not lower contract thresholds to make kitchen pass. The failure is
+   useful because it identifies missing scene-local resource ownership.
+
 ## 2026-06-09 SceneLocalResourceContractV1 Checkpoint
 
 Latest pushed work before this section:

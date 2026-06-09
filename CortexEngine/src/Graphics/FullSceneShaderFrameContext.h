@@ -1289,6 +1289,20 @@ struct FullSceneShaderPipelineV3FrameContext {
     std::string sceneLocalReflectionBackgroundSource = "unknown";
     std::string sceneLocalAmbientSource = "unknown";
     std::string sceneLocalAtmosphereSource = "unknown";
+    bool sceneLocalResourceContractReady = false;
+    std::string sceneLocalResourceContractId = "SceneLocalResourceContractV1";
+    std::string sceneLocalResourceContractFamily = "unknown";
+    std::string sceneLocalResourceContractStatus = "unknown";
+    std::string sceneLocalResourceContractUnsafeReason = "unknown";
+    bool sceneLocalResourceContractVisibleExternalHdriAllowed = false;
+    bool sceneLocalResourceContractExternalHdriSafe = false;
+    bool sceneLocalResourceContractEnvironmentPolicyAllowed = false;
+    bool sceneLocalResourceContractReflectionPolicyAllowed = false;
+    bool sceneLocalResourceContractReflectionSourceAllowed = false;
+    bool sceneLocalResourceContractProxyResourcesReady = false;
+    bool sceneLocalResourceContractPayloadResourcesReady = false;
+    uint32_t sceneLocalResourceContractRoleCount = 0;
+    uint32_t sceneLocalResourceContractReadyRoleCount = 0;
     uint32_t sceneLocalEnvironmentSourceCount = 0;
     bool sceneLocalEnvironmentConsumesSceneProfilePolicy = false;
     std::string sceneLocalEnvironmentProfileContractId = "unknown";
@@ -1471,6 +1485,149 @@ inline std::string FullSceneShaderPipelineV3EnvironmentPolicy(const FrameContrac
                   : environmentMode == "open_exterior"
                         ? "open_exterior_scene_environment"
                         : "scene_local_neutral_background";
+}
+
+inline std::string FullSceneShaderSceneLocalResourceContractFamily(const FrameContract& contract) {
+    const std::string family = contract.sceneVisual.family;
+    const std::string profile = contract.sceneVisual.profileId;
+    if (family.find("rt_showcase_gallery") != std::string::npos ||
+        family.find("gallery") != std::string::npos ||
+        profile.find("gallery") != std::string::npos) {
+        return "gallery";
+    }
+    if (family.find("kitchen") != std::string::npos || profile.find("kitchen") != std::string::npos) {
+        return "kitchen";
+    }
+    if (family.find("office") != std::string::npos || profile.find("office") != std::string::npos) {
+        return "office";
+    }
+    if (family.find("gym") != std::string::npos || profile.find("gym") != std::string::npos) {
+        return "gym";
+    }
+    if (family.find("concert") != std::string::npos ||
+        family.find("stage") != std::string::npos ||
+        profile.find("concert") != std::string::npos) {
+        return "concert";
+    }
+    if (family.find("red_room") != std::string::npos ||
+        family.find("red-room") != std::string::npos ||
+        profile.find("red_room") != std::string::npos) {
+        return "red_room";
+    }
+    if (family.find("stadium") != std::string::npos || profile.find("stadium") != std::string::npos) {
+        return "stadium";
+    }
+    return "unknown";
+}
+
+inline bool FullSceneShaderSceneLocalResourceContractAllowsVisibleExternalHdri(
+    const std::string& family) {
+    return family == "gallery" || family == "stadium";
+}
+
+inline bool FullSceneShaderSceneLocalResourceContractAllowsEnvironmentPolicy(
+    const std::string& family,
+    const std::string& policy) {
+    if (family == "gallery") {
+        return policy == "authorized_external_visible_background" ||
+               policy == "enclosed_scene_local_background" ||
+               policy == "scene_local_neutral_background";
+    }
+    if (family == "stadium") {
+        return policy == "stadium_local_sky" ||
+               policy == "authorized_external_visible_background" ||
+               policy == "open_exterior_scene_environment";
+    }
+    if (family == "concert") {
+        return policy == "black_box_local_background" ||
+               policy == "enclosed_scene_local_background" ||
+               policy == "enclosed_scene_local_only";
+    }
+    if (family == "red_room") {
+        return policy == "red_room_local_background" ||
+               policy == "enclosed_scene_local_background" ||
+               policy == "enclosed_scene_local_only";
+    }
+    if (family == "kitchen" || family == "office" || family == "gym") {
+        return policy == "enclosed_scene_local_background" ||
+               policy == "enclosed_scene_local_only" ||
+               policy == "scene_local_neutral_background";
+    }
+    return false;
+}
+
+inline bool FullSceneShaderSceneLocalResourceContractAllowsReflectionPolicy(
+    const std::string& family,
+    const std::string& policy) {
+    if (family == "gallery") {
+        return policy == "local_probe_priority";
+    }
+    if (family == "kitchen") {
+        return policy == "local_probe_priority" ||
+               policy == "planar_plus_probe" ||
+               policy == "screen_space_priority" ||
+               policy == "ray_query_priority";
+    }
+    if (family == "office" || family == "gym") {
+        return policy == "local_probe_priority" ||
+               policy == "screen_space_plus_probe" ||
+               policy == "screen_space_priority" ||
+               policy == "ray_query_priority";
+    }
+    if (family == "concert" || family == "red_room") {
+        return policy == "emissive_probe_priority" ||
+               policy == "local_probe_priority" ||
+               policy == "screen_space_priority" ||
+               policy == "ray_query_priority";
+    }
+    if (family == "stadium") {
+        return policy == "sky_probe_priority" ||
+               policy == "local_probe_priority" ||
+               policy == "screen_space_priority" ||
+               policy == "ray_query_priority";
+    }
+    return false;
+}
+
+inline bool FullSceneShaderSceneLocalResourceContractAllowsReflectionSource(
+    const std::string& family,
+    const std::string& source) {
+    if (family == "gallery") {
+        return source == "local_probe" ||
+               source == "planar" ||
+               source == "screen_space" ||
+               source == "screen_space_reflection" ||
+               source == "ray_traced" ||
+               source == "ray_query_reflection";
+    }
+    if (family == "kitchen") {
+        return source == "local_probe" ||
+               source == "planar" ||
+               source == "screen_space" ||
+               source == "screen_space_reflection" ||
+               source == "ray_query_reflection";
+    }
+    if (family == "office" || family == "gym") {
+        return source == "local_probe" ||
+               source == "screen_space" ||
+               source == "screen_space_reflection" ||
+               source == "ray_query_reflection";
+    }
+    if (family == "concert" || family == "red_room") {
+        return source == "local_probe" ||
+               source == "screen_space" ||
+               source == "screen_space_reflection" ||
+               source == "emissive_rig" ||
+               source == "ray_query_reflection";
+    }
+    if (family == "stadium") {
+        return source == "local_probe" ||
+               source == "sky_probe" ||
+               source == "screen_space" ||
+               source == "screen_space_reflection" ||
+               source == "ray_query_reflection";
+    }
+    return false;
 }
 
 inline std::string FullSceneShaderPipelineV3LightingPolicy(const FrameContract& contract) {
@@ -2324,6 +2481,91 @@ inline FullSceneShaderPipelineV3FrameContext BuildFullSceneShaderPipelineV3Frame
         iblSourceReady ? "scene_local_environment" :
         "unknown";
     context.reflectionV3Ready = readyReflectionChannels == 13u;
+
+    context.sceneLocalResourceContractFamily =
+        FullSceneShaderSceneLocalResourceContractFamily(contract);
+    context.sceneLocalResourceContractVisibleExternalHdriAllowed =
+        FullSceneShaderSceneLocalResourceContractAllowsVisibleExternalHdri(
+            context.sceneLocalResourceContractFamily);
+    context.sceneLocalResourceContractExternalHdriSafe =
+        contract.sceneVisual.active &&
+        !contract.sceneVisual.invalidExternalHDRI &&
+        (!contract.sceneVisual.externalHDRIVisible ||
+         context.sceneLocalResourceContractVisibleExternalHdriAllowed);
+    context.sceneLocalResourceContractEnvironmentPolicyAllowed =
+        FullSceneShaderSceneLocalResourceContractAllowsEnvironmentPolicy(
+            context.sceneLocalResourceContractFamily,
+            context.sceneLocalEnvironmentPolicy);
+    context.sceneLocalResourceContractReflectionPolicyAllowed =
+        FullSceneShaderSceneLocalResourceContractAllowsReflectionPolicy(
+            context.sceneLocalResourceContractFamily,
+            context.sceneProfilePolicyReflection);
+    context.sceneLocalResourceContractReflectionSourceAllowed =
+        FullSceneShaderSceneLocalResourceContractAllowsReflectionSource(
+            context.sceneLocalResourceContractFamily,
+            context.reflectionV3SourceContract);
+    context.sceneLocalResourceContractProxyResourcesReady =
+        context.sceneLocalEnvironmentProxyResourceTableBindable &&
+        context.sceneLocalEnvironmentProxyBoundResourceCount >= 3u;
+    context.sceneLocalResourceContractPayloadResourcesReady =
+        context.sceneLocalTexturePayloadResourceTableBindable &&
+        context.sceneLocalTexturePayloadBoundResourceCount >= 2u;
+
+    uint32_t sceneLocalResourceReadyRoles = 0;
+    sceneLocalResourceReadyRoles +=
+        context.sceneLocalEnvironmentReady &&
+        context.sceneLocalResourceContractProxyResourcesReady &&
+        FullSceneShaderKnownContractString(context.sceneLocalAmbientSource)
+            ? 1u : 0u;
+    sceneLocalResourceReadyRoles +=
+        context.reflectionRadianceReady &&
+        context.reflectionConfidenceReady &&
+        context.reflectionSourceIdReady &&
+        context.sceneLocalResourceContractReflectionSourceAllowed
+            ? 1u : 0u;
+    sceneLocalResourceReadyRoles +=
+        FullSceneShaderKnownContractString(context.sceneLocalVisibleBackgroundSource) &&
+        context.sceneLocalResourceContractExternalHdriSafe
+            ? 1u : 0u;
+    sceneLocalResourceReadyRoles +=
+        FullSceneShaderKnownContractString(context.sceneLocalReflectionBackgroundSource) &&
+        context.sceneLocalResourceContractReflectionSourceAllowed
+            ? 1u : 0u;
+    sceneLocalResourceReadyRoles +=
+        FullSceneShaderKnownContractString(context.sceneLocalAtmosphereSource)
+            ? 1u : 0u;
+    sceneLocalResourceReadyRoles +=
+        FullSceneShaderKnownContractString(context.sceneProfilePolicyExposure) &&
+        FullSceneShaderKnownContractString(contract.sceneVisual.exposurePolicyId)
+            ? 1u : 0u;
+    context.sceneLocalResourceContractRoleCount = 6u;
+    context.sceneLocalResourceContractReadyRoleCount = sceneLocalResourceReadyRoles;
+
+    if (!contract.sceneVisual.active) {
+        context.sceneLocalResourceContractUnsafeReason = "inactive_scene_visual_contract";
+    } else if (!FullSceneShaderKnownContractString(context.sceneLocalResourceContractFamily)) {
+        context.sceneLocalResourceContractUnsafeReason = "unknown_contract_family";
+    } else if (!context.sceneLocalResourceContractExternalHdriSafe) {
+        context.sceneLocalResourceContractUnsafeReason = "unauthorized_visible_external_hdri";
+    } else if (!context.sceneLocalResourceContractEnvironmentPolicyAllowed) {
+        context.sceneLocalResourceContractUnsafeReason = "environment_policy_not_allowed";
+    } else if (!context.sceneLocalResourceContractReflectionPolicyAllowed) {
+        context.sceneLocalResourceContractUnsafeReason = "reflection_policy_not_allowed";
+    } else if (!context.sceneLocalResourceContractReflectionSourceAllowed) {
+        context.sceneLocalResourceContractUnsafeReason = "reflection_source_not_allowed";
+    } else if (!context.sceneLocalResourceContractProxyResourcesReady) {
+        context.sceneLocalResourceContractUnsafeReason = "proxy_resources_below_contract";
+    } else if (!context.sceneLocalResourceContractPayloadResourcesReady) {
+        context.sceneLocalResourceContractUnsafeReason = "payload_resources_below_contract";
+    } else if (context.sceneLocalResourceContractReadyRoleCount != context.sceneLocalResourceContractRoleCount) {
+        context.sceneLocalResourceContractUnsafeReason = "resource_roles_not_ready";
+    } else {
+        context.sceneLocalResourceContractUnsafeReason = "none";
+    }
+    context.sceneLocalResourceContractReady =
+        context.sceneLocalResourceContractUnsafeReason == "none";
+    context.sceneLocalResourceContractStatus =
+        context.sceneLocalResourceContractReady ? "ready" : "unsafe";
 
     FullSceneShaderPipelineV3DomainEvidence reflectionDomain =
         MakeFullSceneShaderPipelineV3DomainEvidence(

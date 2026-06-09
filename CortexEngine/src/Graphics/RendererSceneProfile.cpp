@@ -445,9 +445,9 @@ SceneCinematicProfile BuildSceneLocalCinematicProfile(std::string_view sceneFami
         p.lighting.rigId = "stadium_night_enclosed";
         p.lighting.sunDirection = glm::vec3(-0.18f, 0.92f, 0.08f);
         p.lighting.sunColor = glm::vec3(0.78f, 0.88f, 1.0f);
-        p.lighting.sunIntensity = 1.25f;
+        p.lighting.sunIntensity = 0.28f;
         p.lighting.ambientColor = glm::vec3(0.075f, 0.086f, 0.104f);
-        p.lighting.ambientIntensity = 1.05f;
+        p.lighting.ambientIntensity = 0.42f;
         p.lighting.fogDensity = 0.014f;
         p.reflections.ssrMaxDistance = 90.0f;
         p.reflections.rtGIRayDistance = 36.0f;
@@ -458,14 +458,14 @@ SceneCinematicProfile BuildSceneLocalCinematicProfile(std::string_view sceneFami
         p.reflectionProbes[0].center = glm::vec3(0.0f, 2.2f, 0.0f);
         p.reflectionProbes[0].extents = glm::vec3(12.0f, 4.0f, 10.0f);
         p.reflectionProbes[0].blendDistance = 3.0f;
-        p.post.exposure = 1.38f;
-        p.post.bloomIntensity = 0.22f;
+        p.post.exposure = 0.78f;
+        p.post.bloomIntensity = 0.14f;
         p.post.cool = 0.18f;
         p.material.worldPaletteId = "stadium_night_enclosed";
         p.material.lightingScriptId = "stadium_night";
-        AddAreaFixture(p, "ProfileLight_Stadium_LeftFloodBank", "stadium_flood_bank", glm::vec3(-6.0f, 4.2f, -2.5f), glm::vec3(-1.2f, 0.55f, 0.0f), glm::vec2(2.8f, 0.9f), glm::vec3(0.82f, 0.90f, 1.0f), 22.0f, 12.0f);
-        AddAreaFixture(p, "ProfileLight_Stadium_RightFloodBank", "stadium_flood_bank", glm::vec3(6.0f, 4.2f, -2.5f), glm::vec3(1.2f, 0.55f, 0.0f), glm::vec2(2.8f, 0.9f), glm::vec3(0.82f, 0.90f, 1.0f), 22.0f, 12.0f);
-        AddSpotFixture(p, "ProfileLight_Stadium_FieldWash", "field_spot_wash", glm::vec3(0.0f, 5.0f, -5.5f), glm::vec3(0.0f, 0.55f, 0.0f), glm::vec3(1.0f, 0.92f, 0.78f), 32.0f, 16.0f, false);
+        AddAreaFixture(p, "ProfileLight_Stadium_LeftFloodBank", "stadium_flood_bank", glm::vec3(-6.0f, 4.2f, -2.5f), glm::vec3(-1.2f, 0.55f, 0.0f), glm::vec2(2.8f, 0.9f), glm::vec3(0.82f, 0.90f, 1.0f), 7.5f, 12.0f);
+        AddAreaFixture(p, "ProfileLight_Stadium_RightFloodBank", "stadium_flood_bank", glm::vec3(6.0f, 4.2f, -2.5f), glm::vec3(1.2f, 0.55f, 0.0f), glm::vec2(2.8f, 0.9f), glm::vec3(0.82f, 0.90f, 1.0f), 7.5f, 12.0f);
+        AddSpotFixture(p, "ProfileLight_Stadium_FieldWash", "field_spot_wash", glm::vec3(0.0f, 5.0f, -5.5f), glm::vec3(0.0f, 0.55f, 0.0f), glm::vec3(1.0f, 0.92f, 0.78f), 9.5f, 16.0f, false);
     }
 
     if (!recognizedFamily) {

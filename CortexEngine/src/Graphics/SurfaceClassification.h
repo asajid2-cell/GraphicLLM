@@ -6,6 +6,7 @@
 
 #include <algorithm>
 #include <cstdint>
+#include <string>
 
 namespace Cortex::Graphics {
 
@@ -27,12 +28,28 @@ enum class SurfaceClass : uint32_t {
 
 [[nodiscard]] inline bool SurfacePresetContains(const Scene::RenderableComponent& renderable,
                                                 const char* token) {
-    return token && MaterialPresetRegistry::ContainsToken(renderable.presetName, token);
+    if (!token) {
+        return false;
+    }
+    if (MaterialPresetRegistry::ContainsToken(renderable.presetName, token)) {
+        return true;
+    }
+    const std::string canonicalPreset = MaterialPresetRegistry::Canonicalize(renderable.presetName);
+    return canonicalPreset != renderable.presetName &&
+           MaterialPresetRegistry::ContainsToken(canonicalPreset, token);
 }
 
 [[nodiscard]] inline bool SurfacePresetContains(const MaterialModel& material,
                                                 const char* token) {
-    return token && MaterialPresetRegistry::ContainsToken(material.presetName, token);
+    if (!token) {
+        return false;
+    }
+    if (MaterialPresetRegistry::ContainsToken(material.presetName, token)) {
+        return true;
+    }
+    const std::string canonicalPreset = MaterialPresetRegistry::Canonicalize(material.presetName);
+    return canonicalPreset != material.presetName &&
+           MaterialPresetRegistry::ContainsToken(canonicalPreset, token);
 }
 
 [[nodiscard]] inline bool SurfaceMaterialTypeNear(const MaterialModel& material, float expectedType) {

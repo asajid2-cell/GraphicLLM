@@ -7,6 +7,8 @@ from pathlib import Path
 from typing import Any
 
 
+ROOT = Path(__file__).resolve().parents[1]
+
 DEFAULT_REQUIRED_FAMILIES = [
     "gallery",
     "kitchen",
@@ -26,6 +28,23 @@ def load_json(path: Path) -> dict[str, Any]:
 
 def split_csv(value: str) -> list[str]:
     return [item.strip() for item in value.split(",") if item.strip()]
+
+
+def normalize_packet_root(raw: str, *, packet_list_path: Path | None = None, suite_output_root: Path | None = None) -> Path:
+    path = Path(raw)
+    if path.is_absolute():
+        return path
+
+    candidates = [Path.cwd() / path, ROOT / path]
+    if packet_list_path is not None:
+        candidates.append(packet_list_path.parent / path)
+    if suite_output_root is not None:
+        candidates.append(suite_output_root / path.name)
+
+    for candidate in candidates:
+        if candidate.exists():
+            return candidate.resolve()
+    return (ROOT / path).resolve()
 
 
 def packet_row(packet_root: Path, packet_status: dict[str, Any] | None = None) -> dict[str, Any]:
@@ -258,17 +277,33 @@ def main() -> int:
     parser.add_argument("--output-md", required=True, type=Path)
     args = parser.parse_args()
 
-    roots = [Path(item) for item in args.packet_root]
+    roots = [normalize_packet_root(str(item)) for item in args.packet_root]
     packet_status_by_root: dict[str, dict[str, Any]] = {}
     if args.packet_list_json:
         data = load_json(args.packet_list_json)
-        roots.extend(Path(str(item)) for item in data.get("packet_roots", []))
+        suite_output_root_raw = data.get("output_root")
+        suite_output_root = Path(str(suite_output_root_raw)) if suite_output_root_raw else None
+        roots.extend(
+            normalize_packet_root(
+                str(item),
+                packet_list_path=args.packet_list_json,
+                suite_output_root=suite_output_root,
+            )
+            for item in data.get("packet_roots", [])
+        )
         for status in data.get("packet_status", []):
             if not isinstance(status, dict):
                 continue
             packet_root = status.get("packet_root")
             if isinstance(packet_root, str) and packet_root:
                 packet_status_by_root[packet_root] = status
+                resolved_root = normalize_packet_root(
+                    packet_root,
+                    packet_list_path=args.packet_list_json,
+                    suite_output_root=suite_output_root,
+                )
+                packet_status_by_root[str(resolved_root)] = status
+                packet_status_by_root[resolved_root.as_posix()] = status
     if not roots:
         raise SystemExit("at least one --packet-root or --packet-list-json entry is required")
 

@@ -12931,3 +12931,79 @@ Interpretation:
   high-contrast lighting ownership or `enclosed_mouse_jitter` to exercise
   temporal/reflection stability under motion. Preserve packet failures through
   the matrix instead of judging individual screenshots manually.
+
+### V3 Heavy-Lighting Packet - 2026-06-09
+
+Initial run:
+
+- `build\captures\v3_promotion_suite_heavy_light_sweep_smoke1_20260609`
+  ran `heavy_light_sweep` for `concert,red_room,stadium`, `44` compact heavy
+  views x `3` families = `132` engine launches.
+- Concert and red room passed visual-quality gates. Stadium failed:
+  - `named_policy_ratio 0.661146 < 0.950000`;
+  - `bright_ratio 0.509705 > 0.240000`;
+  - `midtone_ratio 0.256944 < 0.500000`.
+- Diagnosis from stadium debug views:
+  - the stadium capture was overexposed, not just visually bright;
+  - large turf/stand/enclosure areas were falling into default material policy;
+  - the stadium scene profile added high-intensity flood banks and high
+    exposure on top of the seed-authored floodlights.
+
+Root fixes:
+
+- `MaterialPresetRegistry` now aliases `organic` and `grass` to `fabric`,
+  matching existing `turf` behavior. This closes the stadium turf/material
+  taxonomy gap instead of accepting default-policy pixels.
+- `SurfaceClassification` now canonicalizes preset names before token checks,
+  so renderable-level debug/diagnostic classifiers see the same aliases as the
+  material model.
+- `RendererSceneProfile` stadium profile was rebalanced for night-stadium use:
+  lower sun/ambient intensity, lower post exposure/bloom, and lower additive
+  profile flood-bank/field-wash intensities. The seed remains free to carry
+  stadium floodlight intent; the profile now shapes it without blowing out the
+  frame.
+- `build_full_scene_shader_v3_matrix_decision.py` now normalizes relative
+  packet roots from suite status under the CortexEngine root/suite output root.
+  Before this, `build\captures\...` packet paths were resolved from the parent
+  `graphics` repo and the matrix falsely reported `packet root missing`.
+
+Build note:
+
+- A normal `build.ps1 -Config Release` and `ninja CortexEngine.exe` both hit a
+  long asset-sync stall in `tools\sync_assets.cmake`, apparently caused by the
+  large generated asset tree being newer than `build\cortex_assets.stamp`.
+- For this C++-only validation pass, the changed translation units were compiled
+  using the Ninja-emitted `cl.exe` commands under VS 18 `VsDevCmd.bat`, then the
+  executable was relinked with a response file generated from the current
+  `build.ninja` link edge. `build\bin\CortexEngine.exe` relinked at
+  `2026-06-09 15:10`.
+- Treat the asset-sync stall as build-system debt to fix later; it is not a V3
+  renderer packet failure.
+
+Final heavy-light evidence:
+
+- `build\captures\v3_promotion_suite_heavy_light_sweep_smoke2_20260609`
+  ran `heavy_light_sweep` with `promotion_core`, `44` views, `3` families,
+  `SmokeFrames=2`, `CaptureFrame=1`, `CaptureSequenceCount=1`, `-NoBuild`, and
+  `-ContinueOnPacketFailure`.
+- The packet passed scene-local cinematic generation, V2 packet evidence, V3
+  placeholder/stability analysis, scene profile policy ownership, environment
+  payload diagnostics, scene-local resource contract V1, material payload
+  diagnostics, CompositeV3 diagnostics, and promotion decision.
+- Stadium improved to `named_surface_ratio=0.972032`,
+  `named_policy_ratio=0.972019`, `bright_ratio=0.193767`, with no hard visual
+  failures. It still has a visual-quality warning:
+  `midtone_ratio 0.491215 < 0.500000`.
+- `SummarizeExisting` after the matrix path fix refreshed
+  `build\captures\v3_promotion_suite_heavy_light_sweep_smoke2_20260609\v3_matrix_decision.md/json`
+  to `PASS: V3 promotion matrix is fully covered` for
+  `concert,red_room,stadium` and `light_sweep`.
+
+Interpretation:
+
+- Heavy-lighting V3 harness proof is now present for `concert`, `red_room`, and
+  `stadium` under `light_sweep`.
+- The full goal remains incomplete. Remaining high-value proof packets are
+  `enclosed_mouse_jitter` and `enclosed_camera_sweep`; those should use
+  `CaptureSequenceCount >= 2` so motion/temporal stability evidence is not only
+  a single-frame smoke.

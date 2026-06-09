@@ -116,6 +116,8 @@ std::string MaterialPresetRegistry::Canonicalize(std::string_view presetName) {
         {"upholstery", "fabric"},
         {"paper", "fabric"},
         {"fiber", "fabric"},
+        {"organic", "fabric"},
+        {"grass", "fabric"},
         {"turf", "fabric"},
         {"matte_black", "rubber"},
         {"gym_mat", "rubber"},

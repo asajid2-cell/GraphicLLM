@@ -158,6 +158,45 @@ def candidate_predicate_summary(signal: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def candidate_beauty_review_gate(
+    *,
+    review_packet_passed: bool,
+    candidate_beauty_requested_count: int,
+    candidate_beauty_ready_count: int,
+    candidate_predicates: dict[str, Any],
+    material_quality: dict[str, Any],
+    scene_local_resource_contract: dict[str, Any] | None,
+    composite_diagnostics: dict[str, Any] | None,
+) -> dict[str, Any]:
+    blockers: list[str] = []
+    requested_blockers = candidate_predicates.get("requested_blocker_counts", {})
+    if not isinstance(requested_blockers, dict):
+        requested_blockers = {}
+
+    if not review_packet_passed:
+        blockers.append("review_packet_not_passed")
+    if candidate_beauty_requested_count <= 0:
+        blockers.append("candidate_beauty_not_requested")
+    if candidate_beauty_ready_count != candidate_beauty_requested_count:
+        blockers.append("candidate_beauty_ready_count_mismatch")
+    if requested_blockers:
+        blockers.append("candidate_beauty_requested_blockers_present")
+    if material_quality.get("ready") is not True:
+        blockers.append("material_quality_gate_not_ready")
+    if scene_local_resource_contract is None or scene_local_resource_contract.get("ready") is not True:
+        blockers.append("scene_local_resource_contract_not_ready")
+    if composite_diagnostics is None or composite_diagnostics.get("ready") is not True:
+        blockers.append("composite_v3_not_ready")
+
+    return {
+        "ready": not blockers,
+        "blockers": blockers,
+        "requested_report_count": candidate_beauty_requested_count,
+        "ready_report_count": candidate_beauty_ready_count,
+        "requested_blocker_counts": dict(sorted(requested_blockers.items())),
+    }
+
+
 def material_quality_gate(material_payload: dict[str, Any] | None) -> dict[str, Any]:
     if material_payload is None:
         return {
@@ -521,6 +560,15 @@ def make_decision(
         failures.append("CompositeV3 contribution map lacks owned direct/reflection contribution")
 
     review_packet_passed = not failures
+    candidate_beauty_review = candidate_beauty_review_gate(
+        review_packet_passed=review_packet_passed,
+        candidate_beauty_requested_count=candidate_beauty_requested_count,
+        candidate_beauty_ready_count=candidate_beauty_ready_count,
+        candidate_predicates=candidate_predicates,
+        material_quality=material_quality,
+        scene_local_resource_contract=scene_local_resource_contract,
+        composite_diagnostics=composite_diagnostics,
+    )
     full_coverage_ready = (
         review_packet_passed
         and not missing_families
@@ -528,9 +576,22 @@ def make_decision(
         and capture_sequence_count >= 2
         and not warnings
     )
+    default_beauty_promotion_blockers: list[str] = []
+    if candidate_beauty_review.get("ready") is not True:
+        default_beauty_promotion_blockers.append("candidate_beauty_review_not_ready")
+    if not full_coverage_ready:
+        default_beauty_promotion_blockers.append("full_coverage_not_ready")
+    if stability.get("default_beauty_affects_any") is not False:
+        default_beauty_promotion_blockers.append("default_beauty_review_invariant_failed")
+    else:
+        default_beauty_promotion_blockers.append("default_beauty_runtime_path_not_enabled")
+    default_beauty_promotable = not default_beauty_promotion_blockers
+
     if failures:
         status = "blocked"
-    elif full_coverage_ready:
+    elif default_beauty_promotable:
+        status = "default_beauty_promotable"
+    elif full_coverage_ready and candidate_beauty_review.get("ready") is True:
         status = "candidate_ready_not_promoted"
     else:
         status = "review_packet_passed"
@@ -539,7 +600,10 @@ def make_decision(
         "schema": "cortex.full_scene_shader_pipeline_v3.promotion_decision.v1",
         "packet_root": str(packet_root),
         "status": status,
-        "default_beauty_promotable": False,
+        "default_beauty_promotable": default_beauty_promotable,
+        "default_beauty_promotion_blockers": default_beauty_promotion_blockers,
+        "candidate_beauty_review_ready": candidate_beauty_review.get("ready") is True,
+        "candidate_beauty_review_gate": candidate_beauty_review,
         "review_packet_passed": review_packet_passed,
         "full_coverage_ready": full_coverage_ready,
         "report_count": report_count,
@@ -584,6 +648,7 @@ def write_markdown(path: pathlib.Path, decision: dict[str, Any]) -> None:
         f"- packet root: `{decision.get('packet_root')}`",
         f"- status: `{decision.get('status')}`",
         f"- default beauty promotable: `{str(decision.get('default_beauty_promotable')).lower()}`",
+        f"- candidate beauty review ready: `{str(decision.get('candidate_beauty_review_ready')).lower()}`",
         f"- review packet passed: `{str(decision.get('review_packet_passed')).lower()}`",
         f"- report count: `{decision.get('report_count', 0)}`",
         f"- full-pipeline reports: `{decision.get('full_pipeline_report_count', 0)}`",
@@ -618,6 +683,29 @@ def write_markdown(path: pathlib.Path, decision: dict[str, Any]) -> None:
                 f"- requested blocker counts: `{json.dumps(requested_blocker_counts, sort_keys=True)}`",
             ]
         )
+    candidate_review = decision.get("candidate_beauty_review_gate", {})
+    if isinstance(candidate_review, dict):
+        lines.extend(
+            [
+                "",
+                "## Candidate Beauty Review Gate",
+                "",
+                f"- ready: `{str(candidate_review.get('ready')).lower()}`",
+                f"- blockers: `{json.dumps(candidate_review.get('blockers', []), sort_keys=True)}`",
+                f"- requested reports: `{candidate_review.get('requested_report_count', 0)}`",
+                f"- ready reports: `{candidate_review.get('ready_report_count', 0)}`",
+                f"- requested blocker counts: `{json.dumps(candidate_review.get('requested_blocker_counts', {}), sort_keys=True)}`",
+            ]
+        )
+    lines.extend(
+        [
+            "",
+            "## Default Beauty Promotion Gate",
+            "",
+            f"- promotable: `{str(decision.get('default_beauty_promotable')).lower()}`",
+            f"- blockers: `{json.dumps(decision.get('default_beauty_promotion_blockers', []), sort_keys=True)}`",
+        ]
+    )
     material_quality = decision.get("material_quality_gate", {})
     if isinstance(material_quality, dict):
         material_summary = material_quality.get("summary", {})

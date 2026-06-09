@@ -13254,3 +13254,75 @@ Interpretation:
   enclosed scenes, and heavy-lighting scenes in a single aggregate matrix.
 - The remaining engineering decision is whether the next goal is default-beauty
   promotion, visual-quality/art pass, or startup-readiness/material-pop cleanup.
+
+### V3 Candidate Review / Default Promotion Gate Clarification - 2026-06-09
+
+Scope:
+
+- Updated `tools/build_full_scene_shader_v3_promotion_decision.py`.
+- Updated `tools/build_full_scene_shader_v3_matrix_decision.py`.
+- Updated `tools/validate_full_scene_shader_pipeline_v3_plan.py`.
+
+Why:
+
+- Packet and aggregate reports previously exposed `default_beauty_promotable`
+  as a hard `false`, even when every requested candidate-beauty report was
+  ready.
+- That made the evidence ambiguous: a green candidate path looked equivalent to
+  an unready candidate path because the only headline promotion field stayed
+  false.
+
+Implemented:
+
+- Packet-level promotion decisions now emit:
+  - `candidate_beauty_review_ready`;
+  - `candidate_beauty_review_gate`;
+  - `default_beauty_promotion_blockers`.
+- Matrix decisions now emit:
+  - `candidate_beauty_review_ready`;
+  - `candidate_beauty_review_blocker_counts`;
+  - aggregate candidate ready/requested counts;
+  - aggregate `default_beauty_promotion_blocker_counts`;
+  - packet-level default-promotion blocker counts for traceability.
+- The V3 plan validator now requires these contract-surface tokens.
+
+Validation:
+
+```powershell
+python -m py_compile CortexEngine\tools\build_full_scene_shader_v3_promotion_decision.py CortexEngine\tools\build_full_scene_shader_v3_matrix_decision.py CortexEngine\tools\validate_full_scene_shader_pipeline_v3_plan.py
+python CortexEngine\tools\validate_full_scene_shader_pipeline_v3_plan.py
+python CortexEngine\tools\build_full_scene_shader_v3_matrix_decision.py `
+  --packet-root CortexEngine\build\captures\v3_promotion_suite_reflection_static_smoke7_20260609\reflection_static `
+  --packet-root CortexEngine\build\captures\v3_promotion_suite_reflection_mouse_jitter_seq1_20260609\reflection_mouse_jitter `
+  --packet-root CortexEngine\build\captures\v3_promotion_suite_enclosed_static_smoke6_20260609\enclosed_static `
+  --packet-root CortexEngine\build\captures\v3_promotion_suite_enclosed_mouse_jitter_seq2_20260609\enclosed_mouse_jitter `
+  --packet-root CortexEngine\build\captures\v3_promotion_suite_enclosed_camera_sweep_seq1_20260609\enclosed_camera_sweep `
+  --packet-root CortexEngine\build\captures\v3_promotion_suite_heavy_light_sweep_smoke2_20260609\heavy_light_sweep `
+  --required-families stress_rt_showcase_reflection_closeup,gallery,kitchen,office,gym,concert,red_room,stadium `
+  --required-motion-modes static,mouse_jitter,camera_sweep,light_sweep `
+  --output-json CortexEngine\build\captures\v3_promotion_suite_full_existing_matrix_20260609\v3_matrix_decision.json `
+  --output-md CortexEngine\build\captures\v3_promotion_suite_full_existing_matrix_20260609\v3_matrix_decision.md
+```
+
+Result:
+
+- `full_matrix_ready=True`.
+- `candidate_beauty_review_ready=True`.
+- Candidate beauty ready reports: `102/102`.
+- `candidate_beauty_review_blocker_counts={}`.
+- `default_beauty_promotable=False`.
+- Aggregate default-promotion blocker counts:
+  `{"default_beauty_runtime_path_not_enabled": 6}`.
+- Packet default-promotion blocker counts:
+  `{"default_beauty_runtime_path_not_enabled": 6, "full_coverage_not_ready": 6}`.
+
+Interpretation:
+
+- The V3 candidate renderer is now explicitly review-ready across the existing
+  reflection, enclosed, and heavy-lighting aggregate matrix.
+- Default beauty remains unpromoted for the correct reason: the default runtime
+  beauty path is still deliberately not enabled to consume the V3 candidate
+  output.
+- The next aligned renderer slice is the actual default-beauty promotion path
+  or a visual-quality/art pass, not more evidence cleanup for candidate
+  readiness.

@@ -14,7 +14,8 @@ param(
     [switch]$SkipSceneAnalyzers,
     [switch]$ContinueOnPacketFailure,
     [switch]$SummarizeExisting,
-    [switch]$PlanOnly
+    [switch]$PlanOnly,
+    [switch]$PromoteCandidateBeautyV3ToDefault
 )
 
 # run_full_scene_shader_pipeline_v3_promotion_suite.ps1
@@ -354,6 +355,9 @@ foreach ($scenario in $selectedScenarios) {
         if ($SkipSceneAnalyzers) {
             $packetArgs += "-SkipSceneAnalyzers"
         }
+        if ($PromoteCandidateBeautyV3ToDefault) {
+            $packetArgs += "-PromoteCandidateBeautyV3ToDefault"
+        }
 
         & powershell -NoProfile -ExecutionPolicy Bypass -File $packetRunner @packetArgs
         $packetExit = $LASTEXITCODE
@@ -379,6 +383,7 @@ foreach ($scenario in $selectedScenarios) {
         view_count = $scenarioViewCount
         family_count = $scenarioFamilyCount
         estimated_engine_runs = $scenarioEstimatedRuns
+        promote_candidate_beauty_v3_to_default = [bool]$PromoteCandidateBeautyV3ToDefault
         requested_smoke_frames = $captureContract.requested_smoke_frames
         requested_capture_frame = $captureContract.requested_capture_frame
         effective_smoke_frames = $captureContract.effective_smoke_frames
@@ -407,6 +412,7 @@ $statusDoc = [pscustomobject]@{
     continue_on_packet_failure = [bool]$ContinueOnPacketFailure
     summarize_existing = [bool]$SummarizeExisting
     plan_only = [bool]$PlanOnly
+    promote_candidate_beauty_v3_to_default = [bool]$PromoteCandidateBeautyV3ToDefault
     view_profile = $ViewProfile
     override_view_filter = $ViewFilter
     estimated_engine_runs = $estimatedEngineRuns
@@ -421,12 +427,13 @@ $statusLines = @(
     "Plan only: ``$([bool]$PlanOnly)``",
     "Summarize existing: ``$([bool]$SummarizeExisting)``",
     "Continue on packet failure: ``$([bool]$ContinueOnPacketFailure)``",
+    "Promote candidate beauty V3 to default: ``$([bool]$PromoteCandidateBeautyV3ToDefault)``",
     "View profile: ``$ViewProfile``",
     "Motion warmup capture frame: ``$MotionWarmupCaptureFrame``",
     "Estimated engine runs: ``$estimatedEngineRuns``",
     "",
-    "| Scenario | Packet | Families | Motion | View Pack | Views | Est. Runs | Capture | Smoke | Capture Contract | Stress | Ran | Exit | Continued |",
-    "|---|---|---|---|---|---:|---:|---:|---:|---|---|---:|---:|---:|"
+    "| Scenario | Packet | Families | Motion | Promoted Default | View Pack | Views | Est. Runs | Capture | Smoke | Capture Contract | Stress | Ran | Exit | Continued |",
+    "|---|---|---|---|---:|---|---:|---:|---:|---:|---|---|---:|---:|---:|"
 )
 foreach ($row in $statusRows) {
     $contractLabel = if ($row.capture_contract_adjusted) {
@@ -434,7 +441,7 @@ foreach ($row in $statusRows) {
     } else {
         $row.capture_contract_reason
     }
-    $statusLines += "| $($row.scenario) | $($row.packet_root) | $($row.family_filter) | $($row.motion_mode) | $($row.view_pack) | $($row.view_count) | $($row.estimated_engine_runs) | $($row.effective_capture_frame) | $($row.effective_smoke_frames) | $contractLabel | $($row.stress_scene_filter) | $($row.ran_packet) | $($row.exit_code) | $($row.continued_after_failure) |"
+    $statusLines += "| $($row.scenario) | $($row.packet_root) | $($row.family_filter) | $($row.motion_mode) | $($row.promote_candidate_beauty_v3_to_default) | $($row.view_pack) | $($row.view_count) | $($row.estimated_engine_runs) | $($row.effective_capture_frame) | $($row.effective_smoke_frames) | $contractLabel | $($row.stress_scene_filter) | $($row.ran_packet) | $($row.exit_code) | $($row.continued_after_failure) |"
 }
 $statusLines | Set-Content -Encoding UTF8 $suiteStatusMd
 

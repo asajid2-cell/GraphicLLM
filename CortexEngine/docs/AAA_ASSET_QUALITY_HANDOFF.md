@@ -13549,3 +13549,95 @@ Interpretation:
 - Default-beauty promotion is only proven for gallery/static. The next evidence
   gap is promoted packets for reflection-closeup, kitchen, office, gym,
   concert, red room, stadium, and the missing motion modes.
+
+### V3 Promoted Suite Batching + Kitchen Proof - 2026-06-09
+
+Scope:
+
+- Updated `tools/run_full_scene_shader_pipeline_v3_promotion_suite.ps1`.
+
+Implemented:
+
+- Added suite-level `-PromoteCandidateBeautyV3ToDefault`.
+- The suite now forwards the promoted-default switch into every packet runner.
+- Suite status JSON and markdown now record whether promoted-default display was
+  requested for each scenario.
+- The suite status markdown header and table include promoted-default state so
+  review packets and default-promotion packets cannot be confused.
+
+Validation:
+
+```powershell
+$tokens=$null; $errors=$null
+$null=[System.Management.Automation.Language.Parser]::ParseFile(
+  (Resolve-Path 'CortexEngine\tools\run_full_scene_shader_pipeline_v3_promotion_suite.ps1'),
+  [ref]$tokens,
+  [ref]$errors
+)
+if ($errors.Count) { throw $errors[0].Message }
+
+powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine\tools\run_full_scene_shader_pipeline_v3_promotion_suite.ps1 `
+  -PlanOnly -PromoteCandidateBeautyV3ToDefault `
+  -Scenarios enclosed_static `
+  -ViewFilter beauty,candidate_beauty_v3 `
+  -SmokeFrames 62 -CaptureFrame 60 -CaptureSequenceCount 1 `
+  -OutputRoot build\captures\v3_promoted_suite_plan_smoke_20260609
+
+powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine\tools\run_full_scene_shader_pipeline_v3_packet.ps1 `
+  -NoBuild -NoStressScene -SkipSceneAnalyzers -FamilyFilter kitchen `
+  -SmokeFrames 62 -CaptureFrame 60 -CaptureSequenceCount 1 `
+  -StabilityMotionMode static -PromoteCandidateBeautyV3ToDefault `
+  -OutputRoot build\captures\v3_default_beauty_promotion_kitchen_static_smoke1_20260609
+
+python CortexEngine\tools\build_full_scene_shader_v3_matrix_decision.py `
+  --packet-root CortexEngine\build\captures\v3_promotion_suite_reflection_static_smoke7_20260609\reflection_static `
+  --packet-root CortexEngine\build\captures\v3_promotion_suite_reflection_mouse_jitter_seq1_20260609\reflection_mouse_jitter `
+  --packet-root CortexEngine\build\captures\v3_promotion_suite_enclosed_static_smoke6_20260609\enclosed_static `
+  --packet-root CortexEngine\build\captures\v3_promotion_suite_enclosed_mouse_jitter_seq2_20260609\enclosed_mouse_jitter `
+  --packet-root CortexEngine\build\captures\v3_promotion_suite_enclosed_camera_sweep_seq1_20260609\enclosed_camera_sweep `
+  --packet-root CortexEngine\build\captures\v3_promotion_suite_heavy_light_sweep_smoke2_20260609\heavy_light_sweep `
+  --packet-root CortexEngine\build\captures\v3_default_beauty_promotion_gallery_smoke1_20260609 `
+  --packet-root CortexEngine\build\captures\v3_default_beauty_promotion_kitchen_static_smoke1_20260609 `
+  --required-families stress_rt_showcase_reflection_closeup,gallery,kitchen,office,gym,concert,red_room,stadium `
+  --required-motion-modes static,mouse_jitter,camera_sweep,light_sweep `
+  --output-json CortexEngine\build\captures\v3_default_beauty_promotion_mixed_matrix2_20260609\v3_matrix_decision.json `
+  --output-md CortexEngine\build\captures\v3_default_beauty_promotion_mixed_matrix2_20260609\v3_matrix_decision.md
+```
+
+Evidence:
+
+- Plan-only suite artifact:
+  `build\captures\v3_promoted_suite_plan_smoke_20260609\suite_packet_status.md/json`.
+  - `promote_candidate_beauty_v3_to_default=true`;
+  - estimated enclosed-static smoke: `8` engine runs for
+    `beauty,candidate_beauty_v3` across `gallery,kitchen,office,gym`.
+- Kitchen promoted packet:
+  `build\captures\v3_default_beauty_promotion_kitchen_static_smoke1_20260609`.
+  - `v3_stability.json`: `report_count=54`,
+    `default_beauty_affects_any=true`, `promoted_report_count=2`.
+  - `promotion_decision.json`: `status=review_packet_passed`,
+    `candidate_beauty_review_ready=true`,
+    `default_beauty_promotion_allowed=true`,
+    `default_beauty_promotable=false`,
+    blockers `["full_coverage_not_ready"]`.
+- Updated mixed matrix:
+  `build\captures\v3_default_beauty_promotion_mixed_matrix2_20260609\v3_matrix_decision.md/json`.
+  - `full_matrix_ready=true`;
+  - `candidate_beauty_review_ready=true`;
+  - `default_beauty_promotable=false`;
+  - `promoted_packet_count=2`;
+  - `promoted_report_count=4`;
+  - observed promoted families: `gallery,kitchen`;
+  - missing promoted families:
+    `concert,gym,office,red_room,stadium,stress_rt_showcase_reflection_closeup`;
+  - observed promoted motion modes: `static`;
+  - missing promoted motion modes: `camera_sweep,light_sweep,mouse_jitter`.
+
+Interpretation:
+
+- Promoted-default proof generation is now batchable from the suite instead of
+  only available through manual single-packet commands.
+- Default-beauty promotion is still intentionally blocked at aggregate level.
+  The remaining work is promoted evidence coverage, not candidate review
+  readiness: the review matrix is full and candidate beauty is ready
+  `116/116` in the current mixed matrix.

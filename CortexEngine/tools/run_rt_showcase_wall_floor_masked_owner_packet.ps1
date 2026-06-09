@@ -6,6 +6,11 @@ param(
     [double]$MotionLookAmplitude = 0.025,
     [double]$MotionLookCycles = 6.0,
     [double]$FixedDeltaTime = 0.008333333,
+    [string[]]$ForegroundGateRois = @("left_wall_panel_clean"),
+    [double]$MaxForegroundMeanLumaDelta = 8.0,
+    [double]$MaxForegroundChangedRatio = 0.12,
+    [double]$MaxForegroundLargeChangedRatio = 0.04,
+    [double]$MinForegroundMaskCoverage = 0.90,
     [switch]$NoBuild
 )
 
@@ -99,6 +104,54 @@ function Run-Analysis([string]$Name, [string]$CaptureDir, [string]$MaskDir, [boo
     }
 }
 
+function Get-RoiAggregateMetric($AnalysisJson, [string]$Roi, [string]$Metric) {
+    if ($null -eq $AnalysisJson.aggregate -or
+        -not ($AnalysisJson.aggregate.PSObject.Properties.Name -contains $Roi)) {
+        throw "analysis '$($AnalysisJson.capture_dir)' missing ROI '$Roi'"
+    }
+    $roiStats = $AnalysisJson.aggregate.$Roi
+    if (-not ($roiStats.PSObject.Properties.Name -contains $Metric)) {
+        throw "analysis '$($AnalysisJson.capture_dir)' ROI '$Roi' missing metric '$Metric'"
+    }
+    [double]$roiStats.$Metric
+}
+
+function Test-ForegroundGate([string]$AnalysisName, [string]$JsonPath) {
+    $json = Get-Content -Path $JsonPath -Raw | ConvertFrom-Json
+    $rows = @()
+    $failures = New-Object System.Collections.Generic.List[string]
+    foreach ($roi in $ForegroundGateRois) {
+        $mean = Get-RoiAggregateMetric $json $roi "max_mean_abs_luma_delta"
+        $changed = Get-RoiAggregateMetric $json $roi "max_changed_pixel_ratio"
+        $large = Get-RoiAggregateMetric $json $roi "max_large_changed_pixel_ratio"
+        $coverage = Get-RoiAggregateMetric $json $roi "max_mask_coverage"
+        $passed =
+            $coverage -ge $MinForegroundMaskCoverage -and
+            $mean -le $MaxForegroundMeanLumaDelta -and
+            $changed -le $MaxForegroundChangedRatio -and
+            $large -le $MaxForegroundLargeChangedRatio
+        if (-not $passed) {
+            $failures.Add("$AnalysisName/$roi failed foreground gate: mean=$mean changed=$changed large=$large coverage=$coverage")
+        }
+        $rows += [pscustomobject]@{
+            analysis = $AnalysisName
+            roi = $roi
+            mean_abs_luma_delta = $mean
+            changed_pixel_ratio = $changed
+            large_changed_pixel_ratio = $large
+            mask_coverage = $coverage
+            passed = $passed
+        }
+    }
+    [pscustomobject]@{
+        analysis = $AnalysisName
+        json = $JsonPath
+        rows = $rows
+        failures = @($failures)
+        passed = ($failures.Count -eq 0)
+    }
+}
+
 Push-Location $root
 try {
     Copy-Item assets\shaders\Basic.hlsl build\bin\assets\shaders\Basic.hlsl -Force
@@ -130,11 +183,40 @@ try {
     $analysis += Run-Analysis "ownership_foreground" $ownershipDir $maskDir $false
     $analysis += Run-Analysis "ownership_background" $ownershipDir $maskDir $true
 
+    $failures = New-Object System.Collections.Generic.List[string]
+    foreach ($capture in $captures) {
+        if ($capture.capture_count -lt $CaptureCount) {
+            $failures.Add("capture '$($capture.name)' wrote $($capture.capture_count) BMPs, expected at least $CaptureCount")
+        }
+    }
+
+    $beautyForegroundJson = Join-Path $beautyDir "beauty_foreground.json"
+    $specularForegroundJson = Join-Path $specularDir "specular_foreground.json"
+    $gateResults = @()
+    $gateResults += Test-ForegroundGate "beauty_foreground" $beautyForegroundJson
+    $gateResults += Test-ForegroundGate "specular_foreground" $specularForegroundJson
+    foreach ($gate in $gateResults) {
+        foreach ($failure in $gate.failures) {
+            $failures.Add($failure)
+        }
+    }
+    $gatePassed = ($failures.Count -eq 0)
+
     $summary = [pscustomobject]@{
         schema = "cortex.rt_showcase.wall_floor_masked_owner_packet.v1"
         output_root = $OutputRoot
         captures = $captures
         analyses = $analysis
+        gate = [pscustomobject]@{
+            passed = $gatePassed
+            foreground_rois = $ForegroundGateRois
+            max_mean_abs_luma_delta = $MaxForegroundMeanLumaDelta
+            max_changed_pixel_ratio = $MaxForegroundChangedRatio
+            max_large_changed_pixel_ratio = $MaxForegroundLargeChangedRatio
+            min_mask_coverage = $MinForegroundMaskCoverage
+            results = $gateResults
+            failures = @($failures)
+        }
     }
     $summaryPath = Join-Path $OutputRoot "masked_owner_packet_summary.json"
     $summary | ConvertTo-Json -Depth 6 | Set-Content -Path $summaryPath -Encoding UTF8
@@ -159,11 +241,38 @@ try {
     foreach ($item in $analysis) {
         $lines += "- $($item.name): ``$($item.md)``"
     }
+    $lines += ""
+    $lines += "## Foreground Gate"
+    $lines += ""
+    $lines += "Passed: ``$gatePassed``"
+    $lines += ""
+    $lines += "| Analysis | ROI | Mean | Changed | Large Changed | Coverage | Passed |"
+    $lines += "|---|---|---:|---:|---:|---:|---:|"
+    foreach ($gate in $gateResults) {
+        foreach ($row in $gate.rows) {
+            $lines += "| $($row.analysis) | $($row.roi) | $([string]::Format('{0:F4}', $row.mean_abs_luma_delta)) | $([string]::Format('{0:F4}', $row.changed_pixel_ratio)) | $([string]::Format('{0:F4}', $row.large_changed_pixel_ratio)) | $([string]::Format('{0:F4}', $row.mask_coverage)) | $($row.passed) |"
+        }
+    }
+    if ($failures.Count -gt 0) {
+        $lines += ""
+        $lines += "## Failures"
+        $lines += ""
+        foreach ($failure in $failures) {
+            $lines += "- $failure"
+        }
+    }
     $lines | Set-Content -Path $summaryMd -Encoding UTF8
 
     Write-Host "RT Showcase masked owner packet complete"
     Write-Host " summary=$summaryPath"
     Write-Host " report=$summaryMd"
+    if (-not $gatePassed) {
+        Write-Host "Foreground gate failed:" -ForegroundColor Red
+        foreach ($failure in $failures) {
+            Write-Host " - $failure" -ForegroundColor Red
+        }
+        exit 1
+    }
 } finally {
     Pop-Location
     Remove-Item "Env:\CORTEX_DEBUG_VIEW" -ErrorAction SilentlyContinue

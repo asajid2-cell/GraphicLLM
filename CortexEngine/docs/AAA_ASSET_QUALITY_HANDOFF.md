@@ -12165,6 +12165,14 @@ Implemented:
   - `ownership_foreground/background`
   - `masked_owner_packet_summary.json`
   - `masked_owner_packet_summary.md`
+- It now gates foreground-owned opaque receiver metrics independently from the
+  underlying child smoke exit code.
+  - Default ROI: `left_wall_panel_clean`
+  - Default thresholds:
+    - max foreground mean luma delta: `8.0`
+    - max foreground changed ratio: `0.12`
+    - max foreground large-changed ratio: `0.04`
+    - min foreground mask coverage: `0.90`
 
 Smoke command:
 
@@ -12190,10 +12198,53 @@ Smoke result:
 - The wrapper records those child exits but still succeeds if captures and
   analyses are produced.
 
+Gate verification:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass `
+  -File tools\run_rt_showcase_wall_floor_masked_owner_packet.ps1 `
+  -NoBuild `
+  -OutputRoot Z:\328\CMPUT328-A2\codexworks\301\graphics\CortexEngine\build\captures\rt_showcase_wall_floor_masked_owner_packet_gate_smoke_20260609 `
+  -CaptureCount 2 `
+  -MotionFrames 75 `
+  -MotionLookCycles 4.0
+```
+
+- Exit code: `0`
+- Summary:
+  `build\captures\rt_showcase_wall_floor_masked_owner_packet_gate_smoke_20260609\masked_owner_packet_summary.md`
+- Gate rows:
+  - `beauty_foreground / left_wall_panel_clean`: mean `1.6108`,
+    changed `0.0113`, large `0.0015`, coverage `0.9987`, passed
+  - `specular_foreground / left_wall_panel_clean`: mean `0.5839`,
+    changed `0.0106`, large `0.0018`, coverage `0.9987`, passed
+
+Intentional fail verification:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass `
+  -File tools\run_rt_showcase_wall_floor_masked_owner_packet.ps1 `
+  -NoBuild `
+  -OutputRoot Z:\328\CMPUT328-A2\codexworks\301\graphics\CortexEngine\build\captures\rt_showcase_wall_floor_masked_owner_packet_gate_fail_smoke_20260609 `
+  -CaptureCount 2 `
+  -MotionFrames 75 `
+  -MotionLookCycles 4.0 `
+  -MaxForegroundMeanLumaDelta 0.01
+```
+
+- Expected wrapper exit: `1`
+- The verification wrapper observed that expected failure and returned `0` to
+  the shell command.
+- Failure rows:
+  - `beauty_foreground/left_wall_panel_clean`
+  - `specular_foreground/left_wall_panel_clean`
+
 Next pass:
 
-- Convert the wrapper from a packet generator into a true gate:
-  - separate "capture produced with known warnings" from "owner metric failed";
-  - add thresholds for foreground-only opaque receiver ROIs;
-  - leave broad/full-frame instability as diagnostic context, not as the
-    material-flicker verdict.
+- Add another foreground-only floor/platform camera bookmark or ROI. The
+  current `white_platform_clean_right` and `front_dark_floor_clean` ROIs are
+  mostly or entirely background/depth-miss in the reported camera.
+- Use the foreground gate to drive the next real shader fix:
+  - if foreground wall/floor metrics fail, fix material/lighting ownership;
+  - if only background metrics fail, work on visible HDRI/background temporal
+    stability instead of opaque BRDF.

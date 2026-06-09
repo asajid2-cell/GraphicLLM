@@ -3,6 +3,95 @@
 This is the living handoff for the AAA asset-quality goal.
 Read this after compaction before continuing.
 
+## 2026-06-09 AAA Engine Scenes Rebaseline
+
+User concern:
+
+- Recent work can feel too small if it remains context plumbing only.
+- The target is not "a cleaner V3 callsite"; the target is full-scene shader
+  quality that can support breathtaking, Unreal-style scenes with robust
+  reflections, lighting, materials, enclosed environments, and evidence across
+  multiple scene families.
+
+Current honest state:
+
+- V3 renderer architecture is partially cleaned up and safer to extend.
+- `FullSceneShaderV3GraphBuilder` owns display, scene-local environment, and
+  candidate HDR composite context construction.
+- The existing V3 packet system can prove placeholder outputs, material payload
+  diagnostics, environment payload diagnostics, composite diagnostics, and a
+  narrow promotion matrix.
+- This is not yet AAA-quality rendering. It is a foundation for larger shader
+  work.
+- Continuing to only move context structs around would now be too local unless
+  it directly unblocks shader/resource quality.
+
+Strategic pivot:
+
+1. Resource contracts before more cleanup.
+   - Define scene-local diffuse irradiance, specular radiance, visible
+     background, reflection background, fog/atmosphere, and exposure contracts
+     per scene family.
+   - Enclosed scenes must not reflect arbitrary outdoor/office IBLs unless the
+     scene contract explicitly owns that reflection source.
+   - Exterior scenes need separate sky, sun, atmosphere, water, and local probe
+     ownership instead of one global environment hack.
+
+2. ReflectionV3 provider fusion.
+   - Make reflection source selection explicit: planar, screen-space, ray/RT,
+     local probe, scene-local background, fallback.
+   - Add debug views that show provider id, confidence, rejection reason, and
+     contribution weight.
+   - Stop hiding reflection defects with blur. Blur can be a roughness result,
+     not a correctness mask.
+
+3. LightingShadowV3 ownership.
+   - Make direct light, fill light, emissive light, local bounce, and shadow
+     source attribution measurable.
+   - Add debug views for shadow visibility, shadow loss, direct unshadowed,
+     indirect, and energy budget by source.
+   - Validate moving-camera stability, not just static screenshots.
+
+4. Material payload quality.
+   - Strengthen material family, surface class, normal/roughness/metallic
+     completeness, missing-channel masks, and energy clamp diagnostics.
+   - Reject or mark placeholder materials in final-art packets.
+   - Add scene-family expectations: kitchen tile, metal appliances, glass,
+     wood, fabric, painted walls; gallery polished floor and display glass;
+     concert black stage materials, haze, emissives, and controlled speculars.
+
+5. Cross-scene proof, not one stress view.
+   - Required matrix should include at least:
+     - `rt_showcase:reflection_closeup`
+     - one enclosed scene, preferably kitchen or gallery
+     - one emissive/heavy-lighting scene, preferably concert or red room
+   - Motion modes should include static, camera sweep, and mouse jitter.
+   - Evidence must include beauty plus debug views for reflection source,
+     reflection confidence, shadow source/loss, material family, missing
+     material channels, and energy clamp behavior.
+
+Commit cadence:
+
+- Push after every coherent vertical slice:
+  - contract/schema update
+  - renderer implementation
+  - debug/evidence tooling
+  - focused packets and matrix gate
+  - handoff update
+- Avoid giant unpushed exploratory changes.
+- Avoid committing unrelated dirty scene-authoring artifacts unless the slice
+  explicitly owns them.
+
+Next concrete implementation slice:
+
+- Build `SceneLocalResourceContractV1`.
+- Wire it into the V3 packet/evidence path first, then into renderer resource
+  selection.
+- Prove it on reflection-closeup and one enclosed scene.
+- Expected first commit: contract + validator + handoff.
+- Expected second commit: renderer resource selection + debug views.
+- Expected third commit: cross-scene packet/matrix evidence.
+
 ## 2026-06-07 V3 Composite Context Builder Checkpoint
 
 Latest pushed work before this section:

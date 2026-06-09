@@ -13641,3 +13641,68 @@ Interpretation:
   The remaining work is promoted evidence coverage, not candidate review
   readiness: the review matrix is full and candidate beauty is ready
   `116/116` in the current mixed matrix.
+
+### V3 Reflection-Closeup Promoted Proof - 2026-06-09
+
+Scope:
+
+- Added promoted-default evidence for the stress reflection-closeup family.
+
+Validation:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine\tools\run_full_scene_shader_pipeline_v3_packet.ps1 `
+  -NoBuild -SkipSceneAnalyzers `
+  -StressSceneOnly -StressSceneFilter rt_showcase:reflection_closeup `
+  -SmokeFrames 62 -CaptureFrame 60 -CaptureSequenceCount 1 `
+  -StabilityMotionMode static -PromoteCandidateBeautyV3ToDefault `
+  -OutputRoot build\captures\v3_default_beauty_promotion_reflection_static_smoke1_20260609
+
+python CortexEngine\tools\build_full_scene_shader_v3_matrix_decision.py `
+  --packet-root CortexEngine\build\captures\v3_promotion_suite_reflection_static_smoke7_20260609\reflection_static `
+  --packet-root CortexEngine\build\captures\v3_promotion_suite_reflection_mouse_jitter_seq1_20260609\reflection_mouse_jitter `
+  --packet-root CortexEngine\build\captures\v3_promotion_suite_enclosed_static_smoke6_20260609\enclosed_static `
+  --packet-root CortexEngine\build\captures\v3_promotion_suite_enclosed_mouse_jitter_seq2_20260609\enclosed_mouse_jitter `
+  --packet-root CortexEngine\build\captures\v3_promotion_suite_enclosed_camera_sweep_seq1_20260609\enclosed_camera_sweep `
+  --packet-root CortexEngine\build\captures\v3_promotion_suite_heavy_light_sweep_smoke2_20260609\heavy_light_sweep `
+  --packet-root CortexEngine\build\captures\v3_default_beauty_promotion_gallery_smoke1_20260609 `
+  --packet-root CortexEngine\build\captures\v3_default_beauty_promotion_kitchen_static_smoke1_20260609 `
+  --packet-root CortexEngine\build\captures\v3_default_beauty_promotion_reflection_static_smoke1_20260609 `
+  --required-families stress_rt_showcase_reflection_closeup,gallery,kitchen,office,gym,concert,red_room,stadium `
+  --required-motion-modes static,mouse_jitter,camera_sweep,light_sweep `
+  --output-json CortexEngine\build\captures\v3_default_beauty_promotion_mixed_matrix3_20260609\v3_matrix_decision.json `
+  --output-md CortexEngine\build\captures\v3_default_beauty_promotion_mixed_matrix3_20260609\v3_matrix_decision.md
+```
+
+Evidence:
+
+- Reflection-closeup promoted packet:
+  `build\captures\v3_default_beauty_promotion_reflection_static_smoke1_20260609`.
+  - `v3_stability.json`: `report_count=54`,
+    `default_beauty_affects_any=true`, `promoted_report_count=2`.
+  - `promotion_decision.json`: `status=review_packet_passed`,
+    `candidate_beauty_review_ready=true`,
+    `default_beauty_promotion_allowed=true`,
+    `default_beauty_promotable=false`,
+    blockers `["full_coverage_not_ready"]`.
+- Updated mixed matrix:
+  `build\captures\v3_default_beauty_promotion_mixed_matrix3_20260609\v3_matrix_decision.md/json`.
+  - `full_matrix_ready=true`;
+  - `candidate_beauty_review_ready=true`;
+  - `default_beauty_promotable=false`;
+  - `promoted_packet_count=3`;
+  - `promoted_report_count=6`;
+  - observed promoted families:
+    `gallery,kitchen,stress_rt_showcase_reflection_closeup`;
+  - missing promoted families: `concert,gym,office,red_room,stadium`;
+  - observed promoted motion modes: `static`;
+  - missing promoted motion modes: `camera_sweep,light_sweep,mouse_jitter`;
+  - candidate beauty is ready `123/123`.
+
+Interpretation:
+
+- The promoted-default runtime path is now proven on both an enclosed scene
+  family and the separate reflection-closeup stress family.
+- Remaining default promotion work is targeted evidence expansion:
+  `office`, `gym`, `concert`, `red_room`, `stadium`, then promoted non-static
+  motion coverage.

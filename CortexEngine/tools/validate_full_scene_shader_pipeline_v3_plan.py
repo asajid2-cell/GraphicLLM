@@ -9,6 +9,7 @@ import sys
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 PLAN_PATH = ROOT / "docs" / "FULL_SCENE_SHADER_PIPELINE_V3.md"
 CONTRACT_PATH = ROOT / "assets" / "final_art" / "full_scene_shader_pipeline_v3_contract.json"
+SCENE_LOCAL_RESOURCE_CONTRACT_PATH = ROOT / "assets" / "final_art" / "scene_local_resource_contract_v1.json"
 FRAME_CONTRACT_JSON_SOURCE_PATH = ROOT / "src" / "Graphics" / "FrameContractJson.cpp"
 FULL_SCENE_SHADER_FRAME_CONTEXT_PATH = ROOT / "src" / "Graphics" / "FullSceneShaderFrameContext.h"
 RENDERER_RENDER_GRAPH_END_FRAME_PATH = ROOT / "src" / "Graphics" / "Renderer_RenderGraphEndFrame.cpp"
@@ -28,6 +29,7 @@ V3_MATRIX_DECISION_PATH = ROOT / "tools" / "build_full_scene_shader_v3_matrix_de
 V3_MATERIAL_PAYLOAD_ANALYZER_PATH = ROOT / "tools" / "analyze_full_scene_shader_v3_material_payload.py"
 V3_SCENE_PROFILE_ANALYZER_PATH = ROOT / "tools" / "analyze_full_scene_shader_v3_scene_profile.py"
 V3_ENVIRONMENT_PAYLOAD_ANALYZER_PATH = ROOT / "tools" / "analyze_full_scene_shader_v3_environment_payload.py"
+SCENE_LOCAL_RESOURCE_CONTRACT_ANALYZER_PATH = ROOT / "tools" / "analyze_scene_local_resource_contract_v1.py"
 V3_ENVIRONMENT_PROFILE_ANALYZER_PATH = ROOT / "tools" / "analyze_full_scene_shader_v3_environment_profiles.py"
 V3_ENVIRONMENT_PROXY_GENERATOR_PATH = ROOT / "tools" / "generate_scene_local_environment_proxies.py"
 V3_ENVIRONMENT_PROXY_CONTRACT_HEADER_PATH = (
@@ -135,6 +137,11 @@ def main() -> int:
     require(PLAN_PATH.exists(), errors, f"Missing V3 plan: {PLAN_PATH}")
     require(CONTRACT_PATH.exists(), errors, f"Missing V3 contract: {CONTRACT_PATH}")
     require(
+        SCENE_LOCAL_RESOURCE_CONTRACT_PATH.exists(),
+        errors,
+        f"Missing scene-local resource contract: {SCENE_LOCAL_RESOURCE_CONTRACT_PATH}",
+    )
+    require(
         FRAME_CONTRACT_JSON_SOURCE_PATH.exists(),
         errors,
         f"Missing frame contract JSON source: {FRAME_CONTRACT_JSON_SOURCE_PATH}",
@@ -200,6 +207,11 @@ def main() -> int:
         f"Missing V3 environment payload analyzer: {V3_ENVIRONMENT_PAYLOAD_ANALYZER_PATH}",
     )
     require(
+        SCENE_LOCAL_RESOURCE_CONTRACT_ANALYZER_PATH.exists(),
+        errors,
+        f"Missing scene-local resource contract analyzer: {SCENE_LOCAL_RESOURCE_CONTRACT_ANALYZER_PATH}",
+    )
+    require(
         V3_ENVIRONMENT_PROFILE_ANALYZER_PATH.exists(),
         errors,
         f"Missing V3 environment profile analyzer: {V3_ENVIRONMENT_PROFILE_ANALYZER_PATH}",
@@ -263,6 +275,7 @@ def main() -> int:
 
     plan = PLAN_PATH.read_text(encoding="utf-8")
     contract = json.loads(CONTRACT_PATH.read_text(encoding="utf-8"))
+    scene_local_resource_contract = json.loads(SCENE_LOCAL_RESOURCE_CONTRACT_PATH.read_text(encoding="utf-8"))
     frame_contract_source = FRAME_CONTRACT_JSON_SOURCE_PATH.read_text(encoding="utf-8")
     frame_context_source = FULL_SCENE_SHADER_FRAME_CONTEXT_PATH.read_text(encoding="utf-8")
     render_graph_end_frame_source = RENDERER_RENDER_GRAPH_END_FRAME_PATH.read_text(encoding="utf-8")
@@ -282,6 +295,9 @@ def main() -> int:
     material_payload_source = V3_MATERIAL_PAYLOAD_ANALYZER_PATH.read_text(encoding="utf-8")
     scene_profile_source = V3_SCENE_PROFILE_ANALYZER_PATH.read_text(encoding="utf-8")
     environment_payload_source = V3_ENVIRONMENT_PAYLOAD_ANALYZER_PATH.read_text(encoding="utf-8")
+    scene_local_resource_contract_analyzer_source = SCENE_LOCAL_RESOURCE_CONTRACT_ANALYZER_PATH.read_text(
+        encoding="utf-8"
+    )
     environment_profile_source = V3_ENVIRONMENT_PROFILE_ANALYZER_PATH.read_text(encoding="utf-8")
     environment_proxy_generator_source = V3_ENVIRONMENT_PROXY_GENERATOR_PATH.read_text(encoding="utf-8")
     environment_proxy_contract_header_source = V3_ENVIRONMENT_PROXY_CONTRACT_HEADER_PATH.read_text(encoding="utf-8")
@@ -313,6 +329,7 @@ def main() -> int:
             material_payload_source,
             scene_profile_source,
             environment_payload_source,
+            scene_local_resource_contract_analyzer_source,
             environment_profile_source,
             environment_proxy_generator_source,
             environment_proxy_contract_header_source,
@@ -488,6 +505,80 @@ def main() -> int:
         errors,
         "V3 contract must remain planned_not_promoted until runtime evidence exists",
     )
+    resource_contract_ref = contract.get("scene_local_resource_contract", {})
+    require(
+        isinstance(resource_contract_ref, dict),
+        errors,
+        "V3 contract must reference SceneLocalResourceContractV1",
+    )
+    if isinstance(resource_contract_ref, dict):
+        require(
+            resource_contract_ref.get("schema") == "cortex.scene_local_resource_contract.v1",
+            errors,
+            "V3 contract scene_local_resource_contract schema is wrong",
+        )
+        require(
+            resource_contract_ref.get("path") == "assets/final_art/scene_local_resource_contract_v1.json",
+            errors,
+            "V3 contract must point at scene_local_resource_contract_v1.json",
+        )
+        require(
+            resource_contract_ref.get("analyzer") == "tools/analyze_scene_local_resource_contract_v1.py",
+            errors,
+            "V3 contract must point at the scene-local resource contract analyzer",
+        )
+    require(
+        scene_local_resource_contract.get("schema") == "cortex.scene_local_resource_contract.v1",
+        errors,
+        "Scene-local resource contract schema is wrong",
+    )
+    scene_local_roles = set(scene_local_resource_contract.get("required_roles", []))
+    for role in [
+        "diffuse_irradiance",
+        "specular_radiance",
+        "visible_background",
+        "reflection_background",
+        "atmosphere",
+        "exposure",
+    ]:
+        require(role in scene_local_roles, errors, f"Scene-local resource contract missing role: {role}")
+    scene_local_families = scene_local_resource_contract.get("family_contracts", {})
+    require(isinstance(scene_local_families, dict), errors, "Scene-local resource contract missing family_contracts")
+    if isinstance(scene_local_families, dict):
+        for family in ["gallery", "kitchen", "office", "gym", "concert", "red_room", "stadium"]:
+            family_contract = scene_local_families.get(family)
+            require(isinstance(family_contract, dict), errors, f"Scene-local resource contract missing {family}")
+            if isinstance(family_contract, dict):
+                require(
+                    "visible_external_hdri_allowed" in family_contract,
+                    errors,
+                    f"Scene-local resource contract {family} missing visible_external_hdri_allowed",
+                )
+                require(
+                    "allowed_reflection_source_contracts" in family_contract,
+                    errors,
+                    f"Scene-local resource contract {family} missing allowed_reflection_source_contracts",
+                )
+    for token in [
+        "scene_local_resource_contract_v1.json",
+    ]:
+        require(token in packet_source, errors, f"V3 packet runner missing scene-local resource token: {token}")
+        require(token in promotion_source, errors, f"V3 promotion decision missing scene-local resource token: {token}")
+        require(
+            token in scene_local_resource_contract_analyzer_source,
+            errors,
+            f"Scene-local resource contract analyzer missing token: {token}",
+        )
+    for token in [
+        "Scene-local resource contract",
+        "reflection_v3_source_contract",
+        "visible_external_hdri_allowed",
+    ]:
+        require(
+            token in scene_local_resource_contract_analyzer_source,
+            errors,
+            f"Scene-local resource contract analyzer missing token: {token}",
+        )
 
     families = set(contract.get("required_scene_families", []))
     for family in ["gallery", "kitchen", "office", "gym", "concert", "red_room", "stadium"]:

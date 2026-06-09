@@ -162,6 +162,7 @@ def make_decision(
     lighting_motion_path = packet_root / "v3_lighting_motion.json"
     scene_profile_path = packet_root / "v3_scene_profile.json"
     environment_payload_path = packet_root / "v3_environment_payload.json"
+    scene_local_resource_contract_path = packet_root / "scene_local_resource_contract_v1.json"
     material_payload_path = packet_root / "v3_material_payload.json"
     composite_diagnostics_path = packet_root / "v3_composite_diagnostics.json"
 
@@ -174,6 +175,9 @@ def make_decision(
         "lighting_motion": str(lighting_motion_path) if lighting_motion_path.exists() else None,
         "scene_profile": str(scene_profile_path) if scene_profile_path.exists() else None,
         "environment_payload": str(environment_payload_path) if environment_payload_path.exists() else None,
+        "scene_local_resource_contract": (
+            str(scene_local_resource_contract_path) if scene_local_resource_contract_path.exists() else None
+        ),
         "material_payload": str(material_payload_path) if material_payload_path.exists() else None,
         "composite_diagnostics": (
             str(composite_diagnostics_path) if composite_diagnostics_path.exists() else None
@@ -204,6 +208,11 @@ def make_decision(
     lighting_motion = load_json(lighting_motion_path) if lighting_motion_path.exists() else None
     scene_profile = load_json(scene_profile_path) if scene_profile_path.exists() else None
     environment_payload = load_json(environment_payload_path) if environment_payload_path.exists() else None
+    scene_local_resource_contract = (
+        load_json(scene_local_resource_contract_path)
+        if scene_local_resource_contract_path.exists()
+        else None
+    )
     material_payload = load_json(material_payload_path) if material_payload_path.exists() else None
     composite_diagnostics = (
         load_json(composite_diagnostics_path) if composite_diagnostics_path.exists() else None
@@ -236,6 +245,17 @@ def make_decision(
         failures.append("missing v3_environment_payload.json")
     else:
         failures.extend(str(item) for item in environment_payload.get("failures", []))
+    scene_local_resource_summary: dict[str, Any] = {}
+    if scene_local_resource_contract is None:
+        failures.append("missing scene_local_resource_contract_v1.json")
+    else:
+        failures.extend(str(item) for item in scene_local_resource_contract.get("failures", []))
+        warnings.extend(str(item) for item in scene_local_resource_contract.get("warnings", []))
+        raw_summary = scene_local_resource_contract.get("summary", {})
+        if isinstance(raw_summary, dict):
+            scene_local_resource_summary = raw_summary
+        if scene_local_resource_contract.get("ready") is not True:
+            failures.append("Scene-local resource contract is not ready")
     composite_summary: dict[str, Any] = {}
     if composite_diagnostics is None:
         failures.append("missing v3_composite_diagnostics.json")
@@ -436,6 +456,12 @@ def make_decision(
             "mean_direct_contribution": mean_direct_contribution,
             "mean_reflection_contribution": mean_reflection_contribution,
         },
+        "scene_local_resource_contract": {
+            "report_count": int(scene_local_resource_summary.get("report_count", 0) or 0),
+            "ready_report_count": int(scene_local_resource_summary.get("ready_report_count", 0) or 0),
+            "contract_families": scene_local_resource_summary.get("contract_families", []),
+            "proved_role_counts": scene_local_resource_summary.get("proved_role_counts", {}),
+        },
         "failures": failures,
         "warnings": warnings,
         "evidence": evidence,
@@ -498,6 +524,25 @@ def write_markdown(path: pathlib.Path, decision: dict[str, Any]) -> None:
                 f"- mean reflection contribution: `{float(composite.get('mean_reflection_contribution', 0.0) or 0.0):.6f}`",
             ]
         )
+    resource_contract = decision.get("scene_local_resource_contract", {})
+    if isinstance(resource_contract, dict):
+        lines.extend(
+            [
+                "",
+                "## Scene-Local Resource Contract",
+                "",
+                f"- reports: `{resource_contract.get('report_count', 0)}`",
+                f"- ready reports: `{resource_contract.get('ready_report_count', 0)}`",
+                f"- contract families: `{', '.join(resource_contract.get('contract_families', []))}`",
+                "",
+                "| Role | Proved Reports |",
+                "|---|---:|",
+            ]
+        )
+        proved_role_counts = resource_contract.get("proved_role_counts", {})
+        if isinstance(proved_role_counts, dict):
+            for role in sorted(proved_role_counts):
+                lines.append(f"| {role} | {proved_role_counts[role]} |")
     if decision.get("failures"):
         lines.extend(["", "## Failures", ""])
         lines.extend(f"- {failure}" for failure in decision["failures"])

@@ -21,6 +21,7 @@ $v3LightingMotionAnalyzer = Join-Path $root "tools/analyze_full_scene_shader_v3_
 $v3MaterialPayloadAnalyzer = Join-Path $root "tools/analyze_full_scene_shader_v3_material_payload.py"
 $v3SceneProfileAnalyzer = Join-Path $root "tools/analyze_full_scene_shader_v3_scene_profile.py"
 $v3EnvironmentPayloadAnalyzer = Join-Path $root "tools/analyze_full_scene_shader_v3_environment_payload.py"
+$sceneLocalResourceContractAnalyzer = Join-Path $root "tools/analyze_scene_local_resource_contract_v1.py"
 $v3CompositeDiagnosticsAnalyzer = Join-Path $root "tools/analyze_full_scene_shader_v3_composite_diagnostics.py"
 $v3PromotionDecision = Join-Path $root "tools/build_full_scene_shader_v3_promotion_decision.py"
 $outputPath = Join-Path $root $OutputRoot
@@ -34,6 +35,8 @@ $sceneProfileOutput = Join-Path $outputPath "v3_scene_profile.json"
 $sceneProfileMarkdown = Join-Path $outputPath "v3_scene_profile.md"
 $environmentPayloadOutput = Join-Path $outputPath "v3_environment_payload.json"
 $environmentPayloadMarkdown = Join-Path $outputPath "v3_environment_payload.md"
+$sceneLocalResourceContractOutput = Join-Path $outputPath "scene_local_resource_contract_v1.json"
+$sceneLocalResourceContractMarkdown = Join-Path $outputPath "scene_local_resource_contract_v1.md"
 $compositeDiagnosticsOutput = Join-Path $outputPath "v3_composite_diagnostics.json"
 $compositeDiagnosticsMarkdown = Join-Path $outputPath "v3_composite_diagnostics.md"
 $promotionDecisionOutput = Join-Path $outputPath "promotion_decision.json"
@@ -98,6 +101,11 @@ try {
         exit $LASTEXITCODE
     }
 
+    & python $sceneLocalResourceContractAnalyzer --manifest $manifestPath --output-json $sceneLocalResourceContractOutput --output-md $sceneLocalResourceContractMarkdown --min-family-count 1
+    if ($LASTEXITCODE -ne 0) {
+        exit $LASTEXITCODE
+    }
+
     & python $v3MaterialPayloadAnalyzer --manifest $manifestPath --output-json $materialPayloadOutput --output-md $materialPayloadMarkdown
     if ($LASTEXITCODE -ne 0) {
         exit $LASTEXITCODE
@@ -129,5 +137,6 @@ if ($CaptureSequenceCount -ge 2) {
 Write-Host "material_payload=$materialPayloadOutput"
 Write-Host "scene_profile=$sceneProfileOutput"
 Write-Host "environment_payload=$environmentPayloadOutput"
+Write-Host "scene_local_resource_contract=$sceneLocalResourceContractOutput"
 Write-Host "composite_diagnostics=$compositeDiagnosticsOutput"
 Write-Host "promotion_decision=$promotionDecisionOutput"

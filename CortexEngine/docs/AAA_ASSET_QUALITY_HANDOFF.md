@@ -13090,3 +13090,51 @@ Interpretation:
 - The full goal remains incomplete. Remaining high-value proof packets include
   `enclosed_camera_sweep` and the reflection-closeup motion/static packets if
   current evidence for those slices is not already present in the worktree.
+
+### V3 Enclosed Camera-Sweep Warmed Packet - 2026-06-09
+
+Scope:
+
+- Scenario: `enclosed_camera_sweep`.
+- Families: `gallery,kitchen,office,gym`.
+- Motion: `camera_sweep`.
+- View profile: `promotion_core`.
+- Requested command shape used `SmokeFrames=3`, `CaptureFrame=1`, and
+  `CaptureSequenceCount=2`; the promotion-suite warmed capture contract raised
+  that to `CaptureFrame=60`, `SmokeFrames=62`.
+
+Evidence:
+
+- Packet root:
+  `build\captures\v3_promotion_suite_enclosed_camera_sweep_seq1_20260609\enclosed_camera_sweep`.
+- `suite_packet_status.md/json` recorded `176` estimated engine launches,
+  `Capture=60`, `Smoke=62`, `motion_warmup+sequence_extent (1->60)`, and
+  packet exit `0`.
+- `packet_stability_analysis.json` reported `status=PASS`,
+  `failure_count=0`, `warning_count=0`, and `hard_gate_warning_count=0`.
+- `visual_quality_analysis.json` reported `REVIEW_REQUIRED` only because
+  gallery saturation was `0.139748 < 0.140000`; there were no hard visual
+  failures.
+- The packet passed scene-local cinematic generation, V2 packet evidence, V3
+  placeholder/signal/stability, V3 lighting motion, scene profile ownership,
+  environment payload diagnostics, scene-local resource contract V1, material
+  payload diagnostics, CompositeV3 diagnostics, promotion decision, and the V3
+  matrix.
+- `promotion_decision.md` reported `status=review_packet_passed`,
+  `report count=176`, `candidate beauty ready reports=24`, material quality
+  score `1.0000`, scene-local resource contract `176/176` ready reports, and
+  captured families `gallery,gym,kitchen,office`.
+- `v3_matrix_decision.md` reported packet count `1`, passed packet count `1`,
+  `full matrix ready: true`, observed motion `camera_sweep`, observed families
+  `gallery,gym,kitchen,office`, and material quality min score `1.0000`.
+
+Interpretation:
+
+- Enclosed camera-sweep V3 proof is now present for
+  `gallery,kitchen,office,gym` with warmed two-frame sequence evidence.
+- Combined with the prior sections, enclosed static, enclosed mouse-jitter,
+  enclosed camera-sweep, and heavy light-sweep packets are now proven through
+  the V3 promotion harness.
+- The full goal remains incomplete until reflection-closeup static/motion proof
+  is confirmed current in the worktree and any broader full-matrix aggregate
+  required for release is rerun or summarized from existing packet roots.

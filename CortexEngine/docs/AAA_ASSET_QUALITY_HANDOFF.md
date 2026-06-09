@@ -13138,3 +13138,50 @@ Interpretation:
 - The full goal remains incomplete until reflection-closeup static/motion proof
   is confirmed current in the worktree and any broader full-matrix aggregate
   required for release is rerun or summarized from existing packet roots.
+
+### V3 Reflection Closeup Mouse-Jitter Warmed Packet - 2026-06-09
+
+Prior current static evidence:
+
+- `build\captures\v3_promotion_suite_reflection_static_smoke7_20260609`
+  already proves `reflection_static` for
+  `stress_rt_showcase_reflection_closeup` with the full `promotion_core`
+  reflection view pack, packet exit `0`, promotion status
+  `review_packet_passed`, one-packet matrix `full matrix ready: true`, and
+  material quality min score `1.0000`.
+
+Mouse-jitter evidence:
+
+- Packet root:
+  `build\captures\v3_promotion_suite_reflection_mouse_jitter_seq1_20260609\reflection_mouse_jitter`.
+- Scenario: `reflection_mouse_jitter`.
+- Stress target: `rt_showcase:reflection_closeup`.
+- Required family: `stress_rt_showcase_reflection_closeup`.
+- Required motion: `mouse_jitter`.
+- The suite ran with `-SkipSceneAnalyzers` because stress-only reflection
+  packets still have scene-analyzer family compatibility debt.
+- Requested command shape used `SmokeFrames=3`, `CaptureFrame=1`, and
+  `CaptureSequenceCount=2`; the warmed capture contract raised that to
+  `CaptureFrame=60`, `SmokeFrames=62`.
+- Captures: `57` reflection-core views x `2` sequence frames = `114` BMPs.
+- The packet passed scene-local cinematic generation, V2 packet evidence, V3
+  placeholder/signal/stability, V3 lighting motion, scene profile ownership,
+  environment payload diagnostics, scene-local resource contract V1, material
+  payload diagnostics, CompositeV3 diagnostics, promotion decision, and the V3
+  matrix.
+- `promotion_decision.md` reported `status=review_packet_passed`,
+  `report count=57`, `candidate beauty ready reports=6`, material quality
+  score `1.0000`, scene-local resource contract `57/57` ready reports, and
+  captured family `stress_rt_showcase_reflection_closeup`.
+- `v3_matrix_decision.md` reported packet count `1`, passed packet count `1`,
+  `full matrix ready: true`, observed family
+  `stress_rt_showcase_reflection_closeup`, observed motion `mouse_jitter`, and
+  material quality min score `1.0000`.
+
+Interpretation:
+
+- Reflection-closeup static and mouse-jitter V3 proof are now both present in
+  current capture evidence.
+- The main remaining proof gap is an aggregate matrix/suite status that combines
+  the already proven reflection, enclosed, and heavy-light packet roots into a
+  single release-facing decision artifact.

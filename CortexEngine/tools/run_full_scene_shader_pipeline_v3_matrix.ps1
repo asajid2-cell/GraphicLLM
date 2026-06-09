@@ -14,7 +14,8 @@ param(
     [switch]$StressSceneOnly,
     [switch]$NoStressScene,
     [switch]$NoBuild,
-    [switch]$SkipSceneAnalyzers
+    [switch]$SkipSceneAnalyzers,
+    [switch]$ContinueOnPacketFailure
 )
 
 $ErrorActionPreference = "Stop"
@@ -24,6 +25,8 @@ $matrixAnalyzer = Join-Path $root "tools/build_full_scene_shader_v3_matrix_decis
 $outputPath = Join-Path $root $OutputRoot
 $matrixJson = Join-Path $outputPath "v3_matrix_decision.json"
 $matrixMd = Join-Path $outputPath "v3_matrix_decision.md"
+$packetStatusJson = Join-Path $outputPath "packet_run_status.json"
+$packetStatusMd = Join-Path $outputPath "packet_run_status.md"
 
 function Split-Csv([string]$Value) {
     $items = @()
@@ -49,9 +52,17 @@ function Get-SafeName([string]$Value) {
 
 New-Item -ItemType Directory -Force -Path $outputPath | Out-Null
 $packetRootList = @()
+$packetStatusRows = @()
 
 foreach ($packetRoot in (Split-Csv $PacketRoots)) {
     $packetRootList += $packetRoot
+    $packetStatusRows += [pscustomobject]@{
+        packet_root = $packetRoot
+        motion_mode = "provided"
+        ran_packet = $false
+        exit_code = $null
+        continued_after_failure = $false
+    }
 }
 
 if ($RunPackets) {
@@ -87,10 +98,26 @@ if ($RunPackets) {
         }
 
         & powershell -NoProfile -ExecutionPolicy Bypass -File $packetRunner @packetArgs
-        if ($LASTEXITCODE -ne 0) {
-            exit $LASTEXITCODE
-        }
+        $packetExit = $LASTEXITCODE
         $packetRootList += $packetOutputRoot
+        $packetStatusRows += [pscustomobject]@{
+            packet_root = $packetOutputRoot
+            motion_mode = $mode
+            ran_packet = $true
+            exit_code = $packetExit
+            continued_after_failure = ($packetExit -ne 0 -and [bool]$ContinueOnPacketFailure)
+        }
+        if ($packetExit -ne 0 -and -not $ContinueOnPacketFailure) {
+            $status = [pscustomobject]@{
+                schema = "cortex.full_scene_shader_pipeline_v3.matrix_packet_run_status.v1"
+                output_root = $outputPath
+                continue_on_packet_failure = [bool]$ContinueOnPacketFailure
+                packet_roots = @($packetRootList)
+                packet_status = @($packetStatusRows)
+            }
+            $status | ConvertTo-Json -Depth 5 | Set-Content -Encoding UTF8 $packetStatusJson
+            exit $packetExit
+        }
         $firstRun = $false
     }
 }
@@ -99,15 +126,35 @@ if ($packetRootList.Count -eq 0) {
     throw "No packet roots were provided. Pass -PacketRoots for existing packets or use -RunPackets to render a matrix."
 }
 
+$statusDoc = [pscustomobject]@{
+    schema = "cortex.full_scene_shader_pipeline_v3.matrix_packet_run_status.v1"
+    output_root = $outputPath
+    continue_on_packet_failure = [bool]$ContinueOnPacketFailure
+    packet_roots = @($packetRootList)
+    packet_status = @($packetStatusRows)
+}
+$statusDoc | ConvertTo-Json -Depth 5 | Set-Content -Encoding UTF8 $packetStatusJson
+
+$statusLines = @(
+    "# Full Scene Shader Pipeline V3 Matrix Packet Run Status",
+    "",
+    "Continue on packet failure: ``$([bool]$ContinueOnPacketFailure)``",
+    "",
+    "| Packet | Motion | Ran | Exit | Continued |",
+    "|---|---|---:|---:|---:|"
+)
+foreach ($row in $packetStatusRows) {
+    $statusLines += "| $($row.packet_root) | $($row.motion_mode) | $($row.ran_packet) | $($row.exit_code) | $($row.continued_after_failure) |"
+}
+$statusLines | Set-Content -Encoding UTF8 $packetStatusMd
+
 $analyzerArgs = @(
     "--required-families", $RequiredFamilies,
     "--required-motion-modes", $RequiredMotionModes,
+    "--packet-list-json", $packetStatusJson,
     "--output-json", $matrixJson,
     "--output-md", $matrixMd
 )
-foreach ($packetRoot in $packetRootList) {
-    $analyzerArgs += @("--packet-root", $packetRoot)
-}
 
 & python $matrixAnalyzer @analyzerArgs
 if ($LASTEXITCODE -ne 0) {

@@ -28,15 +28,25 @@ def split_csv(value: str) -> list[str]:
     return [item.strip() for item in value.split(",") if item.strip()]
 
 
-def packet_row(packet_root: Path) -> dict[str, Any]:
+def packet_row(packet_root: Path, packet_status: dict[str, Any] | None = None) -> dict[str, Any]:
     manifest_path = packet_root / "manifest.json"
     promotion_path = packet_root / "promotion_decision.json"
     stability_path = packet_root / "v3_stability.json"
+    packet_exit_code = None
+    packet_runner_failed = False
+    continued_after_failure = False
+    if packet_status:
+        packet_exit_code = packet_status.get("exit_code")
+        packet_runner_failed = packet_exit_code not in (None, 0)
+        continued_after_failure = packet_status.get("continued_after_failure") is True
     row: dict[str, Any] = {
         "packet_root": str(packet_root),
         "manifest": str(manifest_path),
         "promotion_decision": str(promotion_path),
         "stability": str(stability_path),
+        "packet_exit_code": packet_exit_code,
+        "packet_runner_failed": packet_runner_failed,
+        "continued_after_failure": continued_after_failure,
         "exists": packet_root.exists(),
         "review_packet_passed": False,
         "families": [],
@@ -44,6 +54,8 @@ def packet_row(packet_root: Path) -> dict[str, Any]:
         "failures": [],
         "warnings": [],
     }
+    if packet_runner_failed:
+        row["failures"].append(f"packet runner exited {packet_exit_code}")
     if not packet_root.exists():
         row["failures"].append("packet root missing")
         return row
@@ -88,8 +100,13 @@ def build_matrix(
     packet_roots: list[Path],
     required_families: list[str],
     required_motion_modes: list[str],
+    packet_status_by_root: dict[str, dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
-    rows = [packet_row(root) for root in packet_roots]
+    packet_status_by_root = packet_status_by_root or {}
+    rows = [
+        packet_row(root, packet_status_by_root.get(str(root)) or packet_status_by_root.get(root.as_posix()))
+        for root in packet_roots
+    ]
     passed_rows = [row for row in rows if row.get("review_packet_passed") is True]
     observed_families = sorted(
         {
@@ -174,8 +191,8 @@ def write_markdown(path: Path, matrix: dict[str, Any]) -> None:
         f"- candidate blocker counts: `{json.dumps(matrix.get('candidate_beauty_blocker_counts', {}), sort_keys=True)}`",
         f"- requested candidate blocker counts: `{json.dumps(matrix.get('candidate_beauty_requested_blocker_counts', {}), sort_keys=True)}`",
         "",
-        "| Packet | Motion | Families | Passed | Status | Candidate Ready | Candidate Blockers |",
-        "|---|---|---|---|---|---:|---|",
+        "| Packet | Motion | Families | Exit | Passed | Status | Candidate Ready | Candidate Blockers |",
+        "|---|---|---|---:|---|---|---:|---|",
     ]
     for row in matrix["packets"]:
         predicates = row.get("candidate_beauty_predicates", {})
@@ -191,6 +208,7 @@ def write_markdown(path: Path, matrix: dict[str, Any]) -> None:
                     f"`{row.get('packet_root')}`",
                     f"`{row.get('motion_mode')}`",
                     f"`{', '.join(row.get('families', []))}`",
+                    f"`{row.get('packet_exit_code')}`",
                     f"`{str(row.get('review_packet_passed')).lower()}`",
                     f"`{row.get('promotion_status', 'unknown')}`",
                     f"`{row.get('candidate_beauty_ready_report_count', 0)}/{row.get('candidate_beauty_requested_report_count', 0)}`",
@@ -219,9 +237,16 @@ def main() -> int:
     args = parser.parse_args()
 
     roots = [Path(item) for item in args.packet_root]
+    packet_status_by_root: dict[str, dict[str, Any]] = {}
     if args.packet_list_json:
         data = load_json(args.packet_list_json)
         roots.extend(Path(str(item)) for item in data.get("packet_roots", []))
+        for status in data.get("packet_status", []):
+            if not isinstance(status, dict):
+                continue
+            packet_root = status.get("packet_root")
+            if isinstance(packet_root, str) and packet_root:
+                packet_status_by_root[packet_root] = status
     if not roots:
         raise SystemExit("at least one --packet-root or --packet-list-json entry is required")
 
@@ -229,6 +254,7 @@ def main() -> int:
         roots,
         split_csv(args.required_families),
         split_csv(args.required_motion_modes),
+        packet_status_by_root,
     )
     args.output_json.parent.mkdir(parents=True, exist_ok=True)
     args.output_json.write_text(json.dumps(matrix, indent=2) + "\n", encoding="utf-8")

@@ -12554,3 +12554,54 @@ Remaining known warnings:
 
 These warnings are still real renderer debt, but they are no longer evidence
 that the reported visible-HDRI/depth-miss flicker is unfixed.
+
+### V3 Matrix Report Preservation - 2026-06-09
+
+Problem:
+
+- The cross-family V3 matrix runner previously exited on the first packet
+  runner failure. That protected the shell exit code, but it lost the durable
+  matrix report that should say which families, motion modes, packets, and
+  promotion predicates were missing.
+- This made cross-scene AAA promotion work fragile during long runs: one bad
+  packet could erase the exact coverage/blocker state needed for the next
+  slice.
+
+Implemented:
+
+- `tools/run_full_scene_shader_pipeline_v3_matrix.ps1` now supports
+  `-ContinueOnPacketFailure`.
+- Matrix runs now always write packet-run status artifacts:
+  `packet_run_status.json` and `packet_run_status.md`.
+- Packet status records include `packet_root`, `motion_mode`, `ran_packet`,
+  `exit_code`, and `continued_after_failure`.
+- `tools/build_full_scene_shader_v3_matrix_decision.py` now consumes
+  `--packet-list-json` and carries packet runner failures into each matrix
+  row as `packet_exit_code`, `packet_runner_failed`, and
+  `continued_after_failure`.
+- `tools/validate_full_scene_shader_pipeline_v3_plan.py` now requires the
+  continuation/status contract tokens so this reporting path stays wired in.
+
+Evidence:
+
+- Existing-packet plus missing-packet probe:
+  `build\captures\v3_matrix_report_preservation_probe_20260609`
+  wrote `v3_matrix_decision.json`, `v3_matrix_decision.md`,
+  `packet_run_status.json`, and `packet_run_status.md`.
+  The matrix explicitly reported one passed packet, one missing packet root,
+  missing `kitchen`, and missing `mouse_jitter`.
+- Intentional invalid-view packet-failure probe:
+  `build\captures\v3_matrix_continue_on_packet_failure_probe_20260609`
+  used `-RunPackets -ContinueOnPacketFailure` with
+  `-ViewFilter definitely_missing_view`.
+  The child packet exited `1`, the matrix wrapper still exited `0`, and the
+  matrix row recorded `packet_exit_code=1`, `packet_runner_failed=true`, and
+  `continued_after_failure=true`.
+
+Interpretation:
+
+- This does not promote the V3 AAA renderer or claim cross-family coverage is
+  good enough.
+- It makes failed and incomplete promotion runs inspectable, so the next
+  cross-scene rendering slices can rank real blockers instead of stopping at
+  the first child-process failure.

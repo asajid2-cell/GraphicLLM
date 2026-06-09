@@ -22,6 +22,10 @@ struct RuntimeFrameDebugSwitches {
     bool disableRTGI = false;
     bool disableFog = false;
     bool disableParticles = false;
+    bool disableMotionVectors = false;
+    bool disableSkybox = false;
+    bool disableOpaqueGeometry = false;
+    bool disableAuxGeometry = false;
     bool logVRAM = false;
     bool forceMinimalFrame = false;
     bool useRenderGraphShadows = true;

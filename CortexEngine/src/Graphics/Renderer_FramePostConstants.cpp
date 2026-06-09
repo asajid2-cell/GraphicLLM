@@ -18,6 +18,11 @@ namespace Cortex::Graphics {
 
 namespace {
 
+bool DisableVisibleBackgroundFromEnv() {
+    const char* value = std::getenv("CORTEX_DISABLE_VISIBLE_BACKGROUND");
+    return value && value[0] != '\0' && std::strcmp(value, "0") != 0;
+}
+
 float ReflectionV3SourceOverrideFromEnv() {
     static bool s_checked = false;
     static float s_override = 0.0f;
@@ -515,6 +520,10 @@ glm::vec4 Renderer::BuildSceneLocalEnvironmentV3PayloadParams() const {
     if (!m_sceneVisualContract.active) {
         return glm::vec4(0.0f);
     }
+    const char* proceduralOnly = std::getenv("CORTEX_SCENE_LOCAL_ENV_V3_PROCEDURAL_ONLY");
+    if (proceduralOnly && std::strcmp(proceduralOnly, "1") == 0) {
+        return glm::vec4(0.0f);
+    }
 
     const SceneLocalPayloadScan scan = ScanSceneLocalPayload(m_sceneVisualContract.family);
     const bool irradianceProxyReady =
@@ -712,11 +721,14 @@ void Renderer::PopulateFrameDebugAndPostConstants(FrameConstants& frameData,
 
     // Image-based lighting parameters
     float iblEnabled = m_environmentState.enabled ? 1.0f : 0.0f;
+    const float backgroundExposure = (DisableVisibleBackgroundFromEnv() || !m_environmentState.backgroundVisible)
+        ? 0.0f
+        : m_environmentState.backgroundExposure;
     frameData.envParams = glm::vec4(
         m_environmentState.diffuseIntensity,
         m_environmentState.specularIntensity,
         iblEnabled,
-        m_environmentState.backgroundExposure);
+        backgroundExposure);
 
     // Color grading parameters (warm/cool) for post-process. We repurpose
     // colorGrade.z for volumetric sun shafts and colorGrade.w for vignette

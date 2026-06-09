@@ -292,6 +292,26 @@ float3 ComputeLocalOutdoorSky(float3 viewDir)
     return max(skyColor, 0.0f);
 }
 
+float3 ComputeSceneLocalDepthMissBackground(float3 viewDir)
+{
+    viewDir = normalize(viewDir);
+    float3 ambientBase = max(g_AmbientColor.rgb, 0.018f.xxx);
+    float3 sunColor = NormalizedSunColor();
+    float up = saturate(viewDir.y * 0.5f + 0.5f);
+    float horizon = pow(saturate(1.0f - abs(viewDir.y) * 1.10f), 1.35f);
+    float payloadReady = step(0.5f, g_SceneLocalPayloadParams.x);
+    float payloadInfluence = saturate(g_SceneLocalPayloadParams.w * g_SceneLocalPayloadParams.z) * payloadReady;
+    float localProbe = step(0.5f, g_LocalProbeParams.z);
+
+    float3 lowerWall = ambientBase * 0.78f + float3(0.036f, 0.033f, 0.030f);
+    float3 upperWall = ambientBase * 1.34f + sunColor * 0.018f + float3(0.020f, 0.021f, 0.023f);
+    float3 galleryNeutral = lerp(lowerWall, upperWall, up);
+    galleryNeutral += horizon * float3(0.020f, 0.024f, 0.028f);
+
+    float ownedBoost = saturate(0.35f + payloadInfluence * 0.45f + localProbe * 0.20f);
+    return max(galleryNeutral * ownedBoost, 0.0f.xxx);
+}
+
 float3 ComputeSceneLocalProbeDiffuse(float3 normal,
                                      uint surfaceClass,
                                      uint sceneMaterialClass)
@@ -1116,7 +1136,7 @@ float4 PSMain(VSOutput input) : SV_Target0 {
         float backgroundExposure = saturate(g_EnvParams.w);
         if (backgroundExposure <= 0.001f)
         {
-            return float4(0.0f, 0.0f, 0.0f, 1.0f);
+            return float4(ComputeSceneLocalDepthMissBackground(viewDir), 1.0f);
         }
         if (iblEnabled) {
             // Match the forward sky path: presentation blur samples higher

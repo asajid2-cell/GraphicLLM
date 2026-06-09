@@ -7,7 +7,7 @@
 
 namespace Cortex::Graphics {
 
-void Renderer::BeginMainSceneFramePhase(const FrameExecutionContext&) {
+void Renderer::BeginMainSceneFramePhase(const FrameExecutionContext& frameCtx) {
     // This opens the broad MainPass GPU scope. The scope is closed in
     // Renderer::Render after the geometry, RT-reflection, temporal, and TAA
     // work that contribute to the main HDR scene have completed.
@@ -16,17 +16,30 @@ void Renderer::BeginMainSceneFramePhase(const FrameExecutionContext&) {
     MarkPassComplete("PrepareMainPass_Done");
 
     // Draw environment background (skybox) into the HDR target before geometry.
-    WriteBreadcrumb(GpuMarker::Skybox);
-    FramePhase::BeginGpuScope(m_commandResources.graphicsList.Get(), "Skybox", "Main");
-    RenderSkybox();
-    FramePhase::EndGpuScope(m_commandResources.graphicsList.Get());
-    RecordFramePass("Skybox",
-                    true,
-                    true,
-                    1,
-                    {"frame_constants", "environment"},
-                    {"hdr_color"});
-    MarkPassComplete("RenderSkybox_Done");
+    if (!frameCtx.features.debug.disableSkybox) {
+        WriteBreadcrumb(GpuMarker::Skybox);
+        FramePhase::BeginGpuScope(m_commandResources.graphicsList.Get(), "Skybox", "Main");
+        RenderSkybox();
+        FramePhase::EndGpuScope(m_commandResources.graphicsList.Get());
+        RecordFramePass("Skybox",
+                        true,
+                        true,
+                        1,
+                        {"frame_constants", "environment"},
+                        {"hdr_color"});
+        MarkPassComplete("RenderSkybox_Done");
+    } else {
+        RecordFramePass("Skybox",
+                        true,
+                        false,
+                        0,
+                        {"frame_constants", "environment"},
+                        {"hdr_color"},
+                        true,
+                        "disabled_by_CORTEX_DISABLE_SKYBOX",
+                        false);
+        MarkPassComplete("RenderSkybox_Skipped");
+    }
 }
 
 void Renderer::ExecuteGeometryFramePhase(const FrameExecutionContext& frameCtx) {
@@ -54,7 +67,7 @@ void Renderer::ExecuteGeometryFramePhase(const FrameExecutionContext& frameCtx) 
         return;
     }
 
-    const bool vbEnabled = featurePlan.runVisibilityBuffer;
+    const bool vbEnabled = featurePlan.runVisibilityBuffer && !featurePlan.debug.disableOpaqueGeometry;
     if (vbEnabled) {
         WriteBreadcrumb(GpuMarker::OpaqueGeometry);
         const uint32_t vbInstancesBefore = m_frameDiagnostics.contract.drawCounts.visibilityBufferInstances;
@@ -83,7 +96,7 @@ void Renderer::ExecuteGeometryFramePhase(const FrameExecutionContext& frameCtx) 
 
     // If VB is disabled or fails to produce a lit HDR frame, fall back to the
     // existing opaque render paths for robustness.
-    if (!vbEnabled || !m_visibilityBufferState.renderedThisFrame) {
+    if (!featurePlan.debug.disableOpaqueGeometry && (!vbEnabled || !m_visibilityBufferState.renderedThisFrame)) {
         if (vbEnabled && !m_visibilityBufferState.renderedThisFrame && m_depthResources.resources.buffer && m_depthResources.resources.resourceState != D3D12_RESOURCE_STATE_DEPTH_WRITE) {
             DepthWriteTransitionPass::TransitionContext depthTransitionContext{};
             depthTransitionContext.commandList = m_commandResources.graphicsList.Get();
@@ -134,11 +147,33 @@ void Renderer::ExecuteGeometryFramePhase(const FrameExecutionContext& frameCtx) 
                             vbEnabled ? "visibility_buffer_not_rendered" : "");
             MarkPassComplete("RenderScene_Done");
         }
+    } else if (featurePlan.debug.disableOpaqueGeometry) {
+        RecordFramePass("ForwardSceneFallback",
+                        true,
+                        false,
+                        0,
+                        {"frame_constants", "renderables", "shadow_map"},
+                        {"hdr_color", "depth", "gbuffer_normal_roughness"},
+                        true,
+                        "disabled_by_CORTEX_DISABLE_OPAQUE_GEOMETRY",
+                        false);
+        MarkPassComplete("RenderScene_Skipped");
     }
 
     // When VB debug visualization is active, keep the frame clean by skipping
     // passes that can obscure the intermediate buffer being inspected.
     if (m_visibilityBufferState.debugOverrideThisFrame) {
+        return;
+    }
+
+    if (featurePlan.debug.disableAuxGeometry) {
+        RecordFramePass("Overlays", true, false, 0, {"frame_constants", "depth"}, {"hdr_color"},
+                        true, "disabled_by_CORTEX_DISABLE_AUX_GEOMETRY", false);
+        RecordFramePass("Water", true, false, 0, {"frame_constants", "depth", "hdr_color"}, {"hdr_color"},
+                        true, "disabled_by_CORTEX_DISABLE_AUX_GEOMETRY", false);
+        RecordFramePass("Transparent", true, false, 0, {"frame_constants", "depth", "hdr_color"}, {"hdr_color"},
+                        true, "disabled_by_CORTEX_DISABLE_AUX_GEOMETRY", false);
+        MarkPassComplete("RenderAuxGeometry_Skipped");
         return;
     }
 

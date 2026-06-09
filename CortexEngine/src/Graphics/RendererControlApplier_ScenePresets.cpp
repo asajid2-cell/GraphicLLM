@@ -125,12 +125,19 @@ void ApplyAutoDemoFeatureLock(Renderer& renderer) {
 
 void ApplyRTShowcaseSceneControls(Renderer& renderer, bool conservativeMode) {
     SceneCinematicProfile profile = BuildGalleryCinematicProfile(conservativeMode);
+    const bool visibleExternalBackground =
+        ReadRTShowcaseDisableFlag("CORTEX_RT_SHOWCASE_VISIBLE_EXTERNAL_BACKGROUND");
+    profile.environment.ownership = visibleExternalBackground
+        ? "authored_visible_gallery_ibl"
+        : "scene_local_gallery_background_hidden_external_ibl";
     profile.environment.iblDiffuse =
         ReadRTShowcaseFloatOverride("CORTEX_RT_SHOWCASE_IBL_DIFFUSE_INTENSITY", 0.85f, 0.0f, 3.0f);
     profile.environment.iblSpecular =
         ReadRTShowcaseFloatOverride("CORTEX_RT_SHOWCASE_IBL_SPECULAR_INTENSITY", 1.25f, 0.0f, 3.0f);
-    profile.environment.backgroundExposure =
-        ReadRTShowcaseFloatOverride("CORTEX_RT_SHOWCASE_BACKGROUND_EXPOSURE", 1.0f, 0.0f, 4.0f);
+    profile.environment.backgroundVisible = visibleExternalBackground;
+    profile.environment.backgroundExposure = visibleExternalBackground
+        ? ReadRTShowcaseFloatOverride("CORTEX_RT_SHOWCASE_BACKGROUND_EXPOSURE", 1.0f, 0.0f, 4.0f)
+        : 0.0f;
     profile.environment.backgroundBlur =
         ReadRTShowcaseFloatOverride("CORTEX_RT_SHOWCASE_BACKGROUND_BLUR", 0.55f, 0.0f, 1.0f);
     profile.lighting.shadowBias =

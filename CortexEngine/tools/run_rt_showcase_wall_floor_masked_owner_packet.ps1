@@ -10,6 +10,9 @@ param(
     [string[]]$CustomRois = @(),
     [string]$CustomRoiList = "",
     [switch]$CustomRoisOnly,
+    [switch]$DisableSkybox,
+    [switch]$DisableAuxForAll,
+    [switch]$DisableVisibleBackground,
     [string[]]$ForegroundGateRois = @("left_wall_panel_clean"),
     [double]$MaxForegroundMeanLumaDelta = 8.0,
     [double]$MaxForegroundChangedRatio = 0.12,
@@ -55,7 +58,7 @@ function Run-CaptureCase([string]$Name, [string]$DebugView, [bool]$DisableAux) {
     New-Item -ItemType Directory -Force -Path $caseDir | Out-Null
 
     Set-EnvOrClear "CORTEX_DEBUG_VIEW" $DebugView
-    if ($DisableAux) {
+    if ($DisableAux -or $DisableAuxForAll) {
         Set-Item "Env:\CORTEX_DISABLE_AUX_GEOMETRY" "1"
     } else {
         Remove-Item "Env:\CORTEX_DISABLE_AUX_GEOMETRY" -ErrorAction SilentlyContinue
@@ -87,7 +90,7 @@ function Run-CaptureCase([string]$Name, [string]$DebugView, [bool]$DisableAux) {
     [pscustomobject]@{
         name = $Name
         debug_view = $DebugView
-        disable_aux = $DisableAux
+        disable_aux = ($DisableAux -or $DisableAuxForAll)
         exit_code = $exitCode
         capture_count = $captureCountActual
         dir = $caseDir
@@ -277,6 +280,11 @@ function Build-OwnerClassification([string]$BeautyForegroundJson,
 }
 
 Push-Location $root
+$oldPacketEnv = @{
+    CORTEX_DISABLE_SKYBOX = $env:CORTEX_DISABLE_SKYBOX
+    CORTEX_DISABLE_AUX_GEOMETRY = $env:CORTEX_DISABLE_AUX_GEOMETRY
+    CORTEX_DISABLE_VISIBLE_BACKGROUND = $env:CORTEX_DISABLE_VISIBLE_BACKGROUND
+}
 try {
     Copy-Item assets\shaders\Basic.hlsl build\bin\assets\shaders\Basic.hlsl -Force
     Copy-Item assets\shaders\DeferredLighting.hlsl build\bin\assets\shaders\DeferredLighting.hlsl -Force
@@ -284,6 +292,16 @@ try {
     Copy-Item assets\shaders\PostProcess.hlsl build\bin\assets\shaders\PostProcess.hlsl -Force
 
     Set-Item "Env:\CORTEX_DISABLE_SHADER_CACHE" "1"
+    if ($DisableSkybox) {
+        Set-Item "Env:\CORTEX_DISABLE_SKYBOX" "1"
+    } else {
+        Remove-Item "Env:\CORTEX_DISABLE_SKYBOX" -ErrorAction SilentlyContinue
+    }
+    if ($DisableVisibleBackground) {
+        Set-Item "Env:\CORTEX_DISABLE_VISIBLE_BACKGROUND" "1"
+    } else {
+        Remove-Item "Env:\CORTEX_DISABLE_VISIBLE_BACKGROUND" -ErrorAction SilentlyContinue
+    }
 
     $captures = @()
     $captures += Run-CaptureCase "beauty" "" $false
@@ -337,6 +355,9 @@ try {
         camera_bookmark = $CameraBookmark
         custom_rois = @($effectiveCustomRois.ToArray())
         custom_rois_only = [bool]$CustomRoisOnly
+        disable_skybox = [bool]$DisableSkybox
+        disable_aux_for_all = [bool]$DisableAuxForAll
+        disable_visible_background = [bool]$DisableVisibleBackground
         captures = $captures
         analyses = $analysis
         gate = [pscustomobject]@{
@@ -363,6 +384,12 @@ try {
         "Camera bookmark: ``$CameraBookmark``",
         "",
         "Custom ROIs: ``$(@($effectiveCustomRois.ToArray()) -join '; ')``",
+        "",
+        "Disable skybox: ``$([bool]$DisableSkybox)``",
+        "",
+        "Disable aux for all captures: ``$([bool]$DisableAuxForAll)``",
+        "",
+        "Disable visible background: ``$([bool]$DisableVisibleBackground)``",
         "",
         "## Captures",
         "",
@@ -422,5 +449,14 @@ try {
     Pop-Location
     Remove-Item "Env:\CORTEX_DEBUG_VIEW" -ErrorAction SilentlyContinue
     Remove-Item "Env:\CORTEX_DISABLE_AUX_GEOMETRY" -ErrorAction SilentlyContinue
+    Remove-Item "Env:\CORTEX_DISABLE_SKYBOX" -ErrorAction SilentlyContinue
+    Remove-Item "Env:\CORTEX_DISABLE_VISIBLE_BACKGROUND" -ErrorAction SilentlyContinue
     Remove-Item "Env:\CORTEX_DISABLE_SHADER_CACHE" -ErrorAction SilentlyContinue
+    foreach ($key in $oldPacketEnv.Keys) {
+        if ($null -eq $oldPacketEnv[$key]) {
+            Remove-Item "Env:\$key" -ErrorAction SilentlyContinue
+        } else {
+            Set-Item "Env:\$key" $oldPacketEnv[$key]
+        }
+    }
 }

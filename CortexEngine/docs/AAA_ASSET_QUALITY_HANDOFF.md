@@ -12464,3 +12464,93 @@ Decision:
   3. whether a scene-local visible-background proxy should replace old-office
      HDRI visibility in this public RT Showcase angle while keeping IBL as a
      lighting/reflection source.
+
+### RT Showcase Scene-Local Depth-Miss Background Fix - 2026-06-09
+
+Root cause:
+
+- `CORTEX_DISABLE_SKYBOX` did not move the reported mixed/background ROI
+  metrics because the pre-geometry skybox pass was not the effective owner of
+  depth-miss pixels.
+- `CORTEX_DISABLE_AUX_GEOMETRY` also did not move the signal materially, so
+  water/transparent/overlay compositing was not the dominant source.
+- The deferred-lighting depth-miss path sampled the external HDRI whenever
+  `g_EnvParams.w` was positive. Before this fix, `g_EnvParams.w` ignored
+  `m_environmentState.backgroundVisible`, so disabling visible background only
+  skipped the skybox pass while deferred lighting could still redraw the old
+  office/studio HDRI behind the enclosed RT Showcase geometry.
+
+Implemented:
+
+- `Renderer_FramePostConstants.cpp` and
+  `Renderer_VisibilityBufferDeferredLighting.cpp` now set background exposure
+  to `0` when either `CORTEX_DISABLE_VISIBLE_BACKGROUND` is active or
+  `m_environmentState.backgroundVisible` is false. IBL diffuse/specular and
+  texture binding remain independent.
+- `Renderer_FrameContractSnapshot.cpp` now reports
+  `background_visible=false`, `background_exposure=0`, and
+  `external_hdri_visible=false` when the visible background is disabled by
+  policy.
+- `ApplyRTShowcaseSceneControls` now defaults RT Showcase to
+  `scene_local_gallery_background_hidden_external_ibl`: hidden visible HDRI,
+  live IBL lighting/reflections. For diagnostics only,
+  `CORTEX_RT_SHOWCASE_VISIBLE_EXTERNAL_BACKGROUND=1` restores the old visible
+  HDRI background.
+- `DeferredLighting.hlsl` now returns a stable scene-local neutral/gallery
+  depth-miss background when visible external background exposure is zero,
+  instead of returning black or sampling the HDRI.
+- `tools/run_rt_showcase_wall_floor_flicker_stability_smoke.ps1` now enforces
+  the new default contract: IBL enabled/bound/positive, shadows and TAA on,
+  visible external HDRI off. The wrapper tolerates the existing named
+  warning-only child failures while still checking scene, camera, frame
+  contract, and captured metrics.
+- `tools/run_rt_showcase_wall_floor_masked_owner_packet.ps1` gained
+  `-DisableSkybox`, `-DisableAuxForAll`, and `-DisableVisibleBackground`
+  packet controls and records those switches in the summary.
+
+Key evidence:
+
+- Visible-background diagnostic:
+  `build\captures\rt_showcase_reported_disable_visible_background_20260609`
+  proved the isolation without disabling IBL:
+  `background_visible=false`, `background_exposure=0`,
+  `image_based_lighting_textures_bound=true`.
+- Final default packet:
+  `build\captures\rt_showcase_scene_local_depthmiss_background_final_20260609`
+  with no diagnostic disable switches:
+  - all four packet captures exited `0` and wrote `16` BMPs each;
+  - foreground wall gate passed:
+    `beauty_foreground` mean `5.6323`, changed `0.1006`, large `0.0287`,
+    coverage `0.9979`;
+  - frame contract proved IBL remained live:
+    `ibl_enabled=true`, `image_based_lighting_textures_bound=true`,
+    diffuse `0.85`, specular `1.25`;
+  - frame contract proved visible HDRI was not used as scene geometry:
+    `background_visible=false`, `background_exposure=0`,
+    `external_hdri_visible=false`,
+    `environment_owner=scene_local_gallery_background_hidden_external_ibl`,
+    `scene_local_visible_background_proxy_ready=true`,
+    `scene_local_environment_policy=scene_local_neutral_background`,
+    `scene_local_visible_background_source=authored_enclosed_room`.
+
+Metric comparison against
+`build\captures\rt_showcase_reported_foreground_wall_gate_wrapper_20260609`:
+
+- `reported_platform_mixed` background mean `15.9385 -> 2.9643`,
+  changed `0.4152 -> 0.0577`, large `0.1379 -> 0.0330`.
+- `reported_lower_floor_mixed` background mean `6.8258 -> 0.2993`,
+  changed `0.1981 -> 0.0098`, large `0.0294 -> 0.0016`.
+- `reported_left_wall_foreground` foreground-owned gate stayed effectively
+  unchanged and passed. The tiny background sliver in that ROI still reports
+  high background deltas because its background coverage is only `0.0024`; keep
+  using foreground coverage when interpreting that ROI.
+
+Remaining known warnings:
+
+- `visibility_buffer_rendered_without_visibility_motion_vectors`
+- `rtv_descriptor_heap_high_water`
+- debug-mask packets can also report
+  `scene_visual_local_probe_table_missing:profile=gallery_public_cinematic_v1:probe_rig=gallery_visible_ibl_panels`
+
+These warnings are still real renderer debt, but they are no longer evidence
+that the reported visible-HDRI/depth-miss flicker is unfixed.

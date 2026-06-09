@@ -21,6 +21,10 @@ RuntimeFrameDebugSwitches LoadRuntimeFrameDebugSwitches() {
             result.disableRTGI = (std::getenv("CORTEX_DISABLE_RT_GI") != nullptr);
             result.disableFog = (std::getenv("CORTEX_DISABLE_FOG") != nullptr);
             result.disableParticles = (std::getenv("CORTEX_DISABLE_PARTICLES") != nullptr);
+            result.disableMotionVectors = (std::getenv("CORTEX_DISABLE_MOTION_VECTORS") != nullptr);
+            result.disableSkybox = (std::getenv("CORTEX_DISABLE_SKYBOX") != nullptr);
+            result.disableOpaqueGeometry = (std::getenv("CORTEX_DISABLE_OPAQUE_GEOMETRY") != nullptr);
+            result.disableAuxGeometry = (std::getenv("CORTEX_DISABLE_AUX_GEOMETRY") != nullptr);
         } else {
             spdlog::warn("Renderer: CORTEX_FORCE_ENABLE_FEATURES set; env disables ignored");
         }
@@ -35,8 +39,10 @@ RuntimeFrameDebugSwitches LoadRuntimeFrameDebugSwitches() {
 
         if (result.disableSSR || result.disableSSAO || result.disableBloom || result.disableTAA ||
             result.disableShadows || result.disableRayTracing || result.disableRTReflections ||
-            result.disableRTGI || result.disableFog || result.disableParticles) {
-            spdlog::info("Renderer: env disables active (SSR={} SSAO={} Bloom={} TAA={} Shadows={} RT={} RTReflections={} RTGI={} Fog={} Particles={})",
+            result.disableRTGI || result.disableFog || result.disableParticles ||
+            result.disableMotionVectors || result.disableSkybox ||
+            result.disableOpaqueGeometry || result.disableAuxGeometry) {
+            spdlog::info("Renderer: env disables active (SSR={} SSAO={} Bloom={} TAA={} Shadows={} RT={} RTReflections={} RTGI={} Fog={} Particles={} MotionVectors={} Skybox={} OpaqueGeometry={} AuxGeometry={})",
                          result.disableSSR ? "off" : "on",
                          result.disableSSAO ? "off" : "on",
                          result.disableBloom ? "off" : "on",
@@ -46,7 +52,11 @@ RuntimeFrameDebugSwitches LoadRuntimeFrameDebugSwitches() {
                          result.disableRTReflections ? "off" : "on",
                          result.disableRTGI ? "off" : "on",
                          result.disableFog ? "off" : "on",
-                         result.disableParticles ? "off" : "on");
+                         result.disableParticles ? "off" : "on",
+                         result.disableMotionVectors ? "off" : "on",
+                         result.disableSkybox ? "off" : "on",
+                         result.disableOpaqueGeometry ? "off" : "on",
+                         result.disableAuxGeometry ? "off" : "on");
         }
         if (result.logVRAM) {
             spdlog::info("Renderer: CORTEX_LOG_VRAM set; logging DXGI video memory usage periodically");
@@ -131,7 +141,8 @@ FrameFeaturePlan BuildFrameFeaturePlan(const FrameFeaturePlanInputs& inputs) {
     plan.runVisibilityBuffer = !plan.runMinimalFrame && !plan.runVoxelBackend && plan.active.visibilityBufferEnabled;
     plan.runGpuCullingFallback = !plan.runMinimalFrame && !plan.runVoxelBackend && plan.active.gpuCullingEnabled;
     plan.runMotionVectors =
-        !plan.runMinimalFrame && !plan.runVoxelBackend && inputs.hasMotionVectorsPipeline &&
+        !plan.runMinimalFrame && !plan.runVoxelBackend && !plan.debug.disableMotionVectors &&
+        inputs.hasMotionVectorsPipeline &&
         inputs.hasVelocityBuffer && inputs.hasDepthBuffer;
     plan.runTAA = !plan.runMinimalFrame && !plan.runVoxelBackend && plan.active.taaEnabled;
     plan.runSSR = !plan.runMinimalFrame && !plan.runVoxelBackend && plan.active.ssrEnabled;

@@ -21,6 +21,15 @@
 #include <spdlog/spdlog.h>
 namespace Cortex::Graphics {
 
+namespace {
+
+bool DisableVisibleBackgroundFromEnv() {
+    const char* value = std::getenv("CORTEX_DISABLE_VISIBLE_BACKGROUND");
+    return value && value[0] != '\0' && std::strcmp(value, "0") != 0;
+}
+
+} // namespace
+
 Renderer::VisibilityBufferDeferredLightingInputs
 Renderer::PrepareVisibilityBufferDeferredLighting(Scene::ECS_Registry* registry) {
     VisibilityBufferDeferredLightingInputs inputs{};
@@ -115,11 +124,14 @@ Renderer::PrepareVisibilityBufferDeferredLighting(Scene::ECS_Registry* registry)
         m_shadowResources.controls.pcfRadius,
         m_shadowResources.controls.enabled ? 1.0f : 0.0f,
         m_shadowResources.controls.pcssEnabled ? 1.0f : 0.0f);
+    const float backgroundExposure = (DisableVisibleBackgroundFromEnv() || !m_environmentState.backgroundVisible)
+        ? 0.0f
+        : m_environmentState.backgroundExposure;
     deferredParams.envParams = glm::vec4(
         m_environmentState.diffuseIntensity,
         m_environmentState.specularIntensity,
         m_environmentState.enabled ? 1.0f : 0.0f,
-        m_environmentState.backgroundExposure);
+        backgroundExposure);
     float invShadowDim = 1.0f / static_cast<float>(m_shadowResources.controls.mapSize);
     deferredParams.shadowInvSizeAndSpecMaxMip =
         glm::vec4(invShadowDim, invShadowDim, 8.0f, glm::radians(m_environmentState.rotationDegrees));

@@ -12,6 +12,7 @@
 #include <cctype>
 #include <cmath>
 #include <cstdlib>
+#include <cstring>
 #include <filesystem>
 #include <string>
 #include <vector>
@@ -21,6 +22,11 @@
 namespace Cortex::Graphics {
 
 namespace {
+bool DisableVisibleBackgroundFromEnv() {
+    const char* value = std::getenv("CORTEX_DISABLE_VISIBLE_BACKGROUND");
+    return value && value[0] != '\0' && std::strcmp(value, "0") != 0;
+}
+
 std::string SceneLocalTextureSetIdForFamily(const std::string& family) {
     std::string id;
     id.reserve(family.size());
@@ -323,8 +329,11 @@ void Renderer::UpdateFrameContractSnapshot(Scene::ECS_Registry* registry,
     contract.environment.iblLimitEnabled = m_environmentState.limitEnabled;
     contract.environment.imageBasedLightingTexturesBound =
         m_environmentState.ShouldBindImageBasedLightingTextures();
-    contract.environment.backgroundVisible = m_environmentState.backgroundVisible;
-    contract.environment.backgroundExposure = m_environmentState.backgroundExposure;
+    const bool disableVisibleBackground = DisableVisibleBackgroundFromEnv();
+    contract.environment.backgroundVisible =
+        m_environmentState.backgroundVisible && !disableVisibleBackground;
+    contract.environment.backgroundExposure =
+        contract.environment.backgroundVisible ? m_environmentState.backgroundExposure : 0.0f;
     contract.environment.backgroundBlur = m_environmentState.backgroundBlur;
     contract.environment.rotationDegrees = m_environmentState.rotationDegrees;
     contract.environment.residentCount = health.residentEnvironments;
@@ -356,7 +365,7 @@ void Renderer::UpdateFrameContractSnapshot(Scene::ECS_Registry* registry,
 
     contract.sceneVisual = m_sceneVisualContract;
     contract.sceneVisual.externalHDRIVisible =
-        m_environmentState.backgroundVisible && m_environmentState.enabled;
+        contract.environment.backgroundVisible && m_environmentState.enabled;
     contract.sceneVisual.invalidExternalHDRI =
         contract.sceneVisual.active &&
         contract.sceneVisual.enclosedScene &&

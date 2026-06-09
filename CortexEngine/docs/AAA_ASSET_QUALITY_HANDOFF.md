@@ -13706,3 +13706,70 @@ Interpretation:
 - Remaining default promotion work is targeted evidence expansion:
   `office`, `gym`, `concert`, `red_room`, `stadium`, then promoted non-static
   motion coverage.
+
+### V3 Office/Gym Promoted Proof - 2026-06-09
+
+Scope:
+
+- Added promoted-default evidence for the `office` and `gym` enclosed families.
+
+Validation:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine\tools\run_full_scene_shader_pipeline_v3_packet.ps1 `
+  -NoBuild -NoStressScene -SkipSceneAnalyzers `
+  -FamilyFilter office,gym `
+  -SmokeFrames 62 -CaptureFrame 60 -CaptureSequenceCount 1 `
+  -StabilityMotionMode static -PromoteCandidateBeautyV3ToDefault `
+  -OutputRoot build\captures\v3_default_beauty_promotion_office_gym_static_smoke1_20260609
+
+python CortexEngine\tools\build_full_scene_shader_v3_matrix_decision.py `
+  --packet-root CortexEngine\build\captures\v3_promotion_suite_reflection_static_smoke7_20260609\reflection_static `
+  --packet-root CortexEngine\build\captures\v3_promotion_suite_reflection_mouse_jitter_seq1_20260609\reflection_mouse_jitter `
+  --packet-root CortexEngine\build\captures\v3_promotion_suite_enclosed_static_smoke6_20260609\enclosed_static `
+  --packet-root CortexEngine\build\captures\v3_promotion_suite_enclosed_mouse_jitter_seq2_20260609\enclosed_mouse_jitter `
+  --packet-root CortexEngine\build\captures\v3_promotion_suite_enclosed_camera_sweep_seq1_20260609\enclosed_camera_sweep `
+  --packet-root CortexEngine\build\captures\v3_promotion_suite_heavy_light_sweep_smoke2_20260609\heavy_light_sweep `
+  --packet-root CortexEngine\build\captures\v3_default_beauty_promotion_gallery_smoke1_20260609 `
+  --packet-root CortexEngine\build\captures\v3_default_beauty_promotion_kitchen_static_smoke1_20260609 `
+  --packet-root CortexEngine\build\captures\v3_default_beauty_promotion_reflection_static_smoke1_20260609 `
+  --packet-root CortexEngine\build\captures\v3_default_beauty_promotion_office_gym_static_smoke1_20260609 `
+  --required-families stress_rt_showcase_reflection_closeup,gallery,kitchen,office,gym,concert,red_room,stadium `
+  --required-motion-modes static,mouse_jitter,camera_sweep,light_sweep `
+  --output-json CortexEngine\build\captures\v3_default_beauty_promotion_mixed_matrix4_20260609\v3_matrix_decision.json `
+  --output-md CortexEngine\build\captures\v3_default_beauty_promotion_mixed_matrix4_20260609\v3_matrix_decision.md
+```
+
+Evidence:
+
+- Office/gym promoted packet:
+  `build\captures\v3_default_beauty_promotion_office_gym_static_smoke1_20260609`.
+  - `v3_stability.json`: `report_count=108`,
+    `default_beauty_affects_any=true`, `promoted_report_count=4`.
+  - `promotion_decision.json`: `status=review_packet_passed`,
+    `candidate_beauty_review_ready=true`,
+    `default_beauty_promotion_allowed=true`,
+    `default_beauty_promotable=false`,
+    blockers `["full_coverage_not_ready"]`.
+- Updated mixed matrix:
+  `build\captures\v3_default_beauty_promotion_mixed_matrix4_20260609\v3_matrix_decision.md/json`.
+  - `full_matrix_ready=true`;
+  - `candidate_beauty_review_ready=true`;
+  - `default_beauty_promotable=false`;
+  - `promoted_packet_count=4`;
+  - `promoted_report_count=10`;
+  - observed promoted families:
+    `gallery,gym,kitchen,office,stress_rt_showcase_reflection_closeup`;
+  - missing promoted families: `concert,red_room,stadium`;
+  - observed promoted motion modes: `static`;
+  - missing promoted motion modes: `camera_sweep,light_sweep,mouse_jitter`;
+  - candidate beauty is ready `137/137`.
+
+Interpretation:
+
+- Static promoted-default family coverage is now proven for every required
+  non-heavy scene family.
+- The remaining family coverage is exactly the heavy-lighting group:
+  `concert`, `red_room`, and `stadium`.
+- The motion coverage blocker remains untouched: promoted packets still need
+  `mouse_jitter`, `camera_sweep`, and `light_sweep` evidence.

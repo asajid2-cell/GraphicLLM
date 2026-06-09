@@ -12405,3 +12405,62 @@ Current interpretation:
 - The next root pass should focus on visible HDRI/background temporal
   presentation and mixed transparent/aux compositing. Do not return to broad
   opaque BRDF or shadow tweaks unless a high-coverage foreground ROI fails.
+
+### RT Showcase Background-TAA Negative Result - 2026-06-09
+
+Implemented:
+
+- `tools/run_rt_showcase_wall_floor_masked_owner_packet.ps1` now also copies
+  `assets/shaders/PostProcess.hlsl` into `build/bin/assets/shaders` before
+  capture. This makes post-process/TAA shader experiments actually participate
+  in masked owner packets when `CORTEX_DISABLE_SHADER_CACHE=1` is set.
+
+Tested but reverted:
+
+- A narrow TAA shader experiment treated depth-miss pixels as a background
+  surface class:
+  - accepted depth-miss neighbours for the clamp window;
+  - allowed background-background history instead of rejecting all far-plane
+    history;
+  - capped background history below opaque-surface history.
+- The experiment was not kept because it did not materially move the reported
+  16-frame owner packet.
+
+Evidence packet with the experiment active:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass `
+  -File tools\run_rt_showcase_wall_floor_masked_owner_packet.ps1 `
+  -NoBuild `
+  -CameraBookmark reported_wall_floor_flicker `
+  -CustomRoiList "reported_left_wall_foreground:25,185,360,440;reported_platform_mixed:610,405,1190,555;reported_lower_floor_mixed:430,545,1015,705" `
+  -CustomRoisOnly `
+  -ForegroundGateRois reported_left_wall_foreground `
+  -OutputRoot Z:\328\CMPUT328-A2\codexworks\301\graphics\CortexEngine\build\captures\rt_showcase_reported_background_taa_20260609 `
+  -CaptureCount 16 `
+  -MotionFrames 100 `
+  -MotionLookCycles 6.0
+```
+
+Comparison against
+`build\captures\rt_showcase_reported_foreground_wall_gate_wrapper_20260609`:
+
+- foreground wall gate stayed essentially unchanged and passed
+- background/mixed rows also stayed essentially unchanged:
+  - `reported_platform_mixed` background mean `15.9385 -> 15.9064`
+  - `reported_lower_floor_mixed` background mean `6.8258 -> 6.8058`
+
+Decision:
+
+- Do not keep the TAA shader experiment.
+- Treat the remaining reported-view instability as entering before or outside
+  the tested TAA branch, or as expected background/depth-miss camera motion
+  that needs a different presentation/ownership strategy.
+- Next pass should isolate:
+  1. whether `CORTEX_DISABLE_SKYBOX` / visible background removal collapses the
+     mixed ROI signal;
+  2. whether `CORTEX_DISABLE_AUX_GEOMETRY` or transparent/water removal
+     collapses the mixed ROI signal;
+  3. whether a scene-local visible-background proxy should replace old-office
+     HDRI visibility in this public RT Showcase angle while keeping IBL as a
+     lighting/reflection source.

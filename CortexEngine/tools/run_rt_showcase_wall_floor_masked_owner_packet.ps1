@@ -281,6 +281,7 @@ try {
     Copy-Item assets\shaders\Basic.hlsl build\bin\assets\shaders\Basic.hlsl -Force
     Copy-Item assets\shaders\DeferredLighting.hlsl build\bin\assets\shaders\DeferredLighting.hlsl -Force
     Copy-Item assets\shaders\MaterialResolve.hlsl build\bin\assets\shaders\MaterialResolve.hlsl -Force
+    Copy-Item assets\shaders\PostProcess.hlsl build\bin\assets\shaders\PostProcess.hlsl -Force
 
     Set-Item "Env:\CORTEX_DISABLE_SHADER_CACHE" "1"
 

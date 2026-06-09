@@ -823,6 +823,7 @@ uint ComputeClusterIndex(int2 pixelCoord, float viewZ)
 
 float3 CalculateLighting(float3 normal, float3 worldPos, float3 albedo, float metallic, float roughness, float ao, float2 uv, int2 pixelCoord, float4 tangentWS, bool useClusteredLocalLights)
 {
+    uint debugView = (uint)g_DebugMode.x;
     float3 viewDir = normalize(g_CameraPosition.xyz - worldPos);
 
     // Material classification encoded in fractalParams1.w by the renderer:
@@ -972,7 +973,7 @@ float3 CalculateLighting(float3 normal, float3 worldPos, float3 albedo, float me
     float3 totalLighting = 0.0f;
 
     bool clusterActive = false;
-    uint lightCount = g_LightCount.x;
+    uint lightCount = min(g_LightCount.x, LIGHT_MAX);
 
 #ifdef ENABLE_BINDLESS
     clusterActive =
@@ -990,9 +991,18 @@ float3 CalculateLighting(float3 normal, float3 worldPos, float3 albedo, float me
     }
 #endif
 
-    [loop]
-    for (uint i = 0; i < lightCount; ++i)
+    // Keep forward light reads as static constant-buffer lanes. On some
+    // DX12 drivers, dynamically indexing the cbuffer light array with the
+    // loop induction variable can TDR even when the index is bounded. The
+    // unrolled lane form preserves the runtime light-count gate while making
+    // each g_Lights[] access a compile-time constant.
+    [unroll]
+    for (uint i = 0u; i < LIGHT_MAX; ++i)
     {
+        if (i >= lightCount)
+        {
+            break;
+        }
         Light light = g_Lights[i];
         uint type = (uint)light.position_type.w;
         uint fixtureClass = DecodeFixtureClass(type, light);
@@ -1451,7 +1461,6 @@ float3 CalculateLighting(float3 normal, float3 worldPos, float3 albedo, float me
     // Image-based lighting (IBL) using environment maps when available.
     // Expose the debug view mode for the entire lighting function so that
     // both IBL-specialized views and RT GI gating can branch on it.
-    uint debugView = (uint)g_DebugMode.x;
     float3 ambient = 0.0f;
     float3 diffuseIBL = 0.0f;
     float3 specularIBL = 0.0f;
@@ -1940,16 +1949,20 @@ PSOutput PSMainInternal(PSInput input, bool useClusteredLocalLights)
         // this point and the strongest light's color. This helps you see which
         // LightComponent objects are actually contributing illumination and
         // how their ranges overlap.
-        uint lightCount = g_LightCount.x;
+        uint lightCount = min(g_LightCount.x, LIGHT_MAX);
         float3 viewDirDbg = normalize(g_CameraPosition.xyz - input.worldPos);
 
         uint activeLights = 0;
         float maxLuma = 0.0f;
         float3 maxColor = 0.0f;
 
-        [loop]
-        for (uint i = 0; i < lightCount; ++i)
+        [unroll]
+        for (uint i = 0u; i < LIGHT_MAX; ++i)
         {
+            if (i >= lightCount)
+            {
+                break;
+            }
             Light light = g_Lights[i];
             uint type = (uint)light.position_type.w;
 

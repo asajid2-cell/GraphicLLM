@@ -692,23 +692,22 @@ void Renderer::PopulateFrameDebugAndPostConstants(FrameConstants& frameData,
         rtHistoryValid);
 
     // Post-process parameters: reciprocal resolution, FXAA flag, and an extra
-    // channel used as a simple runtime toggle for ray-traced sun shadows in
-    // the shading path (when DXR is available and the RT pipeline is valid).
+    // channel used as a frame-local ownership toggle for ray-traced sun shadows
+    // in the forward shading path.
     float fxaaFlag = (m_temporalAAState.enabled ? 0.0f : (m_postProcessState.fxaaEnabled ? 1.0f : 0.0f));
-    bool rtPipelineReady =
-        m_rtRuntimeState.supported &&
-        m_rtRuntimeState.enabled &&
-        m_services.rayTracingContext &&
-        m_services.rayTracingContext->HasPipeline();
-    bool rtReflPipelineReady =
-        rtPipelineReady &&
+    // postParams.w represents "RT sun shadows enabled" per ShaderTypes.h line 102.
+    // This must follow the active RT frame plan, not raw DXR runtime readiness:
+    // env disables, missing TLAS/depth/mask resources, or skipped RT shadow
+    // dispatches mean the forward shader does not own the RT shadow mask.
+    const bool rtShadowMaskOwnedThisFrame =
+        m_framePlanning.rtPlan.dispatchShadows &&
+        m_rtShadowTargets.mask &&
+        m_rtShadowTargets.maskSRV.IsValid();
+    const bool rtReflPipelineReady =
+        m_framePlanning.rtPlan.enabled &&
         m_services.rayTracingContext &&
         m_services.rayTracingContext->HasReflectionPipeline();
-    // postParams.w represents "RT sun shadows enabled" per ShaderTypes.h line 102.
-    // This flag gates the RT shadow mask sampling in Basic.hlsl (line 878).
-    // RT shadows are always active when the RT pipeline is ready, unlike
-    // reflections/GI which have separate feature toggles.
-    float rtShadowsToggle = rtPipelineReady ? 1.0f : 0.0f;
+    float rtShadowsToggle = rtShadowMaskOwnedThisFrame ? 1.0f : 0.0f;
     frameData.postParams = glm::vec4(invWidth, invHeight, fxaaFlag, rtShadowsToggle);
 
     // Image-based lighting parameters

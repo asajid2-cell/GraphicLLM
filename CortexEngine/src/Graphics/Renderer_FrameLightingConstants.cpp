@@ -346,11 +346,19 @@ void Renderer::PopulateFrameLightingAndShadows(FrameConstants& frameData,
         }
     }
 
+    const RuntimeFrameDebugSwitches debugSwitches = LoadRuntimeFrameDebugSwitches();
+    const bool shadowMapOwnedThisFrame =
+        m_shadowResources.controls.enabled &&
+        !debugSwitches.disableShadows &&
+        m_shadowResources.resources.map &&
+        m_shadowResources.resources.srv.IsValid() &&
+        m_pipelineState.shadow;
+
     frameData.shadowParams = glm::vec4(
         m_shadowResources.controls.bias,
         m_shadowResources.controls.pcfRadius,
-        m_shadowResources.controls.enabled ? 1.0f : 0.0f,
-        m_shadowResources.controls.pcssEnabled ? 1.0f : 0.0f);
+        shadowMapOwnedThisFrame ? 1.0f : 0.0f,
+        (shadowMapOwnedThisFrame && m_shadowResources.controls.pcssEnabled) ? 1.0f : 0.0f);
 
 }
 

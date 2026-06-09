@@ -3,6 +3,110 @@
 This is the living handoff for the AAA asset-quality goal.
 Read this after compaction before continuing.
 
+## 2026-06-09 Forward Light CBuffer TDR Root-Cause Slice
+
+Context:
+
+- Active repro scene:
+  `build/diagnostics/kitchen_seed_reduction/shell5.json`
+- Launch path:
+  `CortexEngine.exe --scene model_authored_scene --mode=default --no-llm --no-dreamer --no-launcher --smoke-frames=1`
+- Repro env disabled skybox, aux geometry, VB, GPU culling, SSR, SSAO,
+  bloom, TAA, shadows, HZB, motion vectors, post, RT, RT reflections, RT GI,
+  fog, and particles.
+- The executable reads shaders from `build/bin/assets/shaders`, so shader-only
+  probes must copy `assets/shaders/Basic.hlsl` there and use
+  `CORTEX_DISABLE_SHADER_CACHE=1`.
+
+Diagnosis:
+
+- Beauty with opaque geometry enabled previously TDR'd even after IBL, RT,
+  shadows, and post were disabled.
+- Earlier probes showed:
+  - debug view before the direct-light loop passed
+  - debug view after the loop hung
+  - constant pixel shader passed
+  - reduced non-PBR albedo path passed
+- New probes narrowed the failure further:
+  - static pre-loop `g_Lights[0]` read passed
+  - loop with no light-array read passed
+  - loop-variable indexing of `g_Lights[i]` reproduced the GPU fence timeout
+    / `DXGI_ERROR_DEVICE_HUNG` behavior
+- Root cause for this repro: the forward Basic shader used a dynamically
+  indexed constant-buffer light array in the direct light loop. On this DX12
+  driver/GPU path, the bounded loop induction variable access could still TDR.
+
+Implemented:
+
+- `assets/shaders/Basic.hlsl`
+  - changed the main direct-light loop from dynamic
+    `for (i < lightCount) g_Lights[i]` to an unrolled `LIGHT_MAX` lane loop
+    with a runtime `if (i >= lightCount) break` gate
+  - changed debug view 17's forward-light loop the same way
+  - kept full shader features enabled; temporary probe modes and compile-time
+    feature-disable switches were removed
+- `src/Graphics/Renderer_FrameLightingConstants.cpp`
+  - `shadowParams.z/w` now mean the shadow map is owned by this frame:
+    controls enabled, runtime shadow disable is false, shadow map/SRV exist,
+    and the shadow pipeline exists
+- `src/Graphics/Renderer_FramePostConstants.cpp`
+  - `postParams.w` now means the RT shadow mask is owned by this frame:
+    RT shadow dispatch is planned and mask/SRV exist
+  - this prevents the forward shader from sampling RT shadow masks based only
+    on raw RT pipeline readiness
+
+Validation:
+
+```powershell
+Copy-Item assets\shaders\Basic.hlsl build\bin\assets\shaders\Basic.hlsl -Force
+cmd.exe /d /c "call ""C:\Program Files\Microsoft Visual Studio\18\Community\Common7\Tools\VsDevCmd.bat"" -arch=x64 -host_arch=x64 >nul && set ""CORTEX_SKIP_ASSET_SYNC=1"" && cmake --build build --config Release --target CortexEngine --parallel 8"
+ctest --test-dir build --output-on-failure -C Release
+```
+
+Results:
+
+- Native build completed with `CORTEX_SKIP_ASSET_SYNC=1`.
+- The known trailing `vswhere.exe` warning still appears after the successful
+  build command.
+- Full asset sync hung in `tools/sync_assets.cmake`; stopped those build
+  processes and used explicit shader sync for runtime validation.
+- `ctest` returned success but this build tree reported `No tests were found`.
+- Clean stripped beauty repro passed:
+  `build/captures/kitchen_shell5_static_light_lanes_minimal_final_beauty_20260609`
+  - exit `0`
+  - no fence timeout
+  - no device removal
+  - reached `Renderer shutdown: GPU idle`
+- Forward-light debug view 17 passed:
+  `build/captures/kitchen_shell5_static_light_lanes_minimal_final_17_20260609`
+  - exit `0`
+  - no fence timeout
+  - no device removal
+  - reached `Renderer shutdown: GPU idle`
+- A scene-local/IBL-visible variant also passed:
+  `build/captures/kitchen_shell5_beauty_ibl_on_static_light_lanes_probe_20260609`
+  - note: this kitchen profile reported IBL intensity `0`, so it is not a full
+    old-office-HDRI stress case
+
+Current interpretation:
+
+- This slice fixes the proven TDR root in the shell5 forward opaque path.
+- It does not yet prove every user-visible flicker case is gone. Next passes
+  should stress the old office HDRI/default-scene floor with IBL active, higher
+  frame count, and mouse-look motion.
+- Keep using synchronized shader copies or a non-skipped asset sync before
+  judging shader changes.
+
+Next work:
+
+1. Run the original/default office-HDRI floor repro with IBL active and
+   mouse-look motion.
+2. If flicker remains without TDR, separate shadow-map shimmer, SSR/specular
+   instability, and IBL/reflection source instability with debug views.
+3. Continue Full-Scene AAA work after the stability gate:
+   ReflectionV3 provider evidence, LightingShadowV3 ownership diagnostics,
+   material-quality gates, and cross-scene packets.
+
 ## 2026-06-09 Runtime SceneLocalResourceContractV1 Checkpoint
 
 Latest pushed work before this section:

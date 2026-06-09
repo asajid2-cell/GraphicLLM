@@ -1,0 +1,268 @@
+{
+  "schema": "cortex.scene_local_resource_contract.v1",
+  "purpose": "Declare scene-local rendering resources that must be owned before full-scene shader outputs can be treated as final-art evidence.",
+  "status": "packet_gate_only",
+  "required_roles": [
+    "diffuse_irradiance",
+    "specular_radiance",
+    "visible_background",
+    "reflection_background",
+    "atmosphere",
+    "exposure"
+  ],
+  "role_contracts": {
+    "diffuse_irradiance": {
+      "producer": "SceneLocalEnvironmentV3",
+      "required_runtime_fields": [
+        "scene_local_environment_ready",
+        "scene_local_ambient_source",
+        "scene_local_environment_proxy_resource_table_bindable",
+        "scene_local_environment_proxy_bound_resource_count"
+      ],
+      "required_debug_views": [
+        "scene_local_environment",
+        "ambient_ibl"
+      ]
+    },
+    "specular_radiance": {
+      "producer": "FullSceneReflectionV3",
+      "required_runtime_fields": [
+        "reflection_radiance_ready",
+        "reflection_confidence_ready",
+        "reflection_source_id_ready",
+        "scene_local_reflection_background_source"
+      ],
+      "required_debug_views": [
+        "reflection_radiance",
+        "reflection_confidence",
+        "reflection_source_id"
+      ]
+    },
+    "visible_background": {
+      "producer": "SceneLocalEnvironmentV3",
+      "required_runtime_fields": [
+        "scene_local_visible_background_source",
+        "visible_external_hdri_allowed",
+        "invalid_external_hdri"
+      ],
+      "required_debug_views": [
+        "visible_background"
+      ]
+    },
+    "reflection_background": {
+      "producer": "FullSceneReflectionV3",
+      "required_runtime_fields": [
+        "scene_local_reflection_background_source",
+        "reflection_v3_source_contract",
+        "reflection_v3_source_count"
+      ],
+      "required_debug_views": [
+        "reflection_background",
+        "reflection_source_id",
+        "reflection_source_suppression"
+      ]
+    },
+    "atmosphere": {
+      "producer": "SceneLocalEnvironmentV3",
+      "required_runtime_fields": [
+        "scene_local_atmosphere_source"
+      ],
+      "required_debug_views": [
+        "atmosphere"
+      ]
+    },
+    "exposure": {
+      "producer": "SceneProfileV3",
+      "required_runtime_fields": [
+        "scene_profile_policy_contract.exposure_policy",
+        "scene_visual_contract.exposure_policy_id"
+      ],
+      "required_debug_views": [
+        "energy_clamp_policy",
+        "overbright_diagnostics"
+      ]
+    }
+  },
+  "family_aliases": {
+    "rt_showcase_gallery": "gallery",
+    "stress_rt_showcase_reflection_closeup": "gallery"
+  },
+  "family_contracts": {
+    "gallery": {
+      "enclosure_mode": "neutral_lab",
+      "visible_external_hdri_allowed": true,
+      "allowed_environment_policies": [
+        "authorized_external_visible_background",
+        "enclosed_scene_local_background"
+      ],
+      "allowed_reflection_policies": [
+        "local_probe_priority"
+      ],
+      "allowed_reflection_source_contracts": [
+        "local_probe",
+        "planar",
+        "screen_space",
+        "ray_traced",
+        "ray_query_reflection"
+      ],
+      "min_proxy_resource_count": 3,
+      "min_payload_resource_count": 2,
+      "required_material_families": [
+        "painted_wall",
+        "polished_floor",
+        "display_glass",
+        "brushed_metal"
+      ]
+    },
+    "kitchen": {
+      "enclosure_mode": "enclosed_room",
+      "visible_external_hdri_allowed": false,
+      "allowed_environment_policies": [
+        "enclosed_scene_local_background"
+      ],
+      "allowed_reflection_policies": [
+        "local_probe_priority",
+        "planar_plus_probe"
+      ],
+      "allowed_reflection_source_contracts": [
+        "local_probe",
+        "planar",
+        "screen_space"
+      ],
+      "min_proxy_resource_count": 3,
+      "min_payload_resource_count": 2,
+      "required_material_families": [
+        "tile",
+        "painted_wall",
+        "appliance_metal",
+        "glass",
+        "wood"
+      ]
+    },
+    "office": {
+      "enclosure_mode": "enclosed_room",
+      "visible_external_hdri_allowed": false,
+      "allowed_environment_policies": [
+        "enclosed_scene_local_background"
+      ],
+      "allowed_reflection_policies": [
+        "local_probe_priority",
+        "screen_space_plus_probe"
+      ],
+      "allowed_reflection_source_contracts": [
+        "local_probe",
+        "screen_space"
+      ],
+      "min_proxy_resource_count": 3,
+      "min_payload_resource_count": 2,
+      "required_material_families": [
+        "fabric",
+        "plastic",
+        "painted_wall",
+        "wood",
+        "glass"
+      ]
+    },
+    "gym": {
+      "enclosure_mode": "large_enclosed_room",
+      "visible_external_hdri_allowed": false,
+      "allowed_environment_policies": [
+        "enclosed_scene_local_background"
+      ],
+      "allowed_reflection_policies": [
+        "local_probe_priority",
+        "screen_space_plus_probe"
+      ],
+      "allowed_reflection_source_contracts": [
+        "local_probe",
+        "screen_space"
+      ],
+      "min_proxy_resource_count": 3,
+      "min_payload_resource_count": 2,
+      "required_material_families": [
+        "sport_floor",
+        "painted_wall",
+        "rubber",
+        "painted_metal"
+      ]
+    },
+    "concert": {
+      "enclosure_mode": "large_dark_enclosed_room",
+      "visible_external_hdri_allowed": false,
+      "allowed_environment_policies": [
+        "black_box_local_background",
+        "enclosed_scene_local_background"
+      ],
+      "allowed_reflection_policies": [
+        "emissive_probe_priority",
+        "local_probe_priority"
+      ],
+      "allowed_reflection_source_contracts": [
+        "local_probe",
+        "screen_space",
+        "emissive_rig"
+      ],
+      "min_proxy_resource_count": 3,
+      "min_payload_resource_count": 2,
+      "required_material_families": [
+        "black_stage",
+        "emissive_panel",
+        "haze",
+        "painted_metal",
+        "fabric"
+      ]
+    },
+    "red_room": {
+      "enclosure_mode": "enclosed_room",
+      "visible_external_hdri_allowed": false,
+      "allowed_environment_policies": [
+        "red_room_local_background",
+        "enclosed_scene_local_background"
+      ],
+      "allowed_reflection_policies": [
+        "emissive_probe_priority",
+        "local_probe_priority"
+      ],
+      "allowed_reflection_source_contracts": [
+        "local_probe",
+        "screen_space",
+        "emissive_rig"
+      ],
+      "min_proxy_resource_count": 3,
+      "min_payload_resource_count": 2,
+      "required_material_families": [
+        "painted_wall",
+        "fabric",
+        "emissive_panel",
+        "glossy_trim"
+      ]
+    },
+    "stadium": {
+      "enclosure_mode": "large_open_or_partially_enclosed",
+      "visible_external_hdri_allowed": true,
+      "allowed_environment_policies": [
+        "stadium_local_sky",
+        "authorized_external_visible_background"
+      ],
+      "allowed_reflection_policies": [
+        "sky_probe_priority",
+        "local_probe_priority"
+      ],
+      "allowed_reflection_source_contracts": [
+        "local_probe",
+        "sky_probe",
+        "screen_space"
+      ],
+      "min_proxy_resource_count": 3,
+      "min_payload_resource_count": 2,
+      "required_material_families": [
+        "turf",
+        "concrete",
+        "painted_metal",
+        "plastic_seat",
+        "emissive_board"
+      ]
+    }
+  },
+  "promotion_rule": "A packet may pass the scene-local resource contract only when every analyzed frame report maps to a known family contract, proves each required role through runtime fields, obeys external-background authorization, and exposes required debug views in the packet view filter."
+}

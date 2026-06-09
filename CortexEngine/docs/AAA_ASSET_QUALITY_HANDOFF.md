@@ -3,6 +3,123 @@
 This is the living handoff for the AAA asset-quality goal.
 Read this after compaction before continuing.
 
+## 2026-06-09 SceneLocalResourceContractV1 Checkpoint
+
+Latest pushed work before this section:
+
+- Commit `ff1e95f` rebaselined the AAA work away from pure V3 plumbing and
+  toward full-scene shader resource, reflection, lighting, material, and
+  cross-scene evidence.
+
+Implemented after that:
+
+- Added `assets/final_art/scene_local_resource_contract_v1.json`.
+- Added `tools/analyze_scene_local_resource_contract_v1.py`.
+- Extended `assets/final_art/full_scene_shader_pipeline_v3_contract.json` with
+  a `scene_local_resource_contract` section.
+- Extended `tools/run_full_scene_shader_pipeline_v3_packet.ps1` so V3 packets
+  emit:
+  - `scene_local_resource_contract_v1.json`
+  - `scene_local_resource_contract_v1.md`
+- Extended `tools/build_full_scene_shader_v3_promotion_decision.py` so packet
+  review requires the scene-local resource contract.
+- Extended `tools/validate_full_scene_shader_pipeline_v3_plan.py` so static V3
+  validation requires the contract file, analyzer, packet hook, promotion hook,
+  resource roles, and family contracts.
+
+What the contract proves:
+
+- Required roles:
+  - diffuse irradiance
+  - specular radiance
+  - visible background
+  - reflection background
+  - atmosphere
+  - exposure
+- Required family contracts:
+  - gallery
+  - kitchen
+  - office
+  - gym
+  - concert
+  - red_room
+  - stadium
+- Per-family rules now declare:
+  - whether visible external HDRI is allowed
+  - allowed environment policies
+  - allowed reflection policies
+  - allowed reflection source contracts
+  - minimum scene-local proxy and payload resource counts
+  - expected material families for later material-quality gates
+
+Validation:
+
+```powershell
+python -m py_compile tools\analyze_scene_local_resource_contract_v1.py tools\build_full_scene_shader_v3_promotion_decision.py tools\validate_full_scene_shader_pipeline_v3_plan.py
+python tools\validate_full_scene_shader_pipeline_v3_plan.py
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_full_scene_shader_pipeline_v3_packet.ps1 -NoBuild -SkipSceneAnalyzers -StressSceneOnly -StressSceneFilter rt_showcase:reflection_closeup -SmokeFrames 8 -CaptureFrame 4 -CaptureSequenceCount 1 -StabilityMotionMode static -OutputRoot build\captures\v3_scene_local_resource_contract_smoke_20260609
+python tools\analyze_full_scene_shader_v3_placeholders.py --input build\captures\v3_scene_local_resource_contract_smoke_20260609 --signal-output build\captures\v3_scene_local_resource_contract_smoke_20260609\v3_signal.json --stability-output build\captures\v3_scene_local_resource_contract_smoke_20260609\v3_stability.json --require-lighting-split-ready --require-lighting-split-draw-count 1 --require-lighting-signal-metrics
+python tools\analyze_full_scene_shader_v3_scene_profile.py --manifest build\captures\v3_scene_local_resource_contract_smoke_20260609\manifest.json --output-json build\captures\v3_scene_local_resource_contract_smoke_20260609\v3_scene_profile.json --output-md build\captures\v3_scene_local_resource_contract_smoke_20260609\v3_scene_profile.md --min-family-count 1
+python tools\analyze_full_scene_shader_v3_environment_payload.py --manifest build\captures\v3_scene_local_resource_contract_smoke_20260609\manifest.json --output-json build\captures\v3_scene_local_resource_contract_smoke_20260609\v3_environment_payload.json --output-md build\captures\v3_scene_local_resource_contract_smoke_20260609\v3_environment_payload.md --min-payload-ready 0
+python tools\analyze_scene_local_resource_contract_v1.py --manifest build\captures\v3_scene_local_resource_contract_smoke_20260609\manifest.json --output-json build\captures\v3_scene_local_resource_contract_smoke_20260609\scene_local_resource_contract_v1.json --output-md build\captures\v3_scene_local_resource_contract_smoke_20260609\scene_local_resource_contract_v1.md --min-family-count 1
+python tools\analyze_full_scene_shader_v3_material_payload.py --manifest build\captures\v3_scene_local_resource_contract_smoke_20260609\manifest.json --output-json build\captures\v3_scene_local_resource_contract_smoke_20260609\v3_material_payload.json --output-md build\captures\v3_scene_local_resource_contract_smoke_20260609\v3_material_payload.md
+python tools\analyze_full_scene_shader_v3_composite_diagnostics.py --manifest build\captures\v3_scene_local_resource_contract_smoke_20260609\manifest.json --output-json build\captures\v3_scene_local_resource_contract_smoke_20260609\v3_composite_diagnostics.json --output-md build\captures\v3_scene_local_resource_contract_smoke_20260609\v3_composite_diagnostics.md
+python tools\build_full_scene_shader_v3_promotion_decision.py --packet-root build\captures\v3_scene_local_resource_contract_smoke_20260609 --output-json build\captures\v3_scene_local_resource_contract_smoke_20260609\promotion_decision.json --output-md build\captures\v3_scene_local_resource_contract_smoke_20260609\promotion_decision.md --allow-subset-review
+python tools\build_full_scene_shader_v3_matrix_decision.py --packet-root build\captures\v3_scene_local_resource_contract_smoke_20260609 --required-families stress_rt_showcase_reflection_closeup --required-motion-modes static --output-json build\captures\v3_scene_local_resource_contract_smoke_20260609\v3_matrix_single_packet_decision.json --output-md build\captures\v3_scene_local_resource_contract_smoke_20260609\v3_matrix_single_packet_decision.md
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_full_scene_shader_pipeline_v3_packet.ps1 -NoBuild -SkipSceneAnalyzers -StressSceneOnly -StressSceneFilter rt_showcase:reflection_closeup -ViewFilter "beauty,candidate_beauty_v3,candidate_hdr_scene_color,scene_local_environment,ambient_lighting,visible_background,reflection_background,atmosphere,reflection_radiance,reflection_confidence,reflection_source_id,reflection_source_suppression,ambient_ibl,energy_clamp_policy,overbright_diagnostics,composite_contribution_map,legacy_rescue_usage,material_base_color,material_normal,material_missing_channel_mask,roughness,metallic,surface_class,surface_policy,material_family,reflection_policy,temporal_policy,post_sensitivity,material_id,object_id,direct_light,direct_light_unshadowed,direct_light_shadow_loss,shadow_factor,v3_direct_lighting,v3_direct_lighting_unshadowed,v3_shadow_visibility,v3_shadow_loss,v3_indirect_lighting,v3_lighting_energy_budget,v3_shadow_source_attribution" -SmokeFrames 8 -CaptureFrame 4 -CaptureSequenceCount 1 -StabilityMotionMode static -OutputRoot build\captures\v3_scene_local_resource_contract_integrated_smoke_20260609
+python tools\build_full_scene_shader_v3_matrix_decision.py --packet-root build\captures\v3_scene_local_resource_contract_integrated_smoke_20260609 --required-families stress_rt_showcase_reflection_closeup --required-motion-modes static --output-json build\captures\v3_scene_local_resource_contract_integrated_smoke_20260609\v3_matrix_single_packet_decision.json --output-md build\captures\v3_scene_local_resource_contract_integrated_smoke_20260609\v3_matrix_single_packet_decision.md
+```
+
+Results:
+
+- Python compile passed.
+- Static V3 plan validator passed.
+- Packet capture produced `54` reports. The full packet command timed out
+  after capture while evidence files were still being written, so the analyzer
+  chain was rerun manually against the completed manifest.
+- V3 placeholder packet artifacts passed with `54` reports.
+- V3 scene profile policy ownership passed.
+- V3 environment payload diagnostics passed.
+- Scene-local resource contract passed:
+  - `54/54` ready reports
+  - contract family: `gallery`
+  - all six resource roles proved on all `54` reports
+- V3 material payload diagnostics passed.
+- CompositeV3 diagnostics passed.
+- Promotion decision passed with status `review_packet_passed`.
+- Single-packet matrix passed for
+  `stress_rt_showcase_reflection_closeup/static`.
+- Integrated V3 packet runner path also passed after adding the analyzer:
+  - packet root
+    `build\captures\v3_scene_local_resource_contract_integrated_smoke_20260609`
+  - `41` reports
+  - scene-local resource contract passed
+  - promotion decision status `review_packet_passed`
+  - single-packet matrix passed for
+    `stress_rt_showcase_reflection_closeup/static`
+
+Important caveat:
+
+- This is the contract/evidence slice. It does not yet change renderer resource
+  selection or improve beauty. The next slice must consume this contract in
+  renderer-side resource selection and debug views.
+
+Current next work:
+
+1. Wire `SceneLocalResourceContractV1` into renderer resource selection:
+   - map scene profile/family to contract family
+   - expose chosen diffuse/specular/background/reflection/exposure owners in
+     frame reports
+   - fail or mark unsafe when an enclosed scene uses unauthorized visible IBL
+2. Add/strengthen debug views:
+   - reflection provider id
+   - reflection confidence
+   - reflection rejection/suppression
+   - scene-local visible background owner
+   - scene-local reflection background owner
+3. Prove the contract on one enclosed non-gallery scene, preferably kitchen, so
+   the "no arbitrary visible IBL in enclosed rooms" rule is exercised.
+
 ## 2026-06-09 AAA Engine Scenes Rebaseline
 
 User concern:

@@ -3,6 +3,21 @@
   "purpose": "Ground the FullSceneShaderPipeline V3 refactor in named render-graph resources, debug views, frame-report evidence, and packet gates before beauty promotion.",
   "status": "planned_not_promoted",
   "promotion_rule": "No V3 domain may affect default beauty until its producer resource, consumer path, debug view, frame-report fields, packet analyzer, and contact sheet evidence pass on the required stress families.",
+  "scene_local_resource_contract": {
+    "schema": "cortex.scene_local_resource_contract.v1",
+    "path": "assets/final_art/scene_local_resource_contract_v1.json",
+    "packet_output": "scene_local_resource_contract_v1.json",
+    "analyzer": "tools/analyze_scene_local_resource_contract_v1.py",
+    "required_roles": [
+      "diffuse_irradiance",
+      "specular_radiance",
+      "visible_background",
+      "reflection_background",
+      "atmosphere",
+      "exposure"
+    ],
+    "promotion_rule": "Scene-local resource contracts must pass before V3 packet review can pass; enclosed scenes cannot pass with unauthorized visible external HDRI."
+  },
   "candidate_path_debt_fields": [
     "render_graph_missing_producer_count",
     "render_graph_missing_producer_resources",

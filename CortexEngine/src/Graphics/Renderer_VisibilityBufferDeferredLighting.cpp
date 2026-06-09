@@ -140,6 +140,7 @@ Renderer::PrepareVisibilityBufferDeferredLighting(Scene::ECS_Registry* registry)
         m_environmentState.localProbeSpecularIntensity,
         m_environmentState.localProbeRadianceEnabled ? 1.0f : 0.0f,
         0.0f);
+    deferredParams.sceneLocalPayloadParams = BuildSceneLocalEnvironmentV3PayloadParams();
     deferredParams.cinematicStabilityParams = BuildCinematicStabilityParams();
 
     if (m_environmentState.ShouldBindImageBasedLightingTextures()) {

@@ -2299,7 +2299,12 @@ float4 SkyboxPS(SkyboxVSOutput input) : SV_TARGET
     // lat-long UVs for the equirectangular panorama so the background rotates
     // correctly with the camera.
     float2 skyUV = DirectionToLatLong(RotateEnvironmentDirection(dir));
-    float backgroundMip = saturate(g_AmbientColor.w) * 8.0f;
+    uint specWidth, specHeight, specMips;
+    g_EnvSpecular.GetDimensions(0, specWidth, specHeight, specMips);
+    float maxMip = specMips > 0 ? float(specMips - 1) : 8.0f;
+    float backgroundBlurMip = saturate(g_AmbientColor.w) * maxMip;
+    float backgroundFootprintMip = EnvReflectionFootprintMip(skyUV, (float)specWidth, (float)specHeight, maxMip);
+    float backgroundMip = max(backgroundBlurMip, backgroundFootprintMip);
     float3 color = g_EnvSpecular.SampleLevel(g_Sampler, skyUV, backgroundMip).rgb *
                    g_EnvParams.y * g_EnvParams.w;
     return float4(color, 1.0f);

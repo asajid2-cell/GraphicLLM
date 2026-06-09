@@ -114,6 +114,7 @@ cbuffer PerFrameData : register(b0) {
     uint4  g_ClusterParams;                // x=clusterCountZ, y=maxLightsPerCluster, z=localLightCount, w unused
     uint4  g_ReflectionProbeParams;        // x=probeTableSRVIndex, y=probeCount, z/w unused
     float4 g_LocalProbeParams;             // x=diffuse scale, y=specular scale, z=enabled, w unused
+    float4 g_SceneLocalPayloadParams;      // x=payload ready, y=texture richness, z=proxy score, w=shader influence
     float4 g_CinematicStabilityParams;     // x=specular damping, y=debug stability, z=shadow softness, w=highlight protection
 };
 
@@ -383,6 +384,35 @@ float SpecularOcclusion(float NdotV, float ao, float roughness)
     // strongly in creases, while rough lobes keep softer ambient reflection.
     float exponent = exp2(-16.0f * saturate(roughness) - 1.0f);
     return saturate(pow(saturate(NdotV + ao), exponent) - 1.0f + ao);
+}
+
+float SceneLocalGlobalSpecularOwnership(uint surfaceClass,
+                                        uint sceneMaterialClass,
+                                        float roughness,
+                                        float metallic,
+                                        float probeWeight)
+{
+    if (surfaceClass == SURFACE_CLASS_MIRROR ||
+        surfaceClass == SURFACE_CLASS_GLASS ||
+        surfaceClass == SURFACE_CLASS_WATER ||
+        metallic > 0.55f) {
+        return 1.0f;
+    }
+
+    const float roughReceiver = smoothstep(0.34f, 0.86f, saturate(roughness));
+    const float payloadInfluence =
+        (g_SceneLocalPayloadParams.x > 0.5f)
+            ? saturate(g_SceneLocalPayloadParams.w * g_SceneLocalPayloadParams.z)
+            : 0.0f;
+    const float sceneLocalCoverage = max(saturate(probeWeight), payloadInfluence);
+    const float localOwnership = sceneLocalCoverage * roughReceiver;
+
+    // Broad rough room-shell receivers should be lit by the scene-local probe
+    // or scene-local payload once either owns the pixel. The visible HDRI
+    // remains active for the background and genuinely reflective materials,
+    // but it no longer injects high-frequency office bands into walls,
+    // concrete, and matte platforms.
+    return lerp(1.0f, 0.04f, localOwnership);
 }
 
 float3 SceneMaterialCinematicDirectDiffuseTint(uint sceneMaterialClass,
@@ -1098,7 +1128,10 @@ float4 PSMain(VSOutput input) : SV_Target0 {
             g_EnvSpecular.GetDimensions(0, specWidth, specHeight, specMipCount);
             float specMaxMip = max((specMipCount > 0u) ? (float)(specMipCount - 1u) : 0.0f,
                                    g_ShadowInvSizeAndSpecMaxMip.z);
-            float backgroundMip = saturate(g_AmbientColor.w) * specMaxMip;
+            float backgroundBlurMip = saturate(g_AmbientColor.w) * specMaxMip;
+            float backgroundFootprintMip =
+                EnvReflectionFootprintMipFromDirection(viewDir, (float)specWidth, (float)specHeight, specMaxMip);
+            float backgroundMip = max(backgroundBlurMip, backgroundFootprintMip);
             float3 sky = SampleEnvSpecular(viewDir, backgroundMip, INVALID_BINDLESS_INDEX) *
                          g_EnvParams.y * backgroundExposure;
             return float4(sky, 1.0f);
@@ -1442,6 +1475,7 @@ float4 PSMain(VSOutput input) : SV_Target0 {
     }
     const float diffuseMip = specMaxMip;
     float specularMipLevelForDebug = roughness * specMaxMip;
+    float globalSpecularOwnershipForDebug = 1.0f;
 
 #ifdef ENABLE_BINDLESS
     const uint probeCount = g_ReflectionProbeParams.y;
@@ -1527,6 +1561,9 @@ float4 PSMain(VSOutput input) : SV_Target0 {
         float3 specLocal = localProbeTextureRadianceAllowed && specularEnvIndex != INVALID_BINDLESS_INDEX
             ? SampleEnvSpecular(specDir, mipLevel, specularEnvIndex)
             : ComputeSceneLocalProbeSpecular(specDir, surfaceClass, sceneMaterialClass, roughness);
+        const float globalSpecularOwnership =
+            SceneLocalGlobalSpecularOwnership(surfaceClass, sceneMaterialClass, roughness, metallic, probeWeight);
+        globalSpecularOwnershipForDebug = globalSpecularOwnership;
         float3 prefilteredColor =
             specGlobal * max(g_EnvParams.y, 0.0f) +
             specLocal * localProbeSpecularScale * probeWeight;
@@ -1639,6 +1676,9 @@ float4 PSMain(VSOutput input) : SV_Target0 {
     }
     if (g_ReflectionProbeParams.z == 47u) {
         return float4(SceneMaterialPolicyDebugColor(sceneMaterialClass, surfaceClass, roughness, metallic), 1.0f);
+    }
+    if (g_ReflectionProbeParams.z == 92u) {
+        return float4(globalSpecularOwnershipForDebug.xxx, 1.0f);
     }
 
     // Final color

@@ -11855,3 +11855,296 @@ Current next work:
 3. Continue separating model-scene report-evidence capture from visual-capture
    success so family packets can produce diagnostics even when renderer
    stability debt remains.
+
+### RT Showcase Wall/Floor IBL Flicker Diagnosis - 2026-06-09
+
+Context:
+
+- User repro remains the default `rt_showcase` old-office/studio IBL path,
+  camera bookmark `reported_wall_floor_flicker`, with mouse yaw jitter.
+- Do not treat fixes that hide/disable/blur IBL as root fixes.
+- The relevant command shape is:
+
+```powershell
+Copy-Item assets\shaders\Basic.hlsl build\bin\assets\shaders\Basic.hlsl -Force
+Copy-Item assets\shaders\DeferredLighting.hlsl build\bin\assets\shaders\DeferredLighting.hlsl -Force
+Copy-Item assets\shaders\MaterialResolve.hlsl build\bin\assets\shaders\MaterialResolve.hlsl -Force
+$env:CORTEX_DISABLE_SHADER_CACHE='1'
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_rt_showcase_wall_floor_flicker_stability_smoke.ps1 `
+  -NoBuild `
+  -LogDir Z:\328\CMPUT328-A2\codexworks\301\graphics\CortexEngine\build\captures\rt_showcase_wall_floor_<name> `
+  -CaptureStartFrame 70 -CaptureCount 48 `
+  -MotionFrames 180 -MotionLookAmplitude 0.025 -MotionLookCycles 12.0 `
+  -FixedDeltaTime 0.008333333
+Remove-Item Env:\CORTEX_DISABLE_SHADER_CACHE -ErrorAction SilentlyContinue
+```
+
+Important harness note:
+
+- Pass an absolute `-LogDir`. A relative `build\captures\...` path is passed
+  to the engine through `CORTEX_LOG_DIR` after the wrapper changes directory to
+  `build\bin`, so captures land under `build\bin\build\captures\...` while the
+  wrapper checks `build\captures\...`.
+
+Implemented / tested this pass:
+
+- Removed the speculative roughness/specular blur policy from
+  `SurfaceClassification.hlsli` and `DeferredLighting.hlsl`; earlier evidence
+  showed it did not move the reported ROI.
+- Kept the VB material-gradient correction in `MaterialResolve.hlsl` as a
+  technically correct derivative fix, but it is not proven as the dominant
+  flicker root.
+- Changed the RT Showcase courtyard pool from one full white `8x8` plane plus
+  one full transparent/water `8x8` plane separated by only `0.01` units into
+  explicit rim strips plus a smaller inset water plane.
+  - This removes real coextensive-plane ownership debt.
+  - It did not materially move the reported flicker metrics.
+- Added `tools/analyze_rt_showcase_wall_floor_roi_stability.py`.
+  - It parses captured BMPs directly.
+  - It reports fixed ROIs for `white_platform`, `front_dark_floor`,
+    `left_wall_panel`, `pool_water_rim`, `background_office`, and whole frame.
+  - Use it alongside the full-frame smoke because the visible office HDRI
+    background contributes legitimate parallax under mouse yaw.
+- Added a VB deferred scene-local payload constant lane and tried local-payload
+  ownership gating for rough non-reflective global HDRI specular.
+  - Also tried the same concept in `Basic.hlsl` forward IBL using
+    `g_FogExtraParams`.
+  - These patches compiled, but did not materially improve the reported beauty
+    or ROI metrics. Treat them as unproven until the next pass decides whether
+    to keep, revise, or revert.
+
+Current evidence:
+
+```powershell
+python tools\analyze_rt_showcase_wall_floor_roi_stability.py `
+  --capture-dir build\captures\rt_showcase_wall_floor_exact_ablation_after_pool_20260609\baseline `
+  --output-json build\captures\rt_showcase_wall_floor_exact_ablation_after_pool_20260609\baseline\wall_floor_roi_stability.json `
+  --output-md build\captures\rt_showcase_wall_floor_exact_ablation_after_pool_20260609\baseline\wall_floor_roi_stability.md
+
+python tools\analyze_rt_showcase_wall_floor_roi_stability.py `
+  --capture-dir build\captures\rt_showcase_wall_floor_exact_ablation_after_pool_20260609\no_ibl `
+  --output-json build\captures\rt_showcase_wall_floor_exact_ablation_after_pool_20260609\no_ibl\wall_floor_roi_stability.json `
+  --output-md build\captures\rt_showcase_wall_floor_exact_ablation_after_pool_20260609\no_ibl\wall_floor_roi_stability.md
+```
+
+Baseline exact-path ROI maxima after the pool ownership geometry change:
+
+| ROI | Max mean luma | Max changed | Max large changed |
+|---|---:|---:|---:|
+| white_platform | `11.4857` | `0.2754` | `0.0970` |
+| front_dark_floor | `5.9437` | `0.1741` | `0.0282` |
+| left_wall_panel | `4.8461` | `0.0819` | `0.0241` |
+| pool_water_rim | `22.0276` | `0.4414` | `0.2239` |
+| background_office | `8.0819` | `0.1726` | `0.0597` |
+| whole_frame | `6.9590` | `0.1457` | `0.0489` |
+
+No-IBL exact-path ROI maxima:
+
+| ROI | Max mean luma | Max changed | Max large changed |
+|---|---:|---:|---:|
+| white_platform | `4.4074` | `0.0756` | `0.0483` |
+| front_dark_floor | `1.5494` | `0.0159` | `0.0137` |
+| left_wall_panel | `3.3334` | `0.0388` | `0.0182` |
+| pool_water_rim | `12.6724` | `0.2608` | `0.1699` |
+| background_office | `2.6431` | `0.0657` | `0.0237` |
+| whole_frame | `2.7549` | `0.0497` | `0.0242` |
+
+Exact beauty ablation summary:
+
+- baseline: max mean `6.9219`, changed `0.14446`, large `0.04881`
+- `CORTEX_ENABLE_VB_MOTION_VECTORS=1`: no meaningful change
+- `CORTEX_DISABLE_SHADOWS=1`: no meaningful improvement
+- `CORTEX_DISABLE_SSAO=1`: no meaningful change
+- `CORTEX_DISABLE_SSR=1`: no meaningful change
+- `CORTEX_DISABLE_IBL=1`: max mean drops to `2.7444`, changed `0.04939`
+- IBL component split:
+  - diffuse-only: max mean `4.0988`, changed `0.06138`
+  - specular-only: max mean `6.6682`, changed `0.14154`
+  - low specular (`0.25`): max mean `5.0931`, changed `0.08828`
+
+Current interpretation:
+
+- The major remaining owner is IBL, especially specular/environment contribution.
+- The first local-probe ownership attempt failed because debug view `42`
+  showed the reported white platform/wall area has essentially zero local probe
+  coverage.
+- Adding frame-level scene-local payload influence to VB deferred lighting and
+  forward `Basic.hlsl` did not move the reported ROI enough. This means the
+  remaining leak is probably in transparent/water compositing, sky/background
+  contribution through the view, or another post/forward path, not just the
+  opaque VB deferred BRDF.
+- Do not repeat shadow/SSAO/SSR/VB-motion-vector ablations as first moves; they
+  have already been ruled out for this repro.
+
+Recommended next pass:
+
+1. Decide whether to keep or revert the unproven scene-local specular ownership
+   edits in `DeferredLighting.hlsl`, `Basic.hlsl`, `VisibilityBuffer.h`, and
+   `Renderer_VisibilityBufferDeferredLighting.cpp`.
+2. Run exact-path ablations for transparent/water/skybox/background composition
+   ownership, not just opaque deferred lighting.
+   - Search for existing env disables for auxiliary geometry, water, skybox,
+     transparency, and background presentation.
+   - If none exist, add default-off diagnostics so these lanes can be isolated.
+3. Add an owner/debug view for transparent/water IBL contribution or composite
+   contribution over the reported platform ROI.
+4. Only after the owner is proven, implement the root contract:
+   - transparent/water materials sample scene-local proxy radiance or a stable
+     local reflection lane where appropriate;
+   - visible HDRI background remains visible when required, but it must not
+     inject unstable high-frequency specular bands into rough interior/room
+     surfaces.
+
+### RT Showcase Wall/Floor IBL Flicker Follow-Up - 2026-06-09
+
+Current status:
+
+- Not fixed yet. Do not claim the wall/floor flicker is solved.
+- Added `tools/analyze_rt_showcase_wall_floor_roi_stability.py` tight ROIs:
+  - `white_platform_clean_right`
+  - `white_platform_clean_left`
+  - `front_dark_floor_clean`
+  - `left_wall_panel_clean`
+- Added debug view `92` as `VB_DeferredGlobalIBLOwnership`.
+  - Previous debug view `48` was invalid for this purpose because it is routed
+    to `VB_MaterialId`.
+- Added diagnostic env override:
+  - `CORTEX_RT_SHOWCASE_BACKGROUND_BLUR=<0..1>`
+  - This only overrides the RT Showcase gallery profile background blur for
+    reproducible testing.
+- Added derivative-based visible-background mip selection in:
+  - `assets/shaders/DeferredLighting.hlsl` depth-miss background path
+  - `assets/shaders/Basic.hlsl` forward skybox path
+
+Important negative result:
+
+- Hard-suppressing deferred global specular ownership on rough payload-owned
+  pixels did not materially improve the broad beauty ROI.
+- The hard branch did trigger in debug view `92`; on the clean-right platform
+  ownership dropped near `0.056`.
+- Therefore, the no-op was not stale shader bytecode and not the wrong pass.
+
+Tighter ROI re-analysis:
+
+| Capture | white_platform_clean_right | front_dark_floor_clean | left_wall_panel_clean | background_office | whole_frame |
+|---|---:|---:|---:|---:|---:|
+| baseline | `13.4528 / 0.4078 / 0.0949` | `5.9750 / 0.1745 / 0.0252` | `4.7129 / 0.0776 / 0.0198` | `8.0819 / 0.1726 / 0.0597` | `6.9590 / 0.1457 / 0.0489` |
+| no IBL | `0.1989 / 0.0000 / 0.0000` | `0.6294 / 0.0071 / 0.0052` | `3.0693 / 0.0327 / 0.0119` | `2.6431 / 0.0657 / 0.0237` | `2.7549 / 0.0497 / 0.0242` |
+| diffuse-only IBL | `0.0000 / 0.0000 / 0.0000` | `0.1586 / 0.0058 / 0.0000` | `4.3872 / 0.0594 / 0.0133` | `4.9542 / 0.0815 / 0.0402` | `4.1147 / 0.0623 / 0.0298` |
+| specular-only IBL | `13.4528 / 0.4078 / 0.0949` | `5.9652 / 0.1739 / 0.0252` | `4.4160 / 0.0673 / 0.0191` | `8.0281 / 0.1716 / 0.0582` | `6.7046 / 0.1430 / 0.0480` |
+| low specular IBL | `4.6343 / 0.1154 / 0.0091` | `1.9603 / 0.0363 / 0.0016` | `4.6026 / 0.0640 / 0.0148` | `6.0774 / 0.1134 / 0.0424` | `5.1147 / 0.0893 / 0.0317` |
+
+Interpretation:
+
+- The clean-right patch is controlled by the specular/background side of IBL,
+  not diffuse IBL.
+- The specular debug screenshot showed that the broad/tight screen ROIs still
+  include depth-miss visible HDRI and silhouette motion. This means the current
+  ROI metric can be dominated by expected background parallax, not only by
+  material flicker.
+- Background blur `0.0` with the old mip behavior was not worse under this
+  metric, which further suggests the current metric is not isolating the
+  visible user artifact cleanly enough.
+
+Next required pass:
+
+1. Add a depth/material-aware ROI analyzer or capture an explicit ID/depth mask
+   for the reported floor/wall receiver before changing more shader policy.
+2. Separate three owners in the evidence packet:
+   - depth-miss visible HDRI background
+   - opaque VB deferred receiver
+   - forward transparent/water/aux receiver
+3. Only then choose the final fix:
+   - if depth-miss dominates, improve visible-background antialiasing/temporal
+     stability and exclude expected parallax from the floor/wall gate;
+   - if opaque receiver dominates, continue scene-local reflection ownership;
+   - if transparent/water dominates, fix the forward/aux reflection path.
+
+### RT Showcase Masked Owner Packet - 2026-06-09
+
+Implemented:
+
+- Quarantined the unproven IBL ownership policy:
+  - removed the forward `Basic.hlsl` scene-local global specular multiplier;
+  - restored deferred global HDRI specular contribution to beauty output;
+  - kept debug view `92` as diagnostic-only.
+- Extended `tools/analyze_rt_showcase_wall_floor_roi_stability.py` with aligned
+  debug-view masks:
+  - `--mask-dir`
+  - `--mask-mode luma|not-reference-color`
+  - `--invert-mask`
+  - `--mask-threshold`
+  - `--mask-reference-x/y`
+- Used debug view `36` (`VB_GBuffer_NormalRoughness`) as a stable foreground
+  mask via `--mask-mode not-reference-color`, rejecting the top-right
+  depth-miss lavender background color.
+
+Captured packet:
+
+```powershell
+build\captures\rt_showcase_wall_floor_masked_owner_packet_beauty_20260609
+build\captures\rt_showcase_wall_floor_masked_owner_packet_mask_normal_roughness36_20260609
+build\captures\rt_showcase_wall_floor_masked_owner_packet_specular9_20260609
+build\captures\rt_showcase_wall_floor_masked_owner_packet_ownership92_20260609
+```
+
+Analysis commands:
+
+```powershell
+$mask='build\captures\rt_showcase_wall_floor_masked_owner_packet_mask_normal_roughness36_20260609'
+python tools\analyze_rt_showcase_wall_floor_roi_stability.py `
+  --capture-dir build\captures\rt_showcase_wall_floor_masked_owner_packet_beauty_20260609 `
+  --mask-dir $mask `
+  --mask-mode not-reference-color `
+  --mask-threshold 12 `
+  --mask-reference-x 1270 `
+  --mask-reference-y 10 `
+  --output-json build\captures\rt_showcase_wall_floor_masked_owner_packet_beauty_20260609\beauty_fg_color.json `
+  --output-md build\captures\rt_showcase_wall_floor_masked_owner_packet_beauty_20260609\beauty_fg_color.md
+
+python tools\analyze_rt_showcase_wall_floor_roi_stability.py `
+  --capture-dir build\captures\rt_showcase_wall_floor_masked_owner_packet_beauty_20260609 `
+  --mask-dir $mask `
+  --mask-mode not-reference-color `
+  --mask-threshold 12 `
+  --mask-reference-x 1270 `
+  --mask-reference-y 10 `
+  --invert-mask `
+  --output-json build\captures\rt_showcase_wall_floor_masked_owner_packet_beauty_20260609\beauty_bg_color.json `
+  --output-md build\captures\rt_showcase_wall_floor_masked_owner_packet_beauty_20260609\beauty_bg_color.md
+```
+
+Masked evidence:
+
+| Report | white_platform_clean_right | front_dark_floor_clean | left_wall_panel_clean | background_office | whole_frame |
+|---|---:|---:|---:|---:|---:|
+| beauty foreground | `0.0000 / 0.0000 / 0.0000 / coverage 0.0000` | `1.4247 / 0.0497 / 0.0017 / coverage 0.0330` | `4.6196 / 0.0721 / 0.0183 / coverage 0.9987` | `5.1814 / 0.1052 / 0.0413 / coverage 0.5981` | `5.2061 / 0.0936 / 0.0353 / coverage 0.5166` |
+| beauty background | `12.3975 / 0.3739 / 0.0850 / coverage 1.0000` | `5.7482 / 0.1680 / 0.0217 / coverage 0.9685` | `25.0356 / 0.7121 / 0.2319 / coverage 0.0016` | `11.8989 / 0.2554 / 0.0908 / coverage 0.4560` | `8.1430 / 0.1846 / 0.0578 / coverage 0.5099` |
+| specular foreground | `0.0000 / 0.0000 / 0.0000 / coverage 0.0000` | `1.8670 / 0.0521 / 0.0119 / coverage 0.0330` | `2.5180 / 0.0559 / 0.0156 / coverage 0.9987` | `2.0071 / 0.0398 / 0.0017 / coverage 0.5981` | `2.8751 / 0.0616 / 0.0167 / coverage 0.5166` |
+| specular background | `12.3975 / 0.3739 / 0.0850 / coverage 1.0000` | `5.7750 / 0.1685 / 0.0221 / coverage 0.9685` | `22.5263 / 0.7424 / 0.2319 / coverage 0.0016` | `8.8245 / 0.2259 / 0.0536 / coverage 0.4560` | `7.2196 / 0.1767 / 0.0476 / coverage 0.5099` |
+
+Interpretation:
+
+- The old `white_platform_clean_right` ROI was not a reliable floor/platform
+  receiver measurement in this camera. It was `100%` masked background.
+- The old `front_dark_floor_clean` ROI was also mostly background
+  (`~96.85%` background, `~3.30%` foreground).
+- The `left_wall_panel_clean` ROI is the best current opaque receiver sample:
+  `~99.87%` foreground.
+- The remaining large whole-frame/broad-ROI instability is heavily influenced
+  by depth-miss visible HDRI and silhouette parallax. Do not use those broad
+  metrics as proof of an opaque material/shader flicker.
+
+Next pass:
+
+1. Promote the masked owner packet into a reusable repro gate:
+   - require an aligned mask capture;
+   - report foreground/background splits by default;
+   - gate opaque receiver stability on foreground-only ROIs.
+2. Add more foreground-only wall/floor ROIs or camera bookmarks where the
+   platform/floor is actually visible in the foreground mask.
+3. Only then re-enter shader policy:
+   - if foreground wall ROI still flickers, inspect material ID/policy and
+     specular ownership for that receiver;
+   - if foreground is stable but background is noisy, work on visible-HDRI
+     temporal/background presentation rather than material BRDF.

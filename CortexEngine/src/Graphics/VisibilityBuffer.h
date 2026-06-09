@@ -270,6 +270,7 @@ public:
         alignas(16) glm::uvec4 clusterParams;          // x=clusterCountZ, y=maxLightsPerCluster, z=localLightCount, w unused
         alignas(16) glm::uvec4 reflectionProbeParams;  // x=probeTableSRVIndex, y=probeCount, z/w unused
         glm::vec4 localProbeParams;                    // x=diffuse scale, y=specular scale, z=enabled, w unused
+        glm::vec4 sceneLocalPayloadParams;             // x=payload ready, y=texture richness, z=proxy score, w=shader influence
         glm::vec4 cinematicStabilityParams;            // x=specular damping, y=debug stability, z=shadow softness, w=highlight protection
     };
 

@@ -38,6 +38,7 @@ V3_ENVIRONMENT_PROXY_CONTRACT_HEADER_PATH = (
 )
 V3_SHADOW_ATTRIBUTION_ANALYZER_PATH = ROOT / "tools" / "analyze_full_scene_shader_v3_shadow_attribution.py"
 V3_SHADOW_FOCUS_RUNNER_PATH = ROOT / "tools" / "run_lighting_v3_shadow_motion_focus_packet.ps1"
+V3_SHADOW_PROMOTION_MATRIX_PATH = ROOT / "tools" / "build_lighting_v3_shadow_promotion_matrix.py"
 V3_REFLECTION_SOURCE_RESOLVER_ANALYZER_PATH = ROOT / "tools" / "analyze_reflection_v3_source_resolver.py"
 V3_REFLECTION_FOCUS_RUNNER_PATH = ROOT / "tools" / "run_reflection_v3_motion_focus_packet.ps1"
 SCENE_LOCAL_ENVIRONMENT_V3_SHADER_PATH = ROOT / "assets" / "shaders" / "SceneLocalEnvironmentV3.hlsl"
@@ -238,6 +239,11 @@ def main() -> int:
         f"Missing V3 shadow focus runner: {V3_SHADOW_FOCUS_RUNNER_PATH}",
     )
     require(
+        V3_SHADOW_PROMOTION_MATRIX_PATH.exists(),
+        errors,
+        f"Missing V3 shadow promotion matrix builder: {V3_SHADOW_PROMOTION_MATRIX_PATH}",
+    )
+    require(
         V3_REFLECTION_SOURCE_RESOLVER_ANALYZER_PATH.exists(),
         errors,
         f"Missing ReflectionV3 source resolver analyzer: {V3_REFLECTION_SOURCE_RESOLVER_ANALYZER_PATH}",
@@ -310,6 +316,7 @@ def main() -> int:
     environment_proxy_contract_header_source = V3_ENVIRONMENT_PROXY_CONTRACT_HEADER_PATH.read_text(encoding="utf-8")
     shadow_attribution_source = V3_SHADOW_ATTRIBUTION_ANALYZER_PATH.read_text(encoding="utf-8")
     shadow_focus_runner_source = V3_SHADOW_FOCUS_RUNNER_PATH.read_text(encoding="utf-8")
+    shadow_promotion_matrix_source = V3_SHADOW_PROMOTION_MATRIX_PATH.read_text(encoding="utf-8")
     reflection_source_resolver_source = V3_REFLECTION_SOURCE_RESOLVER_ANALYZER_PATH.read_text(encoding="utf-8")
     reflection_focus_runner_source = V3_REFLECTION_FOCUS_RUNNER_PATH.read_text(encoding="utf-8")
     scene_local_environment_v3_shader = SCENE_LOCAL_ENVIRONMENT_V3_SHADER_PATH.read_text(encoding="utf-8")
@@ -343,6 +350,7 @@ def main() -> int:
             environment_proxy_contract_header_source,
             shadow_attribution_source,
             shadow_focus_runner_source,
+            shadow_promotion_matrix_source,
             reflection_source_resolver_source,
             reflection_focus_runner_source,
             scene_local_environment_v3_shader,
@@ -1230,6 +1238,9 @@ def main() -> int:
         "lighting_energy_budget",
         "shadow_source_attribution",
         "analyze_full_scene_shader_v3_shadow_attribution.py",
+        "build_lighting_v3_shadow_promotion_matrix.py",
+        "lighting_shadow_promotion_matrix.v1",
+        "shadow_promotion_ready",
         "sun_shadow_loss_ratio",
         "local_shadow_loss_ratio",
         "CORTEX_LIGHT_SWEEP",

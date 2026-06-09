@@ -2083,3 +2083,68 @@ Current limitation:
 
 - This is still focused stress evidence. Promotion-grade LightingShadowV3
   evidence needs the same `light_sweep` row in a bounded cross-family matrix.
+
+### LightingShadowV3 Promotion Matrix - 2026-06-09
+
+Implemented:
+
+- Added `tools/build_lighting_v3_shadow_promotion_matrix.py`.
+- The matrix builder consumes existing packet roots and runs:
+  - `analyze_full_scene_shader_v3_shadow_attribution.py` for ownership/source
+    attribution on every packet;
+  - `analyze_full_scene_shader_v3_lighting_motion.py --focus shadow` for
+    non-static motion packets.
+- The matrix reports:
+  - required/observed/missing shadow families;
+  - required/observed/missing shadow motion modes;
+  - attribution-ready packet count;
+  - motion-ready packet count;
+  - per-packet attribution/motion failures and warnings.
+- `tools/validate_full_scene_shader_pipeline_v3_plan.py` now requires the
+  promotion matrix builder and its schema/readiness markers.
+
+Validation:
+
+```powershell
+python -m py_compile `
+  CortexEngine\tools\build_lighting_v3_shadow_promotion_matrix.py `
+  CortexEngine\tools\validate_full_scene_shader_pipeline_v3_plan.py
+
+python CortexEngine\tools\validate_full_scene_shader_pipeline_v3_plan.py
+
+python CortexEngine\tools\build_lighting_v3_shadow_promotion_matrix.py `
+  --packet-root CortexEngine\build\captures\v3_default_beauty_promotion_gallery_smoke1_20260609 `
+  --packet-root CortexEngine\build\captures\v3_default_beauty_promotion_kitchen_static_smoke1_20260609 `
+  --packet-root CortexEngine\build\captures\v3_default_beauty_promotion_reflection_static_smoke1_20260609 `
+  --packet-root CortexEngine\build\captures\v3_default_beauty_promotion_office_gym_static_smoke1_20260609 `
+  --packet-root CortexEngine\build\captures\v3_default_beauty_promotion_heavy_light_sweep_seq1_20260609 `
+  --packet-root CortexEngine\build\captures\v3_default_beauty_promotion_gallery_camera_sweep_seq1_20260609 `
+  --packet-root CortexEngine\build\captures\v3_default_beauty_promotion_gallery_mouse_jitter_seq1_20260609 `
+  --required-families stress_rt_showcase_reflection_closeup,gallery,kitchen,office,gym,concert,red_room,stadium `
+  --required-motion-modes static,mouse_jitter,camera_sweep,light_sweep `
+  --output-json CortexEngine\build\captures\v3_lighting_shadow_promotion_matrix1_20260609\lighting_shadow_promotion_matrix.json `
+  --output-md CortexEngine\build\captures\v3_lighting_shadow_promotion_matrix1_20260609\lighting_shadow_promotion_matrix.md
+```
+
+Evidence:
+
+- Matrix:
+  `build\captures\v3_lighting_shadow_promotion_matrix1_20260609\lighting_shadow_promotion_matrix.md/json`.
+- Results:
+  - `packet_count=7`;
+  - `ready_attribution_packet_count=7`;
+  - `ready_motion_packet_count=3`;
+  - `shadow_promotion_ready=true`;
+  - observed families:
+    `concert,gallery,gym,kitchen,office,red_room,stadium,stress_rt_showcase_reflection_closeup`;
+  - missing families: none;
+  - observed motion modes: `camera_sweep,light_sweep,mouse_jitter,static`;
+  - missing motion modes: none;
+  - failures: `0`;
+  - warnings: `0`.
+
+Interpretation:
+
+- The prior LightingShadowV3 limitation is resolved for promotion-grade
+  evidence: shadow attribution and focused shadow motion now have a bounded
+  cross-family matrix over the required family/motion set.

@@ -87,6 +87,7 @@ def packet_row(packet_root: Path, packet_status: dict[str, Any] | None = None) -
 
     manifest = load_json(manifest_path)
     promotion = load_json(promotion_path)
+    stability = load_json(stability_path) if stability_path.exists() else {}
     families: set[str] = set()
     for result in manifest.get("results", []):
         if not isinstance(result, dict):
@@ -99,9 +100,12 @@ def packet_row(packet_root: Path, packet_status: dict[str, Any] | None = None) -
     row["review_packet_passed"] = promotion.get("review_packet_passed") is True
     row["promotion_status"] = promotion.get("status", "unknown")
     row["default_beauty_promotable"] = promotion.get("default_beauty_promotable")
+    row["default_beauty_promotion_allowed"] = promotion.get("default_beauty_promotion_allowed")
     row["default_beauty_promotion_blockers"] = promotion.get(
         "default_beauty_promotion_blockers", []
     )
+    row["default_beauty_affects_any"] = stability.get("default_beauty_affects_any")
+    row["promoted_report_count"] = int(stability.get("promoted_report_count", 0) or 0)
     row["candidate_beauty_review_ready"] = promotion.get("candidate_beauty_review_ready")
     row["candidate_beauty_review_gate"] = promotion.get("candidate_beauty_review_gate", {})
     row["full_coverage_ready"] = promotion.get("full_coverage_ready")
@@ -145,6 +149,27 @@ def build_matrix(
         {
             str(row.get("motion_mode"))
             for row in passed_rows
+            if isinstance(row.get("motion_mode"), str) and row.get("motion_mode") != "unknown"
+        }
+    )
+    promoted_rows = [
+        row
+        for row in passed_rows
+        if int(row.get("promoted_report_count", 0) or 0) > 0
+        and row.get("default_beauty_affects_any") is True
+    ]
+    observed_promoted_families = sorted(
+        {
+            family
+            for row in promoted_rows
+            for family in row.get("families", [])
+            if isinstance(family, str)
+        }
+    )
+    observed_promoted_motion_modes = sorted(
+        {
+            str(row.get("motion_mode"))
+            for row in promoted_rows
             if isinstance(row.get("motion_mode"), str) and row.get("motion_mode") != "unknown"
         }
     )
@@ -204,6 +229,10 @@ def build_matrix(
 
     missing_families = sorted(set(required_families) - set(observed_families))
     missing_motion_modes = sorted(set(required_motion_modes) - set(observed_motion_modes))
+    missing_promoted_families = sorted(set(required_families) - set(observed_promoted_families))
+    missing_promoted_motion_modes = sorted(
+        set(required_motion_modes) - set(observed_promoted_motion_modes)
+    )
     if missing_families:
         failures.append("missing required families: " + ", ".join(missing_families))
     if missing_motion_modes:
@@ -239,23 +268,36 @@ def build_matrix(
             aggregate_candidate_review_blockers.get("material_quality_gate_not_ready", 0) + 1
         )
 
-    default_beauty_promotable = (
-        candidate_beauty_review_ready
-        and all(row.get("default_beauty_promotable") is True for row in rows)
-    )
     aggregate_default_promotion_blockers: dict[str, int] = {}
     if not candidate_beauty_review_ready:
         aggregate_default_promotion_blockers["candidate_beauty_review_not_ready"] = 1
     if not full_matrix_ready:
         aggregate_default_promotion_blockers["full_matrix_not_ready"] = 1
+    if not promoted_rows:
+        aggregate_default_promotion_blockers["default_beauty_runtime_path_not_enabled"] = 1
+    if missing_promoted_families:
+        aggregate_default_promotion_blockers["missing_promoted_families"] = len(
+            missing_promoted_families
+        )
+    if missing_promoted_motion_modes:
+        aggregate_default_promotion_blockers["missing_promoted_motion_modes"] = len(
+            missing_promoted_motion_modes
+        )
     runtime_path_blockers = packet_default_promotion_blockers.get(
         "default_beauty_runtime_path_not_enabled", 0
     )
-    if runtime_path_blockers:
+    if runtime_path_blockers and not promoted_rows:
         aggregate_default_promotion_blockers["default_beauty_runtime_path_not_enabled"] = (
             runtime_path_blockers
         )
-    default_beauty_promotable = default_beauty_promotable and not aggregate_default_promotion_blockers
+    default_beauty_promotable = (
+        candidate_beauty_review_ready
+        and full_matrix_ready
+        and bool(promoted_rows)
+        and not missing_promoted_families
+        and not missing_promoted_motion_modes
+        and not aggregate_default_promotion_blockers
+    )
 
     return {
         "schema": "cortex.full_scene_shader_pipeline_v3.matrix_decision.v1",
@@ -267,6 +309,14 @@ def build_matrix(
         "required_motion_modes": required_motion_modes,
         "observed_motion_modes": observed_motion_modes,
         "missing_motion_modes": missing_motion_modes,
+        "observed_promoted_families": observed_promoted_families,
+        "missing_promoted_families": missing_promoted_families,
+        "observed_promoted_motion_modes": observed_promoted_motion_modes,
+        "missing_promoted_motion_modes": missing_promoted_motion_modes,
+        "promoted_packet_count": len(promoted_rows),
+        "promoted_report_count": sum(
+            int(row.get("promoted_report_count", 0) or 0) for row in promoted_rows
+        ),
         "full_matrix_ready": full_matrix_ready,
         "candidate_beauty_review_ready": candidate_beauty_review_ready,
         "default_beauty_promotable": default_beauty_promotable,
@@ -306,6 +356,12 @@ def write_markdown(path: Path, matrix: dict[str, Any]) -> None:
         f"- missing families: `{', '.join(matrix['missing_families'])}`",
         f"- observed motion modes: `{', '.join(matrix['observed_motion_modes'])}`",
         f"- missing motion modes: `{', '.join(matrix['missing_motion_modes'])}`",
+        f"- promoted packet count: `{matrix.get('promoted_packet_count', 0)}`",
+        f"- promoted report count: `{matrix.get('promoted_report_count', 0)}`",
+        f"- observed promoted families: `{', '.join(matrix.get('observed_promoted_families', []))}`",
+        f"- missing promoted families: `{', '.join(matrix.get('missing_promoted_families', []))}`",
+        f"- observed promoted motion modes: `{', '.join(matrix.get('observed_promoted_motion_modes', []))}`",
+        f"- missing promoted motion modes: `{', '.join(matrix.get('missing_promoted_motion_modes', []))}`",
         f"- candidate blocker counts: `{json.dumps(matrix.get('candidate_beauty_blocker_counts', {}), sort_keys=True)}`",
         f"- requested candidate blocker counts: `{json.dumps(matrix.get('candidate_beauty_requested_blocker_counts', {}), sort_keys=True)}`",
         f"- candidate review blocker counts: `{json.dumps(matrix.get('candidate_beauty_review_blocker_counts', {}), sort_keys=True)}`",
@@ -315,8 +371,8 @@ def write_markdown(path: Path, matrix: dict[str, Any]) -> None:
         f"- material quality min score: `{float(matrix.get('material_quality_min_score', 0.0) or 0.0):.4f}`",
         f"- material quality blocker counts: `{json.dumps(matrix.get('material_quality_blocker_counts', {}), sort_keys=True)}`",
         "",
-        "| Packet | Motion | Families | Exit | Passed | Status | Candidate Review | Material Score | Candidate Ready | Requested Blockers | Default Blockers |",
-        "|---|---|---|---:|---|---|---|---:|---:|---|---|",
+        "| Packet | Motion | Families | Exit | Passed | Status | Candidate Review | Promoted Reports | Material Score | Candidate Ready | Requested Blockers | Default Blockers |",
+        "|---|---|---|---:|---|---|---|---:|---:|---:|---|---|",
     ]
     for row in matrix["packets"]:
         predicates = row.get("candidate_beauty_predicates", {})
@@ -343,6 +399,7 @@ def write_markdown(path: Path, matrix: dict[str, Any]) -> None:
                     f"`{str(row.get('review_packet_passed')).lower()}`",
                     f"`{row.get('promotion_status', 'unknown')}`",
                     f"`{str(row.get('candidate_beauty_review_ready')).lower()}`",
+                    f"`{row.get('promoted_report_count', 0)}`",
                     f"`{material_score:.4f}`",
                     f"`{row.get('candidate_beauty_ready_report_count', 0)}/{row.get('candidate_beauty_requested_report_count', 0)}`",
                     f"`{json.dumps(requested_blocker_counts, sort_keys=True)}`",

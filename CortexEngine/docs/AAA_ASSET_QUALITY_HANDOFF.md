@@ -13449,3 +13449,103 @@ Interpretation:
   across the required families/motion modes. The next aligned step is to run or
   batch promoted packets beyond gallery/static, then aggregate them with the
   existing candidate review matrix.
+
+### V3 Promoted Coverage Matrix Semantics - 2026-06-09
+
+Scope:
+
+- Updated `tools/build_full_scene_shader_v3_matrix_decision.py`.
+- Updated `tools/validate_full_scene_shader_pipeline_v3_plan.py`.
+
+Why:
+
+- The previous matrix could prove candidate review readiness but could not
+  express which families and motion modes had actually been promoted to default
+  beauty.
+- Packet-level `full_coverage_not_ready` is expected for scenario/family
+  subset packets, so default promotion cannot be decided by requiring every
+  packet to be individually `default_beauty_promotable=true`.
+
+Implemented:
+
+- Matrix rows now load `v3_stability.json` and expose:
+  - `default_beauty_affects_any`;
+  - `promoted_report_count`;
+  - `default_beauty_promotion_allowed`.
+- Matrix summaries now expose:
+  - `observed_promoted_families`;
+  - `missing_promoted_families`;
+  - `observed_promoted_motion_modes`;
+  - `missing_promoted_motion_modes`;
+  - `promoted_packet_count`;
+  - `promoted_report_count`.
+- `default_beauty_promotable` is now an aggregate promoted-coverage decision:
+  it requires candidate review readiness, full review matrix coverage, at least
+  one promoted packet, and no missing promoted required family or motion mode.
+- The plan validator now requires the promoted-coverage reporting fields.
+
+Validation:
+
+```powershell
+python -m py_compile CortexEngine\tools\build_full_scene_shader_v3_matrix_decision.py CortexEngine\tools\validate_full_scene_shader_pipeline_v3_plan.py
+python CortexEngine\tools\validate_full_scene_shader_pipeline_v3_plan.py
+
+python CortexEngine\tools\build_full_scene_shader_v3_matrix_decision.py `
+  --packet-root CortexEngine\build\captures\v3_promotion_suite_reflection_static_smoke7_20260609\reflection_static `
+  --packet-root CortexEngine\build\captures\v3_promotion_suite_reflection_mouse_jitter_seq1_20260609\reflection_mouse_jitter `
+  --packet-root CortexEngine\build\captures\v3_promotion_suite_enclosed_static_smoke6_20260609\enclosed_static `
+  --packet-root CortexEngine\build\captures\v3_promotion_suite_enclosed_mouse_jitter_seq2_20260609\enclosed_mouse_jitter `
+  --packet-root CortexEngine\build\captures\v3_promotion_suite_enclosed_camera_sweep_seq1_20260609\enclosed_camera_sweep `
+  --packet-root CortexEngine\build\captures\v3_promotion_suite_heavy_light_sweep_smoke2_20260609\heavy_light_sweep `
+  --required-families stress_rt_showcase_reflection_closeup,gallery,kitchen,office,gym,concert,red_room,stadium `
+  --required-motion-modes static,mouse_jitter,camera_sweep,light_sweep `
+  --output-json CortexEngine\build\captures\v3_promotion_suite_full_existing_matrix_20260609\v3_matrix_decision.json `
+  --output-md CortexEngine\build\captures\v3_promotion_suite_full_existing_matrix_20260609\v3_matrix_decision.md
+
+python CortexEngine\tools\build_full_scene_shader_v3_matrix_decision.py `
+  --packet-root CortexEngine\build\captures\v3_promotion_suite_reflection_static_smoke7_20260609\reflection_static `
+  --packet-root CortexEngine\build\captures\v3_promotion_suite_reflection_mouse_jitter_seq1_20260609\reflection_mouse_jitter `
+  --packet-root CortexEngine\build\captures\v3_promotion_suite_enclosed_static_smoke6_20260609\enclosed_static `
+  --packet-root CortexEngine\build\captures\v3_promotion_suite_enclosed_mouse_jitter_seq2_20260609\enclosed_mouse_jitter `
+  --packet-root CortexEngine\build\captures\v3_promotion_suite_enclosed_camera_sweep_seq1_20260609\enclosed_camera_sweep `
+  --packet-root CortexEngine\build\captures\v3_promotion_suite_heavy_light_sweep_smoke2_20260609\heavy_light_sweep `
+  --packet-root CortexEngine\build\captures\v3_default_beauty_promotion_gallery_smoke1_20260609 `
+  --required-families stress_rt_showcase_reflection_closeup,gallery,kitchen,office,gym,concert,red_room,stadium `
+  --required-motion-modes static,mouse_jitter,camera_sweep,light_sweep `
+  --output-json CortexEngine\build\captures\v3_default_beauty_promotion_mixed_matrix_20260609\v3_matrix_decision.json `
+  --output-md CortexEngine\build\captures\v3_default_beauty_promotion_mixed_matrix_20260609\v3_matrix_decision.md
+```
+
+Current matrix results:
+
+- Review-only aggregate:
+  - `full_matrix_ready=true`;
+  - `candidate_beauty_review_ready=true`;
+  - `default_beauty_promotable=false`;
+  - `promoted_packet_count=0`;
+  - missing promoted families: all required families;
+  - missing promoted motions: `static,mouse_jitter,camera_sweep,light_sweep`.
+- Mixed aggregate with the gallery promoted proof:
+  - artifact:
+    `build\captures\v3_default_beauty_promotion_mixed_matrix_20260609\v3_matrix_decision.md/json`;
+  - `full_matrix_ready=true`;
+  - `candidate_beauty_review_ready=true`;
+  - `default_beauty_promotable=false`;
+  - `promoted_packet_count=1`;
+  - `promoted_report_count=2`;
+  - observed promoted families: `gallery`;
+  - missing promoted families:
+    `concert,gym,kitchen,office,red_room,stadium,stress_rt_showcase_reflection_closeup`;
+  - observed promoted motion modes: `static`;
+  - missing promoted motion modes: `camera_sweep,light_sweep,mouse_jitter`;
+  - candidate beauty ready reports: `109/109`;
+  - requested candidate blocker counts: `{}`;
+  - material quality min score: `1.0000`.
+
+Interpretation:
+
+- The matrix now gives an honest release-facing default-promotion roadmap.
+- Review/candidate V3 coverage is complete for the existing required matrix.
+- Default-beauty promotion is only proven for gallery/static. The next evidence
+  gap is promoted packets for reflection-closeup, kitchen, office, gym,
+  concert, red room, stadium, and the missing motion modes.

@@ -12308,3 +12308,100 @@ Next pass:
    presentation or transparent/aux compositing.
 3. Keep the old broad/background metrics as diagnostic context only; do not use
    them as the final opaque material flicker gate.
+
+### RT Showcase Reported-Camera Owner Classification - 2026-06-09
+
+Implemented:
+
+- `tools/analyze_rt_showcase_wall_floor_roi_stability.py`
+  - added `--replace-default-rois` so long packets can analyze only the
+    explicitly requested ROIs instead of timing out on every default ROI.
+- `tools/run_rt_showcase_wall_floor_masked_owner_packet.ps1`
+  - added `-CustomRoiList` with semicolon-delimited ROI definitions. This is
+    safer than PowerShell array syntax for values that themselves contain
+    commas.
+  - added `-CustomRoisOnly`, which passes `--replace-default-rois`.
+  - added an `Owner Classification` table to the packet summary.
+
+Classification meanings:
+
+- `foreground_receiver_pass`: foreground mask coverage is high and both beauty
+  plus foreground specular are under the foreground gate.
+- `mixed_foreground_background`: the ROI contains real foreground plus
+  substantial depth-miss/background; it is not a valid opaque material gate.
+- `background_or_depth_miss_dominant` / `depth_miss_background`: instability
+  should be investigated in visible HDRI/background presentation or composite
+  ownership, not opaque BRDF policy.
+
+Validated short wrapper smoke:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass `
+  -File tools\run_rt_showcase_wall_floor_masked_owner_packet.ps1 `
+  -NoBuild `
+  -CameraBookmark reported_wall_floor_flicker `
+  -CustomRoiList "reported_left_wall_foreground:25,185,360,440;reported_platform_mixed:610,405,1190,555;reported_lower_floor_mixed:430,545,1015,705" `
+  -CustomRoisOnly `
+  -ForegroundGateRois reported_left_wall_foreground `
+  -OutputRoot Z:\328\CMPUT328-A2\codexworks\301\graphics\CortexEngine\build\captures\rt_showcase_reported_owner_classification_smoke_20260609 `
+  -CaptureCount 2 `
+  -MotionFrames 75 `
+  -MotionLookCycles 4.0
+```
+
+Smoke result:
+
+- Wrapper exit: `0`
+- Summary:
+  `build\captures\rt_showcase_reported_owner_classification_smoke_20260609\masked_owner_packet_summary.md`
+- Owner classification:
+  - `reported_left_wall_foreground`: `foreground_receiver_pass`, foreground
+    coverage `0.9979`
+  - `reported_platform_mixed`: `mixed_foreground_background`, foreground
+    coverage `0.2265`
+  - `reported_lower_floor_mixed`: `mixed_foreground_background`, foreground
+    coverage `0.1987`
+
+Longer reported-camera evidence:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass `
+  -File tools\run_rt_showcase_wall_floor_masked_owner_packet.ps1 `
+  -NoBuild `
+  -CameraBookmark reported_wall_floor_flicker `
+  -CustomRoiList "reported_left_wall_foreground:25,185,360,440;reported_platform_mixed:610,405,1190,555;reported_lower_floor_mixed:430,545,1015,705" `
+  -CustomRoisOnly `
+  -ForegroundGateRois reported_left_wall_foreground `
+  -OutputRoot Z:\328\CMPUT328-A2\codexworks\301\graphics\CortexEngine\build\captures\rt_showcase_reported_foreground_wall_gate_wrapper_20260609 `
+  -CaptureCount 16 `
+  -MotionFrames 100 `
+  -MotionLookCycles 6.0
+```
+
+Longer result:
+
+- Wrapper exit: `0`
+- Summary:
+  `build\captures\rt_showcase_reported_foreground_wall_gate_wrapper_20260609\masked_owner_packet_summary.md`
+- Foreground gate passed:
+  - `beauty_foreground / reported_left_wall_foreground`: mean `5.6329`,
+    changed `0.1006`, large `0.0287`, coverage `0.9979`
+  - `specular_foreground / reported_left_wall_foreground`: mean `4.5307`,
+    changed `0.1010`, large `0.0322`, coverage `0.9979`
+- Background/mixed evidence:
+  - `beauty_background / reported_left_wall_foreground`: mean `19.6978`,
+    changed `0.4918`, large `0.1803`, coverage `0.0024`
+  - `beauty_background / reported_platform_mixed`: mean `15.9385`,
+    changed `0.4152`, large `0.1379`, coverage `0.8337`
+  - `beauty_background / reported_lower_floor_mixed`: mean `6.8258`,
+    changed `0.1981`, large `0.0294`, coverage `0.8101`
+
+Current interpretation:
+
+- The exact reported camera now has a foreground-owned wall receiver that stays
+  inside the current gate over 16 frames.
+- The platform/lower-floor regions are not valid opaque receiver gates because
+  they are mostly depth-miss/background under the aligned mask.
+- The next root pass should focus on visible HDRI/background temporal
+  presentation and mixed transparent/aux compositing. Do not return to broad
+  opaque BRDF or shadow tweaks unless a high-coverage foreground ROI fails.

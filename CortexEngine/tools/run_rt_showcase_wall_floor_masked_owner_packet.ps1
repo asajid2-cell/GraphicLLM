@@ -8,6 +8,8 @@ param(
     [double]$FixedDeltaTime = 0.008333333,
     [string]$CameraBookmark = "reported_wall_floor_flicker",
     [string[]]$CustomRois = @(),
+    [string]$CustomRoiList = "",
+    [switch]$CustomRoisOnly,
     [string[]]$ForegroundGateRois = @("left_wall_panel_clean"),
     [double]$MaxForegroundMeanLumaDelta = 8.0,
     [double]$MaxForegroundChangedRatio = 0.12,
@@ -25,6 +27,20 @@ if ([string]::IsNullOrWhiteSpace($OutputRoot)) {
 }
 $OutputRoot = [System.IO.Path]::GetFullPath($OutputRoot)
 New-Item -ItemType Directory -Force -Path $OutputRoot | Out-Null
+
+$effectiveCustomRois = New-Object System.Collections.Generic.List[string]
+foreach ($roi in $CustomRois) {
+    if (-not [string]::IsNullOrWhiteSpace($roi)) {
+        $effectiveCustomRois.Add($roi) | Out-Null
+    }
+}
+if (-not [string]::IsNullOrWhiteSpace($CustomRoiList)) {
+    foreach ($roi in ($CustomRoiList -split ';')) {
+        if (-not [string]::IsNullOrWhiteSpace($roi)) {
+            $effectiveCustomRois.Add($roi.Trim()) | Out-Null
+        }
+    }
+}
 
 function Set-EnvOrClear([string]$Name, [string]$Value) {
     if ([string]::IsNullOrWhiteSpace($Value)) {
@@ -95,7 +111,10 @@ function Run-Analysis([string]$Name, [string]$CaptureDir, [string]$MaskDir, [boo
     if ($InvertMask) {
         $analysisArgs += "--invert-mask"
     }
-    foreach ($roi in $CustomRois) {
+    if ($CustomRoisOnly) {
+        $analysisArgs += "--replace-default-rois"
+    }
+    foreach ($roi in $effectiveCustomRois) {
         if (-not [string]::IsNullOrWhiteSpace($roi)) {
             $analysisArgs += @("--roi", $roi)
         }
@@ -160,6 +179,103 @@ function Test-ForegroundGate([string]$AnalysisName, [string]$JsonPath) {
     }
 }
 
+function Get-AnalysisJson([string]$JsonPath) {
+    Get-Content -Path $JsonPath -Raw | ConvertFrom-Json
+}
+
+function Get-AnalysisRois($AnalysisJson) {
+    if ($null -eq $AnalysisJson.aggregate) {
+        return @()
+    }
+    @($AnalysisJson.aggregate.PSObject.Properties.Name)
+}
+
+function Get-OptionalRoiMetric($AnalysisJson, [string]$Roi, [string]$Metric, [double]$Default = 0.0) {
+    if ($null -eq $AnalysisJson.aggregate -or
+        -not ($AnalysisJson.aggregate.PSObject.Properties.Name -contains $Roi)) {
+        return $Default
+    }
+    $roiStats = $AnalysisJson.aggregate.$Roi
+    if (-not ($roiStats.PSObject.Properties.Name -contains $Metric)) {
+        return $Default
+    }
+    [double]$roiStats.$Metric
+}
+
+function Build-OwnerClassification([string]$BeautyForegroundJson,
+                                   [string]$BeautyBackgroundJson,
+                                   [string]$SpecularForegroundJson) {
+    $beautyFg = Get-AnalysisJson $BeautyForegroundJson
+    $beautyBg = Get-AnalysisJson $BeautyBackgroundJson
+    $specularFg = Get-AnalysisJson $SpecularForegroundJson
+    $roiNames = New-Object System.Collections.Generic.HashSet[string] ([System.StringComparer]::OrdinalIgnoreCase)
+    foreach ($roi in (Get-AnalysisRois $beautyFg)) { $roiNames.Add($roi) | Out-Null }
+    foreach ($roi in (Get-AnalysisRois $beautyBg)) { $roiNames.Add($roi) | Out-Null }
+
+    $rows = @()
+    foreach ($roi in ($roiNames | Sort-Object)) {
+        $fgCoverage = Get-OptionalRoiMetric $beautyFg $roi "max_mask_coverage"
+        $bgCoverage = Get-OptionalRoiMetric $beautyBg $roi "max_mask_coverage"
+        $fgMean = Get-OptionalRoiMetric $beautyFg $roi "max_mean_abs_luma_delta"
+        $fgChanged = Get-OptionalRoiMetric $beautyFg $roi "max_changed_pixel_ratio"
+        $fgLarge = Get-OptionalRoiMetric $beautyFg $roi "max_large_changed_pixel_ratio"
+        $bgMean = Get-OptionalRoiMetric $beautyBg $roi "max_mean_abs_luma_delta"
+        $bgChanged = Get-OptionalRoiMetric $beautyBg $roi "max_changed_pixel_ratio"
+        $bgLarge = Get-OptionalRoiMetric $beautyBg $roi "max_large_changed_pixel_ratio"
+        $specFgMean = Get-OptionalRoiMetric $specularFg $roi "max_mean_abs_luma_delta"
+        $specFgChanged = Get-OptionalRoiMetric $specularFg $roi "max_changed_pixel_ratio"
+        $specFgLarge = Get-OptionalRoiMetric $specularFg $roi "max_large_changed_pixel_ratio"
+
+        $foregroundPass =
+            $fgCoverage -ge $MinForegroundMaskCoverage -and
+            $fgMean -le $MaxForegroundMeanLumaDelta -and
+            $fgChanged -le $MaxForegroundChangedRatio -and
+            $fgLarge -le $MaxForegroundLargeChangedRatio -and
+            $specFgMean -le $MaxForegroundMeanLumaDelta -and
+            $specFgChanged -le $MaxForegroundChangedRatio -and
+            $specFgLarge -le $MaxForegroundLargeChangedRatio
+
+        $backgroundDominant =
+            $bgCoverage -ge 0.50 -and
+            (
+                $bgMean -gt [Math]::Max($fgMean * 1.50, $MaxForegroundMeanLumaDelta) -or
+                $bgChanged -gt [Math]::Max($fgChanged * 1.50, $MaxForegroundChangedRatio) -or
+                $bgLarge -gt [Math]::Max($fgLarge * 1.50, $MaxForegroundLargeChangedRatio)
+            )
+
+        $class = "mixed_or_unclassified"
+        if ($foregroundPass) {
+            $class = "foreground_receiver_pass"
+        } elseif ($fgCoverage -lt 0.05 -and $bgCoverage -ge 0.90) {
+            $class = "depth_miss_background"
+        } elseif ($backgroundDominant) {
+            $class = "background_or_depth_miss_dominant"
+        } elseif ($fgCoverage -gt 0.05 -and $fgCoverage -lt $MinForegroundMaskCoverage) {
+            $class = "mixed_foreground_background"
+        } elseif ($fgCoverage -ge $MinForegroundMaskCoverage) {
+            $class = "foreground_receiver_unstable"
+        }
+
+        $rows += [pscustomobject]@{
+            roi = $roi
+            classification = $class
+            foreground_gate_pass = $foregroundPass
+            foreground_coverage = $fgCoverage
+            background_coverage = $bgCoverage
+            beauty_foreground_mean = $fgMean
+            beauty_foreground_changed = $fgChanged
+            beauty_foreground_large = $fgLarge
+            beauty_background_mean = $bgMean
+            beauty_background_changed = $bgChanged
+            beauty_background_large = $bgLarge
+            specular_foreground_mean = $specFgMean
+            specular_foreground_changed = $specFgChanged
+            specular_foreground_large = $specFgLarge
+        }
+    }
+    $rows
+}
+
 Push-Location $root
 try {
     Copy-Item assets\shaders\Basic.hlsl build\bin\assets\shaders\Basic.hlsl -Force
@@ -209,12 +325,17 @@ try {
         }
     }
     $gatePassed = ($failures.Count -eq 0)
+    $ownerClassification = Build-OwnerClassification `
+        $beautyForegroundJson `
+        (Join-Path $beautyDir "beauty_background.json") `
+        $specularForegroundJson
 
     $summary = [pscustomobject]@{
         schema = "cortex.rt_showcase.wall_floor_masked_owner_packet.v1"
         output_root = $OutputRoot
         camera_bookmark = $CameraBookmark
-        custom_rois = $CustomRois
+        custom_rois = @($effectiveCustomRois.ToArray())
+        custom_rois_only = [bool]$CustomRoisOnly
         captures = $captures
         analyses = $analysis
         gate = [pscustomobject]@{
@@ -227,6 +348,7 @@ try {
             results = $gateResults
             failures = @($failures)
         }
+        owner_classification = $ownerClassification
     }
     $summaryPath = Join-Path $OutputRoot "masked_owner_packet_summary.json"
     $summary | ConvertTo-Json -Depth 6 | Set-Content -Path $summaryPath -Encoding UTF8
@@ -239,7 +361,7 @@ try {
         "",
         "Camera bookmark: ``$CameraBookmark``",
         "",
-        "Custom ROIs: ``$($CustomRois -join ', ')``",
+        "Custom ROIs: ``$(@($effectiveCustomRois.ToArray()) -join '; ')``",
         "",
         "## Captures",
         "",
@@ -274,6 +396,14 @@ try {
         foreach ($failure in $failures) {
             $lines += "- $failure"
         }
+    }
+    $lines += ""
+    $lines += "## Owner Classification"
+    $lines += ""
+    $lines += "| ROI | Class | FG Coverage | BG Coverage | FG Mean | BG Mean | Spec FG Mean |"
+    $lines += "|---|---|---:|---:|---:|---:|---:|"
+    foreach ($row in $ownerClassification) {
+        $lines += "| $($row.roi) | $($row.classification) | $([string]::Format('{0:F4}', $row.foreground_coverage)) | $([string]::Format('{0:F4}', $row.background_coverage)) | $([string]::Format('{0:F4}', $row.beauty_foreground_mean)) | $([string]::Format('{0:F4}', $row.beauty_background_mean)) | $([string]::Format('{0:F4}', $row.specular_foreground_mean)) |"
     }
     $lines | Set-Content -Path $summaryMd -Encoding UTF8
 

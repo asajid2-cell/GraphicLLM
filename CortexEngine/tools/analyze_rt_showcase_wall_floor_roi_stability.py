@@ -220,6 +220,8 @@ def main() -> int:
                         help="Measure pixels rejected by the foreground mask instead of accepted pixels")
     parser.add_argument("--roi", action="append", type=parse_roi, default=[],
                         help="Add or override a fixed ROI as name:x0,y0,x1,y1")
+    parser.add_argument("--replace-default-rois", action="store_true",
+                        help="Measure only ROIs supplied with --roi")
     parser.add_argument("--output-json", required=True, type=Path)
     parser.add_argument("--output-md", required=True, type=Path)
     args = parser.parse_args()
@@ -237,9 +239,11 @@ def main() -> int:
             raise SystemExit(
                 f"mask dir {args.mask_dir} is missing {len(missing)} aligned frames, first={missing[0]}")
 
-    rois = dict(DEFAULT_ROIS)
+    rois = {} if args.replace_default_rois else dict(DEFAULT_ROIS)
     for name, roi in args.roi:
         rois[name] = roi
+    if not rois:
+        raise SystemExit("no ROIs selected")
 
     rows = []
     aggregate = {

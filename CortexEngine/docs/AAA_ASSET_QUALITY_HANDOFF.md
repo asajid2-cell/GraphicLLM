@@ -14006,3 +14006,71 @@ Interpretation:
   ownership/source attribution and focused shadow motion.
 - This closes the prior V3 plan limitation that only focused stress evidence
   existed for LightingShadowV3.
+
+### ReflectionV3 Promotion Matrix - 2026-06-09
+
+Scope:
+
+- Added `tools/build_reflection_v3_promotion_matrix.py`.
+- Updated `tools/validate_full_scene_shader_pipeline_v3_plan.py`.
+- Updated `docs/FULL_SCENE_SHADER_PIPELINE_V3.md`.
+
+Implemented:
+
+- The new matrix builder consumes existing packet roots and validates
+  ReflectionV3 at promotion scope.
+- It checks reflection debug visibility for every family using required
+  ReflectionV3 outputs:
+  `reflection_radiance`, `reflection_confidence`, `reflection_source_id`,
+  source signal/mask/suppression, temporal delta, and history diagnostics.
+- For sequenced packets it runs:
+  - `analyze_reflection_v3_source_resolver.py`;
+  - `analyze_full_scene_shader_v3_lighting_motion.py --focus reflection`.
+- It reports required/observed/missing families and motion modes, debug
+  visibility packet readiness, source resolver packet readiness, and
+  per-packet failures/warnings.
+- The static V3 plan validator now requires the matrix tool and checks its
+  schema/readiness markers.
+
+Validation:
+
+```powershell
+python -m py_compile CortexEngine\tools\build_reflection_v3_promotion_matrix.py CortexEngine\tools\validate_full_scene_shader_pipeline_v3_plan.py
+python CortexEngine\tools\validate_full_scene_shader_pipeline_v3_plan.py
+
+python CortexEngine\tools\build_reflection_v3_promotion_matrix.py `
+  --packet-root CortexEngine\build\captures\v3_default_beauty_promotion_gallery_smoke1_20260609 `
+  --packet-root CortexEngine\build\captures\v3_default_beauty_promotion_kitchen_static_smoke1_20260609 `
+  --packet-root CortexEngine\build\captures\v3_default_beauty_promotion_reflection_static_smoke1_20260609 `
+  --packet-root CortexEngine\build\captures\v3_default_beauty_promotion_office_gym_static_smoke1_20260609 `
+  --packet-root CortexEngine\build\captures\v3_default_beauty_promotion_heavy_light_sweep_seq1_20260609 `
+  --packet-root CortexEngine\build\captures\v3_default_beauty_promotion_gallery_camera_sweep_seq1_20260609 `
+  --packet-root CortexEngine\build\captures\v3_default_beauty_promotion_gallery_mouse_jitter_seq1_20260609 `
+  --required-families stress_rt_showcase_reflection_closeup,gallery,kitchen,office,gym,concert,red_room,stadium `
+  --required-motion-modes static,mouse_jitter,camera_sweep,light_sweep `
+  --output-json CortexEngine\build\captures\v3_reflection_promotion_matrix1_20260609\reflection_promotion_matrix.json `
+  --output-md CortexEngine\build\captures\v3_reflection_promotion_matrix1_20260609\reflection_promotion_matrix.md
+```
+
+Evidence:
+
+- Matrix artifact:
+  `build\captures\v3_reflection_promotion_matrix1_20260609\reflection_promotion_matrix.md/json`.
+- Results:
+  - `packet_count=7`;
+  - `debug_visibility_packet_count=7`;
+  - `source_resolver_packet_count=3`;
+  - `reflection_promotion_ready=true`;
+  - observed families:
+    `concert,gallery,gym,kitchen,office,red_room,stadium,stress_rt_showcase_reflection_closeup`;
+  - missing families: none;
+  - observed motion modes: `camera_sweep,light_sweep,mouse_jitter,static`;
+  - missing motion modes: none;
+  - failures: `0`;
+  - warnings: `0`.
+
+Interpretation:
+
+- ReflectionV3 now has promotion-grade matrix evidence for provider/source
+  debug visibility across required families and source-resolver/motion behavior
+  across required motion modes.

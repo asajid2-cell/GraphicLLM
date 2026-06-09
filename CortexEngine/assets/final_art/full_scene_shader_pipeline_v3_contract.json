@@ -16,6 +16,22 @@
       "atmosphere",
       "exposure"
     ],
+    "required_runtime_fields": [
+      "scene_local_resource_contract_ready",
+      "scene_local_resource_contract_id",
+      "scene_local_resource_contract_family",
+      "scene_local_resource_contract_status",
+      "scene_local_resource_contract_unsafe_reason",
+      "scene_local_resource_contract_visible_external_hdri_allowed",
+      "scene_local_resource_contract_external_hdri_safe",
+      "scene_local_resource_contract_environment_policy_allowed",
+      "scene_local_resource_contract_reflection_policy_allowed",
+      "scene_local_resource_contract_reflection_source_allowed",
+      "scene_local_resource_contract_proxy_resources_ready",
+      "scene_local_resource_contract_payload_resources_ready",
+      "scene_local_resource_contract_role_count",
+      "scene_local_resource_contract_ready_role_count"
+    ],
     "promotion_rule": "Scene-local resource contracts must pass before V3 packet review can pass; enclosed scenes cannot pass with unauthorized visible external HDRI."
   },
   "candidate_path_debt_fields": [

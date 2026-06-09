@@ -542,6 +542,21 @@ def main() -> int:
         "exposure",
     ]:
         require(role in scene_local_roles, errors, f"Scene-local resource contract missing role: {role}")
+    runtime_fields = set(resource_contract_ref.get("required_runtime_fields", [])) if isinstance(
+        resource_contract_ref,
+        dict,
+    ) else set()
+    for field in [
+        "scene_local_resource_contract_ready",
+        "scene_local_resource_contract_id",
+        "scene_local_resource_contract_family",
+        "scene_local_resource_contract_status",
+        "scene_local_resource_contract_unsafe_reason",
+        "scene_local_resource_contract_external_hdri_safe",
+        "scene_local_resource_contract_reflection_source_allowed",
+        "scene_local_resource_contract_ready_role_count",
+    ]:
+        require(field in runtime_fields, errors, f"V3 contract missing scene-local runtime field: {field}")
     scene_local_families = scene_local_resource_contract.get("family_contracts", {})
     require(isinstance(scene_local_families, dict), errors, "Scene-local resource contract missing family_contracts")
     if isinstance(scene_local_families, dict):
@@ -973,6 +988,41 @@ def main() -> int:
         '"scene_local_ambient_source"',
         "sceneLocalAtmosphereSource",
         '"scene_local_atmosphere_source"',
+        "sceneLocalResourceContractReady",
+        '"scene_local_resource_contract_ready"',
+        "sceneLocalResourceContractId",
+        '"scene_local_resource_contract_id"',
+        "sceneLocalResourceContractFamily",
+        '"scene_local_resource_contract_family"',
+        "sceneLocalResourceContractStatus",
+        '"scene_local_resource_contract_status"',
+        "sceneLocalResourceContractUnsafeReason",
+        '"scene_local_resource_contract_unsafe_reason"',
+        "sceneLocalResourceContractVisibleExternalHdriAllowed",
+        '"scene_local_resource_contract_visible_external_hdri_allowed"',
+        "sceneLocalResourceContractExternalHdriSafe",
+        '"scene_local_resource_contract_external_hdri_safe"',
+        "sceneLocalResourceContractEnvironmentPolicyAllowed",
+        '"scene_local_resource_contract_environment_policy_allowed"',
+        "sceneLocalResourceContractReflectionPolicyAllowed",
+        '"scene_local_resource_contract_reflection_policy_allowed"',
+        "sceneLocalResourceContractReflectionSourceAllowed",
+        '"scene_local_resource_contract_reflection_source_allowed"',
+        "sceneLocalResourceContractProxyResourcesReady",
+        '"scene_local_resource_contract_proxy_resources_ready"',
+        "sceneLocalResourceContractPayloadResourcesReady",
+        '"scene_local_resource_contract_payload_resources_ready"',
+        "sceneLocalResourceContractRoleCount",
+        '"scene_local_resource_contract_role_count"',
+        "sceneLocalResourceContractReadyRoleCount",
+        '"scene_local_resource_contract_ready_role_count"',
+        "FullSceneShaderSceneLocalResourceContractFamily",
+        "FullSceneShaderSceneLocalResourceContractAllowsVisibleExternalHdri",
+        "FullSceneShaderSceneLocalResourceContractAllowsEnvironmentPolicy",
+        "FullSceneShaderSceneLocalResourceContractAllowsReflectionPolicy",
+        "FullSceneShaderSceneLocalResourceContractAllowsReflectionSource",
+        "unauthorized_visible_external_hdri",
+        "reflection_source_not_allowed",
         "sceneLocalEnvironmentSourceCount",
         '"scene_local_environment_source_count"',
         "sceneLocalEnvironmentConsumesSceneProfilePolicy",

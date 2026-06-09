@@ -93,7 +93,8 @@
       "visible_external_hdri_allowed": true,
       "allowed_environment_policies": [
         "authorized_external_visible_background",
-        "enclosed_scene_local_background"
+        "enclosed_scene_local_background",
+        "scene_local_neutral_background"
       ],
       "allowed_reflection_policies": [
         "local_probe_priority"
@@ -102,6 +103,7 @@
         "local_probe",
         "planar",
         "screen_space",
+        "screen_space_reflection",
         "ray_traced",
         "ray_query_reflection"
       ],
@@ -118,16 +120,22 @@
       "enclosure_mode": "enclosed_room",
       "visible_external_hdri_allowed": false,
       "allowed_environment_policies": [
-        "enclosed_scene_local_background"
+        "enclosed_scene_local_background",
+        "enclosed_scene_local_only",
+        "scene_local_neutral_background"
       ],
       "allowed_reflection_policies": [
         "local_probe_priority",
-        "planar_plus_probe"
+        "planar_plus_probe",
+        "screen_space_priority",
+        "ray_query_priority"
       ],
       "allowed_reflection_source_contracts": [
         "local_probe",
         "planar",
-        "screen_space"
+        "screen_space",
+        "screen_space_reflection",
+        "ray_query_reflection"
       ],
       "min_proxy_resource_count": 3,
       "min_payload_resource_count": 2,
@@ -143,15 +151,21 @@
       "enclosure_mode": "enclosed_room",
       "visible_external_hdri_allowed": false,
       "allowed_environment_policies": [
-        "enclosed_scene_local_background"
+        "enclosed_scene_local_background",
+        "enclosed_scene_local_only",
+        "scene_local_neutral_background"
       ],
       "allowed_reflection_policies": [
         "local_probe_priority",
-        "screen_space_plus_probe"
+        "screen_space_plus_probe",
+        "screen_space_priority",
+        "ray_query_priority"
       ],
       "allowed_reflection_source_contracts": [
         "local_probe",
-        "screen_space"
+        "screen_space",
+        "screen_space_reflection",
+        "ray_query_reflection"
       ],
       "min_proxy_resource_count": 3,
       "min_payload_resource_count": 2,
@@ -167,15 +181,21 @@
       "enclosure_mode": "large_enclosed_room",
       "visible_external_hdri_allowed": false,
       "allowed_environment_policies": [
-        "enclosed_scene_local_background"
+        "enclosed_scene_local_background",
+        "enclosed_scene_local_only",
+        "scene_local_neutral_background"
       ],
       "allowed_reflection_policies": [
         "local_probe_priority",
-        "screen_space_plus_probe"
+        "screen_space_plus_probe",
+        "screen_space_priority",
+        "ray_query_priority"
       ],
       "allowed_reflection_source_contracts": [
         "local_probe",
-        "screen_space"
+        "screen_space",
+        "screen_space_reflection",
+        "ray_query_reflection"
       ],
       "min_proxy_resource_count": 3,
       "min_payload_resource_count": 2,
@@ -191,16 +211,21 @@
       "visible_external_hdri_allowed": false,
       "allowed_environment_policies": [
         "black_box_local_background",
-        "enclosed_scene_local_background"
+        "enclosed_scene_local_background",
+        "enclosed_scene_local_only"
       ],
       "allowed_reflection_policies": [
         "emissive_probe_priority",
-        "local_probe_priority"
+        "local_probe_priority",
+        "screen_space_priority",
+        "ray_query_priority"
       ],
       "allowed_reflection_source_contracts": [
         "local_probe",
         "screen_space",
-        "emissive_rig"
+        "screen_space_reflection",
+        "emissive_rig",
+        "ray_query_reflection"
       ],
       "min_proxy_resource_count": 3,
       "min_payload_resource_count": 2,
@@ -217,16 +242,21 @@
       "visible_external_hdri_allowed": false,
       "allowed_environment_policies": [
         "red_room_local_background",
-        "enclosed_scene_local_background"
+        "enclosed_scene_local_background",
+        "enclosed_scene_local_only"
       ],
       "allowed_reflection_policies": [
         "emissive_probe_priority",
-        "local_probe_priority"
+        "local_probe_priority",
+        "screen_space_priority",
+        "ray_query_priority"
       ],
       "allowed_reflection_source_contracts": [
         "local_probe",
         "screen_space",
-        "emissive_rig"
+        "screen_space_reflection",
+        "emissive_rig",
+        "ray_query_reflection"
       ],
       "min_proxy_resource_count": 3,
       "min_payload_resource_count": 2,
@@ -242,16 +272,21 @@
       "visible_external_hdri_allowed": true,
       "allowed_environment_policies": [
         "stadium_local_sky",
-        "authorized_external_visible_background"
+        "authorized_external_visible_background",
+        "open_exterior_scene_environment"
       ],
       "allowed_reflection_policies": [
         "sky_probe_priority",
-        "local_probe_priority"
+        "local_probe_priority",
+        "screen_space_priority",
+        "ray_query_priority"
       ],
       "allowed_reflection_source_contracts": [
         "local_probe",
         "sky_probe",
-        "screen_space"
+        "screen_space",
+        "screen_space_reflection",
+        "ray_query_reflection"
       ],
       "min_proxy_resource_count": 3,
       "min_payload_resource_count": 2,

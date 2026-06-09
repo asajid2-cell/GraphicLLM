@@ -10,7 +10,8 @@ param(
     [switch]$NoBuild,
     [switch]$SkipSceneAnalyzers,
     [switch]$StressSceneOnly,
-    [switch]$NoStressScene
+    [switch]$NoStressScene,
+    [switch]$PromoteCandidateBeautyV3ToDefault
 )
 
 $ErrorActionPreference = "Stop"
@@ -68,6 +69,9 @@ if ($StressSceneOnly) {
 if ($NoStressScene) {
     $packetArgs += "-NoStressScene"
 }
+if ($PromoteCandidateBeautyV3ToDefault) {
+    $packetArgs += "-PromoteCandidateBeautyV3ToDefault"
+}
 
 try {
     $env:CORTEX_ENABLE_FULL_SCENE_LIGHTING_V3_SPLIT = "1"
@@ -77,7 +81,18 @@ try {
         exit $LASTEXITCODE
     }
 
-    & python $v3Analyzer --input $outputPath --signal-output $signalOutput --stability-output $stabilityOutput --require-lighting-split-ready --require-lighting-split-draw-count 1 --require-lighting-signal-metrics
+    $v3AnalyzerArgs = @(
+        "--input", $outputPath,
+        "--signal-output", $signalOutput,
+        "--stability-output", $stabilityOutput,
+        "--require-lighting-split-ready",
+        "--require-lighting-split-draw-count", "1",
+        "--require-lighting-signal-metrics"
+    )
+    if ($PromoteCandidateBeautyV3ToDefault) {
+        $v3AnalyzerArgs += "--allow-default-beauty-promotion"
+    }
+    & python $v3Analyzer @v3AnalyzerArgs
     if ($LASTEXITCODE -ne 0) {
         exit $LASTEXITCODE
     }
@@ -116,7 +131,16 @@ try {
         exit $LASTEXITCODE
     }
 
-    & python $v3PromotionDecision --packet-root $outputPath --output-json $promotionDecisionOutput --output-md $promotionDecisionMarkdown --allow-subset-review
+    $promotionArgs = @(
+        "--packet-root", $outputPath,
+        "--output-json", $promotionDecisionOutput,
+        "--output-md", $promotionDecisionMarkdown,
+        "--allow-subset-review"
+    )
+    if ($PromoteCandidateBeautyV3ToDefault) {
+        $promotionArgs += "--allow-default-beauty-promotion"
+    }
+    & python $v3PromotionDecision @promotionArgs
     if ($LASTEXITCODE -ne 0) {
         exit $LASTEXITCODE
     }

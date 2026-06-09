@@ -296,6 +296,7 @@ def make_decision(
     required_families: list[str],
     required_motion_modes: list[str],
     allow_subset_review: bool,
+    allow_default_beauty_promotion: bool,
 ) -> dict[str, Any]:
     manifest_path = packet_root / "manifest.json"
     signal_path = packet_root / "v3_signal.json"
@@ -426,10 +427,16 @@ def make_decision(
         )
     if full_pipeline_report_count <= 0:
         failures.append("no full-pipeline V3 reports were analyzed")
-    if stability.get("default_beauty_affects_any") is not False:
+    default_beauty_affects_any = stability.get("default_beauty_affects_any") is True
+    promoted_report_count = int(stability.get("promoted_report_count", 0) or 0)
+    if default_beauty_affects_any and not allow_default_beauty_promotion:
         failures.append("V3 affected default beauty in a review packet")
-    if stability.get("promoted_report_count") not in (0, None):
+    if promoted_report_count and not allow_default_beauty_promotion:
         failures.append("V3 report status was promoted before an explicit promotion decision")
+    if allow_default_beauty_promotion and not default_beauty_affects_any:
+        failures.append("default beauty promotion proof did not affect default beauty")
+    if allow_default_beauty_promotion and promoted_report_count <= 0:
+        failures.append("default beauty promotion proof has no promoted reports")
     if stability.get("lighting_signal_metrics_ready") is not True:
         failures.append("lighting signal metrics are not ready")
 
@@ -581,10 +588,15 @@ def make_decision(
         default_beauty_promotion_blockers.append("candidate_beauty_review_not_ready")
     if not full_coverage_ready:
         default_beauty_promotion_blockers.append("full_coverage_not_ready")
-    if stability.get("default_beauty_affects_any") is not False:
-        default_beauty_promotion_blockers.append("default_beauty_review_invariant_failed")
+    if stability.get("default_beauty_affects_any") is True:
+        if not allow_default_beauty_promotion:
+            default_beauty_promotion_blockers.append("default_beauty_review_invariant_failed")
+    elif allow_default_beauty_promotion:
+        default_beauty_promotion_blockers.append("default_beauty_runtime_path_not_enabled")
     else:
         default_beauty_promotion_blockers.append("default_beauty_runtime_path_not_enabled")
+    if stability.get("default_beauty_affects_any") not in (False, True):
+        default_beauty_promotion_blockers.append("default_beauty_review_invariant_failed")
     default_beauty_promotable = not default_beauty_promotion_blockers
 
     if failures:
@@ -602,6 +614,7 @@ def make_decision(
         "status": status,
         "default_beauty_promotable": default_beauty_promotable,
         "default_beauty_promotion_blockers": default_beauty_promotion_blockers,
+        "default_beauty_promotion_allowed": allow_default_beauty_promotion,
         "candidate_beauty_review_ready": candidate_beauty_review.get("ready") is True,
         "candidate_beauty_review_gate": candidate_beauty_review,
         "review_packet_passed": review_packet_passed,
@@ -699,12 +712,13 @@ def write_markdown(path: pathlib.Path, decision: dict[str, Any]) -> None:
         )
     lines.extend(
         [
-            "",
-            "## Default Beauty Promotion Gate",
-            "",
-            f"- promotable: `{str(decision.get('default_beauty_promotable')).lower()}`",
-            f"- blockers: `{json.dumps(decision.get('default_beauty_promotion_blockers', []), sort_keys=True)}`",
-        ]
+                "",
+                "## Default Beauty Promotion Gate",
+                "",
+                f"- promotion allowed: `{str(decision.get('default_beauty_promotion_allowed')).lower()}`",
+                f"- promotable: `{str(decision.get('default_beauty_promotable')).lower()}`",
+                f"- blockers: `{json.dumps(decision.get('default_beauty_promotion_blockers', []), sort_keys=True)}`",
+            ]
     )
     material_quality = decision.get("material_quality_gate", {})
     if isinstance(material_quality, dict):
@@ -781,6 +795,7 @@ def main() -> int:
     parser.add_argument("--required-families", default=",".join(DEFAULT_REQUIRED_FAMILIES))
     parser.add_argument("--required-motion-modes", default=",".join(DEFAULT_REQUIRED_MOTION_MODES))
     parser.add_argument("--allow-subset-review", action="store_true")
+    parser.add_argument("--allow-default-beauty-promotion", action="store_true")
     parser.add_argument("--fail-on-blocked", action="store_true")
     args = parser.parse_args()
 
@@ -790,6 +805,7 @@ def main() -> int:
         required_families=split_csv(args.required_families),
         required_motion_modes=split_csv(args.required_motion_modes),
         allow_subset_review=args.allow_subset_review,
+        allow_default_beauty_promotion=args.allow_default_beauty_promotion,
     )
 
     output_json = pathlib.Path(args.output_json)

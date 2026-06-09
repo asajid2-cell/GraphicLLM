@@ -11,7 +11,8 @@ param(
     [switch]$NoBuild,
     [switch]$StressSceneOnly,
     [switch]$SkipSceneAnalyzers,
-    [switch]$NoStressScene
+    [switch]$NoStressScene,
+    [switch]$PromoteCandidateBeautyV3ToDefault
 )
 
 $ErrorActionPreference = "Stop"
@@ -69,6 +70,9 @@ if ($SkipSceneAnalyzers) {
         "-SkipStabilityAnalysis",
         "-SkipVisualQualityAnalysis"
     )
+}
+if ($PromoteCandidateBeautyV3ToDefault) {
+    $packetArgs += "-PromoteCandidateBeautyV3ToDefault"
 }
 
 & powershell -NoProfile -ExecutionPolicy Bypass -File $packetRunner @packetArgs

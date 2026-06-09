@@ -1708,6 +1708,11 @@ inline FullSceneShaderPipelineV3FrameContext BuildFullSceneShaderPipelineV3Frame
             contract,
             "FullSceneCandidateBeautyV3Display",
             "back_buffer");
+    context.defaultBeautyAffects = context.candidateBeautyDisplayed;
+    if (context.defaultBeautyAffects) {
+        context.status = "candidate_promoted_to_default";
+        context.beautyOutput = "candidate_ldr_cinematic_output";
+    }
 
     for (const auto& pass : contract.passes) {
         bool touchesV3Resource = false;
@@ -2933,13 +2938,12 @@ inline FullSceneShaderPipelineV3FrameContext BuildFullSceneShaderPipelineV3Frame
     if (!context.candidateBeautyLegacyBridgeRejected) {
         FullSceneShaderPushUnique(context.candidateBeautyBlockers, "legacy_hdr_bridge_present");
     }
-    if (!context.candidateBeautyDefaultBeautyUnchanged) {
+    if (!context.candidateBeautyDefaultBeautyUnchanged && !context.candidateBeautyDisplayed) {
         FullSceneShaderPushUnique(context.candidateBeautyBlockers, "default_beauty_affected");
     }
     context.candidateBeautyReady =
         context.candidateBeautyRequested &&
-        context.candidateBeautyReadyPredicateCount == context.candidateBeautyPredicateCount &&
-        context.candidateBeautyDefaultBeautyUnchanged;
+        context.candidateBeautyReadyPredicateCount == context.candidateBeautyPredicateCount;
     context.candidateBeautyProducer =
         context.candidateBeautyRequested ? "CinematicPostV3" : "none";
     context.candidateBeautyOutput =
@@ -2952,7 +2956,9 @@ inline FullSceneShaderPipelineV3FrameContext BuildFullSceneShaderPipelineV3Frame
             context.candidateBeautyOutput,
             "candidate_beauty_v3",
             context.candidateBeautyReady
-                ? "CinematicPostV3 is opt-in and writes candidate LDR from candidate HDR without affecting default beauty"
+                ? (context.candidateBeautyDisplayed
+                       ? "CinematicPostV3 is promoted to default beauty through candidate_ldr_cinematic_output"
+                       : "CinematicPostV3 is opt-in and writes candidate LDR from candidate HDR without affecting default beauty")
                 : context.candidateBeautyRequested
                 ? (legacyCandidateBridgePresent
                        ? "Candidate beauty was requested but a legacy hdr_color bridge is present; this cannot be marked ready"
@@ -2960,9 +2966,11 @@ inline FullSceneShaderPipelineV3FrameContext BuildFullSceneShaderPipelineV3Frame
                 : "Candidate beauty is opt-in and was not requested this frame");
     candidateBeautyDomain.enabled = context.candidateBeautyRequested;
     candidateBeautyDomain.ready = context.candidateBeautyReady;
-    candidateBeautyDomain.defaultBeautyAffects = false;
+    candidateBeautyDomain.defaultBeautyAffects = context.defaultBeautyAffects;
     candidateBeautyDomain.promotionState =
-        context.candidateBeautyReady ? "candidate" : "planned";
+        context.candidateBeautyReady
+            ? (context.candidateBeautyDisplayed ? "promoted_default" : "candidate")
+            : "planned";
     candidateBeautyDomain.backingResources = {
         realCompositeV3ProducerReady ? "candidate_hdr_scene_color" : "hdr_scene_color",
         "hdr_scene_color",
@@ -2986,7 +2994,7 @@ inline FullSceneShaderPipelineV3FrameContext BuildFullSceneShaderPipelineV3Frame
         candidateLdrOutputReady ? "candidate_ldr_output_owned" : "candidate_ldr_output_missing",
         candidateReadsCandidateHdr ? "candidate_reads_candidate_hdr_scene_color" : "candidate_hdr_input_missing",
         legacyCandidateBridgePresent ? "legacy_hdr_bridge_present" : "legacy_hdr_bridge_rejected",
-        "default_beauty_unchanged",
+        context.candidateBeautyDisplayed ? "default_beauty_promoted_to_candidate" : "default_beauty_unchanged",
     };
     candidateBeautyDomain.backingResourceCount =
         context.candidateBeautyReadyPredicateCount;

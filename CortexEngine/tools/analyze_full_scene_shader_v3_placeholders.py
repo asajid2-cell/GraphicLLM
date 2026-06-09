@@ -340,6 +340,7 @@ def analyze_report(
     *,
     require_lighting_split_ready: bool,
     require_lighting_split_draw_count: int | None,
+    allow_default_beauty_promotion: bool,
 ) -> dict[str, Any]:
     report = load_json(path)
     v3 = get_v3(report)
@@ -375,12 +376,31 @@ def analyze_report(
 
     if v3.get("schema") != "cortex.full_scene_shader_pipeline_v3.runtime_report.v1":
         failures.append("wrong V3 runtime report schema")
-    if v3.get("status") != "planned_not_promoted":
-        failures.append("V3 status must remain planned_not_promoted")
-    if v3.get("default_beauty_affects") is not False:
-        failures.append("V3 must not affect default beauty in placeholder mode")
-    if v3.get("candidate_beauty_requested") is True and v3.get("default_beauty_affects") is not False:
-        failures.append("candidate beauty must remain opt-in and must not affect default beauty")
+    promoted_default = (
+        v3.get("status") == "candidate_promoted_to_default" or
+        v3.get("default_beauty_affects") is True
+    )
+    if allow_default_beauty_promotion:
+        if v3.get("status") not in {"planned_not_promoted", "candidate_promoted_to_default"}:
+            failures.append("V3 status must be planned_not_promoted or candidate_promoted_to_default")
+        if promoted_default:
+            if v3.get("status") != "candidate_promoted_to_default":
+                failures.append("promoted default beauty requires candidate_promoted_to_default status")
+            if v3.get("default_beauty_affects") is not True:
+                failures.append("promoted default beauty requires default_beauty_affects=true")
+            if v3.get("beauty_output") != "candidate_ldr_cinematic_output":
+                failures.append("promoted default beauty must output candidate_ldr_cinematic_output")
+            if v3.get("candidate_beauty_requested") is not True:
+                failures.append("promoted default beauty requires candidate_beauty_requested=true")
+            if v3.get("candidate_beauty_displayed") is not True:
+                failures.append("promoted default beauty requires candidate_beauty_displayed=true")
+    else:
+        if v3.get("status") != "planned_not_promoted":
+            failures.append("V3 status must remain planned_not_promoted")
+        if v3.get("default_beauty_affects") is not False:
+            failures.append("V3 must not affect default beauty in placeholder mode")
+        if v3.get("candidate_beauty_requested") is True and v3.get("default_beauty_affects") is not False:
+            failures.append("candidate beauty must remain opt-in and must not affect default beauty")
     if v3.get("runtime_placeholders_ready") is not True:
         failures.append("runtime_placeholders_ready must be true")
     if v3.get("contract_grounded") is not True:
@@ -957,7 +977,9 @@ def analyze_report(
                 failures.append("candidate beauty must output candidate_ldr_cinematic_output")
             if candidate_domain.get("debug_view") != "candidate_beauty_v3":
                 failures.append("candidate beauty must expose candidate_beauty_v3 debug view")
-            if candidate_domain.get("default_beauty_affects") is not False:
+            if candidate_domain.get("default_beauty_affects") is not False and not (
+                allow_default_beauty_promotion and promoted_default
+            ):
                 failures.append("candidate beauty must not affect default beauty")
             channels = set(candidate_domain.get("channels", []))
             if candidate_ready and "legacy_hdr_bridge_rejected" not in channels:
@@ -1008,6 +1030,11 @@ def analyze_report(
                 failures.append("FullSceneCandidateBeautyV3Display pass does not write back_buffer")
         if not candidate_ready:
             failures.append("candidate_beauty_displayed=true before candidate_beauty_ready")
+        if allow_default_beauty_promotion and promoted_default:
+            if v3.get("candidate_beauty_default_beauty_unchanged") is not False:
+                failures.append("promoted default beauty must report candidate_beauty_default_beauty_unchanged=false")
+        elif v3.get("candidate_beauty_default_beauty_unchanged") is not True:
+            failures.append("candidate beauty display without promotion must leave default beauty unchanged")
     if not candidate_ready and candidate_predicate_count > 0 and not candidate_blockers:
         failures.append("candidate_beauty_ready=false without candidate_beauty_blockers")
     if not candidate_requested and "candidate_beauty_not_requested" not in candidate_blockers:
@@ -1117,6 +1144,7 @@ def main() -> int:
     parser.add_argument("--require-lighting-split-ready", action="store_true")
     parser.add_argument("--require-lighting-split-draw-count", type=int)
     parser.add_argument("--require-lighting-signal-metrics", action="store_true")
+    parser.add_argument("--allow-default-beauty-promotion", action="store_true")
     args = parser.parse_args()
 
     input_path = pathlib.Path(args.input)
@@ -1126,6 +1154,7 @@ def main() -> int:
             path,
             require_lighting_split_ready=args.require_lighting_split_ready,
             require_lighting_split_draw_count=args.require_lighting_split_draw_count,
+            allow_default_beauty_promotion=args.allow_default_beauty_promotion,
         )
         for path in reports
     ]

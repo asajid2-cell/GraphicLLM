@@ -13326,3 +13326,126 @@ Interpretation:
 - The next aligned renderer slice is the actual default-beauty promotion path
   or a visual-quality/art pass, not more evidence cleanup for candidate
   readiness.
+
+### V3 Default Beauty Promotion Proof Slice - 2026-06-09
+
+Scope:
+
+- Updated `src/Graphics/FullSceneShaderFrameContext.h`.
+- Updated `tools/analyze_full_scene_shader_v3_placeholders.py`.
+- Updated `tools/build_full_scene_shader_v3_promotion_decision.py`.
+- Updated packet runners:
+  - `tools/run_scene_local_cinematic_renderer_v1_packets.ps1`;
+  - `tools/run_full_scene_shader_pipeline_v2_packet.ps1`;
+  - `tools/run_full_scene_shader_pipeline_v3_packet.ps1`.
+
+Implemented:
+
+- Runtime V3 reports now derive promoted default-beauty state from the
+  `FullSceneCandidateBeautyV3Display -> back_buffer` pass.
+- Promoted frames report:
+  - `status=candidate_promoted_to_default`;
+  - `beauty_output=candidate_ldr_cinematic_output`;
+  - `default_beauty_affects=true`.
+- Candidate readiness no longer treats intended promoted default display as
+  candidate-path debt. Review packets still keep
+  `candidate_beauty_default_beauty_unchanged=true`.
+- The V3 placeholder analyzer remains strict by default, but accepts promoted
+  default-beauty reports only with `--allow-default-beauty-promotion`.
+- The V3 promotion decision accepts promoted reports only with
+  `--allow-default-beauty-promotion`.
+- Packet runners now support `-PromoteCandidateBeautyV3ToDefault`.
+  - The display env is applied only to `beauty` and `candidate_beauty_v3`
+    captures.
+  - Diagnostic/material views still run as diagnostics so they do not falsely
+    claim composite/post ownership.
+
+Validation:
+
+```powershell
+python -m py_compile CortexEngine\tools\analyze_full_scene_shader_v3_placeholders.py CortexEngine\tools\build_full_scene_shader_v3_promotion_decision.py CortexEngine\tools\build_full_scene_shader_v3_matrix_decision.py CortexEngine\tools\validate_full_scene_shader_pipeline_v3_plan.py
+python CortexEngine\tools\validate_full_scene_shader_pipeline_v3_plan.py
+
+$files = @(
+  'CortexEngine\tools\run_scene_local_cinematic_renderer_v1_packets.ps1',
+  'CortexEngine\tools\run_full_scene_shader_pipeline_v2_packet.ps1',
+  'CortexEngine\tools\run_full_scene_shader_pipeline_v3_packet.ps1'
+)
+foreach ($f in $files) {
+  $tokens = $null
+  $errors = $null
+  $null = [System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path $f), [ref]$tokens, [ref]$errors)
+  if ($errors.Count) { throw $errors[0].Message }
+}
+
+cmd.exe /d /c "call ""C:\Program Files\Microsoft Visual Studio\18\Community\Common7\Tools\VsDevCmd.bat"" -arch=x64 -host_arch=x64 >nul && set ""CORTEX_SKIP_ASSET_SYNC=1"" && cmake --build CortexEngine\build --config Release --target CortexEngine"
+
+powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine\tools\run_full_scene_shader_pipeline_v3_packet.ps1 `
+  -NoBuild -NoStressScene -SkipSceneAnalyzers -FamilyFilter gallery `
+  -SmokeFrames 62 -CaptureFrame 60 -CaptureSequenceCount 1 `
+  -StabilityMotionMode static -PromoteCandidateBeautyV3ToDefault `
+  -OutputRoot build\captures\v3_default_beauty_promotion_gallery_smoke1_20260609
+
+python CortexEngine\tools\analyze_full_scene_shader_v3_placeholders.py `
+  --input CortexEngine\build\captures\v3_promotion_suite_enclosed_camera_sweep_seq1_20260609\enclosed_camera_sweep `
+  --signal-output CortexEngine\build\captures\v3_promotion_suite_enclosed_camera_sweep_seq1_20260609\enclosed_camera_sweep\v3_signal.regression_tmp.json `
+  --stability-output CortexEngine\build\captures\v3_promotion_suite_enclosed_camera_sweep_seq1_20260609\enclosed_camera_sweep\v3_stability.regression_tmp.json `
+  --require-lighting-split-ready --require-lighting-split-draw-count 1 `
+  --require-lighting-signal-metrics
+```
+
+Build notes:
+
+- Plain `cmake --build CortexEngine\build --config Release --target
+  CortexEngine` timed out once in the existing asset/build path.
+- Running without `VsDevCmd.bat` failed because the shell lacked MSVC/Windows
+  SDK include paths (`string`, `cstdint`, `rpc.h`, `stdarg.h`).
+- The documented `VsDevCmd.bat` build with `CORTEX_SKIP_ASSET_SYNC=1` passed.
+- The build still prints the existing trailing `vswhere.exe` warning after the
+  link has succeeded.
+
+Promoted packet evidence:
+
+- Packet root:
+  `build\captures\v3_default_beauty_promotion_gallery_smoke1_20260609`.
+- The packet passed V2 evidence, V3 placeholder/signal analysis, scene profile,
+  environment payload, scene-local resource contract, material payload,
+  CompositeV3 diagnostics, and promotion decision.
+- `v3_stability.json`:
+  - `report_count=54`;
+  - `default_beauty_affects_any=true`;
+  - `promoted_report_count=2`.
+- Promoted rows:
+  - `beauty`: `status=candidate_promoted_to_default`,
+    `beauty_output=candidate_ldr_cinematic_output`,
+    `candidate_beauty_ready=true`, `candidate_beauty_displayed=true`,
+    blockers `[]`.
+  - `candidate_beauty_v3`: same promoted/default evidence.
+- `promotion_decision.md`:
+  - `status=review_packet_passed`;
+  - `candidate beauty review ready=true`;
+  - candidate beauty ready reports `7/7`;
+  - material quality score `1.0000`;
+  - scene-local resource contract `54/54`;
+  - default beauty promotion allowed `true`;
+  - default beauty promotable `false` only because this is a gallery/static
+    subset packet and therefore has `full_coverage_not_ready`.
+
+Regression evidence:
+
+- Strict review-mode analyzer still passes on the existing enclosed
+  camera-sweep packet without `--allow-default-beauty-promotion`.
+- Temporary regression outputs were removed after the check.
+
+Interpretation:
+
+- The engine now has an explicit, analyzable default-beauty promotion path from
+  `FullSceneCompositeV3 -> CinematicPostV3 -> candidate_ldr_cinematic_output ->
+  back_buffer`.
+- The prior aggregate blocker `default_beauty_runtime_path_not_enabled` is no
+  longer a hard architecture gap; it is now covered by a focused promoted
+  gallery proof.
+- Full default-beauty promotability still requires a promoted aggregate matrix
+  across the required families/motion modes. The next aligned step is to run or
+  batch promoted packets beyond gallery/static, then aggregate them with the
+  existing candidate review matrix.

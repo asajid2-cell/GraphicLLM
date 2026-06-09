@@ -29,7 +29,8 @@ param(
     [string]$GymSeed = "",
     [string]$ConcertSeed = "",
     [string]$RedRoomSeed = "",
-    [string]$StadiumSeed = ""
+    [string]$StadiumSeed = "",
+    [switch]$PromoteCandidateBeautyV3ToDefault
 )
 
 $ErrorActionPreference = "Stop"
@@ -414,10 +415,19 @@ function Invoke-PacketCapture([string]$Family,
     } else {
         $env:CORTEX_DEBUG_VIEW = [string]$View.DebugView
     }
-    if ($View.PSObject.Properties.Name -contains "CandidateBeautyV3" -and $View.CandidateBeautyV3) {
+    $promoteThisView = $PromoteCandidateBeautyV3ToDefault -and (
+        [string]::Equals($View.Name, "beauty", [System.StringComparison]::OrdinalIgnoreCase) -or
+        [string]::Equals($View.Name, "candidate_beauty_v3", [System.StringComparison]::OrdinalIgnoreCase)
+    )
+    if ($promoteThisView) {
         $env:CORTEX_ENABLE_FULL_SCENE_CANDIDATE_BEAUTY_V3 = "1"
+        $env:CORTEX_DISPLAY_FULL_SCENE_CANDIDATE_BEAUTY_V3 = "1"
+    } elseif ($View.PSObject.Properties.Name -contains "CandidateBeautyV3" -and $View.CandidateBeautyV3) {
+        $env:CORTEX_ENABLE_FULL_SCENE_CANDIDATE_BEAUTY_V3 = "1"
+        Remove-Item Env:\CORTEX_DISPLAY_FULL_SCENE_CANDIDATE_BEAUTY_V3 -ErrorAction SilentlyContinue
     } else {
         Remove-Item Env:\CORTEX_ENABLE_FULL_SCENE_CANDIDATE_BEAUTY_V3 -ErrorAction SilentlyContinue
+        Remove-Item Env:\CORTEX_DISPLAY_FULL_SCENE_CANDIDATE_BEAUTY_V3 -ErrorAction SilentlyContinue
     }
     if ([string]::IsNullOrWhiteSpace($SeedPath)) {
         Remove-Item Env:\CORTEX_MODEL_AUTHORED_SCENE_SEED -ErrorAction SilentlyContinue

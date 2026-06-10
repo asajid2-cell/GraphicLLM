@@ -2211,3 +2211,73 @@ Interpretation:
 - ReflectionV3 now has promotion-grade matrix evidence for provider/source
   debug visibility across required families and source-resolver/motion evidence
   across the required motion set.
+
+### MaterialV3 Quality Matrix - 2026-06-09
+
+Implemented:
+
+- Added `tools/build_material_v3_quality_matrix.py`.
+- The matrix builder consumes existing packet roots and their
+  `v3_material_payload.json` artifacts.
+- It applies the same material-quality predicates used by
+  `tools/build_full_scene_shader_v3_promotion_decision.py`.
+- It reports required/observed/missing material families and motion modes,
+  minimum quality score, material ratios, contract debug-view debt, unresolved
+  fallback totals, blocker counts, and warning counts.
+- `tools/validate_full_scene_shader_pipeline_v3_plan.py` now requires the
+  MaterialV3 quality matrix builder and its schema/readiness markers.
+
+Validation:
+
+```powershell
+python -m py_compile `
+  CortexEngine\tools\build_material_v3_quality_matrix.py `
+  CortexEngine\tools\validate_full_scene_shader_pipeline_v3_plan.py
+
+python CortexEngine\tools\validate_full_scene_shader_pipeline_v3_plan.py
+
+python CortexEngine\tools\build_material_v3_quality_matrix.py `
+  --packet-root CortexEngine\build\captures\v3_default_beauty_promotion_gallery_smoke1_20260609 `
+  --packet-root CortexEngine\build\captures\v3_default_beauty_promotion_kitchen_static_smoke1_20260609 `
+  --packet-root CortexEngine\build\captures\v3_default_beauty_promotion_reflection_static_smoke1_20260609 `
+  --packet-root CortexEngine\build\captures\v3_default_beauty_promotion_office_gym_static_smoke1_20260609 `
+  --packet-root CortexEngine\build\captures\v3_default_beauty_promotion_heavy_light_sweep_seq1_20260609 `
+  --packet-root CortexEngine\build\captures\v3_default_beauty_promotion_gallery_camera_sweep_seq1_20260609 `
+  --packet-root CortexEngine\build\captures\v3_default_beauty_promotion_gallery_mouse_jitter_seq1_20260609 `
+  --required-families stress_rt_showcase_reflection_closeup,gallery,kitchen,office,gym,concert,red_room,stadium `
+  --required-motion-modes static,mouse_jitter,camera_sweep,light_sweep `
+  --output-json CortexEngine\build\captures\v3_material_quality_matrix1_20260609\material_quality_matrix.json `
+  --output-md CortexEngine\build\captures\v3_material_quality_matrix1_20260609\material_quality_matrix.md
+```
+
+Evidence:
+
+- Matrix:
+  `build\captures\v3_material_quality_matrix1_20260609\material_quality_matrix.md/json`.
+- Results:
+  - `packet_count=7`;
+  - `ready_packet_count=7`;
+  - `material_quality_ready=true`;
+  - minimum quality score `1.0000`;
+  - observed families:
+    `concert,gallery,gym,kitchen,office,red_room,stadium,stress_rt_showcase_reflection_closeup`;
+  - missing families: none;
+  - observed motion modes: `camera_sweep,light_sweep,mouse_jitter,static`;
+  - missing motion modes: none;
+  - sampled materials: `65826`;
+  - named material ratio: `1.0000`;
+  - advanced feature ratio: `0.7564`;
+  - reflection eligible ratio: `0.3224`;
+  - contract debug-view debt total: `0`;
+  - unresolved roughness fallback total: `0`;
+  - unresolved transmission fallback total: `0`;
+  - failures: `0`;
+  - warnings: `8`.
+
+Interpretation:
+
+- MaterialV3 now has a dedicated promotion-grade quality matrix over the
+  required family/motion packet set.
+- The hard material-quality gate is clean. The remaining class-authored default
+  warnings are explicitly tracked nonblocking material debt, not unresolved
+  fallback or missing-channel debt.

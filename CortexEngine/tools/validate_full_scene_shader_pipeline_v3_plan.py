@@ -28,6 +28,7 @@ SCENE_LOCAL_PACKET_RUNNER_PATH = ROOT / "tools" / "run_scene_local_cinematic_ren
 V3_PROMOTION_DECISION_PATH = ROOT / "tools" / "build_full_scene_shader_v3_promotion_decision.py"
 V3_MATRIX_DECISION_PATH = ROOT / "tools" / "build_full_scene_shader_v3_matrix_decision.py"
 V3_MATERIAL_PAYLOAD_ANALYZER_PATH = ROOT / "tools" / "analyze_full_scene_shader_v3_material_payload.py"
+V3_MATERIAL_QUALITY_MATRIX_PATH = ROOT / "tools" / "build_material_v3_quality_matrix.py"
 V3_SCENE_PROFILE_ANALYZER_PATH = ROOT / "tools" / "analyze_full_scene_shader_v3_scene_profile.py"
 V3_ENVIRONMENT_PAYLOAD_ANALYZER_PATH = ROOT / "tools" / "analyze_full_scene_shader_v3_environment_payload.py"
 SCENE_LOCAL_RESOURCE_CONTRACT_ANALYZER_PATH = ROOT / "tools" / "analyze_scene_local_resource_contract_v1.py"
@@ -205,6 +206,11 @@ def main() -> int:
         f"Missing V3 material payload analyzer: {V3_MATERIAL_PAYLOAD_ANALYZER_PATH}",
     )
     require(
+        V3_MATERIAL_QUALITY_MATRIX_PATH.exists(),
+        errors,
+        f"Missing MaterialV3 quality matrix builder: {V3_MATERIAL_QUALITY_MATRIX_PATH}",
+    )
+    require(
         V3_SCENE_PROFILE_ANALYZER_PATH.exists(),
         errors,
         f"Missing V3 scene profile analyzer: {V3_SCENE_PROFILE_ANALYZER_PATH}",
@@ -312,6 +318,7 @@ def main() -> int:
     promotion_source = V3_PROMOTION_DECISION_PATH.read_text(encoding="utf-8")
     matrix_source = V3_MATRIX_DECISION_PATH.read_text(encoding="utf-8")
     material_payload_source = V3_MATERIAL_PAYLOAD_ANALYZER_PATH.read_text(encoding="utf-8")
+    material_quality_matrix_source = V3_MATERIAL_QUALITY_MATRIX_PATH.read_text(encoding="utf-8")
     scene_profile_source = V3_SCENE_PROFILE_ANALYZER_PATH.read_text(encoding="utf-8")
     environment_payload_source = V3_ENVIRONMENT_PAYLOAD_ANALYZER_PATH.read_text(encoding="utf-8")
     scene_local_resource_contract_analyzer_source = SCENE_LOCAL_RESOURCE_CONTRACT_ANALYZER_PATH.read_text(
@@ -349,6 +356,7 @@ def main() -> int:
             promotion_source,
             matrix_source,
             material_payload_source,
+            material_quality_matrix_source,
             scene_profile_source,
             environment_payload_source,
             scene_local_resource_contract_analyzer_source,
@@ -1236,6 +1244,9 @@ def main() -> int:
         "vb_gbuffer_material_ext1",
         "vb_gbuffer_material_ext2",
         "FullSceneMaterialResolveV3",
+        "build_material_v3_quality_matrix.py",
+        "material_quality_matrix.v1",
+        "material_quality_ready",
         "FullSceneLightingV3Adapter",
         "VBDeferredLighting",
         "hdr_color",

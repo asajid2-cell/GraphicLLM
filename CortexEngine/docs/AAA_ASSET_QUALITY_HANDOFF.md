@@ -14218,3 +14218,60 @@ Interpretation:
   matrix evidence across the required family/motion set.
 - The matrix proves that the packet set has no unsafe visible external HDRI
   use and no missing scene-local resource role ownership.
+
+### V3 Engineering Readiness Audit - 2026-06-09
+
+Scope:
+
+- Added `tools/build_full_scene_shader_v3_readiness_audit.py`.
+- Updated `tools/validate_full_scene_shader_pipeline_v3_plan.py`.
+- Updated `docs/FULL_SCENE_SHADER_PIPELINE_V3.md`.
+
+Implemented:
+
+- The readiness audit aggregates five promotion/readiness matrices:
+  default-beauty promotion, scene-local resource contract, MaterialV3 quality,
+  LightingShadowV3, and ReflectionV3.
+- It reports one `engineering_readiness_ready` status and preserves the
+  boundary that goal completion still requires human visual acceptance/release
+  visual review.
+- The static V3 plan validator now requires the audit tool and checks its
+  schema/readiness/boundary markers.
+
+Validation:
+
+```powershell
+python -m py_compile CortexEngine\tools\build_full_scene_shader_v3_readiness_audit.py CortexEngine\tools\validate_full_scene_shader_pipeline_v3_plan.py
+python CortexEngine\tools\validate_full_scene_shader_pipeline_v3_plan.py
+
+python CortexEngine\tools\build_full_scene_shader_v3_readiness_audit.py `
+  --default-promotion-matrix CortexEngine\build\captures\v3_default_beauty_promotion_mixed_matrix6_20260609\v3_matrix_decision.json `
+  --scene-local-matrix CortexEngine\build\captures\v3_scene_local_resource_contract_matrix1_20260609\scene_local_resource_contract_matrix.json `
+  --material-quality-matrix CortexEngine\build\captures\v3_material_quality_matrix1_20260609\material_quality_matrix.json `
+  --shadow-matrix CortexEngine\build\captures\v3_lighting_shadow_promotion_matrix1_20260609\lighting_shadow_promotion_matrix.json `
+  --reflection-matrix CortexEngine\build\captures\v3_reflection_promotion_matrix1_20260609\reflection_promotion_matrix.json `
+  --output-json CortexEngine\build\captures\v3_full_scene_shader_readiness_audit1_20260609\readiness_audit.json `
+  --output-md CortexEngine\build\captures\v3_full_scene_shader_readiness_audit1_20260609\readiness_audit.md
+```
+
+Evidence:
+
+- Audit artifact:
+  `build\captures\v3_full_scene_shader_readiness_audit1_20260609\readiness_audit.md/json`.
+- Results:
+  - `engineering_readiness_ready=true`;
+  - `ready_gate_count=5/5`;
+  - failures `0`;
+  - warnings `57`;
+  - `goal_completion_ready=false`;
+  - `human_visual_acceptance_required=true`;
+  - goal completion blockers:
+    `human_visual_acceptance_required`,
+    `release_visual_artifact_review_not_encoded_in_audit`.
+
+Interpretation:
+
+- Renderer-side V3 engineering readiness now has a single aggregate audit and
+  passes across the matrix gates.
+- Do not mark the broader goal complete from this audit alone. Final completion
+  still needs human visual acceptance/release artifact review.

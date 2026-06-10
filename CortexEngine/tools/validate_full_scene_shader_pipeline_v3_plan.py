@@ -27,6 +27,7 @@ V3_PROMOTION_SUITE_RUNNER_PATH = ROOT / "tools" / "run_full_scene_shader_pipelin
 SCENE_LOCAL_PACKET_RUNNER_PATH = ROOT / "tools" / "run_scene_local_cinematic_renderer_v1_packets.ps1"
 V3_PROMOTION_DECISION_PATH = ROOT / "tools" / "build_full_scene_shader_v3_promotion_decision.py"
 V3_MATRIX_DECISION_PATH = ROOT / "tools" / "build_full_scene_shader_v3_matrix_decision.py"
+V3_READINESS_AUDIT_PATH = ROOT / "tools" / "build_full_scene_shader_v3_readiness_audit.py"
 V3_MATERIAL_PAYLOAD_ANALYZER_PATH = ROOT / "tools" / "analyze_full_scene_shader_v3_material_payload.py"
 V3_MATERIAL_QUALITY_MATRIX_PATH = ROOT / "tools" / "build_material_v3_quality_matrix.py"
 V3_SCENE_PROFILE_ANALYZER_PATH = ROOT / "tools" / "analyze_full_scene_shader_v3_scene_profile.py"
@@ -202,6 +203,11 @@ def main() -> int:
         f"Missing V3 matrix decision builder: {V3_MATRIX_DECISION_PATH}",
     )
     require(
+        V3_READINESS_AUDIT_PATH.exists(),
+        errors,
+        f"Missing V3 readiness audit builder: {V3_READINESS_AUDIT_PATH}",
+    )
+    require(
         V3_MATERIAL_PAYLOAD_ANALYZER_PATH.exists(),
         errors,
         f"Missing V3 material payload analyzer: {V3_MATERIAL_PAYLOAD_ANALYZER_PATH}",
@@ -323,6 +329,7 @@ def main() -> int:
     scene_local_packet_source = SCENE_LOCAL_PACKET_RUNNER_PATH.read_text(encoding="utf-8")
     promotion_source = V3_PROMOTION_DECISION_PATH.read_text(encoding="utf-8")
     matrix_source = V3_MATRIX_DECISION_PATH.read_text(encoding="utf-8")
+    readiness_audit_source = V3_READINESS_AUDIT_PATH.read_text(encoding="utf-8")
     material_payload_source = V3_MATERIAL_PAYLOAD_ANALYZER_PATH.read_text(encoding="utf-8")
     material_quality_matrix_source = V3_MATERIAL_QUALITY_MATRIX_PATH.read_text(encoding="utf-8")
     scene_profile_source = V3_SCENE_PROFILE_ANALYZER_PATH.read_text(encoding="utf-8")
@@ -364,6 +371,7 @@ def main() -> int:
             scene_local_packet_source,
             promotion_source,
             matrix_source,
+            readiness_audit_source,
             material_payload_source,
             material_quality_matrix_source,
             scene_profile_source,
@@ -1254,6 +1262,10 @@ def main() -> int:
         "vb_gbuffer_material_ext1",
         "vb_gbuffer_material_ext2",
         "FullSceneMaterialResolveV3",
+        "build_full_scene_shader_v3_readiness_audit.py",
+        "readiness_audit.v1",
+        "engineering_readiness_ready",
+        "human_visual_acceptance_required",
         "build_material_v3_quality_matrix.py",
         "material_quality_matrix.v1",
         "material_quality_ready",

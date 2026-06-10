@@ -2506,3 +2506,63 @@ Interpretation:
   generated contact sheet.
 - The remaining completion boundary is explicitly subjective human visual
   acceptance, not missing engineering/review evidence.
+
+### V3 Readiness Warning Taxonomy - 2026-06-09
+
+Implemented:
+
+- Extended `tools/build_full_scene_shader_v3_readiness_audit.py` with warning
+  classification.
+- The audit now reports:
+  - `release_warning_debt_classified`;
+  - `unknown_warning_count`;
+  - `warning_summary`;
+  - category counts and examples.
+- Unknown warning categories are hard failures by default. The explicit
+  `--allow-unknown-warnings` flag exists only for exploratory triage runs.
+- Updated `tools/validate_full_scene_shader_pipeline_v3_plan.py` so warning
+  taxonomy markers are part of the V3 static contract.
+
+Validation:
+
+```powershell
+python -m py_compile `
+  CortexEngine\tools\build_full_scene_shader_v3_readiness_audit.py `
+  CortexEngine\tools\validate_full_scene_shader_pipeline_v3_plan.py
+
+python CortexEngine\tools\validate_full_scene_shader_pipeline_v3_plan.py
+
+python CortexEngine\tools\build_full_scene_shader_v3_readiness_audit.py `
+  --default-promotion-matrix CortexEngine\build\captures\v3_default_beauty_promotion_mixed_matrix6_20260609\v3_matrix_decision.json `
+  --scene-local-matrix CortexEngine\build\captures\v3_scene_local_resource_contract_matrix1_20260609\scene_local_resource_contract_matrix.json `
+  --material-quality-matrix CortexEngine\build\captures\v3_material_quality_matrix1_20260609\material_quality_matrix.json `
+  --shadow-matrix CortexEngine\build\captures\v3_lighting_shadow_promotion_matrix1_20260609\lighting_shadow_promotion_matrix.json `
+  --reflection-matrix CortexEngine\build\captures\v3_reflection_promotion_matrix1_20260609\reflection_promotion_matrix.json `
+  --release-visual-review-matrix CortexEngine\build\captures\v3_release_visual_review_matrix1_20260609\release_visual_review_matrix.json `
+  --output-json CortexEngine\build\captures\v3_full_scene_shader_readiness_audit3_20260609\readiness_audit.json `
+  --output-md CortexEngine\build\captures\v3_full_scene_shader_readiness_audit3_20260609\readiness_audit.md
+```
+
+Evidence:
+
+- Audit:
+  `build\captures\v3_full_scene_shader_readiness_audit3_20260609\readiness_audit.md/json`.
+- Results:
+  - `engineering_readiness_ready=true`;
+  - `ready_gate_count=6/6`;
+  - failures: `0`;
+  - warnings: `64`;
+  - `release_warning_debt_classified=true`;
+  - `unknown_warning_count=0`;
+  - warning categories:
+    - `class_authored_material_defaults=20`;
+    - `legacy_visual_quality_context_warning=7`;
+    - `lighting_balance_review_warning=1`;
+    - `optional_material_signal_warning=3`;
+    - `packet_shard_coverage_warning=33`.
+
+Interpretation:
+
+- The warning list is no longer unstructured release noise.
+- Future warnings must either map to a known release-debt class or fail the
+  readiness audit as unknown warning debt.

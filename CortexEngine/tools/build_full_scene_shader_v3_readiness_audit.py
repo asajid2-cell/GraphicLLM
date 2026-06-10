@@ -16,6 +16,42 @@ def load_json(path: Path) -> dict[str, Any]:
     return json.loads(path.read_text(encoding="utf-8-sig"))
 
 
+def classify_warning(warning: str) -> str:
+    lowered = warning.lower()
+    if (
+        "missing required families" in lowered
+        or "missing required motion modes" in lowered
+        or "motion promotion evidence requires capture_sequence_count" in lowered
+    ):
+        return "packet_shard_coverage_warning"
+    if "material class-authored defaults still present" in lowered:
+        return "class_authored_material_defaults"
+    if "nonblack_ratio" in lowered or "optional signal" in lowered:
+        return "optional_material_signal_warning"
+    if "underlit_mean" in lowered:
+        return "lighting_balance_review_warning"
+    if "visual_quality_analysis" in lowered:
+        return "legacy_visual_quality_context_warning"
+    return "unknown_warning"
+
+
+def warning_summary(warnings: list[str]) -> dict[str, Any]:
+    categories: dict[str, dict[str, Any]] = {}
+    for warning in warnings:
+        category = classify_warning(warning)
+        row = categories.setdefault(category, {"count": 0, "examples": []})
+        row["count"] += 1
+        if len(row["examples"]) < 5:
+            row["examples"].append(warning)
+    ordered = dict(sorted(categories.items()))
+    return {
+        "total_warning_count": len(warnings),
+        "category_counts": {key: value["count"] for key, value in ordered.items()},
+        "categories": ordered,
+        "unknown_warning_count": ordered.get("unknown_warning", {}).get("count", 0),
+    }
+
+
 def gate(
     *,
     name: str,
@@ -119,10 +155,17 @@ def build_audit(args: argparse.Namespace) -> dict[str, Any]:
             failures.append(f"{row['name']}: {failure}")
         for warning in row["warnings"]:
             warnings.append(f"{row['name']}: {warning}")
+    warnings_by_category = warning_summary(warnings)
+    unknown_warning_count = int(warnings_by_category.get("unknown_warning_count", 0) or 0)
+    if args.fail_on_unknown_warnings and unknown_warning_count:
+        failures.append(f"release warning debt has {unknown_warning_count} unknown warnings")
 
     return {
         "schema": "cortex.full_scene_shader_pipeline_v3.readiness_audit.v1",
         "engineering_readiness_ready": not failures,
+        "release_warning_debt_classified": unknown_warning_count == 0,
+        "unknown_warning_count": unknown_warning_count,
+        "warning_summary": warnings_by_category,
         "human_visual_acceptance_required": True,
         "goal_completion_ready": False,
         "goal_completion_blockers": [
@@ -146,6 +189,8 @@ def write_markdown(audit: dict[str, Any], output: Path) -> None:
         f"- gates: `{audit['ready_gate_count']}/{audit['gate_count']}`",
         f"- failures: `{len(audit['failures'])}`",
         f"- warnings: `{len(audit['warnings'])}`",
+        f"- release warning debt classified: `{str(audit['release_warning_debt_classified']).lower()}`",
+        f"- unknown warning count: `{audit['unknown_warning_count']}`",
         "",
         "| Gate | Ready | Matrix | Key Summary | Failures | Warnings |",
         "|---|---:|---|---|---:|---:|",
@@ -185,6 +230,12 @@ def write_markdown(audit: dict[str, Any], output: Path) -> None:
     if audit["goal_completion_blockers"]:
         lines.extend(["", "## Goal Completion Blockers", ""])
         lines.extend(f"- `{blocker}`" for blocker in audit["goal_completion_blockers"])
+    warning_summary_data = audit.get("warning_summary", {})
+    category_counts = warning_summary_data.get("category_counts", {})
+    if category_counts:
+        lines.extend(["", "## Warning Categories", ""])
+        for category, count in category_counts.items():
+            lines.append(f"- `{category}`: `{count}`")
     if audit["warnings"]:
         lines.extend(["", "## Warnings", ""])
         lines.extend(f"- {warning}" for warning in audit["warnings"])
@@ -202,9 +253,11 @@ def main() -> int:
     parser.add_argument("--shadow-matrix", required=True, type=Path)
     parser.add_argument("--reflection-matrix", required=True, type=Path)
     parser.add_argument("--release-visual-review-matrix", required=True, type=Path)
+    parser.add_argument("--allow-unknown-warnings", action="store_true")
     parser.add_argument("--output-json", required=True, type=Path)
     parser.add_argument("--output-md", required=True, type=Path)
     args = parser.parse_args()
+    args.fail_on_unknown_warnings = not args.allow_unknown_warnings
 
     audit = build_audit(args)
     args.output_json.parent.mkdir(parents=True, exist_ok=True)

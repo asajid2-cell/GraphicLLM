@@ -2413,3 +2413,96 @@ Interpretation:
 - The broader goal is still not automatically complete: the audit deliberately
   does not encode final human visual acceptance or release visual artifact
   review.
+
+### V3 Release Visual Artifact Review Matrix - 2026-06-09
+
+Implemented:
+
+- Added `tools/build_full_scene_shader_v3_release_visual_review_matrix.py`.
+- The matrix consumes the promoted packet set from the default-beauty promotion
+  matrix and validates that release-review artifacts exist for every promoted
+  family/motion packet.
+- It requires reviewable captures for:
+  - `beauty`;
+  - `candidate_beauty_v3`;
+  - `scene_local_environment`;
+  - `material_family`;
+  - `reflection_source_id`;
+  - `v3_shadow_source_attribution`;
+  - `v3_lighting_energy_budget`.
+- It performs basic image sanity on beauty/candidate-beauty captures, builds a
+  contact sheet, and keeps final taste approval as
+  `human_visual_acceptance_required=true`.
+- Legacy packet-local `visual_quality_analysis` failures are carried as review
+  warnings, not hard blockers, because the V3 Reflection/Lighting/Material
+  matrices are now the promotion authorities for those domains.
+- Updated `tools/build_full_scene_shader_v3_readiness_audit.py` so the
+  aggregate audit includes this matrix as a sixth gate.
+- Updated `tools/validate_full_scene_shader_pipeline_v3_plan.py` so the release
+  visual review matrix and contact-sheet markers are part of the static V3
+  contract.
+
+Validation:
+
+```powershell
+python -m py_compile `
+  CortexEngine\tools\build_full_scene_shader_v3_release_visual_review_matrix.py `
+  CortexEngine\tools\build_full_scene_shader_v3_readiness_audit.py `
+  CortexEngine\tools\validate_full_scene_shader_pipeline_v3_plan.py
+
+python CortexEngine\tools\build_full_scene_shader_v3_release_visual_review_matrix.py `
+  --default-promotion-matrix CortexEngine\build\captures\v3_default_beauty_promotion_mixed_matrix6_20260609\v3_matrix_decision.json `
+  --contact-sheet CortexEngine\build\captures\v3_release_visual_review_matrix1_20260609\release_visual_review_contact_sheet.jpg `
+  --output-json CortexEngine\build\captures\v3_release_visual_review_matrix1_20260609\release_visual_review_matrix.json `
+  --output-md CortexEngine\build\captures\v3_release_visual_review_matrix1_20260609\release_visual_review_matrix.md
+
+python CortexEngine\tools\build_full_scene_shader_v3_readiness_audit.py `
+  --default-promotion-matrix CortexEngine\build\captures\v3_default_beauty_promotion_mixed_matrix6_20260609\v3_matrix_decision.json `
+  --scene-local-matrix CortexEngine\build\captures\v3_scene_local_resource_contract_matrix1_20260609\scene_local_resource_contract_matrix.json `
+  --material-quality-matrix CortexEngine\build\captures\v3_material_quality_matrix1_20260609\material_quality_matrix.json `
+  --shadow-matrix CortexEngine\build\captures\v3_lighting_shadow_promotion_matrix1_20260609\lighting_shadow_promotion_matrix.json `
+  --reflection-matrix CortexEngine\build\captures\v3_reflection_promotion_matrix1_20260609\reflection_promotion_matrix.json `
+  --release-visual-review-matrix CortexEngine\build\captures\v3_release_visual_review_matrix1_20260609\release_visual_review_matrix.json `
+  --output-json CortexEngine\build\captures\v3_full_scene_shader_readiness_audit2_20260609\readiness_audit.json `
+  --output-md CortexEngine\build\captures\v3_full_scene_shader_readiness_audit2_20260609\readiness_audit.md
+
+python CortexEngine\tools\validate_full_scene_shader_pipeline_v3_plan.py
+```
+
+Evidence:
+
+- Release visual matrix:
+  `build\captures\v3_release_visual_review_matrix1_20260609\release_visual_review_matrix.md/json`.
+- Contact sheet:
+  `build\captures\v3_release_visual_review_matrix1_20260609\release_visual_review_contact_sheet.jpg`.
+- Superseding readiness audit:
+  `build\captures\v3_full_scene_shader_readiness_audit2_20260609\readiness_audit.md/json`.
+- Release visual results:
+  - `visual_artifact_review_ready=true`;
+  - `human_review_packet_ready=true`;
+  - `packet_count=7`;
+  - `artifact_ready_packet_count=7`;
+  - observed families:
+    `concert,gallery,gym,kitchen,office,red_room,stadium,stress_rt_showcase_reflection_closeup`;
+  - missing families: none;
+  - observed motion modes: `camera_sweep,light_sweep,mouse_jitter,static`;
+  - missing motion modes: none;
+  - `review_cell_count=70`;
+  - `nonblank_beauty_count=10`;
+  - failures: `0`;
+  - warnings: `7`.
+- Audit2 results:
+  - `engineering_readiness_ready=true`;
+  - `ready_gate_count=6/6`;
+  - failures: `0`;
+  - warnings: `64`;
+  - `goal_completion_ready=false`;
+  - goal completion blocker:
+    `human_visual_acceptance_required`.
+
+Interpretation:
+
+- Release visual artifact review is now encoded in the V3 audit and backed by a
+  generated contact sheet.
+- The remaining completion boundary is explicitly subjective human visual
+  acceptance, not missing engineering/review evidence.

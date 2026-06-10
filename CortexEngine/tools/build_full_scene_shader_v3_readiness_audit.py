@@ -68,6 +68,9 @@ def gate(
         "candidate_beauty_ready_report_count",
         "candidate_beauty_requested_report_count",
         "material_quality_min_score",
+        "artifact_ready_packet_count",
+        "review_cell_count",
+        "nonblank_beauty_count",
     ):
         if key in data:
             row["summary"][key] = data.get(key)
@@ -102,6 +105,12 @@ def build_audit(args: argparse.Namespace) -> dict[str, Any]:
             path=args.reflection_matrix,
             ready_field="reflection_promotion_ready",
         ),
+        gate(
+            name="release_visual_artifact_review",
+            path=args.release_visual_review_matrix,
+            ready_field="visual_artifact_review_ready",
+            extra_required_true=["human_review_packet_ready"],
+        ),
     ]
     failures: list[str] = []
     warnings: list[str] = []
@@ -118,7 +127,6 @@ def build_audit(args: argparse.Namespace) -> dict[str, Any]:
         "goal_completion_ready": False,
         "goal_completion_blockers": [
             "human_visual_acceptance_required",
-            "release_visual_artifact_review_not_encoded_in_audit",
         ],
         "gate_count": len(gates),
         "ready_gate_count": sum(1 for row in gates if row["ready"] and not row["failures"]),
@@ -152,6 +160,9 @@ def write_markdown(audit: dict[str, Any], output: Path) -> None:
             "ready_packet_count",
             "total_report_count",
             "minimum_material_quality_score",
+            "artifact_ready_packet_count",
+            "review_cell_count",
+            "nonblank_beauty_count",
         ):
             if summary.get(key) is not None:
                 key_summary.append(f"{key}={summary[key]}")
@@ -190,6 +201,7 @@ def main() -> int:
     parser.add_argument("--material-quality-matrix", required=True, type=Path)
     parser.add_argument("--shadow-matrix", required=True, type=Path)
     parser.add_argument("--reflection-matrix", required=True, type=Path)
+    parser.add_argument("--release-visual-review-matrix", required=True, type=Path)
     parser.add_argument("--output-json", required=True, type=Path)
     parser.add_argument("--output-md", required=True, type=Path)
     args = parser.parse_args()

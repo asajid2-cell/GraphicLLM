@@ -14147,3 +14147,74 @@ Interpretation:
 - The hard material-quality gate is clean. Class-authored roughness/
   transmission defaults remain tracked warnings, but there is no unresolved
   fallback or missing-channel-mask debt in this matrix.
+
+### Scene-Local Resource Contract Matrix - 2026-06-09
+
+Scope:
+
+- Added `tools/build_scene_local_resource_contract_matrix.py`.
+- Updated `tools/validate_full_scene_shader_pipeline_v3_plan.py`.
+- Updated `docs/FULL_SCENE_SHADER_PIPELINE_V3.md`.
+
+Implemented:
+
+- The new matrix builder consumes existing packet roots and validates
+  scene-local rendering resource contracts at promotion scope.
+- It checks required family/motion coverage, all reports ready, all resource
+  roles proved on every report, no external HDRI violations, no unsafe runtime
+  contract reasons, and observed reflection source contracts.
+- It tracks manifest families separately from canonical contract families so
+  the reflection-closeup stress scene remains visible in the matrix while the
+  runtime contract is still validated through its canonical scene-local family.
+- The static V3 plan validator now requires the matrix tool and checks its
+  schema/readiness markers.
+
+Validation:
+
+```powershell
+python -m py_compile CortexEngine\tools\build_scene_local_resource_contract_matrix.py CortexEngine\tools\validate_full_scene_shader_pipeline_v3_plan.py
+python CortexEngine\tools\validate_full_scene_shader_pipeline_v3_plan.py
+
+python CortexEngine\tools\build_scene_local_resource_contract_matrix.py `
+  --packet-root CortexEngine\build\captures\v3_default_beauty_promotion_gallery_smoke1_20260609 `
+  --packet-root CortexEngine\build\captures\v3_default_beauty_promotion_kitchen_static_smoke1_20260609 `
+  --packet-root CortexEngine\build\captures\v3_default_beauty_promotion_reflection_static_smoke1_20260609 `
+  --packet-root CortexEngine\build\captures\v3_default_beauty_promotion_office_gym_static_smoke1_20260609 `
+  --packet-root CortexEngine\build\captures\v3_default_beauty_promotion_heavy_light_sweep_seq1_20260609 `
+  --packet-root CortexEngine\build\captures\v3_default_beauty_promotion_gallery_camera_sweep_seq1_20260609 `
+  --packet-root CortexEngine\build\captures\v3_default_beauty_promotion_gallery_mouse_jitter_seq1_20260609 `
+  --required-families stress_rt_showcase_reflection_closeup,gallery,kitchen,office,gym,concert,red_room,stadium `
+  --required-motion-modes static,mouse_jitter,camera_sweep,light_sweep `
+  --output-json CortexEngine\build\captures\v3_scene_local_resource_contract_matrix1_20260609\scene_local_resource_contract_matrix.json `
+  --output-md CortexEngine\build\captures\v3_scene_local_resource_contract_matrix1_20260609\scene_local_resource_contract_matrix.md
+```
+
+Evidence:
+
+- Matrix artifact:
+  `build\captures\v3_scene_local_resource_contract_matrix1_20260609\scene_local_resource_contract_matrix.md/json`.
+- Results:
+  - `packet_count=7`;
+  - `ready_packet_count=7`;
+  - `scene_local_resource_contract_ready=true`;
+  - total reports `540`;
+  - ready reports `540`;
+  - observed families:
+    `concert,gallery,gym,kitchen,office,red_room,stadium,stress_rt_showcase_reflection_closeup`;
+  - missing families: none;
+  - observed motion modes: `camera_sweep,light_sweep,mouse_jitter,static`;
+  - missing motion modes: none;
+  - observed reflection source contracts:
+    `local_probe,ray_query_reflection,screen_space_reflection`;
+  - each required role proved on `540` reports:
+    `diffuse_irradiance`, `specular_radiance`, `visible_background`,
+    `reflection_background`, `atmosphere`, and `exposure`;
+  - failures `0`;
+  - warnings `0`.
+
+Interpretation:
+
+- Scene-local rendering resource contracts now have dedicated promotion-grade
+  matrix evidence across the required family/motion set.
+- The matrix proves that the packet set has no unsafe visible external HDRI
+  use and no missing scene-local resource role ownership.

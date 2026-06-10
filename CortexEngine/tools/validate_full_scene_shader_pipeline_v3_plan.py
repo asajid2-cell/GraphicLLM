@@ -32,6 +32,7 @@ V3_MATERIAL_QUALITY_MATRIX_PATH = ROOT / "tools" / "build_material_v3_quality_ma
 V3_SCENE_PROFILE_ANALYZER_PATH = ROOT / "tools" / "analyze_full_scene_shader_v3_scene_profile.py"
 V3_ENVIRONMENT_PAYLOAD_ANALYZER_PATH = ROOT / "tools" / "analyze_full_scene_shader_v3_environment_payload.py"
 SCENE_LOCAL_RESOURCE_CONTRACT_ANALYZER_PATH = ROOT / "tools" / "analyze_scene_local_resource_contract_v1.py"
+SCENE_LOCAL_RESOURCE_CONTRACT_MATRIX_PATH = ROOT / "tools" / "build_scene_local_resource_contract_matrix.py"
 V3_ENVIRONMENT_PROFILE_ANALYZER_PATH = ROOT / "tools" / "analyze_full_scene_shader_v3_environment_profiles.py"
 V3_ENVIRONMENT_PROXY_GENERATOR_PATH = ROOT / "tools" / "generate_scene_local_environment_proxies.py"
 V3_ENVIRONMENT_PROXY_CONTRACT_HEADER_PATH = (
@@ -226,6 +227,11 @@ def main() -> int:
         f"Missing scene-local resource contract analyzer: {SCENE_LOCAL_RESOURCE_CONTRACT_ANALYZER_PATH}",
     )
     require(
+        SCENE_LOCAL_RESOURCE_CONTRACT_MATRIX_PATH.exists(),
+        errors,
+        f"Missing scene-local resource contract matrix builder: {SCENE_LOCAL_RESOURCE_CONTRACT_MATRIX_PATH}",
+    )
+    require(
         V3_ENVIRONMENT_PROFILE_ANALYZER_PATH.exists(),
         errors,
         f"Missing V3 environment profile analyzer: {V3_ENVIRONMENT_PROFILE_ANALYZER_PATH}",
@@ -324,6 +330,9 @@ def main() -> int:
     scene_local_resource_contract_analyzer_source = SCENE_LOCAL_RESOURCE_CONTRACT_ANALYZER_PATH.read_text(
         encoding="utf-8"
     )
+    scene_local_resource_contract_matrix_source = SCENE_LOCAL_RESOURCE_CONTRACT_MATRIX_PATH.read_text(
+        encoding="utf-8"
+    )
     environment_profile_source = V3_ENVIRONMENT_PROFILE_ANALYZER_PATH.read_text(encoding="utf-8")
     environment_proxy_generator_source = V3_ENVIRONMENT_PROXY_GENERATOR_PATH.read_text(encoding="utf-8")
     environment_proxy_contract_header_source = V3_ENVIRONMENT_PROXY_CONTRACT_HEADER_PATH.read_text(encoding="utf-8")
@@ -360,6 +369,7 @@ def main() -> int:
             scene_profile_source,
             environment_payload_source,
             scene_local_resource_contract_analyzer_source,
+            scene_local_resource_contract_matrix_source,
             environment_profile_source,
             environment_proxy_generator_source,
             environment_proxy_contract_header_source,
@@ -1292,6 +1302,9 @@ def main() -> int:
         "hysteresisMargin",
         "hysteresisHold",
         "SceneLocalEnvironmentV3",
+        "build_scene_local_resource_contract_matrix.py",
+        "scene_local_resource_contract.promotion_matrix.v1",
+        "scene_local_resource_contract_ready",
         "ambient_lighting_owned",
         "reflection_background_owned",
         "FullSceneCompositeV3",

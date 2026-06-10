@@ -2281,3 +2281,77 @@ Interpretation:
 - The hard material-quality gate is clean. The remaining class-authored default
   warnings are explicitly tracked nonblocking material debt, not unresolved
   fallback or missing-channel debt.
+
+### Scene-Local Resource Contract Matrix - 2026-06-09
+
+Implemented:
+
+- Added `tools/build_scene_local_resource_contract_matrix.py`.
+- The matrix builder consumes packet roots and their
+  `scene_local_resource_contract_v1.json` artifacts.
+- It validates:
+  - required family/motion coverage;
+  - all reports ready;
+  - all required roles proved on every report;
+  - no external HDRI violations;
+  - no unsafe runtime contract reasons;
+  - observed reflection source contracts.
+- It tracks both manifest families and canonical contract families so stress
+  scenes remain visible while still validating their scene-local resource
+  ownership through the canonical contract.
+- `tools/validate_full_scene_shader_pipeline_v3_plan.py` now requires the
+  scene-local resource contract matrix builder and its schema/readiness markers.
+
+Validation:
+
+```powershell
+python -m py_compile `
+  CortexEngine\tools\build_scene_local_resource_contract_matrix.py `
+  CortexEngine\tools\validate_full_scene_shader_pipeline_v3_plan.py
+
+python CortexEngine\tools\validate_full_scene_shader_pipeline_v3_plan.py
+
+python CortexEngine\tools\build_scene_local_resource_contract_matrix.py `
+  --packet-root CortexEngine\build\captures\v3_default_beauty_promotion_gallery_smoke1_20260609 `
+  --packet-root CortexEngine\build\captures\v3_default_beauty_promotion_kitchen_static_smoke1_20260609 `
+  --packet-root CortexEngine\build\captures\v3_default_beauty_promotion_reflection_static_smoke1_20260609 `
+  --packet-root CortexEngine\build\captures\v3_default_beauty_promotion_office_gym_static_smoke1_20260609 `
+  --packet-root CortexEngine\build\captures\v3_default_beauty_promotion_heavy_light_sweep_seq1_20260609 `
+  --packet-root CortexEngine\build\captures\v3_default_beauty_promotion_gallery_camera_sweep_seq1_20260609 `
+  --packet-root CortexEngine\build\captures\v3_default_beauty_promotion_gallery_mouse_jitter_seq1_20260609 `
+  --required-families stress_rt_showcase_reflection_closeup,gallery,kitchen,office,gym,concert,red_room,stadium `
+  --required-motion-modes static,mouse_jitter,camera_sweep,light_sweep `
+  --output-json CortexEngine\build\captures\v3_scene_local_resource_contract_matrix1_20260609\scene_local_resource_contract_matrix.json `
+  --output-md CortexEngine\build\captures\v3_scene_local_resource_contract_matrix1_20260609\scene_local_resource_contract_matrix.md
+```
+
+Evidence:
+
+- Matrix:
+  `build\captures\v3_scene_local_resource_contract_matrix1_20260609\scene_local_resource_contract_matrix.md/json`.
+- Results:
+  - `packet_count=7`;
+  - `ready_packet_count=7`;
+  - `scene_local_resource_contract_ready=true`;
+  - total reports `540`;
+  - ready reports `540`;
+  - observed families:
+    `concert,gallery,gym,kitchen,office,red_room,stadium,stress_rt_showcase_reflection_closeup`;
+  - missing families: none;
+  - observed motion modes: `camera_sweep,light_sweep,mouse_jitter,static`;
+  - missing motion modes: none;
+  - observed reflection source contracts:
+    `local_probe,ray_query_reflection,screen_space_reflection`;
+  - each required role proved on `540` reports:
+    `diffuse_irradiance`, `specular_radiance`, `visible_background`,
+    `reflection_background`, `atmosphere`, and `exposure`;
+  - failures: `0`;
+  - warnings: `0`.
+
+Interpretation:
+
+- Scene-local rendering resource contracts now have a dedicated promotion-grade
+  matrix across the required packet set.
+- The matrix proves enclosed/heavy/stress scenes are not relying on unsafe
+  visible external IBL backgrounds and that every required resource role is
+  owned on every report.

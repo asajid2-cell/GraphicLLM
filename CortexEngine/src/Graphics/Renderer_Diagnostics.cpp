@@ -70,10 +70,10 @@ Renderer::FeatureState Renderer::GetFeatureState() const {
     state.ssaoIntensity = m_ssao.State().controls.intensity;
     state.iblEnabled = m_environmentState.enabled;
     state.iblLimitEnabled = m_environmentState.limitEnabled;
-    state.ssrEnabled = m_ssrResources.controls.enabled;
-    state.ssrMaxDistance = m_ssrResources.controls.maxDistance;
-    state.ssrThickness = m_ssrResources.controls.thickness;
-    state.ssrStrength = m_ssrResources.controls.strength;
+    state.ssrEnabled = m_ssr.State().controls.enabled;
+    state.ssrMaxDistance = m_ssr.State().controls.maxDistance;
+    state.ssrThickness = m_ssr.State().controls.thickness;
+    state.ssrStrength = m_ssr.State().controls.strength;
     state.fogEnabled = m_fogState.enabled;
     state.particlesEnabled = m_particleState.controls.enabledForScene;
     state.particleDensityScale = m_particleState.controls.densityScale;
@@ -371,7 +371,7 @@ void Renderer::ReportDeviceRemoved(const char* context,
         rs(m_rtShadowTargets.historyState),
         rs(m_mainTargets.normalRoughness.resources.state),
         rs(m_ssao.State().resources.resourceState),
-        rs(m_ssrResources.resources.resourceState),
+        rs(m_ssr.State().resources.resourceState),
         rs(m_temporalScreenState.velocityState),
         rs(m_temporalScreenState.historyState),
         rs(m_temporalScreenState.taaIntermediateState),
@@ -504,7 +504,7 @@ void Renderer::LogDiagnostics() const {
     spdlog::info("Features: TAA={} FXAA={} SSR={} SSAO={} Bloom={:.2f} Fog={} Shadows={} IBL={}",
                  m_temporalAAState.enabled,
                  m_postProcessState.fxaaEnabled,
-                 m_ssrResources.controls.enabled,
+                 m_ssr.State().controls.enabled,
                  m_ssao.State().controls.enabled,
                  m_bloomResources.controls.intensity,
                  m_fogState.enabled,
@@ -519,7 +519,7 @@ void Renderer::LogDiagnostics() const {
     spdlog::info("Resource states: depth=0x{:X} hdr=0x{:X} ssr=0x{:X}",
                  static_cast<uint32_t>(m_depthResources.resources.resourceState),
                  static_cast<uint32_t>(m_mainTargets.hdr.resources.state),
-                 static_cast<uint32_t>(m_ssrResources.resources.resourceState));
+                 static_cast<uint32_t>(m_ssr.State().resources.resourceState));
     spdlog::info("Timings (ms): depthPrepass={:.2f} shadow={:.2f} main={:.2f}",
                  m_frameDiagnostics.timings.depthPrepassMs,
                  m_frameDiagnostics.timings.shadowPassMs,

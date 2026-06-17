@@ -21,7 +21,7 @@ constexpr D3D12_RESOURCE_STATES kScreenSpaceShaderResourceState =
 Renderer::RenderGraphPassResult
 Renderer::ExecuteSSRInRenderGraph() {
     RenderGraphPassResult result{};
-    if (!m_services.renderGraph || !m_commandResources.graphicsList || !m_pipelineState.ssr || !m_ssrResources.resources.color ||
+    if (!m_services.renderGraph || !m_commandResources.graphicsList || !m_pipelineState.ssr || !m_ssr.State().resources.color ||
         !m_mainTargets.hdr.resources.color || !m_depthResources.resources.buffer) {
         result.fallbackUsed = true;
         result.fallbackReason = "render_graph_ssr_prerequisites_missing";
@@ -47,7 +47,7 @@ Renderer::ExecuteSSRInRenderGraph() {
         result.fallbackReason = "render_graph_ssr_normal_resource_missing";
         return result;
     }
-    if (!m_ssrResources.descriptors.srvTableValid) {
+    if (!m_ssr.State().descriptors.srvTableValid) {
         result.fallbackUsed = true;
         result.fallbackReason = "render_graph_ssr_descriptor_table_missing";
         return result;
@@ -64,7 +64,7 @@ Renderer::ExecuteSSRInRenderGraph() {
     const RGResourceHandle normalHandle =
         m_services.renderGraph->ImportResource(normalResource, normalState, usesVBNormal ? "VB_NormalRoughness_SSR" : "NormalRoughness_SSR");
     const RGResourceHandle ssrHandle =
-        m_services.renderGraph->ImportResource(m_ssrResources.resources.color.Get(), m_ssrResources.resources.resourceState, "SSRColor");
+        m_services.renderGraph->ImportResource(m_ssr.State().resources.color.Get(), m_ssr.State().resources.resourceState, "SSRColor");
 
     SSRPass::GraphContext ssrContext{};
     ssrContext.hdr = hdrHandle;
@@ -76,8 +76,8 @@ Renderer::ExecuteSSRInRenderGraph() {
     ssrContext.prepare.commandList = m_commandResources.graphicsList.Get();
     ssrContext.prepare.skipTransitions = true;
     ssrContext.prepare.ssrTarget = {
-        m_ssrResources.resources.color.Get(),
-        &m_ssrResources.resources.resourceState,
+        m_ssr.State().resources.color.Get(),
+        &m_ssr.State().resources.resourceState,
         D3D12_RESOURCE_STATE_RENDER_TARGET,
     };
     ssrContext.prepare.hdr = {
@@ -95,15 +95,15 @@ Renderer::ExecuteSSRInRenderGraph() {
         &m_depthResources.resources.resourceState,
         kDepthSampleState,
     };
-    auto& ssrTable = m_ssrResources.descriptors.srvTables[m_frameRuntime.frameIndex % kFrameCount];
+    auto& ssrTable = m_ssr.State().descriptors.srvTables[m_frameRuntime.frameIndex % kFrameCount];
     ssrContext.draw.device = m_services.device ? m_services.device->GetDevice() : nullptr;
     ssrContext.draw.commandList = m_commandResources.graphicsList.Get();
     ssrContext.draw.descriptorManager = m_services.descriptorManager.get();
     ssrContext.draw.rootSignature = m_pipelineState.rootSignature.get();
     ssrContext.draw.frameConstants = m_constantBuffers.currentFrameGPU;
     ssrContext.draw.pipeline = m_pipelineState.ssr.get();
-    ssrContext.draw.target = m_ssrResources.resources.color.Get();
-    ssrContext.draw.targetRtv = m_ssrResources.resources.rtv;
+    ssrContext.draw.target = m_ssr.State().resources.color.Get();
+    ssrContext.draw.targetRtv = m_ssr.State().resources.rtv;
     ssrContext.draw.hdr = m_mainTargets.hdr.resources.color.Get();
     ssrContext.draw.depth = m_depthResources.resources.buffer.Get();
     ssrContext.draw.normalRoughness = normalResource;
@@ -127,7 +127,7 @@ Renderer::ExecuteSSRInRenderGraph() {
     } else {
         m_mainTargets.hdr.resources.state = m_services.renderGraph->GetResourceState(hdrHandle);
         m_depthResources.resources.resourceState = m_services.renderGraph->GetResourceState(depthHandle);
-        m_ssrResources.resources.resourceState = m_services.renderGraph->GetResourceState(ssrHandle);
+        m_ssr.State().resources.resourceState = m_services.renderGraph->GetResourceState(ssrHandle);
         if (usesVBNormal) {
             auto finalStates = m_services.visibilityBuffer->GetResourceStateSnapshot();
             finalStates.normalRoughness = m_services.renderGraph->GetResourceState(normalHandle);

@@ -57,6 +57,7 @@
 #include "Graphics/RendererServiceState.h"
 #include "Graphics/RendererShadowState.h"
 #include "Graphics/RendererSSRState.h"
+#include "Graphics/Subsystems/SSRSubsystem.h"
 #include "Graphics/RendererTemporalScreenState.h"
 #include "Graphics/RendererTemporalState.h"
 #include "Graphics/RendererTextureUploadState.h"
@@ -718,6 +719,7 @@ private:
     void RenderWaterSurfaces(Scene::ECS_Registry* registry);
     void RenderTransparent(Scene::ECS_Registry* registry);
     void RenderSSR();
+    SSRRenderContext MakeSSRRenderContext();
     void RenderTAA();
     [[nodiscard]] bool SeedTAAHistory(bool skipTransitions);
     [[nodiscard]] bool ResolveTAAIntermediate(bool skipTransitions);
@@ -863,7 +865,7 @@ public:
 
     SSAOSubsystem m_ssao;
 
-    SSRPassState m_ssrResources;
+    SSRSubsystem m_ssr;
     LocalReflectionRadianceState m_localReflectionRadianceState;
 
     TemporalScreenPassState m_temporalScreenState;

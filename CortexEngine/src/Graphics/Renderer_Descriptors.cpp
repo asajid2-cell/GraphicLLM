@@ -80,7 +80,7 @@ void Renderer::UpdateTAAResolveDescriptorTable() {
     context.history = m_temporalScreenState.historyColor.Get();
     context.depth = m_depthResources.resources.buffer.Get();
     context.normalRoughness = normalRes;
-    context.ssr = m_ssrResources.resources.color.Get();
+    context.ssr = m_ssr.State().resources.color.Get();
     context.velocity = m_temporalScreenState.velocityBuffer.Get();
     context.temporalMask = m_temporalMaskState.texture.Get();
     (void)TAAPass::UpdateResolveDescriptorTable(context);
@@ -93,8 +93,8 @@ Result<void> Renderer::InitializePostProcessDescriptorTable() {
             handle = {};
         }
     }
-    m_ssrResources.descriptors.srvTableValid = false;
-    for (auto& table : m_ssrResources.descriptors.srvTables) {
+    m_ssr.State().descriptors.srvTableValid = false;
+    for (auto& table : m_ssr.State().descriptors.srvTables) {
         for (auto& handle : table) {
             handle = {};
         }
@@ -192,7 +192,7 @@ Result<void> Renderer::InitializePostProcessDescriptorTable() {
     if (postTableResult.IsErr()) {
         return postTableResult;
     }
-    auto ssrTableResult = allocateTableSet(m_ssrResources.descriptors.srvTables, "SSR");
+    auto ssrTableResult = allocateTableSet(m_ssr.State().descriptors.srvTables, "SSR");
     if (ssrTableResult.IsErr()) {
         return ssrTableResult;
     }
@@ -290,7 +290,7 @@ Result<void> Renderer::InitializePostProcessDescriptorTable() {
     };
 
     validateTableSet(m_temporalScreenState.postProcessSrvTables, m_temporalScreenState.postProcessSrvTableValid, "Post-process");
-    validateTableSet(m_ssrResources.descriptors.srvTables, m_ssrResources.descriptors.srvTableValid, "SSR");
+    validateTableSet(m_ssr.State().descriptors.srvTables, m_ssr.State().descriptors.srvTableValid, "SSR");
     validateTableSet(m_temporalScreenState.motionVectorSrvTables, m_temporalScreenState.motionVectorSrvTableValid, "Motion-vector");
     bool ssaoSrvValid = false;
     bool ssaoUavValid = false;
@@ -380,7 +380,7 @@ void Renderer::UpdatePostProcessDescriptorTable() {
     context.hzb = m_hzb.State().resources.texture.Get();
     context.hzbMipCount = m_hzb.State().resources.mipCount;
     context.wantsHzbDebug = (m_debugViewState.mode == 32u);
-    context.ssr = m_ssrResources.resources.color.Get();
+    context.ssr = m_ssr.State().resources.color.Get();
     context.velocity = m_temporalScreenState.velocityBuffer.Get();
     context.rtReflection = m_rtReflectionTargets.color.Get();
     context.rtReflectionHistory = m_rtReflectionTargets.history.Get();

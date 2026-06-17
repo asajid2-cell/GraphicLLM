@@ -112,7 +112,7 @@ Result<void> Renderer::CreateHDRTarget() {
         spdlog::warn("{}", taaIntermediateResult.Error());
     }
 
-    auto ssrResult = m_ssrResources.resources.CreateTarget(
+    auto ssrResult = m_ssr.State().resources.CreateTarget(
         m_services.device->GetDevice(),
         m_services.descriptorManager.get(),
         width,

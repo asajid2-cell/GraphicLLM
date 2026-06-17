@@ -461,10 +461,10 @@ void Renderer::UpdateFrameContractSnapshot(Scene::ECS_Registry* registry,
     contract.lighting.ssaoRadius = m_ssao.State().controls.radius;
     contract.lighting.ssaoBias = m_ssao.State().controls.bias;
     contract.lighting.ssaoIntensity = m_ssao.State().controls.intensity;
-    contract.screenSpace.ssrEnabled = m_ssrResources.controls.enabled;
-    contract.screenSpace.ssrMaxDistance = m_ssrResources.controls.maxDistance;
-    contract.screenSpace.ssrThickness = m_ssrResources.controls.thickness;
-    contract.screenSpace.ssrStrength = m_ssrResources.controls.strength;
+    contract.screenSpace.ssrEnabled = m_ssr.State().controls.enabled;
+    contract.screenSpace.ssrMaxDistance = m_ssr.State().controls.maxDistance;
+    contract.screenSpace.ssrThickness = m_ssr.State().controls.thickness;
+    contract.screenSpace.ssrStrength = m_ssr.State().controls.strength;
     contract.screenSpace.ssaoEnabled = m_ssao.State().controls.enabled;
     contract.screenSpace.ssaoRadius = m_ssao.State().controls.radius;
     contract.screenSpace.ssaoBias = m_ssao.State().controls.bias;
@@ -650,7 +650,7 @@ void Renderer::UpdateFrameContractSnapshot(Scene::ECS_Registry* registry,
         addResource("vb_gbuffer_material_ext2", m_services.visibilityBuffer->GetMaterialExt2Buffer(), contract.renderWidth, contract.renderHeight);
     }
     addResource("ssao", m_ssao.State().resources.texture.Get(), ssaoWidth, ssaoHeight);
-    addResource("ssr_color", m_ssrResources.resources.color.Get(), contract.renderWidth, contract.renderHeight);
+    addResource("ssr_color", m_ssr.State().resources.color.Get(), contract.renderWidth, contract.renderHeight);
     addResource("velocity", m_temporalScreenState.velocityBuffer.Get(), contract.renderWidth, contract.renderHeight);
     addResource("temporal_rejection_mask", m_temporalMaskState.texture.Get(), contract.renderWidth, contract.renderHeight);
     addResource("temporal_rejection_mask_stats", m_temporalMaskState.statsBuffer.Get(), 0, 0);

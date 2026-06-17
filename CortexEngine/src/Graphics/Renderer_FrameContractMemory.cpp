@@ -124,7 +124,7 @@ Renderer::VRAMBreakdown Renderer::GetEstimatedVRAMBreakdown() const {
     addResource(breakdown.postProcessBytes, m_rtShadowTargets.mask.Get());
     addResource(breakdown.postProcessBytes, m_rtShadowTargets.history.Get());
     addResource(breakdown.postProcessBytes, m_ssao.State().resources.texture.Get());
-    addResource(breakdown.postProcessBytes, m_ssrResources.resources.color.Get());
+    addResource(breakdown.postProcessBytes, m_ssr.State().resources.color.Get());
     addResource(breakdown.postProcessBytes, m_rtReflectionTargets.color.Get());
     addResource(breakdown.postProcessBytes, m_rtReflectionTargets.history.Get());
     addResource(breakdown.postProcessBytes, m_rtGITargets.color.Get());

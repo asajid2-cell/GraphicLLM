@@ -126,7 +126,7 @@ Renderer::ExecuteTAAInRenderGraph() {
     taaContext.resolveDescriptors.history = m_temporalScreenState.historyColor.Get();
     taaContext.resolveDescriptors.depth = m_depthResources.resources.buffer.Get();
     taaContext.resolveDescriptors.normalRoughness = normalResource;
-    taaContext.resolveDescriptors.ssr = m_ssrResources.resources.color.Get();
+    taaContext.resolveDescriptors.ssr = m_ssr.State().resources.color.Get();
     taaContext.resolveDescriptors.velocity = m_temporalScreenState.velocityBuffer.Get();
     taaContext.resolveDescriptors.temporalMask = m_temporalMaskState.texture.Get();
     taaContext.resolve.commandList = m_commandResources.graphicsList.Get();

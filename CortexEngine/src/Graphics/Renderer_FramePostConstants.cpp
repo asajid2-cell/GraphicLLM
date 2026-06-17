@@ -805,7 +805,7 @@ void Renderer::PopulateFrameDebugAndPostConstants(FrameConstants& frameData,
             spdlog::warn("Renderer: CORTEX_V2_REFLECTION_CANDIDATE_BEAUTY set; V2 reflection candidate drives beauty (review)");
         }
     }
-    if (m_ssrResources.frame.activeThisFrame) {
+    if (m_ssr.State().frame.activeThisFrame) {
         postFxFlags |= 1u;
     }
     if (rtReflPipelineReady && m_rtRuntimeState.reflectionsEnabled) {
@@ -870,9 +870,9 @@ void Renderer::PopulateFrameDebugAndPostConstants(FrameConstants& frameData,
         m_waterState.steepness);
 
     frameData.ssrParams = glm::vec4(
-        m_ssrResources.controls.maxDistance,
-        m_ssrResources.controls.thickness,
-        m_ssrResources.controls.strength,
+        m_ssr.State().controls.maxDistance,
+        m_ssr.State().controls.thickness,
+        m_ssr.State().controls.strength,
         0.0f);
     frameData.postGradeParams = glm::vec4(
         m_postProcessState.contrast,

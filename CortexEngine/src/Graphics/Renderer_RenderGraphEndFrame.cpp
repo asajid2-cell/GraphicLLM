@@ -301,8 +301,8 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
         if (m_ssao.State().resources.texture) {
             ssaoHandle = m_services.renderGraph->ImportResource(m_ssao.State().resources.texture.Get(), m_ssao.State().resources.resourceState, "SSAO");
         }
-        if (m_ssrResources.resources.color) {
-            ssrHandle = m_services.renderGraph->ImportResource(m_ssrResources.resources.color.Get(), m_ssrResources.resources.resourceState, "SSRColor");
+        if (m_ssr.State().resources.color) {
+            ssrHandle = m_services.renderGraph->ImportResource(m_ssr.State().resources.color.Get(), m_ssr.State().resources.resourceState, "SSRColor");
         }
         if (wantsFusedBloomThisFrame) {
             if (!useFusedBloomTransients) {
@@ -770,7 +770,7 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
         executeContext.descriptorUpdate.hzb = m_hzb.State().resources.texture.Get();
         executeContext.descriptorUpdate.hzbMipCount = m_hzb.State().resources.mipCount;
         executeContext.descriptorUpdate.wantsHzbDebug = wantsHzbDebug;
-        executeContext.descriptorUpdate.ssr = m_ssrResources.resources.color.Get();
+        executeContext.descriptorUpdate.ssr = m_ssr.State().resources.color.Get();
         executeContext.descriptorUpdate.velocity = m_temporalScreenState.velocityBuffer.Get();
         executeContext.descriptorUpdate.rtReflection = m_rtReflectionTargets.color.Get();
         executeContext.descriptorUpdate.rtReflectionHistory = m_rtReflectionTargets.history.Get();
@@ -1172,7 +1172,7 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
             m_bloomResources.resources.resourceState[level][0] = m_services.renderGraph->GetResourceState(bloomHandle);
         }
         if (ssaoHandle.IsValid()) m_ssao.State().resources.resourceState = m_services.renderGraph->GetResourceState(ssaoHandle);
-        if (ssrHandle.IsValid()) m_ssrResources.resources.resourceState = m_services.renderGraph->GetResourceState(ssrHandle);
+        if (ssrHandle.IsValid()) m_ssr.State().resources.resourceState = m_services.renderGraph->GetResourceState(ssrHandle);
         if (historyHandle.IsValid()) m_temporalScreenState.historyState = m_services.renderGraph->GetResourceState(historyHandle);
         if (depthPpHandle.IsValid()) m_depthResources.resources.resourceState = m_services.renderGraph->GetResourceState(depthPpHandle);
         if (!m_visibilityBufferState.renderedThisFrame && normalHandle.IsValid()) {

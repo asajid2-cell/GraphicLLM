@@ -96,7 +96,7 @@ void Renderer::RecordFramePass(const char* name,
         if (resource == "reflection_history_v3_validity") return resourceBytes(m_mainTargets.reflectionV3.resources.historyValidity.Get());
         if (resource == "reflection_history_v3_rejection") return resourceBytes(m_mainTargets.reflectionV3.resources.historyRejection.Get());
         if (resource == "ssao") return resourceBytes(m_ssao.State().resources.texture.Get());
-        if (resource == "ssr_color") return resourceBytes(m_ssrResources.resources.color.Get());
+        if (resource == "ssr_color") return resourceBytes(m_ssr.State().resources.color.Get());
         if (resource == "velocity") return resourceBytes(m_temporalScreenState.velocityBuffer.Get());
         if (resource == "temporal_rejection_mask") return resourceBytes(m_temporalMaskState.texture.Get());
         if (resource == "taa_history") return resourceBytes(m_temporalScreenState.historyColor.Get());

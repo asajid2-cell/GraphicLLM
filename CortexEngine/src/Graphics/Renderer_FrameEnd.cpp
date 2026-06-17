@@ -222,7 +222,7 @@ void Renderer::EndFrame() {
     {
         const EndFrameShaderResourcePass::TransitionTarget targets[] = {
             {m_ssao.State().resources.texture.Get(), &m_ssao.State().resources.resourceState},
-            {m_ssrResources.resources.color.Get(), &m_ssrResources.resources.resourceState},
+            {m_ssr.State().resources.color.Get(), &m_ssr.State().resources.resourceState},
             {m_temporalScreenState.velocityBuffer.Get(), &m_temporalScreenState.velocityState},
             {m_temporalScreenState.taaIntermediate.Get(), &m_temporalScreenState.taaIntermediateState},
             {m_rtReflectionTargets.color.Get(), &m_rtReflectionTargets.colorState},

@@ -200,11 +200,11 @@ bool Renderer::UsesGpuParticleLifecycle() const {
 }
 
 void Renderer::SetSSREnabled(bool enabled) {
-    if (m_ssrResources.controls.enabled == enabled) {
+    if (m_ssr.State().controls.enabled == enabled) {
         return;
     }
-    m_ssrResources.controls.enabled = enabled;
-    spdlog::info("SSR {}", m_ssrResources.controls.enabled ? "ENABLED" : "DISABLED");
+    m_ssr.State().controls.enabled = enabled;
+    spdlog::info("SSR {}", m_ssr.State().controls.enabled ? "ENABLED" : "DISABLED");
 }
 
 void Renderer::SetSSRParams(float maxDistance, float thickness, float strength) {
@@ -212,34 +212,34 @@ void Renderer::SetSSRParams(float maxDistance, float thickness, float strength) 
     const float t = std::clamp(thickness, 0.005f, 1.0f);
     const float s = std::clamp(strength, 0.0f, 1.0f);
 
-    if (std::abs(d - m_ssrResources.controls.maxDistance) < 1e-3f &&
-        std::abs(t - m_ssrResources.controls.thickness) < 1e-4f &&
-        std::abs(s - m_ssrResources.controls.strength) < 1e-3f) {
+    if (std::abs(d - m_ssr.State().controls.maxDistance) < 1e-3f &&
+        std::abs(t - m_ssr.State().controls.thickness) < 1e-4f &&
+        std::abs(s - m_ssr.State().controls.strength) < 1e-3f) {
         return;
     }
 
-    m_ssrResources.controls.maxDistance = d;
-    m_ssrResources.controls.thickness = t;
-    m_ssrResources.controls.strength = s;
+    m_ssr.State().controls.maxDistance = d;
+    m_ssr.State().controls.thickness = t;
+    m_ssr.State().controls.strength = s;
     spdlog::info("SSR params set to max_distance={}, thickness={}, strength={}",
-                 m_ssrResources.controls.maxDistance,
-                 m_ssrResources.controls.thickness,
-                 m_ssrResources.controls.strength);
+                 m_ssr.State().controls.maxDistance,
+                 m_ssr.State().controls.thickness,
+                 m_ssr.State().controls.strength);
 }
 
 void Renderer::ToggleSSR() {
-    SetSSREnabled(!m_ssrResources.controls.enabled);
+    SetSSREnabled(!m_ssr.State().controls.enabled);
 }
 
 void Renderer::CycleScreenSpaceEffectsDebug() {
     // Determine current state from flags:
     // 0 = both on, 1 = SSR only, 2 = SSAO only, 3 = both off
     uint32_t state = 0;
-    if (m_ssrResources.controls.enabled && m_ssao.State().controls.enabled) {
+    if (m_ssr.State().controls.enabled && m_ssao.State().controls.enabled) {
         state = 0;
-    } else if (m_ssrResources.controls.enabled && !m_ssao.State().controls.enabled) {
+    } else if (m_ssr.State().controls.enabled && !m_ssao.State().controls.enabled) {
         state = 1;
-    } else if (!m_ssrResources.controls.enabled && m_ssao.State().controls.enabled) {
+    } else if (!m_ssr.State().controls.enabled && m_ssao.State().controls.enabled) {
         state = 2;
     } else {
         state = 3;

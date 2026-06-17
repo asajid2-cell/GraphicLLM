@@ -26,8 +26,8 @@ void Renderer::RenderPostProcess() {
             {m_ssao.State().resources.texture.Get(), &m_ssao.State().resources.resourceState, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE},
             {m_ssr.State().resources.color.Get(), &m_ssr.State().resources.resourceState, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE},
             {wantsHzbDebug ? m_hzb.State().resources.texture.Get() : nullptr, &m_hzb.State().resources.resourceState, hzbDebugState},
-            {m_temporalScreenState.velocityBuffer.Get(), &m_temporalScreenState.velocityState, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE},
-            {m_temporalScreenState.taaIntermediate.Get(), &m_temporalScreenState.taaIntermediateState, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE},
+            {m_temporal.ScreenState().velocityBuffer.Get(), &m_temporal.ScreenState().velocityState, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE},
+            {m_temporal.ScreenState().taaIntermediate.Get(), &m_temporal.ScreenState().taaIntermediateState, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE},
             {m_rtReflectionTargets.color.Get(), &m_rtReflectionTargets.colorState, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE},
             {m_rtReflectionTargets.history.Get(), &m_rtReflectionTargets.historyState, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE},
         };
@@ -91,12 +91,12 @@ void Renderer::RenderPostProcess() {
         spdlog::error("RenderPostProcess: HDR SRV is invalid");
         return;
     }
-    if (!m_temporalScreenState.postProcessSrvTableValid) {
+    if (!m_temporal.ScreenState().postProcessSrvTableValid) {
         spdlog::error("RenderPostProcess: persistent SRV table is invalid");
         return;
     }
     UpdatePostProcessDescriptorTable();
-    auto& postTable = m_temporalScreenState.postProcessSrvTables[m_frameRuntime.frameIndex % kFrameCount];
+    auto& postTable = m_temporal.ScreenState().postProcessSrvTables[m_frameRuntime.frameIndex % kFrameCount];
     if (!PostProcessPass::Draw({
             m_commandResources.graphicsList.Get(),
             m_services.descriptorManager.get(),

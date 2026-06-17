@@ -119,7 +119,7 @@ Renderer::VRAMBreakdown Renderer::GetEstimatedVRAMBreakdown() const {
     addResource(breakdown.renderTargetBytes, m_mainTargets.reflectionV3.resources.historyRejection.Get());
     addResource(breakdown.renderTargetBytes, m_mainTargets.compositeV3.resources.hdrSceneColor.Get());
     addResource(breakdown.renderTargetBytes, m_mainTargets.candidateBeautyV3.resources.ldrOutput.Get());
-    addResource(breakdown.renderTargetBytes, m_temporalScreenState.velocityBuffer.Get());
+    addResource(breakdown.renderTargetBytes, m_temporal.ScreenState().velocityBuffer.Get());
 
     addResource(breakdown.postProcessBytes, m_rtShadowTargets.mask.Get());
     addResource(breakdown.postProcessBytes, m_rtShadowTargets.history.Get());
@@ -129,8 +129,8 @@ Renderer::VRAMBreakdown Renderer::GetEstimatedVRAMBreakdown() const {
     addResource(breakdown.postProcessBytes, m_rtReflectionTargets.history.Get());
     addResource(breakdown.postProcessBytes, m_rtGITargets.color.Get());
     addResource(breakdown.postProcessBytes, m_rtGITargets.history.Get());
-    addResource(breakdown.postProcessBytes, m_temporalScreenState.historyColor.Get());
-    addResource(breakdown.postProcessBytes, m_temporalScreenState.taaIntermediate.Get());
+    addResource(breakdown.postProcessBytes, m_temporal.ScreenState().historyColor.Get());
+    addResource(breakdown.postProcessBytes, m_temporal.ScreenState().taaIntermediate.Get());
 
     addResource(breakdown.debugBytes, m_debugLines.State().vertexBuffer.Get());
     addResource(breakdown.voxelBytes, m_voxel.State().gridBuffer.Get());

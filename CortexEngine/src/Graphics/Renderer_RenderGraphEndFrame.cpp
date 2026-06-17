@@ -290,8 +290,8 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
 
     if (wantsRgPostThisFrame) {
         hdrHandle = m_services.renderGraph->ImportResource(m_mainTargets.hdr.resources.color.Get(), m_mainTargets.hdr.resources.state, "HDR");
-        if (m_temporalScreenState.historyColor) {
-            historyHandle = m_services.renderGraph->ImportResource(m_temporalScreenState.historyColor.Get(), m_temporalScreenState.historyState, "TAAHistory");
+        if (m_temporal.ScreenState().historyColor) {
+            historyHandle = m_services.renderGraph->ImportResource(m_temporal.ScreenState().historyColor.Get(), m_temporal.ScreenState().historyState, "TAAHistory");
         }
         if (m_depthResources.resources.buffer) {
             depthPpHandle = depthHandle.IsValid()
@@ -407,11 +407,11 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
                 vbPostInitialStates.materialExt2,
                 "MaterialExt2_SurfaceClass");
         }
-        if (m_temporalScreenState.velocityBuffer) {
-            velocityHandle = m_services.renderGraph->ImportResource(m_temporalScreenState.velocityBuffer.Get(), m_temporalScreenState.velocityState, "Velocity");
+        if (m_temporal.ScreenState().velocityBuffer) {
+            velocityHandle = m_services.renderGraph->ImportResource(m_temporal.ScreenState().velocityBuffer.Get(), m_temporal.ScreenState().velocityState, "Velocity");
         }
-        if (m_temporalScreenState.taaIntermediate) {
-            taaHandle = m_services.renderGraph->ImportResource(m_temporalScreenState.taaIntermediate.Get(), m_temporalScreenState.taaIntermediateState, "TAAIntermediate");
+        if (m_temporal.ScreenState().taaIntermediate) {
+            taaHandle = m_services.renderGraph->ImportResource(m_temporal.ScreenState().taaIntermediate.Get(), m_temporal.ScreenState().taaIntermediateState, "TAAIntermediate");
         }
         if (m_rtReflectionTargets.color) {
             rtReflHandle = m_services.renderGraph->ImportResource(m_rtReflectionTargets.color.Get(), m_rtReflectionTargets.colorState, "RTReflection");
@@ -755,7 +755,7 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
         executeContext.useBloomOverride = wantsFusedBloomThisFrame && bloomHandle.IsValid();
         executeContext.bloom = bloomHandle;
         executeContext.localReflectionRadiance = localReflRadianceHandle;
-        auto& postTable = m_temporalScreenState.postProcessSrvTables[m_frameRuntime.frameIndex % kFrameCount];
+        auto& postTable = m_temporal.ScreenState().postProcessSrvTables[m_frameRuntime.frameIndex % kFrameCount];
         executeContext.descriptorUpdate.device = m_services.device ? m_services.device->GetDevice() : nullptr;
         executeContext.descriptorUpdate.srvTable = std::span<DescriptorHandle>(postTable.data(), postTable.size());
         executeContext.descriptorUpdate.hdr = m_mainTargets.hdr.resources.color.Get();
@@ -764,14 +764,14 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
             ? m_bloom.State().resources.texA[1].Get()
             : m_bloom.State().resources.texA[0].Get();
         executeContext.descriptorUpdate.ssao = m_ssao.State().resources.texture.Get();
-        executeContext.descriptorUpdate.history = m_temporalScreenState.historyColor.Get();
+        executeContext.descriptorUpdate.history = m_temporal.ScreenState().historyColor.Get();
         executeContext.descriptorUpdate.depth = m_depthResources.resources.buffer.Get();
         executeContext.descriptorUpdate.normalRoughness = postNormalResource;
         executeContext.descriptorUpdate.hzb = m_hzb.State().resources.texture.Get();
         executeContext.descriptorUpdate.hzbMipCount = m_hzb.State().resources.mipCount;
         executeContext.descriptorUpdate.wantsHzbDebug = wantsHzbDebug;
         executeContext.descriptorUpdate.ssr = m_ssr.State().resources.color.Get();
-        executeContext.descriptorUpdate.velocity = m_temporalScreenState.velocityBuffer.Get();
+        executeContext.descriptorUpdate.velocity = m_temporal.ScreenState().velocityBuffer.Get();
         executeContext.descriptorUpdate.rtReflection = m_rtReflectionTargets.color.Get();
         executeContext.descriptorUpdate.rtReflectionHistory = m_rtReflectionTargets.history.Get();
         executeContext.descriptorUpdate.emissiveMetallic = postEmissiveMetallicResource;
@@ -1173,7 +1173,7 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
         }
         if (ssaoHandle.IsValid()) m_ssao.State().resources.resourceState = m_services.renderGraph->GetResourceState(ssaoHandle);
         if (ssrHandle.IsValid()) m_ssr.State().resources.resourceState = m_services.renderGraph->GetResourceState(ssrHandle);
-        if (historyHandle.IsValid()) m_temporalScreenState.historyState = m_services.renderGraph->GetResourceState(historyHandle);
+        if (historyHandle.IsValid()) m_temporal.ScreenState().historyState = m_services.renderGraph->GetResourceState(historyHandle);
         if (depthPpHandle.IsValid()) m_depthResources.resources.resourceState = m_services.renderGraph->GetResourceState(depthPpHandle);
         if (!m_visibilityBufferState.renderedThisFrame && normalHandle.IsValid()) {
             m_mainTargets.normalRoughness.resources.state = m_services.renderGraph->GetResourceState(normalHandle);
@@ -1197,8 +1197,8 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
             }
             m_services.visibilityBuffer->ApplyResourceStateSnapshot(finalStates);
         }
-        if (velocityHandle.IsValid()) m_temporalScreenState.velocityState = m_services.renderGraph->GetResourceState(velocityHandle);
-        if (taaHandle.IsValid()) m_temporalScreenState.taaIntermediateState = m_services.renderGraph->GetResourceState(taaHandle);
+        if (velocityHandle.IsValid()) m_temporal.ScreenState().velocityState = m_services.renderGraph->GetResourceState(velocityHandle);
+        if (taaHandle.IsValid()) m_temporal.ScreenState().taaIntermediateState = m_services.renderGraph->GetResourceState(taaHandle);
         if (rtReflHandle.IsValid()) m_rtReflectionTargets.colorState = m_services.renderGraph->GetResourceState(rtReflHandle);
         if (rtReflHistHandle.IsValid()) m_rtReflectionTargets.historyState = m_services.renderGraph->GetResourceState(rtReflHistHandle);
         if (candidateBeautyHandle.IsValid()) {

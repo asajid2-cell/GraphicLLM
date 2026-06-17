@@ -68,7 +68,7 @@ void Renderer::ExecuteRTDenoisePass(const char* frameNormalRoughnessResource) {
         }
     }
 
-    if (!normalSrv.IsValid() || !m_depthResources.descriptors.srv.IsValid() || !m_temporalScreenState.velocitySRV.IsValid() ||
+    if (!normalSrv.IsValid() || !m_depthResources.descriptors.srv.IsValid() || !m_temporal.ScreenState().velocitySRV.IsValid() ||
         !m_temporalMaskState.builtThisFrame || !m_temporalMaskState.srv.IsValid()) {
         markFallback("rt_denoiser_missing_inputs");
     }
@@ -78,7 +78,7 @@ void Renderer::ExecuteRTDenoisePass(const char* frameNormalRoughnessResource) {
         commonResources.commandList = m_commandResources.graphicsList.Get();
         commonResources.depth = {m_depthResources.resources.buffer.Get(), &m_depthResources.resources.resourceState};
         commonResources.normalRoughness = {normalResource, normalState};
-        commonResources.velocity = {m_temporalScreenState.velocityBuffer.Get(), &m_temporalScreenState.velocityState};
+        commonResources.velocity = {m_temporal.ScreenState().velocityBuffer.Get(), &m_temporal.ScreenState().velocityState};
         commonResources.temporalMask = {m_temporalMaskState.texture.Get(), &m_temporalMaskState.resourceState};
         if (!RTDenoiser::PrepareCommonResources(commonResources)) {
             markFallback("rt_denoiser_resource_transition_failed");
@@ -156,14 +156,14 @@ void Renderer::ExecuteRTDenoisePass(const char* frameNormalRoughnessResource) {
             desc.historySRV = historySRV;
             desc.depthSRV = m_depthResources.descriptors.srv;
             desc.normalRoughnessSRV = normalSrv;
-            desc.velocitySRV = m_temporalScreenState.velocitySRV;
+            desc.velocitySRV = m_temporal.ScreenState().velocitySRV;
             desc.temporalMaskSRV = m_temporalMaskState.srv;
             desc.historyUAV = historyUAV;
             desc.currentResource = current;
             desc.historyResource = history;
             desc.depthResource = m_depthResources.resources.buffer.Get();
             desc.normalRoughnessResource = normalResource;
-            desc.velocityResource = m_temporalScreenState.velocityBuffer.Get();
+            desc.velocityResource = m_temporal.ScreenState().velocityBuffer.Get();
             desc.temporalMaskResource = m_temporalMaskState.texture.Get();
             desc.srvTable = m_rtDenoiseState.srvTables[m_frameRuntime.frameIndex % kFrameCount][0];
             desc.uavTable = m_rtDenoiseState.uavTables[m_frameRuntime.frameIndex % kFrameCount][0];

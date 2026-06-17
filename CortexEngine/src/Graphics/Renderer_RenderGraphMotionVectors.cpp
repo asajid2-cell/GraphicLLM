@@ -23,7 +23,7 @@ Renderer::RenderGraphPassResult
 Renderer::ExecuteMotionVectorsInRenderGraph() {
     RenderGraphPassResult result{};
     m_frameDiagnostics.contract.motionVectors.planned = true;
-    if (!m_services.renderGraph || !m_commandResources.graphicsList || !m_temporalScreenState.velocityBuffer) {
+    if (!m_services.renderGraph || !m_commandResources.graphicsList || !m_temporal.ScreenState().velocityBuffer) {
         result.fallbackUsed = true;
         result.fallbackReason = "render_graph_motion_vectors_prerequisites_missing";
         return result;
@@ -48,7 +48,7 @@ Renderer::ExecuteMotionVectorsInRenderGraph() {
 
     m_services.renderGraph->BeginFrame();
     const RGResourceHandle velocityHandle =
-        m_services.renderGraph->ImportResource(m_temporalScreenState.velocityBuffer.Get(), m_temporalScreenState.velocityState, "Velocity");
+        m_services.renderGraph->ImportResource(m_temporal.ScreenState().velocityBuffer.Get(), m_temporal.ScreenState().velocityState, "Velocity");
     RGResourceHandle depthHandle{};
     if (!useVisibilityBufferMotion && m_depthResources.resources.buffer) {
         depthHandle = m_services.renderGraph->ImportResource(m_depthResources.resources.buffer.Get(), m_depthResources.resources.resourceState, "Depth_MotionVectors");
@@ -69,8 +69,8 @@ Renderer::ExecuteMotionVectorsInRenderGraph() {
     graphContext.useVisibilityBufferMotion = useVisibilityBufferMotion;
     graphContext.visibilityMotion.renderer = m_services.visibilityBuffer.get();
     graphContext.visibilityMotion.commandList = m_commandResources.graphicsList.Get();
-    graphContext.visibilityMotion.velocityBuffer = m_temporalScreenState.velocityBuffer.Get();
-    graphContext.visibilityMotion.velocityState = &m_temporalScreenState.velocityState;
+    graphContext.visibilityMotion.velocityBuffer = m_temporal.ScreenState().velocityBuffer.Get();
+    graphContext.visibilityMotion.velocityState = &m_temporal.ScreenState().velocityState;
     graphContext.visibilityMotion.meshDraws = &m_visibilityBufferState.meshDraws;
     graphContext.visibilityMotion.frameConstants = m_constantBuffers.currentFrameGPU;
     graphContext.visibilityMotion.visibilityShaderResourceState = kScreenSpaceShaderResourceState;
@@ -79,8 +79,8 @@ Renderer::ExecuteMotionVectorsInRenderGraph() {
     graphContext.status.stage = &motionStage;
     graphContext.cameraTarget.commandList = m_commandResources.graphicsList.Get();
     graphContext.cameraTarget.velocity = {
-        m_temporalScreenState.velocityBuffer.Get(),
-        &m_temporalScreenState.velocityState,
+        m_temporal.ScreenState().velocityBuffer.Get(),
+        &m_temporal.ScreenState().velocityState,
     };
     graphContext.cameraTarget.depth = {
         m_depthResources.resources.buffer.Get(),
@@ -88,16 +88,16 @@ Renderer::ExecuteMotionVectorsInRenderGraph() {
     };
     graphContext.cameraTarget.depthSampleState = kDepthSampleState;
     graphContext.cameraTarget.skipTransitions = true;
-    if (!useVisibilityBufferMotion && m_temporalScreenState.motionVectorSrvTableValid) {
-        auto& motionTable = m_temporalScreenState.motionVectorSrvTables[m_frameRuntime.frameIndex % kFrameCount];
+    if (!useVisibilityBufferMotion && m_temporal.ScreenState().motionVectorSrvTableValid) {
+        auto& motionTable = m_temporal.ScreenState().motionVectorSrvTables[m_frameRuntime.frameIndex % kFrameCount];
         graphContext.cameraDraw.device = m_services.device ? m_services.device->GetDevice() : nullptr;
         graphContext.cameraDraw.commandList = m_commandResources.graphicsList.Get();
         graphContext.cameraDraw.descriptorManager = m_services.descriptorManager.get();
         graphContext.cameraDraw.rootSignature = m_pipelineState.rootSignature.get();
         graphContext.cameraDraw.frameConstants = m_constantBuffers.currentFrameGPU;
         graphContext.cameraDraw.pipeline = m_pipelineState.motionVectors.get();
-        graphContext.cameraDraw.target = m_temporalScreenState.velocityBuffer.Get();
-        graphContext.cameraDraw.targetRtv = m_temporalScreenState.velocityRTV;
+        graphContext.cameraDraw.target = m_temporal.ScreenState().velocityBuffer.Get();
+        graphContext.cameraDraw.targetRtv = m_temporal.ScreenState().velocityRTV;
         graphContext.cameraDraw.depth = m_depthResources.resources.buffer.Get();
         graphContext.cameraDraw.srvTable = std::span<DescriptorHandle>(motionTable.data(), motionTable.size());
     }
@@ -105,10 +105,10 @@ Renderer::ExecuteMotionVectorsInRenderGraph() {
     if (useVisibilityBufferMotion) {
         motionResult = MotionVectorPass::AddToGraph(*m_services.renderGraph, graphContext);
     } else {
-        if (!m_depthResources.resources.buffer || !m_pipelineState.motionVectors || !m_temporalScreenState.motionVectorSrvTableValid) {
+        if (!m_depthResources.resources.buffer || !m_pipelineState.motionVectors || !m_temporal.ScreenState().motionVectorSrvTableValid) {
             m_services.renderGraph->EndFrame();
             result.fallbackUsed = true;
-            result.fallbackReason = !m_temporalScreenState.motionVectorSrvTableValid
+            result.fallbackReason = !m_temporal.ScreenState().motionVectorSrvTableValid
                 ? "render_graph_motion_vectors_camera_descriptor_table_missing"
                 : "render_graph_motion_vectors_camera_prerequisites_missing";
             m_frameDiagnostics.contract.motionVectors.visibilityBufferMotion = false;
@@ -141,7 +141,7 @@ Renderer::ExecuteMotionVectorsInRenderGraph() {
             result.fallbackReason += motionStage;
         }
     } else {
-        m_temporalScreenState.velocityState = m_services.renderGraph->GetResourceState(velocityHandle);
+        m_temporal.ScreenState().velocityState = m_services.renderGraph->GetResourceState(velocityHandle);
         if (depthHandle.IsValid()) {
             m_depthResources.resources.resourceState = m_services.renderGraph->GetResourceState(depthHandle);
         }

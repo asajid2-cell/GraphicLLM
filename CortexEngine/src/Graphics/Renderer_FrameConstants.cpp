@@ -98,7 +98,7 @@ void Renderer::UpdateFrameConstants(float deltaTime, Scene::ECS_Registry* regist
     }
 
     // Detect camera movement BEFORE jitter decision to avoid 1-frame lag.
-    // This ensures m_temporalAAState.cameraIsMoving reflects the CURRENT frame's state when
+    // This ensures m_temporal.AAState().cameraIsMoving reflects the CURRENT frame's state when
     // we decide whether to apply TAA jitter, preventing flickering at standstill.
     if (m_cameraState.hasPrevious) {
         float posDelta = glm::length(cameraPos - m_cameraState.prevPositionWS);
@@ -108,9 +108,9 @@ void Renderer::UpdateFrameConstants(float deltaTime, Scene::ECS_Registry* regist
         float angleDelta = std::acos(fwdDot);
         const float softPosThreshold   = 0.1f;
         const float softAngleThreshold = glm::radians(3.0f);
-        m_temporalAAState.cameraIsMoving = (posDelta > softPosThreshold || angleDelta > softAngleThreshold);
+        m_temporal.AAState().cameraIsMoving = (posDelta > softPosThreshold || angleDelta > softAngleThreshold);
     } else {
-        m_temporalAAState.cameraIsMoving = true;
+        m_temporal.AAState().cameraIsMoving = true;
     }
 
     // Temporal AA jitter (in pixels) and corresponding UV delta for history
@@ -128,7 +128,7 @@ void Renderer::UpdateFrameConstants(float deltaTime, Scene::ECS_Registry* regist
     float invHeight = 1.0f / std::max(1.0f, internalHeight);
 
     glm::vec2 jitterPixels(0.0f);
-    if (m_temporalAAState.enabled) {
+    if (m_temporal.AAState().enabled) {
         static bool s_checkedForceNoJitter = false;
         static bool s_forceNoJitter = false;
         if (!s_checkedForceNoJitter) {
@@ -139,13 +139,13 @@ void Renderer::UpdateFrameConstants(float deltaTime, Scene::ECS_Registry* regist
             }
         }
 
-        m_temporalAAState.jitterPrevPixels = m_temporalAAState.jitterCurrPixels;
+        m_temporal.AAState().jitterPrevPixels = m_temporal.AAState().jitterCurrPixels;
         float jx = 0.0f;
         float jy = 0.0f;
         if (!s_forceNoJitter) {
-            jx = Halton(m_temporalAAState.sampleIndex + 1, 2) - 0.5f;
-            jy = Halton(m_temporalAAState.sampleIndex + 1, 3) - 0.5f;
-            m_temporalAAState.sampleIndex++;
+            jx = Halton(m_temporal.AAState().sampleIndex + 1, 2) - 0.5f;
+            jy = Halton(m_temporal.AAState().sampleIndex + 1, 3) - 0.5f;
+            m_temporal.AAState().sampleIndex++;
         }
         // Scale jitter so per-frame shifts are small and objects remain
         // stable while still providing enough subpixel coverage for TAA.
@@ -153,17 +153,17 @@ void Renderer::UpdateFrameConstants(float deltaTime, Scene::ECS_Registry* regist
         if (s_forceNoJitter) {
             jitterScale = 0.0f;
         }
-        if (!m_temporalAAState.cameraIsMoving) {
+        if (!m_temporal.AAState().cameraIsMoving) {
             // When the camera is effectively stationary, disable jitter so
             // the image converges to a sharp, stable result without
             // "double-exposed" edges.
             jitterScale = 0.0f;
         }
         jitterPixels = glm::vec2(jx, jy) * jitterScale;
-        m_temporalAAState.jitterCurrPixels = jitterPixels;
+        m_temporal.AAState().jitterCurrPixels = jitterPixels;
     } else {
-        m_temporalAAState.jitterPrevPixels = glm::vec2(0.0f);
-        m_temporalAAState.jitterCurrPixels = glm::vec2(0.0f);
+        m_temporal.AAState().jitterPrevPixels = glm::vec2(0.0f);
+        m_temporal.AAState().jitterCurrPixels = glm::vec2(0.0f);
     }
 
     // Compute a non-jittered view-projection matrix for RT reconstruction and
@@ -175,7 +175,7 @@ void Renderer::UpdateFrameConstants(float deltaTime, Scene::ECS_Registry* regist
     frameData.invViewProjectionNoJitter = glm::inverse(vpNoJitter);
 
     // Apply jitter to projection (NDC space).
-    if (m_temporalAAState.enabled) {
+    if (m_temporal.AAState().enabled) {
         float jitterNdcX = (2.0f * jitterPixels.x) * invWidth;
         float jitterNdcY = (2.0f * jitterPixels.y) * invHeight;
         // Offset projection center; DirectX-style clip space uses [x,y] in row 2, column 0/1.

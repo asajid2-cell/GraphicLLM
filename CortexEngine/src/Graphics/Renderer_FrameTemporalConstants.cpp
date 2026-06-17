@@ -16,8 +16,8 @@ void Renderer::PublishFrameConstants(FrameConstants& frameData,
     // motion vectors. We store the *non-jittered* view-projection from the
     // previous frame so that motion vectors do not encode TAA jitter; jitter
     // is handled separately via g_TAAParams.xy in the post-process.
-    if (m_temporalAAState.hasPrevViewProj) {
-        frameData.prevViewProjectionMatrix = m_temporalAAState.prevViewProjMatrix;
+    if (m_temporal.AAState().hasPrevViewProj) {
+        frameData.prevViewProjectionMatrix = m_temporal.AAState().prevViewProjMatrix;
     } else {
         frameData.prevViewProjectionMatrix = vpNoJitter;
     }
@@ -25,12 +25,12 @@ void Renderer::PublishFrameConstants(FrameConstants& frameData,
     frameData.invViewProjectionMatrix = glm::inverse(frameData.viewProjectionMatrix);
 
     // Update history for next frame (non-jittered)
-    m_temporalAAState.prevViewProjMatrix = vpNoJitter;
-    m_temporalAAState.hasPrevViewProj = true;
+    m_temporal.AAState().prevViewProjMatrix = vpNoJitter;
+    m_temporal.AAState().hasPrevViewProj = true;
 
     // Reset RT temporal history when the camera moves significantly to
     // avoid smearing old GI/shadow data across new viewpoints.
-    // NOTE: m_temporalAAState.cameraIsMoving is now computed earlier (before jitter decision)
+    // NOTE: m_temporal.AAState().cameraIsMoving is now computed earlier (before jitter decision)
     // to avoid 1-frame lag that caused flickering at standstill.
     if (m_cameraState.hasPrevious) {
         float posDelta = glm::length(cameraPos - m_cameraState.prevPositionWS);

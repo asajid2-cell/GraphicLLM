@@ -44,7 +44,7 @@ FrameExecutionContext Renderer::BuildFrameExecutionContext(Scene::ECS_Registry* 
     featureInputs.shadowsEnabled = m_shadows.Resources().controls.enabled;
     featureInputs.gpuCullingEnabled = m_gpuCullingState.enabled;
     featureInputs.visibilityBufferEnabled = m_visibilityBufferState.enabled;
-    featureInputs.taaEnabled = m_temporalAAState.enabled;
+    featureInputs.taaEnabled = m_temporal.AAState().enabled;
     featureInputs.ssrEnabled = m_ssr.State().controls.enabled;
     featureInputs.ssaoEnabled = m_ssao.State().controls.enabled;
     featureInputs.bloomEnabled = (m_bloom.State().controls.intensity > 0.0f);
@@ -60,8 +60,8 @@ FrameExecutionContext Renderer::BuildFrameExecutionContext(Scene::ECS_Registry* 
     featureInputs.hasGPUCulling = (m_services.gpuCulling != nullptr);
     featureInputs.hasVisibilityBuffer = (m_services.visibilityBuffer != nullptr);
     featureInputs.hasTAAPipeline = pipelineReadiness.taa;
-    featureInputs.hasHistoryColor = (m_temporalScreenState.historyColor != nullptr);
-    featureInputs.hasTAAIntermediate = (m_temporalScreenState.taaIntermediate != nullptr);
+    featureInputs.hasHistoryColor = (m_temporal.ScreenState().historyColor != nullptr);
+    featureInputs.hasTAAIntermediate = (m_temporal.ScreenState().taaIntermediate != nullptr);
     featureInputs.hasSSRPipeline = pipelineReadiness.ssr;
     featureInputs.hasSSRColor = (m_ssr.State().resources.color != nullptr);
     featureInputs.hasHDRColor = (m_mainTargets.hdr.resources.color != nullptr);
@@ -72,7 +72,7 @@ FrameExecutionContext Renderer::BuildFrameExecutionContext(Scene::ECS_Registry* 
     featureInputs.hasBloomDownsamplePipeline = pipelineReadiness.bloomDownsample;
     featureInputs.hasVoxelPipeline = pipelineReadiness.voxel;
     featureInputs.hasMotionVectorsPipeline = pipelineReadiness.motionVectors;
-    featureInputs.hasVelocityBuffer = (m_temporalScreenState.velocityBuffer != nullptr);
+    featureInputs.hasVelocityBuffer = (m_temporal.ScreenState().velocityBuffer != nullptr);
     featureInputs.hasDepthBuffer = (m_depthResources.resources.buffer != nullptr);
     featureInputs.hasPostProcessPipeline = pipelineReadiness.postProcess;
     featureInputs.particlesEnabledForScene = m_particles.State().controls.enabledForScene;

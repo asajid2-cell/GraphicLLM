@@ -12,7 +12,7 @@ void Renderer::BuildTemporalRejectionMask(const char* frameNormalRoughnessResour
     if (!m_services.temporalRejectionMask || !m_services.temporalRejectionMask->IsReady() ||
         !m_temporalMaskState.texture || !m_temporalMaskState.uav.IsValid() ||
         !m_depthResources.resources.buffer || !m_depthResources.descriptors.srv.IsValid() ||
-        !m_temporalScreenState.velocityBuffer || !m_temporalScreenState.velocitySRV.IsValid() ||
+        !m_temporal.ScreenState().velocityBuffer || !m_temporal.ScreenState().velocitySRV.IsValid() ||
         !m_services.device || !m_services.descriptorManager || !m_commandResources.graphicsList ||
         !m_temporalMaskState.descriptorTablesValid) {
         return;
@@ -54,11 +54,11 @@ void Renderer::BuildTemporalRejectionMask(const char* frameNormalRoughnessResour
     desc.frameConstants = m_constantBuffers.currentFrameGPU;
     desc.depthSRV = m_depthResources.descriptors.srv;
     desc.normalRoughnessSRV = normalSrv;
-    desc.velocitySRV = m_temporalScreenState.velocitySRV;
+    desc.velocitySRV = m_temporal.ScreenState().velocitySRV;
     desc.outputUAV = m_temporalMaskState.uav;
     desc.depthResource = m_depthResources.resources.buffer.Get();
     desc.normalRoughnessResource = normalResource;
-    desc.velocityResource = m_temporalScreenState.velocityBuffer.Get();
+    desc.velocityResource = m_temporal.ScreenState().velocityBuffer.Get();
     desc.outputResource = m_temporalMaskState.texture.Get();
     desc.srvTable = m_temporalMaskState.srvTables[m_frameRuntime.frameIndex % kFrameCount][0];
     desc.uavTable = m_temporalMaskState.uavTables[m_frameRuntime.frameIndex % kFrameCount][0];
@@ -70,7 +70,7 @@ void Renderer::BuildTemporalRejectionMask(const char* frameNormalRoughnessResour
             m_services.descriptorManager.get(),
             {m_depthResources.resources.buffer.Get(), &m_depthResources.resources.resourceState},
             {normalResource, normalState},
-            {m_temporalScreenState.velocityBuffer.Get(), &m_temporalScreenState.velocityState},
+            {m_temporal.ScreenState().velocityBuffer.Get(), &m_temporal.ScreenState().velocityState},
             {m_temporalMaskState.texture.Get(), &m_temporalMaskState.resourceState},
             kDepthSampleState,
             kSrvState,

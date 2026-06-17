@@ -116,19 +116,19 @@ bool Renderer::IsDeviceRemoved() const {
 }
 
 void Renderer::SetTAAEnabled(bool enabled) {
-    if (m_temporalAAState.enabled == enabled) {
+    if (m_temporal.AAState().enabled == enabled) {
         return;
     }
-    m_temporalAAState.enabled = enabled;
+    m_temporal.AAState().enabled = enabled;
     // When toggling TAA, reset sample index so the Halton sequence
     // restarts cleanly and avoid sudden large jumps in jitter.
-    m_temporalAAState.sampleIndex = 0;
-    m_temporalAAState.jitterPrevPixels = glm::vec2(0.0f);
-    m_temporalAAState.jitterCurrPixels = glm::vec2(0.0f);
+    m_temporal.AAState().sampleIndex = 0;
+    m_temporal.AAState().jitterPrevPixels = glm::vec2(0.0f);
+    m_temporal.AAState().jitterCurrPixels = glm::vec2(0.0f);
     // Force history to be re-seeded on the next frame so we do not mix
     // incompatible LDR/HDR or pre/post-teleport data.
     InvalidateTAAHistory(enabled ? "feature_enabled" : "feature_disabled");
-    spdlog::info("TAA {}", m_temporalAAState.enabled ? "ENABLED" : "DISABLED");
+    spdlog::info("TAA {}", m_temporal.AAState().enabled ? "ENABLED" : "DISABLED");
 }
 
 void Renderer::SetPCSS(bool enabled) {
@@ -160,7 +160,7 @@ bool Renderer::IsTAAEnabled() const {
 }
 
 void Renderer::ToggleTAA() {
-    SetTAAEnabled(!m_temporalAAState.enabled);
+    SetTAAEnabled(!m_temporal.AAState().enabled);
 }
 
 void Renderer::SetParticlesEnabled(bool enabled) {

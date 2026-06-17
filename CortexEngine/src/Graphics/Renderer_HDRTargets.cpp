@@ -94,7 +94,7 @@ Result<void> Renderer::CreateHDRTarget() {
     }
 
     InvalidateTAAHistory("resource_recreated");
-    auto historyResult = m_temporalScreenState.CreateHistoryColor(
+    auto historyResult = m_temporal.ScreenState().CreateHistoryColor(
         m_services.device->GetDevice(),
         m_services.descriptorManager.get(),
         width,
@@ -103,7 +103,7 @@ Result<void> Renderer::CreateHDRTarget() {
         spdlog::warn("{}", historyResult.Error());
     }
 
-    auto taaIntermediateResult = m_temporalScreenState.CreateTAAIntermediate(
+    auto taaIntermediateResult = m_temporal.ScreenState().CreateTAAIntermediate(
         m_services.device->GetDevice(),
         m_services.descriptorManager.get(),
         width,
@@ -121,7 +121,7 @@ Result<void> Renderer::CreateHDRTarget() {
         spdlog::warn("{}", ssrResult.Error());
     }
 
-    auto velocityResult = m_temporalScreenState.CreateVelocityBuffer(
+    auto velocityResult = m_temporal.ScreenState().CreateVelocityBuffer(
         m_services.device->GetDevice(),
         m_services.descriptorManager.get(),
         width,

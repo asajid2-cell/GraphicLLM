@@ -151,10 +151,10 @@ void Renderer::ResetTemporalHistoryForSceneChange() {
     // Reset TAA history so the first frame after a scene switch uses the
     // current HDR as the new history without blending in the previous scene.
     InvalidateTAAHistory("scene_change");
-    m_temporalAAState.sampleIndex = 0;
-    m_temporalAAState.jitterPrevPixels = glm::vec2(0.0f);
-    m_temporalAAState.jitterCurrPixels = glm::vec2(0.0f);
-    m_temporalAAState.hasPrevViewProj = false;
+    m_temporal.AAState().sampleIndex = 0;
+    m_temporal.AAState().jitterPrevPixels = glm::vec2(0.0f);
+    m_temporal.AAState().jitterCurrPixels = glm::vec2(0.0f);
+    m_temporal.AAState().hasPrevViewProj = false;
 
     // Reset RT temporal data so RT shadows / GI / reflections do not leave
     // ghosted silhouettes from the previous scene.

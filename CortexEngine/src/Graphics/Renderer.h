@@ -64,6 +64,7 @@
 #include "Graphics/Subsystems/SSRSubsystem.h"
 #include "Graphics/RendererTemporalScreenState.h"
 #include "Graphics/RendererTemporalState.h"
+#include "Graphics/Subsystems/TemporalSubsystem.h"
 #include "Graphics/RendererTextureUploadState.h"
 #include "Graphics/RendererVegetationState.h"
 #include "Graphics/RendererVisibilityBufferState.h"
@@ -721,11 +722,8 @@ private:
     void RenderSSR();
     SSRRenderContext MakeSSRRenderContext();
     void RenderTAA();
-    [[nodiscard]] bool SeedTAAHistory(bool skipTransitions);
-    [[nodiscard]] bool ResolveTAAIntermediate(bool skipTransitions);
-    [[nodiscard]] bool CopyTAAIntermediateToHDR(bool skipTransitions);
-    [[nodiscard]] bool CopyHDRToTAAHistory(bool skipTransitions);
     void RenderMotionVectors();
+    TemporalContext MakeTemporalContext();
     void BuildTemporalRejectionMask(const char* frameNormalRoughnessResource,
                                     bool skipTransitions = false,
                                     bool renderGraphOwned = false);
@@ -861,7 +859,7 @@ public:
     SSRSubsystem m_ssr;
     LocalReflectionRadianceState m_localReflectionRadianceState;
 
-    TemporalScreenPassState m_temporalScreenState;
+    TemporalSubsystem m_temporal;
     TemporalMaskPassState m_temporalMaskState;
 
 
@@ -875,8 +873,6 @@ public:
     RendererLightingState m_lightingState;
     FrameContract::SceneVisualInfo m_sceneVisualContract;
     RendererQualityRuntimeState m_qualityRuntimeState;
-    // Temporal anti-aliasing (camera-only) state
-    TemporalAAState m_temporalAAState;
     // Cached camera parameters and history used by culling, RT, and temporal passes.
     RendererCameraFrameState m_cameraState;
 

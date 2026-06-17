@@ -74,7 +74,7 @@ void Renderer::InvalidateTAAHistory(const char* reason) {
 void Renderer::MarkTAAHistoryValid() {
     TemporalMarkValidDesc desc{};
     desc.rejectionMode = "taa_resolve";
-    desc.accumulationAlpha = m_temporalAAState.blendFactor;
+    desc.accumulationAlpha = m_temporal.AAState().blendFactor;
     desc.usedVelocityReprojection = true;
     desc.usedDisocclusionRejection = true;
     m_temporalHistory.manager.MarkValid(TemporalHistoryId::TAAColor, m_frameLifecycle.renderFrameCounter, desc);
@@ -172,7 +172,7 @@ void Renderer::UpdateFrameContractHistories() {
         m_frameDiagnostics.contract.contract.histories.push_back(std::move(info));
     };
 
-    addHistory(TemporalHistoryId::TAAColor, m_temporalScreenState.historyColor.Get(), m_frameDiagnostics.contract.contract.features.taaEnabled);
+    addHistory(TemporalHistoryId::TAAColor, m_temporal.ScreenState().historyColor.Get(), m_frameDiagnostics.contract.contract.features.taaEnabled);
     addHistory(TemporalHistoryId::RTShadow, m_rtShadowTargets.history.Get(), m_frameDiagnostics.contract.contract.features.rayTracingEnabled);
     addHistory(TemporalHistoryId::RTReflection, m_rtReflectionTargets.history.Get(),
                m_frameDiagnostics.contract.contract.features.rayTracingEnabled && m_frameDiagnostics.contract.contract.features.rtReflectionsEnabled);

@@ -21,7 +21,7 @@ Renderer::RenderGraphPassResult
 Renderer::ExecuteTemporalRejectionMaskInRenderGraph(const char* frameNormalRoughnessResource) {
     RenderGraphPassResult result{};
     if (!m_services.renderGraph || !m_commandResources.graphicsList || !m_temporalMaskState.texture ||
-        !m_depthResources.resources.buffer || !m_temporalScreenState.velocityBuffer) {
+        !m_depthResources.resources.buffer || !m_temporal.ScreenState().velocityBuffer) {
         result.fallbackUsed = true;
         result.fallbackReason = "render_graph_temporal_mask_prerequisites_missing";
         return result;
@@ -69,7 +69,7 @@ Renderer::ExecuteTemporalRejectionMaskInRenderGraph(const char* frameNormalRough
     const RGResourceHandle normalHandle =
         m_services.renderGraph->ImportResource(normalResource, normalState, "NormalRoughness_TemporalMask");
     const RGResourceHandle velocityHandle =
-        m_services.renderGraph->ImportResource(m_temporalScreenState.velocityBuffer.Get(), m_temporalScreenState.velocityState, "Velocity_TemporalMask");
+        m_services.renderGraph->ImportResource(m_temporal.ScreenState().velocityBuffer.Get(), m_temporal.ScreenState().velocityState, "Velocity_TemporalMask");
     const RGResourceHandle maskHandle =
         m_services.renderGraph->ImportResource(m_temporalMaskState.texture.Get(),
                                       m_temporalMaskState.resourceState,
@@ -85,7 +85,7 @@ Renderer::ExecuteTemporalRejectionMaskInRenderGraph(const char* frameNormalRough
     graphContext.dispatch.descriptorManager = m_services.descriptorManager.get();
     graphContext.dispatch.depth = {m_depthResources.resources.buffer.Get(), &m_depthResources.resources.resourceState};
     graphContext.dispatch.normalRoughness = {normalResource, normalDispatchState};
-    graphContext.dispatch.velocity = {m_temporalScreenState.velocityBuffer.Get(), &m_temporalScreenState.velocityState};
+    graphContext.dispatch.velocity = {m_temporal.ScreenState().velocityBuffer.Get(), &m_temporal.ScreenState().velocityState};
     graphContext.dispatch.output = {m_temporalMaskState.texture.Get(), &m_temporalMaskState.resourceState};
     graphContext.dispatch.depthSampleState = kDepthSampleState;
     graphContext.dispatch.shaderResourceState = kScreenSpaceShaderResourceState;
@@ -95,11 +95,11 @@ Renderer::ExecuteTemporalRejectionMaskInRenderGraph(const char* frameNormalRough
     graphContext.dispatch.dispatch.frameConstants = m_constantBuffers.currentFrameGPU;
     graphContext.dispatch.dispatch.depthSRV = m_depthResources.descriptors.srv;
     graphContext.dispatch.dispatch.normalRoughnessSRV = normalSRV;
-    graphContext.dispatch.dispatch.velocitySRV = m_temporalScreenState.velocitySRV;
+    graphContext.dispatch.dispatch.velocitySRV = m_temporal.ScreenState().velocitySRV;
     graphContext.dispatch.dispatch.outputUAV = m_temporalMaskState.uav;
     graphContext.dispatch.dispatch.depthResource = m_depthResources.resources.buffer.Get();
     graphContext.dispatch.dispatch.normalRoughnessResource = normalResource;
-    graphContext.dispatch.dispatch.velocityResource = m_temporalScreenState.velocityBuffer.Get();
+    graphContext.dispatch.dispatch.velocityResource = m_temporal.ScreenState().velocityBuffer.Get();
     graphContext.dispatch.dispatch.outputResource = m_temporalMaskState.texture.Get();
     graphContext.dispatch.dispatch.srvTable = m_temporalMaskState.srvTables[m_frameRuntime.frameIndex % kFrameCount][0];
     graphContext.dispatch.dispatch.uavTable = m_temporalMaskState.uavTables[m_frameRuntime.frameIndex % kFrameCount][0];
@@ -130,7 +130,7 @@ Renderer::ExecuteTemporalRejectionMaskInRenderGraph(const char* frameNormalRough
         }
     } else {
         m_depthResources.resources.resourceState = m_services.renderGraph->GetResourceState(depthHandle);
-        m_temporalScreenState.velocityState = m_services.renderGraph->GetResourceState(velocityHandle);
+        m_temporal.ScreenState().velocityState = m_services.renderGraph->GetResourceState(velocityHandle);
         m_temporalMaskState.resourceState = m_services.renderGraph->GetResourceState(maskHandle);
         if (usesVBNormal) {
             auto finalStates = m_services.visibilityBuffer->GetResourceStateSnapshot();

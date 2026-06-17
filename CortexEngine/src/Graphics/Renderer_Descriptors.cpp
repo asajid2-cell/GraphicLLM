@@ -12,8 +12,8 @@
 namespace Cortex::Graphics {
 
 Result<void> Renderer::InitializeTAAResolveDescriptorTable() {
-    m_temporalScreenState.taaResolveSrvTableValid = false;
-    for (auto& table : m_temporalScreenState.taaResolveSrvTables) {
+    m_temporal.ScreenState().taaResolveSrvTableValid = false;
+    for (auto& table : m_temporal.ScreenState().taaResolveSrvTables) {
         for (auto& handle : table) {
             handle = {};
         }
@@ -32,7 +32,7 @@ Result<void> Renderer::InitializeTAAResolveDescriptorTable() {
         auto tableResult = DescriptorTable::AllocateAndWriteNullSRVTable(
             device,
             m_services.descriptorManager.get(),
-            m_temporalScreenState.taaResolveSrvTables[frame],
+            m_temporal.ScreenState().taaResolveSrvTables[frame],
             "TAA resolve",
             DXGI_FORMAT_R16G16B16A16_FLOAT);
         if (tableResult.IsErr()) {
@@ -40,11 +40,11 @@ Result<void> Renderer::InitializeTAAResolveDescriptorTable() {
         }
     }
 
-    m_temporalScreenState.taaResolveSrvTableValid = true;
-    for (size_t frame = 0; frame < kFrameCount && m_temporalScreenState.taaResolveSrvTableValid; ++frame) {
-        if (!DescriptorTable::IsContiguous(m_temporalScreenState.taaResolveSrvTables[frame])) {
+    m_temporal.ScreenState().taaResolveSrvTableValid = true;
+    for (size_t frame = 0; frame < kFrameCount && m_temporal.ScreenState().taaResolveSrvTableValid; ++frame) {
+        if (!DescriptorTable::IsContiguous(m_temporal.ScreenState().taaResolveSrvTables[frame])) {
             spdlog::warn("TAA resolve SRV table is not contiguous for frame {}; persistent table disabled", frame);
-            m_temporalScreenState.taaResolveSrvTableValid = false;
+            m_temporal.ScreenState().taaResolveSrvTableValid = false;
             break;
         }
     }
@@ -52,7 +52,7 @@ Result<void> Renderer::InitializeTAAResolveDescriptorTable() {
 }
 
 void Renderer::UpdateTAAResolveDescriptorTable() {
-    if (!m_temporalScreenState.taaResolveSrvTableValid || !m_services.device) {
+    if (!m_temporal.ScreenState().taaResolveSrvTableValid || !m_services.device) {
         return;
     }
 
@@ -66,7 +66,7 @@ void Renderer::UpdateTAAResolveDescriptorTable() {
         normalRes = m_services.visibilityBuffer->GetNormalRoughnessBuffer();
     }
 
-    auto& table = m_temporalScreenState.taaResolveSrvTables[m_frameRuntime.frameIndex % kFrameCount];
+    auto& table = m_temporal.ScreenState().taaResolveSrvTables[m_frameRuntime.frameIndex % kFrameCount];
     TAAPass::DescriptorUpdateContext context{};
     context.device = device;
     context.srvTable = std::span<DescriptorHandle>(table.data(), table.size());
@@ -77,18 +77,18 @@ void Renderer::UpdateTAAResolveDescriptorTable() {
         ? m_bloom.State().resources.texA[1].Get()
         : m_bloom.State().resources.texA[0].Get();
     context.ssao = m_ssao.State().resources.texture.Get();
-    context.history = m_temporalScreenState.historyColor.Get();
+    context.history = m_temporal.ScreenState().historyColor.Get();
     context.depth = m_depthResources.resources.buffer.Get();
     context.normalRoughness = normalRes;
     context.ssr = m_ssr.State().resources.color.Get();
-    context.velocity = m_temporalScreenState.velocityBuffer.Get();
+    context.velocity = m_temporal.ScreenState().velocityBuffer.Get();
     context.temporalMask = m_temporalMaskState.texture.Get();
     (void)TAAPass::UpdateResolveDescriptorTable(context);
 }
 
 Result<void> Renderer::InitializePostProcessDescriptorTable() {
-    m_temporalScreenState.postProcessSrvTableValid = false;
-    for (auto& table : m_temporalScreenState.postProcessSrvTables) {
+    m_temporal.ScreenState().postProcessSrvTableValid = false;
+    for (auto& table : m_temporal.ScreenState().postProcessSrvTables) {
         for (auto& handle : table) {
             handle = {};
         }
@@ -99,8 +99,8 @@ Result<void> Renderer::InitializePostProcessDescriptorTable() {
             handle = {};
         }
     }
-    m_temporalScreenState.motionVectorSrvTableValid = false;
-    for (auto& table : m_temporalScreenState.motionVectorSrvTables) {
+    m_temporal.ScreenState().motionVectorSrvTableValid = false;
+    for (auto& table : m_temporal.ScreenState().motionVectorSrvTables) {
         for (auto& handle : table) {
             handle = {};
         }
@@ -188,7 +188,7 @@ Result<void> Renderer::InitializePostProcessDescriptorTable() {
         return Result<void>::Ok();
     };
 
-    auto postTableResult = allocateTableSet(m_temporalScreenState.postProcessSrvTables, "post-process");
+    auto postTableResult = allocateTableSet(m_temporal.ScreenState().postProcessSrvTables, "post-process");
     if (postTableResult.IsErr()) {
         return postTableResult;
     }
@@ -196,7 +196,7 @@ Result<void> Renderer::InitializePostProcessDescriptorTable() {
     if (ssrTableResult.IsErr()) {
         return ssrTableResult;
     }
-    auto motionTableResult = allocateTableSet(m_temporalScreenState.motionVectorSrvTables, "motion-vector");
+    auto motionTableResult = allocateTableSet(m_temporal.ScreenState().motionVectorSrvTables, "motion-vector");
     if (motionTableResult.IsErr()) {
         return motionTableResult;
     }
@@ -289,9 +289,9 @@ Result<void> Renderer::InitializePostProcessDescriptorTable() {
         }
     };
 
-    validateTableSet(m_temporalScreenState.postProcessSrvTables, m_temporalScreenState.postProcessSrvTableValid, "Post-process");
+    validateTableSet(m_temporal.ScreenState().postProcessSrvTables, m_temporal.ScreenState().postProcessSrvTableValid, "Post-process");
     validateTableSet(m_ssr.State().descriptors.srvTables, m_ssr.State().descriptors.srvTableValid, "SSR");
-    validateTableSet(m_temporalScreenState.motionVectorSrvTables, m_temporalScreenState.motionVectorSrvTableValid, "Motion-vector");
+    validateTableSet(m_temporal.ScreenState().motionVectorSrvTables, m_temporal.ScreenState().motionVectorSrvTableValid, "Motion-vector");
     bool ssaoSrvValid = false;
     bool ssaoUavValid = false;
     bool rtDenoiseSrvValid = false;
@@ -337,7 +337,7 @@ Result<void> Renderer::InitializePostProcessDescriptorTable() {
 }
 
 void Renderer::UpdatePostProcessDescriptorTable() {
-    if (!m_temporalScreenState.postProcessSrvTableValid || !m_services.device) {
+    if (!m_temporal.ScreenState().postProcessSrvTableValid || !m_services.device) {
         return;
     }
 
@@ -363,7 +363,7 @@ void Renderer::UpdatePostProcessDescriptorTable() {
         materialExt2Res = m_services.visibilityBuffer->GetMaterialExt2Buffer();
     }
 
-    auto& table = m_temporalScreenState.postProcessSrvTables[m_frameRuntime.frameIndex % kFrameCount];
+    auto& table = m_temporal.ScreenState().postProcessSrvTables[m_frameRuntime.frameIndex % kFrameCount];
     PostProcessPass::DescriptorUpdateContext context{};
     context.device = device;
     context.srvTable = std::span<DescriptorHandle>(table.data(), table.size());
@@ -374,14 +374,14 @@ void Renderer::UpdatePostProcessDescriptorTable() {
         ? m_bloom.State().resources.texA[1].Get()
         : m_bloom.State().resources.texA[0].Get();
     context.ssao = m_ssao.State().resources.texture.Get();
-    context.history = m_temporalScreenState.historyColor.Get();
+    context.history = m_temporal.ScreenState().historyColor.Get();
     context.depth = m_depthResources.resources.buffer.Get();
     context.normalRoughness = normalRes;
     context.hzb = m_hzb.State().resources.texture.Get();
     context.hzbMipCount = m_hzb.State().resources.mipCount;
     context.wantsHzbDebug = (m_debugViewState.mode == 32u);
     context.ssr = m_ssr.State().resources.color.Get();
-    context.velocity = m_temporalScreenState.velocityBuffer.Get();
+    context.velocity = m_temporal.ScreenState().velocityBuffer.Get();
     context.rtReflection = m_rtReflectionTargets.color.Get();
     context.rtReflectionHistory = m_rtReflectionTargets.history.Get();
     context.emissiveMetallic = emissiveMetallicRes;

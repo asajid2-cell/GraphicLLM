@@ -651,11 +651,11 @@ void Renderer::UpdateFrameContractSnapshot(Scene::ECS_Registry* registry,
     }
     addResource("ssao", m_ssao.State().resources.texture.Get(), ssaoWidth, ssaoHeight);
     addResource("ssr_color", m_ssr.State().resources.color.Get(), contract.renderWidth, contract.renderHeight);
-    addResource("velocity", m_temporalScreenState.velocityBuffer.Get(), contract.renderWidth, contract.renderHeight);
+    addResource("velocity", m_temporal.ScreenState().velocityBuffer.Get(), contract.renderWidth, contract.renderHeight);
     addResource("temporal_rejection_mask", m_temporalMaskState.texture.Get(), contract.renderWidth, contract.renderHeight);
     addResource("temporal_rejection_mask_stats", m_temporalMaskState.statsBuffer.Get(), 0, 0);
-    addResource("taa_history", m_temporalScreenState.historyColor.Get(), contract.renderWidth, contract.renderHeight);
-    addResource("taa_intermediate", m_temporalScreenState.taaIntermediate.Get(), contract.renderWidth, contract.renderHeight);
+    addResource("taa_history", m_temporal.ScreenState().historyColor.Get(), contract.renderWidth, contract.renderHeight);
+    addResource("taa_intermediate", m_temporal.ScreenState().taaIntermediate.Get(), contract.renderWidth, contract.renderHeight);
     addResource("rt_shadow_mask", m_rtShadowTargets.mask.Get(), contract.renderWidth, contract.renderHeight);
     addResource("rt_shadow_history", m_rtShadowTargets.history.Get(), contract.renderWidth, contract.renderHeight);
     const uint32_t expectedReflectionWidth = m_framePlanning.rtPlan.budget.reflectionWidth > 0

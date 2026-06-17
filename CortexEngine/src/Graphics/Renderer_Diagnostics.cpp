@@ -59,7 +59,7 @@ Renderer::QualityState Renderer::GetQualityState() const {
 
 Renderer::FeatureState Renderer::GetFeatureState() const {
     FeatureState state{};
-    state.taaEnabled = m_temporalAAState.enabled;
+    state.taaEnabled = m_temporal.AAState().enabled;
     state.fxaaEnabled = m_postProcessState.fxaaEnabled;
     state.v2ReflectionCandidateEnabled = m_postProcessState.v2ReflectionCandidateEnabled;
     state.fullSceneCandidateBeautyV3Enabled = m_postProcessState.fullSceneCandidateBeautyV3Enabled;
@@ -372,9 +372,9 @@ void Renderer::ReportDeviceRemoved(const char* context,
         rs(m_mainTargets.normalRoughness.resources.state),
         rs(m_ssao.State().resources.resourceState),
         rs(m_ssr.State().resources.resourceState),
-        rs(m_temporalScreenState.velocityState),
-        rs(m_temporalScreenState.historyState),
-        rs(m_temporalScreenState.taaIntermediateState),
+        rs(m_temporal.ScreenState().velocityState),
+        rs(m_temporal.ScreenState().historyState),
+        rs(m_temporal.ScreenState().taaIntermediateState),
         rs(m_rtReflectionTargets.colorState),
         rs(m_rtReflectionTargets.historyState),
         rs(m_rtGITargets.colorState),
@@ -502,7 +502,7 @@ void Renderer::LogDiagnostics() const {
                  GetGPUCulledCount());
 
     spdlog::info("Features: TAA={} FXAA={} SSR={} SSAO={} Bloom={:.2f} Fog={} Shadows={} IBL={}",
-                 m_temporalAAState.enabled,
+                 m_temporal.AAState().enabled,
                  m_postProcessState.fxaaEnabled,
                  m_ssr.State().controls.enabled,
                  m_ssao.State().controls.enabled,

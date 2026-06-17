@@ -703,7 +703,7 @@ void Renderer::PopulateFrameDebugAndPostConstants(FrameConstants& frameData,
     // Post-process parameters: reciprocal resolution, FXAA flag, and an extra
     // channel used as a frame-local ownership toggle for ray-traced sun shadows
     // in the forward shading path.
-    float fxaaFlag = (m_temporalAAState.enabled ? 0.0f : (m_postProcessState.fxaaEnabled ? 1.0f : 0.0f));
+    float fxaaFlag = (m_temporal.AAState().enabled ? 0.0f : (m_postProcessState.fxaaEnabled ? 1.0f : 0.0f));
     // postParams.w represents "RT sun shadows enabled" per ShaderTypes.h line 102.
     // This must follow the active RT frame plan, not raw DXR runtime readiness:
     // env disables, missing TLAS/depth/mask resources, or skipped RT shadow
@@ -842,11 +842,11 @@ void Renderer::PopulateFrameDebugAndPostConstants(FrameConstants& frameData,
     // on the first frame after startup or resize. When the camera is nearly
     // stationary we reduce jitter and blend strength to keep edges crisp and
     // minimize residual ghosting.
-    glm::vec2 jitterDeltaPixels = m_temporalAAState.jitterPrevPixels - m_temporalAAState.jitterCurrPixels;
+    glm::vec2 jitterDeltaPixels = m_temporal.AAState().jitterPrevPixels - m_temporal.AAState().jitterCurrPixels;
     glm::vec2 jitterDeltaUV = glm::vec2(jitterDeltaPixels.x * invWidth, jitterDeltaPixels.y * invHeight);
-    const bool taaActiveThisFrame = m_temporalAAState.enabled && m_temporalHistory.manager.CanReproject(TemporalHistoryId::TAAColor);
-    float blendForThisFrame = m_temporalAAState.blendFactor;
-    if (!m_temporalAAState.cameraIsMoving) {
+    const bool taaActiveThisFrame = m_temporal.AAState().enabled && m_temporalHistory.manager.CanReproject(TemporalHistoryId::TAAColor);
+    float blendForThisFrame = m_temporal.AAState().blendFactor;
+    if (!m_temporal.AAState().cameraIsMoving) {
         // When the camera is effectively stationary, reduce blend strength
         // so history converges but does not dominate the image.
         blendForThisFrame *= 0.5f;

@@ -189,7 +189,7 @@ void Renderer::CycleDebugViewMode() {
         const bool hasReflSrv = m_rtReflectionTargets.srv.IsValid();
         const bool hasReflHistSrv = m_rtReflectionTargets.historySRV.IsValid();
         spdlog::info("RTRefl debug: rtSupported={} rtEnabled={} reflEnabled={} reflRes={} reflSRV={} reflHistSRV={} postTable={}",
-                     rtSupported, rtEnabled, reflEnabled, hasReflRes, hasReflSrv, hasReflHistSrv, m_temporalScreenState.postProcessSrvTableValid);
+                     rtSupported, rtEnabled, reflEnabled, hasReflRes, hasReflSrv, hasReflHistSrv, m_temporal.ScreenState().postProcessSrvTableValid);
         if (m_services.rayTracingContext) {
             spdlog::info("RTRefl debug: hasReflPipeline={}", m_services.rayTracingContext->HasReflectionPipeline());
         }

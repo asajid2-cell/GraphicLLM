@@ -99,23 +99,23 @@ void Renderer::PopulateFrameLightingAndShadows(FrameConstants& frameData,
         // a shadow-map slice index when using local light shadows.
         float shadowIndex = -1.0f;
 
-        if (m_shadowResources.controls.enabled &&
+        if (m_shadows.Resources().controls.enabled &&
             lightComp.castsShadows &&
             type == Scene::LightType::Spot)
         {
-            if (m_localShadowState.count < kMaxShadowedLocalLights) {
-                uint32_t localIndex = m_localShadowState.count;
+            if (m_shadows.Local().count < kMaxShadowedLocalLights) {
+                uint32_t localIndex = m_shadows.Local().count;
                 uint32_t slice = kShadowCascadeCount + localIndex;
 
                 shadowIndex = static_cast<float>(slice);
-                m_localShadowState.entities[localIndex] = entity;
+                m_shadows.Local().entities[localIndex] = entity;
                 localLightPos[localIndex] = lightXform.position;
                 localLightDir[localIndex] = dir;
                 localLightRange[localIndex] = lightComp.range;
                 localOuterDegrees[localIndex] = lightComp.outerConeDegrees;
 
-                ++m_localShadowState.count;
-            } else if (!m_localShadowState.budgetWarningEmitted) {
+                ++m_shadows.Local().count;
+            } else if (!m_shadows.Local().budgetWarningEmitted) {
                 std::string nameUtf8 = "<unnamed>";
                 if (registry && registry->HasComponent<Scene::TagComponent>(entity)) {
                     const auto& tag = registry->GetComponent<Scene::TagComponent>(entity).tag;
@@ -126,9 +126,9 @@ void Renderer::PopulateFrameLightingAndShadows(FrameConstants& frameData,
                 spdlog::warn(
                     "Local shadow budget exceeded ({} lights); '{}' will render without local shadows. "
                     "Consider disabling 'castsShadows' on some lights or enabling safe lighting rigs.",
-                    m_localShadowState.count,
+                    m_shadows.Local().count,
                     nameUtf8);
-                m_localShadowState.budgetWarningEmitted = true;
+                m_shadows.Local().budgetWarningEmitted = true;
             }
         }
 
@@ -174,7 +174,7 @@ void Renderer::PopulateFrameLightingAndShadows(FrameConstants& frameData,
         lightUp = glm::vec3(0.0f, 0.0f, 1.0f);
     }
 
-    m_shadowCascadeState.lightViewMatrix = glm::lookAtLH(lightPos, sceneCenter, lightUp);
+    m_shadows.Cascade().lightViewMatrix = glm::lookAtLH(lightPos, sceneCenter, lightUp);
 
     // Compute cascade splits (practical split scheme)
     const uint32_t cascadeCount = kShadowCascadeCount;
@@ -183,9 +183,9 @@ void Renderer::PopulateFrameLightingAndShadows(FrameConstants& frameData,
         float si = static_cast<float>(i + 1) / static_cast<float>(cascadeCount);
         float logSplit = camNear * std::pow(camFar / camNear, si);
         float linSplit = camNear + (camFar - camNear) * si;
-        splits[i] = m_shadowResources.controls.cascadeSplitLambda * logSplit +
-                    (1.0f - m_shadowResources.controls.cascadeSplitLambda) * linSplit;
-        m_shadowCascadeState.cascadeSplits[i] = splits[i];
+        splits[i] = m_shadows.Resources().controls.cascadeSplitLambda * logSplit +
+                    (1.0f - m_shadows.Resources().controls.cascadeSplitLambda) * linSplit;
+        m_shadows.Cascade().cascadeSplits[i] = splits[i];
     }
 
     frameData.cascadeSplits = glm::vec4(
@@ -230,7 +230,7 @@ void Renderer::PopulateFrameLightingAndShadows(FrameConstants& frameData,
             glm::vec4 world = invView * glm::vec4(cornerVS, 1.0f);
             glm::vec3 world3(world);
             frustumCornersWS[cornerIndex++] = world3;
-            glm::vec3 ls = glm::vec3(m_shadowCascadeState.lightViewMatrix * world);
+            glm::vec3 ls = glm::vec3(m_shadows.Cascade().lightViewMatrix * world);
             minLS = glm::min(minLS, ls);
             maxLS = glm::max(maxLS, ls);
         }
@@ -245,12 +245,12 @@ void Renderer::PopulateFrameLightingAndShadows(FrameConstants& frameData,
         // projection does not resize and shimmer while the camera turns.
         radius = std::max(0.1f, std::ceil(radius * 16.0f) / 16.0f);
 
-        glm::vec3 centerLS = glm::vec3(m_shadowCascadeState.lightViewMatrix * glm::vec4(cameraPos, 1.0f));
+        glm::vec3 centerLS = glm::vec3(m_shadows.Cascade().lightViewMatrix * glm::vec4(cameraPos, 1.0f));
         glm::vec3 extent(radius);
 
         // Texel snapping to reduce shimmering (per-cascade resolution scaling)
-        float effectiveResX = m_shadowResources.controls.mapSize * m_shadowResources.controls.cascadeResolutionScale[cascadeIndex];
-        float effectiveResY = m_shadowResources.controls.mapSize * m_shadowResources.controls.cascadeResolutionScale[cascadeIndex];
+        float effectiveResX = m_shadows.Resources().controls.mapSize * m_shadows.Resources().controls.cascadeResolutionScale[cascadeIndex];
+        float effectiveResY = m_shadows.Resources().controls.mapSize * m_shadows.Resources().controls.cascadeResolutionScale[cascadeIndex];
         float texelSizeX = (extent.x * 2.0f) / std::max(effectiveResX, 1.0f);
         float texelSizeY = (extent.y * 2.0f) / std::max(effectiveResY, 1.0f);
         if (texelSizeX > 0.0f) {
@@ -270,19 +270,19 @@ void Renderer::PopulateFrameLightingAndShadows(FrameConstants& frameData,
         float nearPlane = std::max(0.0f, minZ);
         float farPlane = maxZ;
 
-        m_shadowCascadeState.lightProjectionMatrices[cascadeIndex] = glm::orthoLH_ZO(minX, maxX, minY, maxY, nearPlane, farPlane);
-        m_shadowCascadeState.lightViewProjectionMatrices[cascadeIndex] = m_shadowCascadeState.lightProjectionMatrices[cascadeIndex] * m_shadowCascadeState.lightViewMatrix;
-        frameData.lightViewProjection[cascadeIndex] = m_shadowCascadeState.lightViewProjectionMatrices[cascadeIndex];
+        m_shadows.Cascade().lightProjectionMatrices[cascadeIndex] = glm::orthoLH_ZO(minX, maxX, minY, maxY, nearPlane, farPlane);
+        m_shadows.Cascade().lightViewProjectionMatrices[cascadeIndex] = m_shadows.Cascade().lightProjectionMatrices[cascadeIndex] * m_shadows.Cascade().lightViewMatrix;
+        frameData.lightViewProjection[cascadeIndex] = m_shadows.Cascade().lightViewProjectionMatrices[cascadeIndex];
     }
 
     // Build spot-light shadow view-projection matrices for any selected local
     // lights and store them in the shared lightViewProjection array starting
     // at index kShadowCascadeCount.
-    if (m_localShadowState.count > 0)
+    if (m_shadows.Local().count > 0)
     {
-        m_localShadowState.hasShadow = true;
+        m_shadows.Local().hasShadow = true;
 
-        for (uint32_t i = 0; i < m_localShadowState.count; ++i)
+        for (uint32_t i = 0; i < m_shadows.Local().count; ++i)
         {
             if (localLightRange[i] <= 0.0f)
             {
@@ -314,7 +314,7 @@ void Renderer::PopulateFrameLightingAndShadows(FrameConstants& frameData,
             glm::mat4 lightProj = glm::perspectiveLH_ZO(fovYLocal, 1.0f, nearPlane, farPlane);
             glm::mat4 lightViewProj = lightProj * spotLightView;
 
-            m_localShadowState.lightViewProjMatrices[i] = lightViewProj;
+            m_shadows.Local().lightViewProjMatrices[i] = lightViewProj;
 
             uint32_t slice = kShadowCascadeCount + i;
             if (slice < kShadowArraySize)
@@ -324,7 +324,7 @@ void Renderer::PopulateFrameLightingAndShadows(FrameConstants& frameData,
         }
 
         // Clear out any unused local shadow slots in the constant buffer.
-        for (uint32_t i = m_localShadowState.count; i < kMaxShadowedLocalLights; ++i)
+        for (uint32_t i = m_shadows.Local().count; i < kMaxShadowedLocalLights; ++i)
         {
             uint32_t slice = kShadowCascadeCount + i;
             if (slice < kShadowArraySize)
@@ -335,7 +335,7 @@ void Renderer::PopulateFrameLightingAndShadows(FrameConstants& frameData,
     }
     else
     {
-        m_localShadowState.hasShadow = false;
+        m_shadows.Local().hasShadow = false;
         for (uint32_t i = 0; i < kMaxShadowedLocalLights; ++i)
         {
             uint32_t slice = kShadowCascadeCount + i;
@@ -348,17 +348,17 @@ void Renderer::PopulateFrameLightingAndShadows(FrameConstants& frameData,
 
     const RuntimeFrameDebugSwitches debugSwitches = LoadRuntimeFrameDebugSwitches();
     const bool shadowMapOwnedThisFrame =
-        m_shadowResources.controls.enabled &&
+        m_shadows.Resources().controls.enabled &&
         !debugSwitches.disableShadows &&
-        m_shadowResources.resources.map &&
-        m_shadowResources.resources.srv.IsValid() &&
+        m_shadows.Resources().resources.map &&
+        m_shadows.Resources().resources.srv.IsValid() &&
         m_pipelineState.shadow;
 
     frameData.shadowParams = glm::vec4(
-        m_shadowResources.controls.bias,
-        m_shadowResources.controls.pcfRadius,
+        m_shadows.Resources().controls.bias,
+        m_shadows.Resources().controls.pcfRadius,
         shadowMapOwnedThisFrame ? 1.0f : 0.0f,
-        (shadowMapOwnedThisFrame && m_shadowResources.controls.pcssEnabled) ? 1.0f : 0.0f);
+        (shadowMapOwnedThisFrame && m_shadows.Resources().controls.pcssEnabled) ? 1.0f : 0.0f);
 
 }
 

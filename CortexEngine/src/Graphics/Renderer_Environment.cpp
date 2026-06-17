@@ -335,7 +335,7 @@ void Renderer::UpdateEnvironmentDescriptorTable() {
     }
 
     EnvironmentDescriptorTableInputs inputs;
-    inputs.shadowMapSRV = m_shadowResources.resources.srv;
+    inputs.shadowMapSRV = m_shadows.Resources().resources.srv;
     inputs.rtShadowMaskSRV = m_rtShadowTargets.maskSRV;
     inputs.rtShadowHistorySRV = m_rtShadowTargets.historySRV;
     inputs.rtGISRV = m_rtGITargets.srv;

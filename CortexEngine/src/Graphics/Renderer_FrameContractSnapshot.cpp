@@ -475,9 +475,9 @@ void Renderer::UpdateFrameContractSnapshot(Scene::ECS_Registry* registry,
     contract.lighting.fogFalloff = m_fogState.falloff;
     contract.lighting.godRayIntensity = m_postProcessState.godRayIntensity;
     contract.lighting.areaLightSizeScale = m_lightingState.areaLightSizeScale;
-    contract.lighting.shadowBias = m_shadowResources.controls.bias;
-    contract.lighting.shadowPCFRadius = m_shadowResources.controls.pcfRadius;
-    contract.lighting.cascadeSplitLambda = m_shadowResources.controls.cascadeSplitLambda;
+    contract.lighting.shadowBias = m_shadows.Resources().controls.bias;
+    contract.lighting.shadowPCFRadius = m_shadows.Resources().controls.pcfRadius;
+    contract.lighting.cascadeSplitLambda = m_shadows.Resources().controls.cascadeSplitLambda;
 
     if (m_framePlanning.sceneSnapshot.IsValidForFrame(m_frameLifecycle.renderFrameCounter)) {
         contract.renderables = m_framePlanning.sceneSnapshot.renderables;
@@ -677,9 +677,9 @@ void Renderer::UpdateFrameContractSnapshot(Scene::ECS_Registry* registry,
     addResource("rt_gi", m_rtGITargets.color.Get(), expectedGIWidth, expectedGIHeight);
     addResource("rt_gi_history", m_rtGITargets.history.Get(), expectedGIWidth, expectedGIHeight);
     addResource("shadow_map",
-                m_shadowResources.resources.map.Get(),
-                static_cast<uint32_t>(m_shadowResources.controls.mapSize),
-                static_cast<uint32_t>(m_shadowResources.controls.mapSize));
+                m_shadows.Resources().resources.map.Get(),
+                static_cast<uint32_t>(m_shadows.Resources().controls.mapSize),
+                static_cast<uint32_t>(m_shadows.Resources().controls.mapSize));
     for (uint32_t level = 0; level < m_bloom.State().resources.activeLevels; ++level) {
         const uint32_t div = 1u << (level + 1u);
         const uint32_t bloomWidth = std::max(1u, contract.renderWidth / div);

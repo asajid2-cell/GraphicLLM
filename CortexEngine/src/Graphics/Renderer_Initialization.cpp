@@ -50,7 +50,7 @@ Result<void> Renderer::Initialize(DX12Device* device, Window* window) {
         m_services.device->GetDedicatedVideoMemoryBytes(),
         std::max(1u, m_services.window->GetWidth()),
         std::max(1u, m_services.window->GetHeight()));
-    m_shadowResources.controls.mapSize = static_cast<float>(m_framePlanning.budgetPlan.shadowMapSize);
+    m_shadows.Resources().controls.mapSize = static_cast<float>(m_framePlanning.budgetPlan.shadowMapSize);
     m_bloom.State().resources.activeLevels = std::clamp<uint32_t>(m_framePlanning.budgetPlan.bloomLevels, 1u, kBloomLevels);
     m_assetRuntime.registry.SetBudgets(m_framePlanning.budgetPlan.textureBudgetBytes,
                                m_framePlanning.budgetPlan.environmentBudgetBytes,
@@ -362,7 +362,7 @@ Result<void> Renderer::Initialize(DX12Device* device, Window* window) {
     auto shadowResult = CreateShadowMapResources();
     if (shadowResult.IsErr()) {
         spdlog::warn("Failed to create shadow map resources: {}", shadowResult.Error());
-        m_shadowResources.controls.enabled = false;
+        m_shadows.Resources().controls.enabled = false;
     }
 
     // Create HDR render target for main pass

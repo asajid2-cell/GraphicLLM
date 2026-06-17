@@ -233,10 +233,10 @@ void Renderer::ApplySafeQualityPreset() {
 
     // Cap shadow-map resolution aggressively to keep cascaded shadows from
     // dominating memory and bandwidth in conservative mode.
-    m_shadowResources.controls.mapSize = std::min(m_shadowResources.controls.mapSize, 1024.0f);
+    m_shadows.Resources().controls.mapSize = std::min(m_shadows.Resources().controls.mapSize, 1024.0f);
     for (uint32_t i = 0; i < kShadowCascadeCount; ++i) {
-        m_shadowResources.controls.cascadeResolutionScale[i] =
-            std::min(m_shadowResources.controls.cascadeResolutionScale[i], 0.60f);
+        m_shadows.Resources().controls.cascadeResolutionScale[i] =
+            std::min(m_shadows.Resources().controls.cascadeResolutionScale[i], 0.60f);
     }
     // If the current atlas is larger than the new safe size, recreate it so
     // the VRAM savings take effect immediately instead of waiting for a

@@ -44,7 +44,7 @@ void Renderer::UpdateFrameConstants(float deltaTime, Scene::ECS_Registry* regist
     // Reset per-frame local light shadow state; will be populated below if we
     // find suitable shadow-casting spotlights. We keep the budget-warning
     // flag sticky so we do not spam logs every frame.
-    m_localShadowState.ResetFrame();
+    m_shadows.Local().ResetFrame();
 
     // Find active camera
     auto cameraView = registry->View<Scene::CameraComponent, Scene::TransformComponent>();

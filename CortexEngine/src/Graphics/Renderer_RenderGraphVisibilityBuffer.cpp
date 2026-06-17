@@ -108,8 +108,8 @@ Renderer::ExecuteVisibilityBufferInRenderGraph(Scene::ECS_Registry* registry) {
             m_depthResources.resources.resourceState,
             m_mainTargets.hdr.resources.color.Get(),
             m_mainTargets.hdr.resources.state,
-            m_shadowResources.resources.map.Get(),
-            m_shadowResources.resources.resourceState,
+            m_shadows.Resources().resources.map.Get(),
+            m_shadows.Resources().resources.resourceState,
             m_rtShadowTargets.mask.Get(),
             m_rtShadowTargets.maskState,
             m_rtGITargets.color.Get(),
@@ -237,11 +237,11 @@ Renderer::ExecuteVisibilityBufferInRenderGraph(Scene::ECS_Registry* registry) {
         vbGraphContext.deferredLighting.envDiffuseResource = deferredInputs.envDiffuseResource;
         vbGraphContext.deferredLighting.envSpecularResource = deferredInputs.envSpecularResource;
         vbGraphContext.deferredLighting.envFormat = deferredInputs.envFormat;
-        vbGraphContext.deferredLighting.shadowMapSRV = m_shadowResources.resources.srv;
+        vbGraphContext.deferredLighting.shadowMapSRV = m_shadows.Resources().resources.srv;
         vbGraphContext.deferredLighting.params = deferredInputs.params;
         vbGraphContext.deferredLighting.depthState = &m_depthResources.resources.resourceState;
         vbGraphContext.deferredLighting.hdrState = &m_mainTargets.hdr.resources.state;
-        vbGraphContext.deferredLighting.shadowState = &m_shadowResources.resources.resourceState;
+        vbGraphContext.deferredLighting.shadowState = &m_shadows.Resources().resources.resourceState;
         vbGraphContext.deferredLighting.rtShadowState = &m_rtShadowTargets.maskState;
         vbGraphContext.deferredLighting.rtGIState = &m_rtGITargets.colorState;
         vbGraphContext.deferredLighting.shadowValid = vbResources.shadow.IsValid();
@@ -282,11 +282,11 @@ Renderer::ExecuteVisibilityBufferInRenderGraph(Scene::ECS_Registry* registry) {
         vbGraphContext.fullSceneLightingV3.envDiffuseResource = deferredInputs.envDiffuseResource;
         vbGraphContext.fullSceneLightingV3.envSpecularResource = deferredInputs.envSpecularResource;
         vbGraphContext.fullSceneLightingV3.envFormat = deferredInputs.envFormat;
-        vbGraphContext.fullSceneLightingV3.shadowMapSRV = m_shadowResources.resources.srv;
+        vbGraphContext.fullSceneLightingV3.shadowMapSRV = m_shadows.Resources().resources.srv;
         vbGraphContext.fullSceneLightingV3.params = deferredInputs.params;
         vbGraphContext.fullSceneLightingV3.depthState = &m_depthResources.resources.resourceState;
         vbGraphContext.fullSceneLightingV3.lightingSplitState = &m_mainTargets.lightingV3.resources.state;
-        vbGraphContext.fullSceneLightingV3.shadowState = &m_shadowResources.resources.resourceState;
+        vbGraphContext.fullSceneLightingV3.shadowState = &m_shadows.Resources().resources.resourceState;
         vbGraphContext.fullSceneLightingV3.rtShadowState = &m_rtShadowTargets.maskState;
         vbGraphContext.fullSceneLightingV3.rtGIState = &m_rtGITargets.colorState;
         vbGraphContext.fullSceneLightingV3.enabled = fullSceneLightingV3Enabled;
@@ -315,7 +315,7 @@ Renderer::ExecuteVisibilityBufferInRenderGraph(Scene::ECS_Registry* registry) {
         } else {
             m_depthResources.resources.resourceState = m_services.renderGraph->GetResourceState(vbResources.depth);
             m_mainTargets.hdr.resources.state = m_services.renderGraph->GetResourceState(vbResources.hdr);
-            if (vbResources.shadow.IsValid()) m_shadowResources.resources.resourceState = m_services.renderGraph->GetResourceState(vbResources.shadow);
+            if (vbResources.shadow.IsValid()) m_shadows.Resources().resources.resourceState = m_services.renderGraph->GetResourceState(vbResources.shadow);
             if (vbResources.rtShadow.IsValid()) m_rtShadowTargets.maskState = m_services.renderGraph->GetResourceState(vbResources.rtShadow);
             if (vbResources.rtGI.IsValid()) m_rtGITargets.colorState = m_services.renderGraph->GetResourceState(vbResources.rtGI);
             if (vbResources.directLighting.IsValid()) {

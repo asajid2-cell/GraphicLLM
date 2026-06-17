@@ -1,70 +1,50 @@
 #include "Renderer.h"
 
-#include "Graphics/RenderableClassification.h"
-#include "Graphics/Passes/ShadowPass.h"
+#include "Core/Window.h"
 #include "Scene/ECS_Registry.h"
+#include "Scene/Components.h"
 
+// Thin forwarder to ShadowSubsystem. Shadow map state (cascades + local),
+// cascade frame state, and the shadow depth pass live in
+// Graphics/Subsystems/ShadowSubsystem. Material prep and the environment
+// descriptor-table update are injected as services.
 namespace Cortex::Graphics {
 
-void Renderer::RenderShadowPass(Scene::ECS_Registry* registry) {
-    if (!registry || !m_shadowResources.resources.map || !m_pipelineState.shadow) {
-        return;
-    }
-
-    RendererSceneSnapshot localSnapshot{};
-    const RendererSceneSnapshot* snapshot = &m_framePlanning.sceneSnapshot;
-    if (!snapshot->IsValidForFrame(m_frameLifecycle.renderFrameCounter)) {
-        localSnapshot = BuildRendererSceneSnapshot(registry, m_frameLifecycle.renderFrameCounter);
-        snapshot = &localSnapshot;
-    }
-    for (uint32_t entryIndex : snapshot->depthWritingIndices) {
-        if (entryIndex >= snapshot->entries.size()) {
-            continue;
-        }
-        const RendererSceneRenderable& sceneEntry = snapshot->entries[entryIndex];
-        if (IsAlphaTestedDepthClass(sceneEntry.depthClass) && sceneEntry.renderable) {
-            PrepareMaterialResources(*sceneEntry.renderable);
-        }
-    }
-
-    ShadowPass::DrawContext draw{};
-    draw.target.commandList = m_commandResources.graphicsList.Get();
-    draw.target.shadowMap = m_shadowResources.resources.map.Get();
-    draw.target.resourceState = &m_shadowResources.resources.resourceState;
-    draw.target.initializedForEditor = &m_shadowResources.resources.initializedForEditor;
-    draw.target.skipTransitions = m_frameDiagnostics.renderGraph.transitions.shadowPassSkipTransitions;
-    draw.dsvs = std::span<const DescriptorHandle>(m_shadowResources.resources.dsvs.data(),
-                                                  m_shadowResources.resources.dsvs.size());
-    draw.viewport = m_shadowResources.raster.viewport;
-    draw.scissor = m_shadowResources.raster.scissor;
-    draw.pipeline.commandList = m_commandResources.graphicsList.Get();
-    draw.pipeline.rootSignature = m_pipelineState.rootSignature->GetRootSignature();
-    draw.pipeline.cbvSrvUavHeap = m_services.descriptorManager
-        ? m_services.descriptorManager->GetCBV_SRV_UAV_Heap()
-        : nullptr;
-    draw.shadow = m_pipelineState.shadow.get();
-    draw.shadowDoubleSided = m_pipelineState.shadowDoubleSided.get();
-    draw.shadowAlpha = m_pipelineState.shadowAlpha.get();
-    draw.shadowAlphaDoubleSided = m_pipelineState.shadowAlphaDoubleSided.get();
-    draw.snapshot = snapshot;
-    draw.objectConstants = &m_constantBuffers.object;
-    draw.materialConstants = &m_constantBuffers.material;
-    draw.shadowConstants = &m_constantBuffers.shadow;
-    draw.frameConstants = m_constantBuffers.currentFrameGPU;
-    draw.materialFallbacks = {
+ShadowContext Renderer::MakeShadowContext() {
+    ShadowContext ctx{};
+    ctx.commandList = m_commandResources.graphicsList.Get();
+    ctx.device = m_services.device;
+    ctx.descriptorManager = m_services.descriptorManager.get();
+    ctx.windowWidth = m_services.window ? m_services.window->GetWidth() : 0;
+    ctx.windowHeight = m_services.window ? m_services.window->GetHeight() : 0;
+    ctx.rootSignature = m_pipelineState.rootSignature ? m_pipelineState.rootSignature->GetRootSignature() : nullptr;
+    ctx.cbvSrvUavHeap = m_services.descriptorManager ? m_services.descriptorManager->GetCBV_SRV_UAV_Heap() : nullptr;
+    ctx.shadow = m_pipelineState.shadow.get();
+    ctx.shadowDoubleSided = m_pipelineState.shadowDoubleSided.get();
+    ctx.shadowAlpha = m_pipelineState.shadowAlpha.get();
+    ctx.shadowAlphaDoubleSided = m_pipelineState.shadowAlphaDoubleSided.get();
+    ctx.shadowPipelineValid = (m_pipelineState.shadow != nullptr);
+    ctx.objectConstants = &m_constantBuffers.object;
+    ctx.materialConstants = &m_constantBuffers.material;
+    ctx.shadowConstants = &m_constantBuffers.shadow;
+    ctx.frameConstants = m_constantBuffers.currentFrameGPU;
+    ctx.materialFallbacks = {
         m_materialFallbacks.albedo.get(),
         m_materialFallbacks.normal.get(),
         m_materialFallbacks.metallic.get(),
         m_materialFallbacks.roughness.get()
     };
-    draw.drawCounter = &m_frameDiagnostics.contract.drawCounts.shadowDraws;
-    draw.cascadeCount = kShadowCascadeCount;
-    draw.maxShadowedLocalLights = kMaxShadowedLocalLights;
-    draw.shadowArraySize = kShadowArraySize;
-    draw.localShadowHasShadow = m_localShadowState.hasShadow;
-    draw.localShadowCount = m_localShadowState.count;
+    ctx.skipTransitions = m_frameDiagnostics.renderGraph.transitions.shadowPassSkipTransitions;
+    ctx.sceneSnapshot = &m_framePlanning.sceneSnapshot;
+    ctx.renderFrameCounter = m_frameLifecycle.renderFrameCounter;
+    ctx.outShadowDraws = &m_frameDiagnostics.contract.drawCounts.shadowDraws;
+    ctx.prepareMaterial = [this](Scene::RenderableComponent& r) { PrepareMaterialResources(r); };
+    ctx.updateEnvironmentTable = [this]() { UpdateEnvironmentDescriptorTable(); };
+    return ctx;
+}
 
-    (void)ShadowPass::Draw(draw);
+void Renderer::RenderShadowPass(Scene::ECS_Registry* registry) {
+    m_shadows.RenderPass(registry, MakeShadowContext());
 }
 
 } // namespace Cortex::Graphics

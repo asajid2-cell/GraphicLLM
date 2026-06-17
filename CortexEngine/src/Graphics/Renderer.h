@@ -59,6 +59,7 @@
 #include "Graphics/Subsystems/SSAOSubsystem.h"
 #include "Graphics/RendererServiceState.h"
 #include "Graphics/RendererShadowState.h"
+#include "Graphics/Subsystems/ShadowSubsystem.h"
 #include "Graphics/RendererSSRState.h"
 #include "Graphics/Subsystems/SSRSubsystem.h"
 #include "Graphics/RendererTemporalScreenState.h"
@@ -506,10 +507,7 @@ public:
     [[nodiscard]] bool IsCommandListOpen() const;
 
 private:
-    static constexpr uint32_t kShadowCascadeCount = 3;
     // Total shadow-map array slices: cascades (sun) + local lights.
-    static constexpr uint32_t kMaxShadowedLocalLights = 3;
-    static constexpr uint32_t kShadowArraySize = kShadowCascadeCount + kMaxShadowedLocalLights;
 
     struct MainSceneEffectsResult {
         const char* frameNormalRoughnessResource = "gbuffer_normal_roughness";
@@ -669,6 +667,7 @@ private:
     void FillMaterialTextureIndices(const Scene::RenderableComponent& renderable,
                                     MaterialConstants& materialData) const;
     void RenderShadowPass(Scene::ECS_Registry* registry);
+    ShadowContext MakeShadowContext();
     struct RenderGraphPassResult {
         bool executed = false;
         bool fallbackUsed = false;
@@ -853,7 +852,7 @@ public:
     DepthTargetState m_depthResources;
     HZBSubsystem m_hzb;
 
-    ShadowMapPassState<kShadowArraySize, kShadowCascadeCount> m_shadowResources;
+    ShadowSubsystem m_shadows;
     EnvironmentLightingState m_environmentState;
     MainRenderTargetState m_mainTargets;
 
@@ -880,8 +879,6 @@ public:
     TemporalAAState m_temporalAAState;
     // Cached camera parameters and history used by culling, RT, and temporal passes.
     RendererCameraFrameState m_cameraState;
-    RendererLocalShadowState<kMaxShadowedLocalLights> m_localShadowState;
-    ShadowCascadeFrameState<kShadowCascadeCount> m_shadowCascadeState;
 
     RTRuntimeState m_rtRuntimeState;
     GpuCullingRuntimeState m_gpuCullingState;

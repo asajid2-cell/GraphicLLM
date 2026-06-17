@@ -107,7 +107,7 @@ Renderer::ExecuteDepthPrepassInRenderGraph(Scene::ECS_Registry* registry) {
 Renderer::RenderGraphPassResult
 Renderer::ExecuteShadowPassInRenderGraph(Scene::ECS_Registry* registry) {
     RenderGraphPassResult result{};
-    if (!m_services.renderGraph || !m_commandResources.graphicsList || !m_shadowResources.resources.map) {
+    if (!m_services.renderGraph || !m_commandResources.graphicsList || !m_shadows.Resources().resources.map) {
         result.fallbackUsed = true;
         result.fallbackReason = "render_graph_shadow_prerequisites_missing";
         return result;
@@ -115,7 +115,7 @@ Renderer::ExecuteShadowPassInRenderGraph(Scene::ECS_Registry* registry) {
 
     m_services.renderGraph->BeginFrame();
     const RGResourceHandle shadowHandle =
-        m_services.renderGraph->ImportResource(m_shadowResources.resources.map.Get(), m_shadowResources.resources.resourceState, "ShadowMap");
+        m_services.renderGraph->ImportResource(m_shadows.Resources().resources.map.Get(), m_shadows.Resources().resources.resourceState, "ShadowMap");
 
     bool stageFailed = false;
     const char* stageError = nullptr;
@@ -139,14 +139,14 @@ Renderer::ExecuteShadowPassInRenderGraph(Scene::ECS_Registry* registry) {
         }
     }
     graphContext.draw.target.commandList = m_commandResources.graphicsList.Get();
-    graphContext.draw.target.shadowMap = m_shadowResources.resources.map.Get();
-    graphContext.draw.target.resourceState = &m_shadowResources.resources.resourceState;
-    graphContext.draw.target.initializedForEditor = &m_shadowResources.resources.initializedForEditor;
+    graphContext.draw.target.shadowMap = m_shadows.Resources().resources.map.Get();
+    graphContext.draw.target.resourceState = &m_shadows.Resources().resources.resourceState;
+    graphContext.draw.target.initializedForEditor = &m_shadows.Resources().resources.initializedForEditor;
     graphContext.draw.target.skipTransitions = true;
-    graphContext.draw.dsvs = std::span<const DescriptorHandle>(m_shadowResources.resources.dsvs.data(),
-                                                               m_shadowResources.resources.dsvs.size());
-    graphContext.draw.viewport = m_shadowResources.raster.viewport;
-    graphContext.draw.scissor = m_shadowResources.raster.scissor;
+    graphContext.draw.dsvs = std::span<const DescriptorHandle>(m_shadows.Resources().resources.dsvs.data(),
+                                                               m_shadows.Resources().resources.dsvs.size());
+    graphContext.draw.viewport = m_shadows.Resources().raster.viewport;
+    graphContext.draw.scissor = m_shadows.Resources().raster.scissor;
     graphContext.draw.pipeline.commandList = m_commandResources.graphicsList.Get();
     graphContext.draw.pipeline.rootSignature = m_pipelineState.rootSignature->GetRootSignature();
     graphContext.draw.pipeline.cbvSrvUavHeap = m_services.descriptorManager
@@ -171,8 +171,8 @@ Renderer::ExecuteShadowPassInRenderGraph(Scene::ECS_Registry* registry) {
     graphContext.draw.cascadeCount = kShadowCascadeCount;
     graphContext.draw.maxShadowedLocalLights = kMaxShadowedLocalLights;
     graphContext.draw.shadowArraySize = kShadowArraySize;
-    graphContext.draw.localShadowHasShadow = m_localShadowState.hasShadow;
-    graphContext.draw.localShadowCount = m_localShadowState.count;
+    graphContext.draw.localShadowHasShadow = m_shadows.Local().hasShadow;
+    graphContext.draw.localShadowCount = m_shadows.Local().count;
 
     const RGResourceHandle shadowResult = ShadowPass::AddToGraph(*m_services.renderGraph, graphContext);
     if (!shadowResult.IsValid()) {
@@ -195,7 +195,7 @@ Renderer::ExecuteShadowPassInRenderGraph(Scene::ECS_Registry* registry) {
             result.fallbackReason += stageError;
         }
     } else {
-        m_shadowResources.resources.resourceState = m_services.renderGraph->GetResourceState(shadowHandle);
+        m_shadows.Resources().resources.resourceState = m_services.renderGraph->GetResourceState(shadowHandle);
         result.executed = true;
     }
     m_services.renderGraph->EndFrame();

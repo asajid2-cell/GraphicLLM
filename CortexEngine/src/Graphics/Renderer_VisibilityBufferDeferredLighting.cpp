@@ -120,10 +120,10 @@ Renderer::PrepareVisibilityBufferDeferredLighting(Scene::ECS_Registry* registry)
                   m_environmentState.backgroundBlur);
     deferredParams.cascadeSplits = m_constantBuffers.frameCPU.cascadeSplits;
     deferredParams.shadowParams = glm::vec4(
-        m_shadowResources.controls.bias,
-        m_shadowResources.controls.pcfRadius,
-        m_shadowResources.controls.enabled ? 1.0f : 0.0f,
-        m_shadowResources.controls.pcssEnabled ? 1.0f : 0.0f);
+        m_shadows.Resources().controls.bias,
+        m_shadows.Resources().controls.pcfRadius,
+        m_shadows.Resources().controls.enabled ? 1.0f : 0.0f,
+        m_shadows.Resources().controls.pcssEnabled ? 1.0f : 0.0f);
     const float backgroundExposure = (DisableVisibleBackgroundFromEnv() || !m_environmentState.backgroundVisible)
         ? 0.0f
         : m_environmentState.backgroundExposure;
@@ -132,7 +132,7 @@ Renderer::PrepareVisibilityBufferDeferredLighting(Scene::ECS_Registry* registry)
         m_environmentState.specularIntensity,
         m_environmentState.enabled ? 1.0f : 0.0f,
         backgroundExposure);
-    float invShadowDim = 1.0f / static_cast<float>(m_shadowResources.controls.mapSize);
+    float invShadowDim = 1.0f / static_cast<float>(m_shadows.Resources().controls.mapSize);
     deferredParams.shadowInvSizeAndSpecMaxMip =
         glm::vec4(invShadowDim, invShadowDim, 8.0f, glm::radians(m_environmentState.rotationDegrees));
     float nearZ = 0.1f, farZ = 1000.0f;
@@ -186,7 +186,7 @@ void Renderer::ApplyVisibilityBufferDeferredLighting(const VisibilityBufferDefer
         inputs.envDiffuseResource,
         inputs.envSpecularResource,
         inputs.envFormat,
-        m_shadowResources.resources.srv,
+        m_shadows.Resources().resources.srv,
         inputs.params);
     if (lightingResult.IsErr()) {
         spdlog::warn("VB deferred lighting failed: {}", lightingResult.Error());

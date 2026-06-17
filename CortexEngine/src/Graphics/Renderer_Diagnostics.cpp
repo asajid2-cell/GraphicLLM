@@ -46,13 +46,13 @@ Renderer::QualityState Renderer::GetQualityState() const {
     state.exposure = m_qualityRuntimeState.exposure;
     state.bloomIntensity = m_bloom.State().controls.intensity;
     state.renderScale = m_qualityRuntimeState.renderScale;
-    state.shadowsEnabled = m_shadowResources.controls.enabled;
+    state.shadowsEnabled = m_shadows.Resources().controls.enabled;
     state.debugViewMode = static_cast<int>(m_debugViewState.mode);
     state.hzbDebugMip = m_hzb.State().debug.debugMip;
-    state.shadowBias = m_shadowResources.controls.bias;
-    state.shadowPCFRadius = m_shadowResources.controls.pcfRadius;
-    state.cascadeSplitLambda = m_shadowResources.controls.cascadeSplitLambda;
-    state.cascade0ResolutionScale = m_shadowResources.controls.cascadeResolutionScale[0];
+    state.shadowBias = m_shadows.Resources().controls.bias;
+    state.shadowPCFRadius = m_shadows.Resources().controls.pcfRadius;
+    state.cascadeSplitLambda = m_shadows.Resources().controls.cascadeSplitLambda;
+    state.cascade0ResolutionScale = m_shadows.Resources().controls.cascadeResolutionScale[0];
     state.visualValidationCaptured = m_frameLifecycle.visualValidationCaptured;
     return state;
 }
@@ -63,7 +63,7 @@ Renderer::FeatureState Renderer::GetFeatureState() const {
     state.fxaaEnabled = m_postProcessState.fxaaEnabled;
     state.v2ReflectionCandidateEnabled = m_postProcessState.v2ReflectionCandidateEnabled;
     state.fullSceneCandidateBeautyV3Enabled = m_postProcessState.fullSceneCandidateBeautyV3Enabled;
-    state.pcssEnabled = m_shadowResources.controls.pcssEnabled;
+    state.pcssEnabled = m_shadows.Resources().controls.pcssEnabled;
     state.ssaoEnabled = m_ssao.State().controls.enabled;
     state.ssaoRadius = m_ssao.State().controls.radius;
     state.ssaoBias = m_ssao.State().controls.bias;
@@ -365,7 +365,7 @@ void Renderer::ReportDeviceRemoved(const char* context,
         file ? file : "unknown",
         line,
         rs(m_depthResources.resources.resourceState),
-        rs(m_shadowResources.resources.resourceState),
+        rs(m_shadows.Resources().resources.resourceState),
         rs(m_mainTargets.hdr.resources.state),
         rs(m_rtShadowTargets.maskState),
         rs(m_rtShadowTargets.historyState),
@@ -508,7 +508,7 @@ void Renderer::LogDiagnostics() const {
                  m_ssao.State().controls.enabled,
                  m_bloom.State().controls.intensity,
                  m_fogState.enabled,
-                 m_shadowResources.controls.enabled,
+                 m_shadows.Resources().controls.enabled,
                  m_environmentState.enabled);
     spdlog::info("RT: supported={} enabled={} reflections={} GI={}",
                  m_rtRuntimeState.supported,

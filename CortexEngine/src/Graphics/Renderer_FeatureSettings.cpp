@@ -132,7 +132,7 @@ void Renderer::SetTAAEnabled(bool enabled) {
 }
 
 void Renderer::SetPCSS(bool enabled) {
-    m_shadowResources.controls.pcssEnabled = enabled;
+    m_shadows.Resources().controls.pcssEnabled = enabled;
 }
 
 void Renderer::SetFXAAEnabled(bool enabled) {

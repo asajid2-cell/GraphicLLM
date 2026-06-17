@@ -10,6 +10,10 @@
 
 namespace Cortex::Graphics {
 
+inline constexpr uint32_t kShadowCascadeCount = 3;
+inline constexpr uint32_t kMaxShadowedLocalLights = 3;
+inline constexpr uint32_t kShadowArraySize = kShadowCascadeCount + kMaxShadowedLocalLights;
+
 template <uint32_t ShadowArraySize>
 struct ShadowMapResources {
     ComPtr<ID3D12Resource> map;

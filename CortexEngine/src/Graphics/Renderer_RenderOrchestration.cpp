@@ -168,7 +168,7 @@ void Renderer::ResetTemporalHistoryForSceneChange() {
 
     // Clear any pending debug-line state to avoid drawing lines that belonged
     // to the previous layout.
-    m_debugLineState.lines.clear();
-    m_debugLineState.disabled = false;
+    m_debugLines.State().lines.clear();
+    m_debugLines.State().disabled = false;
 }
 } // namespace Cortex::Graphics

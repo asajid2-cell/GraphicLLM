@@ -40,6 +40,7 @@
 #include "Graphics/RendererBloomState.h"
 #include "Graphics/RendererCameraState.h"
 #include "Graphics/RendererDebugLineState.h"
+#include "Graphics/Subsystems/DebugLineSubsystem.h"
 #include "Graphics/RendererDepthState.h"
 #include "Graphics/RendererEnvironmentState.h"
 #include "Graphics/RendererGPUCullingState.h"
@@ -868,7 +869,7 @@ public:
 
     MaterialFallbackTextureState m_materialFallbacks;
 
-    DebugLineRenderState m_debugLineState;
+    DebugLineSubsystem m_debugLines;
     RendererDebugViewState m_debugViewState;
 
     RendererLightingState m_lightingState;

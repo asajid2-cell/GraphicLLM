@@ -32,3 +32,23 @@ CortexEngine/docs/*LEDGER.md
 CortexEngine/models/
 CortexEngine/assets/**/*.hdr
 CortexEngine/assets/**/*.exr
+
+# Generated evidence / scene-authoring campaign dumps (untracked, do not version)
+CortexEngine/artifacts/
+CortexEngine/model_authored/
+CortexEngine/potential repo pictures/
+CortexEngine/shap_e_model_cache/
+CortexEngine/docs/media/**/generated/
+CortexEngine/docs/media/**/*.bmp
+
+# Deregistered vendored deps (llama.cpp; LLM backend is OFF by default)
+CortexEngine/vendor/
+
+# Python cache
+**/__pycache__/
+*.pyc
+
+# Stray local outputs / accidental files
+CortexEngine/*_stdout.txt
+CortexEngine/System.Collections.Hashtable
+CortexEngine/debug_menu_state.json

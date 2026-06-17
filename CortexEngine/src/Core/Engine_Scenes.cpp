@@ -2670,11 +2670,14 @@ void Engine::BuildRecipeScene() {
         entt::entity cam = m_registry->CreateEntity();
         m_registry->AddComponent<Scene::TagComponent>(cam, "MainCamera");
         auto& t = m_registry->AddComponent<TransformComponent>(cam);
-        t.position = glm::vec3(6.8f, 6.2f, -8.8f);
-        const glm::vec3 target(0.0f, 0.4f, 0.6f);
+        // Interior eye-level 3/4 view from a front corner (front wall is behind
+        // the camera, so it doesn't occlude) looking across the room toward the
+        // back furniture wall — reads like a real interior photo.
+        t.position = glm::vec3(2.7f, 1.7f, 2.9f);
+        const glm::vec3 target(-0.3f, 0.9f, -1.9f);
         t.rotation = glm::quatLookAtLH(glm::normalize(target - t.position), glm::vec3(0.0f, 1.0f, 0.0f));
         auto& c = m_registry->AddComponent<Scene::CameraComponent>(cam);
-        c.fov = 50.0f;
+        c.fov = 62.0f;
         ConfigureShowcaseCameraClip(c, 120.0f);
         c.isActive = true;
         m_activeCameraEntity = cam;

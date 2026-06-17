@@ -108,9 +108,9 @@ void Renderer::RecordFramePass(const char* name,
         if (resource == "back_buffer" && m_services.window) return resourceBytes(m_services.window->GetCurrentBackBuffer());
         if (resource == "bloom") {
             double total = 0.0;
-            for (uint32_t level = 0; level < m_bloomResources.resources.activeLevels; ++level) {
-                total += resourceBytes(m_bloomResources.resources.texA[level].Get());
-                total += resourceBytes(m_bloomResources.resources.texB[level].Get());
+            for (uint32_t level = 0; level < m_bloom.State().resources.activeLevels; ++level) {
+                total += resourceBytes(m_bloom.State().resources.texA[level].Get());
+                total += resourceBytes(m_bloom.State().resources.texB[level].Get());
             }
             return total;
         }

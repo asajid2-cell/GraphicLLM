@@ -38,6 +38,7 @@
 #include "Graphics/Renderer_PipelineSetupTypes.h"
 #include "Graphics/RendererQualityRuntimeState.h"
 #include "Graphics/RendererBloomState.h"
+#include "Graphics/Subsystems/BloomSubsystem.h"
 #include "Graphics/RendererCameraState.h"
 #include "Graphics/RendererDebugLineState.h"
 #include "Graphics/Subsystems/DebugLineSubsystem.h"
@@ -509,9 +510,6 @@ private:
     // Total shadow-map array slices: cascades (sun) + local lights.
     static constexpr uint32_t kMaxShadowedLocalLights = 3;
     static constexpr uint32_t kShadowArraySize = kShadowCascadeCount + kMaxShadowedLocalLights;
-    static constexpr uint32_t kBloomLevels = 3;
-    static constexpr uint32_t kBloomDescriptorSlots =
-        1u + (kBloomLevels - 1u) + (2u * kBloomLevels) + kBloomLevels;
 
     struct MainSceneEffectsResult {
         const char* frameNormalRoughnessResource = "gbuffer_normal_roughness";
@@ -748,15 +746,7 @@ private:
     void RenderSSAOAsync();  // Async compute version
     SSAORenderContext MakeSSAORenderContext();
     void RenderBloom();
-    [[nodiscard]] bool PrepareBloomPassState();
-    [[nodiscard]] bool BindBloomPassSRV(DescriptorHandle source, const char* label, uint32_t tableSlot);
-    [[nodiscard]] bool BindBloomPassTexture(ID3D12Resource* source, DXGI_FORMAT format, const char* label, uint32_t tableSlot);
-    [[nodiscard]] bool RenderBloomDownsampleBase(bool skipTransitions);
-    [[nodiscard]] bool RenderBloomDownsampleLevel(uint32_t level, bool skipTransitions);
-    [[nodiscard]] bool RenderBloomBlurHorizontal(uint32_t level, bool skipTransitions);
-    [[nodiscard]] bool RenderBloomBlurVertical(uint32_t level, bool skipTransitions);
-    [[nodiscard]] bool RenderBloomComposite(bool skipTransitions);
-    [[nodiscard]] bool CopyBloomCompositeToCombined(bool skipTransitions);
+    BloomContext MakeBloomContext();
     void RenderPostProcess();
     void RenderDebugLines();
     void ProcessGpuJobsPerFrame();
@@ -876,7 +866,7 @@ public:
     TemporalMaskPassState m_temporalMaskState;
 
 
-    BloomPassState<kBloomLevels, kBloomDescriptorSlots> m_bloomResources;
+    BloomSubsystem m_bloom;
 
     MaterialFallbackTextureState m_materialFallbacks;
 

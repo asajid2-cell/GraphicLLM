@@ -135,9 +135,9 @@ Renderer::VRAMBreakdown Renderer::GetEstimatedVRAMBreakdown() const {
     addResource(breakdown.debugBytes, m_debugLines.State().vertexBuffer.Get());
     addResource(breakdown.voxelBytes, m_voxel.State().gridBuffer.Get());
 
-    for (uint32_t i = 0; i < m_bloomResources.resources.activeLevels; ++i) {
-        addResource(breakdown.postProcessBytes, m_bloomResources.resources.texA[i].Get());
-        addResource(breakdown.postProcessBytes, m_bloomResources.resources.texB[i].Get());
+    for (uint32_t i = 0; i < m_bloom.State().resources.activeLevels; ++i) {
+        addResource(breakdown.postProcessBytes, m_bloom.State().resources.texA[i].Get());
+        addResource(breakdown.postProcessBytes, m_bloom.State().resources.texB[i].Get());
     }
 
     const AssetRegistry::MemoryBreakdown assets = m_assetRuntime.registry.GetMemoryBreakdown();

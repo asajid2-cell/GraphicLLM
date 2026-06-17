@@ -44,7 +44,7 @@ Renderer::QualityState Renderer::GetQualityState() const {
         : m_qualityRuntimeState.activeGraphicsPresetId;
     state.graphicsPresetDirtyFromUI = m_qualityRuntimeState.graphicsPresetDirtyFromUI;
     state.exposure = m_qualityRuntimeState.exposure;
-    state.bloomIntensity = m_bloomResources.controls.intensity;
+    state.bloomIntensity = m_bloom.State().controls.intensity;
     state.renderScale = m_qualityRuntimeState.renderScale;
     state.shadowsEnabled = m_shadowResources.controls.enabled;
     state.debugViewMode = static_cast<int>(m_debugViewState.mode);
@@ -198,9 +198,9 @@ Renderer::WaterState Renderer::GetWaterState() const {
 
 Renderer::PostProcessState Renderer::GetPostProcessState() const {
     PostProcessState state = m_postProcessState;
-    state.bloomThreshold = m_bloomResources.controls.threshold;
-    state.bloomSoftKnee = m_bloomResources.controls.softKnee;
-    state.bloomMaxContribution = m_bloomResources.controls.maxContribution;
+    state.bloomThreshold = m_bloom.State().controls.threshold;
+    state.bloomSoftKnee = m_bloom.State().controls.softKnee;
+    state.bloomMaxContribution = m_bloom.State().controls.maxContribution;
     return state;
 }
 
@@ -506,7 +506,7 @@ void Renderer::LogDiagnostics() const {
                  m_postProcessState.fxaaEnabled,
                  m_ssr.State().controls.enabled,
                  m_ssao.State().controls.enabled,
-                 m_bloomResources.controls.intensity,
+                 m_bloom.State().controls.intensity,
                  m_fogState.enabled,
                  m_shadowResources.controls.enabled,
                  m_environmentState.enabled);

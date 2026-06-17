@@ -51,7 +51,7 @@ Result<void> Renderer::Initialize(DX12Device* device, Window* window) {
         std::max(1u, m_services.window->GetWidth()),
         std::max(1u, m_services.window->GetHeight()));
     m_shadowResources.controls.mapSize = static_cast<float>(m_framePlanning.budgetPlan.shadowMapSize);
-    m_bloomResources.resources.activeLevels = std::clamp<uint32_t>(m_framePlanning.budgetPlan.bloomLevels, 1u, kBloomLevels);
+    m_bloom.State().resources.activeLevels = std::clamp<uint32_t>(m_framePlanning.budgetPlan.bloomLevels, 1u, kBloomLevels);
     m_assetRuntime.registry.SetBudgets(m_framePlanning.budgetPlan.textureBudgetBytes,
                                m_framePlanning.budgetPlan.environmentBudgetBytes,
                                m_framePlanning.budgetPlan.geometryBudgetBytes,
@@ -466,7 +466,7 @@ Result<void> Renderer::Initialize(DX12Device* device, Window* window) {
         SetTAAEnabled(false);
         SetSSREnabled(false);
         SetSSAOEnabled(false);
-        m_bloomResources.controls.intensity = 0.0f;
+        m_bloom.State().controls.intensity = 0.0f;
     }
 
     // Compile shaders and create pipeline

@@ -117,11 +117,11 @@ Renderer::ExecuteTAAInRenderGraph() {
     taaContext.resolveDescriptors.device = m_services.device ? m_services.device->GetDevice() : nullptr;
     taaContext.resolveDescriptors.srvTable = std::span<DescriptorHandle>(resolveTable.data(), resolveTable.size());
     taaContext.resolveDescriptors.hdr = m_mainTargets.hdr.resources.color.Get();
-    taaContext.resolveDescriptors.bloomIntensity = m_bloomResources.controls.intensity;
-    taaContext.resolveDescriptors.bloomOverride = m_bloomResources.resources.postProcessOverride;
-    taaContext.resolveDescriptors.bloomFallback = (m_bloomResources.resources.activeLevels > 1)
-        ? m_bloomResources.resources.texA[1].Get()
-        : m_bloomResources.resources.texA[0].Get();
+    taaContext.resolveDescriptors.bloomIntensity = m_bloom.State().controls.intensity;
+    taaContext.resolveDescriptors.bloomOverride = m_bloom.State().resources.postProcessOverride;
+    taaContext.resolveDescriptors.bloomFallback = (m_bloom.State().resources.activeLevels > 1)
+        ? m_bloom.State().resources.texA[1].Get()
+        : m_bloom.State().resources.texA[0].Get();
     taaContext.resolveDescriptors.ssao = m_ssao.State().resources.texture.Get();
     taaContext.resolveDescriptors.history = m_temporalScreenState.historyColor.Get();
     taaContext.resolveDescriptors.depth = m_depthResources.resources.buffer.Get();

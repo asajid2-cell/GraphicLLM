@@ -71,11 +71,11 @@ void Renderer::UpdateTAAResolveDescriptorTable() {
     context.device = device;
     context.srvTable = std::span<DescriptorHandle>(table.data(), table.size());
     context.hdr = m_mainTargets.hdr.resources.color.Get();
-    context.bloomIntensity = m_bloomResources.controls.intensity;
-    context.bloomOverride = m_bloomResources.resources.postProcessOverride;
-    context.bloomFallback = (m_bloomResources.resources.activeLevels > 1)
-        ? m_bloomResources.resources.texA[1].Get()
-        : m_bloomResources.resources.texA[0].Get();
+    context.bloomIntensity = m_bloom.State().controls.intensity;
+    context.bloomOverride = m_bloom.State().resources.postProcessOverride;
+    context.bloomFallback = (m_bloom.State().resources.activeLevels > 1)
+        ? m_bloom.State().resources.texA[1].Get()
+        : m_bloom.State().resources.texA[0].Get();
     context.ssao = m_ssao.State().resources.texture.Get();
     context.history = m_temporalScreenState.historyColor.Get();
     context.depth = m_depthResources.resources.buffer.Get();
@@ -151,8 +151,8 @@ Result<void> Renderer::InitializePostProcessDescriptorTable() {
             handle = {};
         }
     }
-    m_bloomResources.descriptors.srvTableValid = false;
-    for (auto& table : m_bloomResources.descriptors.srvTables) {
+    m_bloom.State().descriptors.srvTableValid = false;
+    for (auto& table : m_bloom.State().descriptors.srvTables) {
         for (auto& handle : table) {
             handle = {};
         }
@@ -256,7 +256,7 @@ Result<void> Renderer::InitializePostProcessDescriptorTable() {
     if (rtReflectionSignalStatsUavResult.IsErr()) {
         return rtReflectionSignalStatsUavResult;
     }
-    auto bloomTableResult = allocateTableSet(m_bloomResources.descriptors.srvTables, "bloom");
+    auto bloomTableResult = allocateTableSet(m_bloom.State().descriptors.srvTables, "bloom");
     if (bloomTableResult.IsErr()) {
         return bloomTableResult;
     }
@@ -332,7 +332,7 @@ Result<void> Renderer::InitializePostProcessDescriptorTable() {
                      "RT reflection signal stats UAV");
     m_rtReflectionSignalState.descriptors.valid =
         rtReflectionSignalStatsSrvValid && rtReflectionSignalStatsUavValid;
-    validateTableSet(m_bloomResources.descriptors.srvTables, m_bloomResources.descriptors.srvTableValid, "Bloom");
+    validateTableSet(m_bloom.State().descriptors.srvTables, m_bloom.State().descriptors.srvTableValid, "Bloom");
     return Result<void>::Ok();
 }
 
@@ -368,11 +368,11 @@ void Renderer::UpdatePostProcessDescriptorTable() {
     context.device = device;
     context.srvTable = std::span<DescriptorHandle>(table.data(), table.size());
     context.hdr = m_mainTargets.hdr.resources.color.Get();
-    context.bloomIntensity = m_bloomResources.controls.intensity;
-    context.bloomOverride = m_bloomResources.resources.postProcessOverride;
-    context.bloomFallback = (m_bloomResources.resources.activeLevels > 1)
-        ? m_bloomResources.resources.texA[1].Get()
-        : m_bloomResources.resources.texA[0].Get();
+    context.bloomIntensity = m_bloom.State().controls.intensity;
+    context.bloomOverride = m_bloom.State().resources.postProcessOverride;
+    context.bloomFallback = (m_bloom.State().resources.activeLevels > 1)
+        ? m_bloom.State().resources.texA[1].Get()
+        : m_bloom.State().resources.texA[0].Get();
     context.ssao = m_ssao.State().resources.texture.Get();
     context.history = m_temporalScreenState.historyColor.Get();
     context.depth = m_depthResources.resources.buffer.Get();

@@ -64,10 +64,10 @@ Renderer::FeatureState Renderer::GetFeatureState() const {
     state.v2ReflectionCandidateEnabled = m_postProcessState.v2ReflectionCandidateEnabled;
     state.fullSceneCandidateBeautyV3Enabled = m_postProcessState.fullSceneCandidateBeautyV3Enabled;
     state.pcssEnabled = m_shadowResources.controls.pcssEnabled;
-    state.ssaoEnabled = m_ssaoResources.controls.enabled;
-    state.ssaoRadius = m_ssaoResources.controls.radius;
-    state.ssaoBias = m_ssaoResources.controls.bias;
-    state.ssaoIntensity = m_ssaoResources.controls.intensity;
+    state.ssaoEnabled = m_ssao.State().controls.enabled;
+    state.ssaoRadius = m_ssao.State().controls.radius;
+    state.ssaoBias = m_ssao.State().controls.bias;
+    state.ssaoIntensity = m_ssao.State().controls.intensity;
     state.iblEnabled = m_environmentState.enabled;
     state.iblLimitEnabled = m_environmentState.limitEnabled;
     state.ssrEnabled = m_ssrResources.controls.enabled;
@@ -370,7 +370,7 @@ void Renderer::ReportDeviceRemoved(const char* context,
         rs(m_rtShadowTargets.maskState),
         rs(m_rtShadowTargets.historyState),
         rs(m_mainTargets.normalRoughness.resources.state),
-        rs(m_ssaoResources.resources.resourceState),
+        rs(m_ssao.State().resources.resourceState),
         rs(m_ssrResources.resources.resourceState),
         rs(m_temporalScreenState.velocityState),
         rs(m_temporalScreenState.historyState),
@@ -505,7 +505,7 @@ void Renderer::LogDiagnostics() const {
                  m_temporalAAState.enabled,
                  m_postProcessState.fxaaEnabled,
                  m_ssrResources.controls.enabled,
-                 m_ssaoResources.controls.enabled,
+                 m_ssao.State().controls.enabled,
                  m_bloomResources.controls.intensity,
                  m_fogState.enabled,
                  m_shadowResources.controls.enabled,

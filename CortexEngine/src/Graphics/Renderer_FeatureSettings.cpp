@@ -235,11 +235,11 @@ void Renderer::CycleScreenSpaceEffectsDebug() {
     // Determine current state from flags:
     // 0 = both on, 1 = SSR only, 2 = SSAO only, 3 = both off
     uint32_t state = 0;
-    if (m_ssrResources.controls.enabled && m_ssaoResources.controls.enabled) {
+    if (m_ssrResources.controls.enabled && m_ssao.State().controls.enabled) {
         state = 0;
-    } else if (m_ssrResources.controls.enabled && !m_ssaoResources.controls.enabled) {
+    } else if (m_ssrResources.controls.enabled && !m_ssao.State().controls.enabled) {
         state = 1;
-    } else if (!m_ssrResources.controls.enabled && m_ssaoResources.controls.enabled) {
+    } else if (!m_ssrResources.controls.enabled && m_ssao.State().controls.enabled) {
         state = 2;
     } else {
         state = 3;

@@ -23,7 +23,7 @@ void Renderer::RenderPostProcess() {
             D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
         const PostProcessTargetPass::ResourceStateRef shaderResources[] = {
             {m_mainTargets.hdr.resources.color.Get(), &m_mainTargets.hdr.resources.state, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE},
-            {m_ssaoResources.resources.texture.Get(), &m_ssaoResources.resources.resourceState, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE},
+            {m_ssao.State().resources.texture.Get(), &m_ssao.State().resources.resourceState, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE},
             {m_ssrResources.resources.color.Get(), &m_ssrResources.resources.resourceState, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE},
             {wantsHzbDebug ? m_hzb.State().resources.texture.Get() : nullptr, &m_hzb.State().resources.resourceState, hzbDebugState},
             {m_temporalScreenState.velocityBuffer.Get(), &m_temporalScreenState.velocityState, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE},

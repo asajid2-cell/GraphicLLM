@@ -309,6 +309,7 @@ set(CORTEX_SOURCES
     src/Graphics/Subsystems/DebugLineSubsystem.cpp
     src/Graphics/Subsystems/VoxelSubsystem.cpp
     src/Graphics/Subsystems/HZBSubsystem.cpp
+    src/Graphics/Subsystems/SSAOSubsystem.cpp
     src/Graphics/Renderer_SSAO.cpp
     src/Graphics/ManyLightReservoir.cpp
     src/Graphics/DiffuseRadianceCache.cpp

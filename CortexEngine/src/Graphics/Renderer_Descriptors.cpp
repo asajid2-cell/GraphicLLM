@@ -76,7 +76,7 @@ void Renderer::UpdateTAAResolveDescriptorTable() {
     context.bloomFallback = (m_bloomResources.resources.activeLevels > 1)
         ? m_bloomResources.resources.texA[1].Get()
         : m_bloomResources.resources.texA[0].Get();
-    context.ssao = m_ssaoResources.resources.texture.Get();
+    context.ssao = m_ssao.State().resources.texture.Get();
     context.history = m_temporalScreenState.historyColor.Get();
     context.depth = m_depthResources.resources.buffer.Get();
     context.normalRoughness = normalRes;
@@ -129,13 +129,13 @@ Result<void> Renderer::InitializePostProcessDescriptorTable() {
     }
     m_rtReflectionSignalState.descriptors.ResetHandles();
     m_localReflectionRadianceState.descriptors.Reset();
-    m_ssaoResources.descriptors.descriptorTablesValid = false;
-    for (auto& table : m_ssaoResources.descriptors.srvTables) {
+    m_ssao.State().descriptors.descriptorTablesValid = false;
+    for (auto& table : m_ssao.State().descriptors.srvTables) {
         for (auto& handle : table) {
             handle = {};
         }
     }
-    for (auto& table : m_ssaoResources.descriptors.uavTables) {
+    for (auto& table : m_ssao.State().descriptors.uavTables) {
         for (auto& handle : table) {
             handle = {};
         }
@@ -200,11 +200,11 @@ Result<void> Renderer::InitializePostProcessDescriptorTable() {
     if (motionTableResult.IsErr()) {
         return motionTableResult;
     }
-    auto ssaoSrvTableResult = allocateTableSet(m_ssaoResources.descriptors.srvTables, "SSAO SRV");
+    auto ssaoSrvTableResult = allocateTableSet(m_ssao.State().descriptors.srvTables, "SSAO SRV");
     if (ssaoSrvTableResult.IsErr()) {
         return ssaoSrvTableResult;
     }
-    auto ssaoUavTableResult = allocateTableSet(m_ssaoResources.descriptors.uavTables, "SSAO UAV");
+    auto ssaoUavTableResult = allocateTableSet(m_ssao.State().descriptors.uavTables, "SSAO UAV");
     if (ssaoUavTableResult.IsErr()) {
         return ssaoUavTableResult;
     }
@@ -304,9 +304,9 @@ Result<void> Renderer::InitializePostProcessDescriptorTable() {
     bool temporalMaskStatsUavValid = false;
     bool rtReflectionSignalStatsSrvValid = false;
     bool rtReflectionSignalStatsUavValid = false;
-    validateTableSet(m_ssaoResources.descriptors.srvTables, ssaoSrvValid, "SSAO SRV");
-    validateTableSet(m_ssaoResources.descriptors.uavTables, ssaoUavValid, "SSAO UAV");
-    m_ssaoResources.descriptors.descriptorTablesValid = ssaoSrvValid && ssaoUavValid;
+    validateTableSet(m_ssao.State().descriptors.srvTables, ssaoSrvValid, "SSAO SRV");
+    validateTableSet(m_ssao.State().descriptors.uavTables, ssaoUavValid, "SSAO UAV");
+    m_ssao.State().descriptors.descriptorTablesValid = ssaoSrvValid && ssaoUavValid;
     validateTableSet(m_rtDenoiseState.srvTables, rtDenoiseSrvValid, "RT denoise SRV");
     validateTableSet(m_rtDenoiseState.uavTables, rtDenoiseUavValid, "RT denoise UAV");
     m_rtDenoiseState.descriptorTablesValid = rtDenoiseSrvValid && rtDenoiseUavValid;
@@ -373,7 +373,7 @@ void Renderer::UpdatePostProcessDescriptorTable() {
     context.bloomFallback = (m_bloomResources.resources.activeLevels > 1)
         ? m_bloomResources.resources.texA[1].Get()
         : m_bloomResources.resources.texA[0].Get();
-    context.ssao = m_ssaoResources.resources.texture.Get();
+    context.ssao = m_ssao.State().resources.texture.Get();
     context.history = m_temporalScreenState.historyColor.Get();
     context.depth = m_depthResources.resources.buffer.Get();
     context.normalRoughness = normalRes;

@@ -754,12 +754,12 @@ void Renderer::PopulateFrameDebugAndPostConstants(FrameConstants& frameData,
 
     // SSAO parameters packed into aoParams. Disable sampling if the SSAO
     // resources are unavailable so post-process does not read null SRVs.
-    const bool ssaoResourcesReady = (m_ssaoResources.resources.texture && m_ssaoResources.resources.srv.IsValid());
+    const bool ssaoResourcesReady = (m_ssao.State().resources.texture && m_ssao.State().resources.srv.IsValid());
     frameData.aoParams = glm::vec4(
-        (m_ssaoResources.controls.enabled && ssaoResourcesReady) ? 1.0f : 0.0f,
-        m_ssaoResources.controls.radius,
-        m_ssaoResources.controls.bias,
-        m_ssaoResources.controls.intensity);
+        (m_ssao.State().controls.enabled && ssaoResourcesReady) ? 1.0f : 0.0f,
+        m_ssao.State().controls.radius,
+        m_ssao.State().controls.bias,
+        m_ssao.State().controls.intensity);
 
     // Bloom shaping parameters. The w component is used as a small bitmask for
     // post-process feature toggles so the shader can safely gate optional

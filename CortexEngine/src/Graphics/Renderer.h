@@ -53,6 +53,7 @@
 #include "Graphics/RendererParticleState.h"
 #include "Graphics/RendererRTState.h"
 #include "Graphics/RendererSSAOState.h"
+#include "Graphics/Subsystems/SSAOSubsystem.h"
 #include "Graphics/RendererServiceState.h"
 #include "Graphics/RendererShadowState.h"
 #include "Graphics/RendererSSRState.h"
@@ -740,6 +741,7 @@ private:
     void UpdatePostProcessDescriptorTable();
     void RenderSSAO();
     void RenderSSAOAsync();  // Async compute version
+    SSAORenderContext MakeSSAORenderContext();
     void RenderBloom();
     [[nodiscard]] bool PrepareBloomPassState();
     [[nodiscard]] bool BindBloomPassSRV(DescriptorHandle source, const char* label, uint32_t tableSlot);
@@ -859,7 +861,7 @@ public:
     EnvironmentLightingState m_environmentState;
     MainRenderTargetState m_mainTargets;
 
-    SSAOPassState m_ssaoResources;
+    SSAOSubsystem m_ssao;
 
     SSRPassState m_ssrResources;
     LocalReflectionRadianceState m_localReflectionRadianceState;

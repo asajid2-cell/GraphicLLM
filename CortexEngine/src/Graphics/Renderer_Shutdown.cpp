@@ -96,7 +96,7 @@ void Renderer::Shutdown() {
     m_mainTargets.reflectionV3.resources.Reset();
     m_mainTargets.compositeV3.resources.Reset();
     m_mainTargets.candidateBeautyV3.resources.Reset();
-    m_ssaoResources.resources.texture.Reset();
+    m_ssao.State().resources.texture.Reset();
     m_commandResources.graphicsList.Reset();
     for (auto& allocator : m_commandResources.graphicsAllocators) {
         allocator.Reset();

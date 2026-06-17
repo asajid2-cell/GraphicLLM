@@ -122,7 +122,7 @@ Renderer::ExecuteTAAInRenderGraph() {
     taaContext.resolveDescriptors.bloomFallback = (m_bloomResources.resources.activeLevels > 1)
         ? m_bloomResources.resources.texA[1].Get()
         : m_bloomResources.resources.texA[0].Get();
-    taaContext.resolveDescriptors.ssao = m_ssaoResources.resources.texture.Get();
+    taaContext.resolveDescriptors.ssao = m_ssao.State().resources.texture.Get();
     taaContext.resolveDescriptors.history = m_temporalScreenState.historyColor.Get();
     taaContext.resolveDescriptors.depth = m_depthResources.resources.buffer.Get();
     taaContext.resolveDescriptors.normalRoughness = normalResource;

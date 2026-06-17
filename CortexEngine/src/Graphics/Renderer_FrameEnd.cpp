@@ -221,7 +221,7 @@ void Renderer::EndFrame() {
     // called, even if the main post-process resolve was skipped.
     {
         const EndFrameShaderResourcePass::TransitionTarget targets[] = {
-            {m_ssaoResources.resources.texture.Get(), &m_ssaoResources.resources.resourceState},
+            {m_ssao.State().resources.texture.Get(), &m_ssao.State().resources.resourceState},
             {m_ssrResources.resources.color.Get(), &m_ssrResources.resources.resourceState},
             {m_temporalScreenState.velocityBuffer.Get(), &m_temporalScreenState.velocityState},
             {m_temporalScreenState.taaIntermediate.Get(), &m_temporalScreenState.taaIntermediateState},

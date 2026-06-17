@@ -16,19 +16,19 @@ Renderer::ExecuteSSAOInRenderGraph() {
     RenderGraphPassResult result{};
     const bool useComputeSSAO = m_pipelineState.ssaoCompute && m_frameRuntime.asyncComputeSupported;
 
-    if (!m_services.renderGraph || !m_commandResources.graphicsList || !m_ssaoResources.controls.enabled || !m_ssaoResources.resources.texture ||
+    if (!m_services.renderGraph || !m_commandResources.graphicsList || !m_ssao.State().controls.enabled || !m_ssao.State().resources.texture ||
         !m_depthResources.resources.buffer || !m_depthResources.descriptors.srv.IsValid()) {
         result.fallbackUsed = true;
         result.fallbackReason = "render_graph_ssao_prerequisites_missing";
         return result;
     }
 
-    if (useComputeSSAO && !m_ssaoResources.resources.uav.IsValid()) {
+    if (useComputeSSAO && !m_ssao.State().resources.uav.IsValid()) {
         result.fallbackUsed = true;
         result.fallbackReason = "render_graph_ssao_uav_missing";
         return result;
     }
-    if (!m_ssaoResources.descriptors.descriptorTablesValid) {
+    if (!m_ssao.State().descriptors.descriptorTablesValid) {
         result.fallbackUsed = true;
         result.fallbackReason = "render_graph_ssao_descriptor_tables_missing";
         return result;
@@ -41,7 +41,7 @@ Renderer::ExecuteSSAOInRenderGraph() {
     const RGResourceHandle depthHandle =
         m_services.renderGraph->ImportResource(m_depthResources.resources.buffer.Get(), m_depthResources.resources.resourceState, "Depth_SSAO");
     const RGResourceHandle ssaoHandle =
-        m_services.renderGraph->ImportResource(m_ssaoResources.resources.texture.Get(), m_ssaoResources.resources.resourceState, "SSAO");
+        m_services.renderGraph->ImportResource(m_ssao.State().resources.texture.Get(), m_ssao.State().resources.resourceState, "SSAO");
 
     SSAOPass::GraphContext ssaoContext{};
     ssaoContext.depth = depthHandle;
@@ -57,18 +57,18 @@ Renderer::ExecuteSSAOInRenderGraph() {
         kDepthSampleState,
     };
     ssaoContext.prepare.target = {
-        m_ssaoResources.resources.texture.Get(),
-        &m_ssaoResources.resources.resourceState,
+        m_ssao.State().resources.texture.Get(),
+        &m_ssao.State().resources.resourceState,
         useComputeSSAO ? D3D12_RESOURCE_STATE_UNORDERED_ACCESS : D3D12_RESOURCE_STATE_RENDER_TARGET,
     };
-    auto& ssaoSrvTable = m_ssaoResources.descriptors.srvTables[m_frameRuntime.frameIndex % kFrameCount];
+    auto& ssaoSrvTable = m_ssao.State().descriptors.srvTables[m_frameRuntime.frameIndex % kFrameCount];
     if (useComputeSSAO) {
         const bool compactRoot = m_pipelineState.singleSrvUavComputeRootSignature != nullptr;
         ID3D12RootSignature* ssaoRootSignature =
             compactRoot ? m_pipelineState.singleSrvUavComputeRootSignature.Get() : m_pipelineState.computeRootSignature->GetRootSignature();
         const uint32_t srvTableSize = compactRoot ? 1u : 10u;
         const uint32_t uavTableSize = compactRoot ? 1u : 4u;
-        auto& ssaoUavTable = m_ssaoResources.descriptors.uavTables[m_frameRuntime.frameIndex % kFrameCount];
+        auto& ssaoUavTable = m_ssao.State().descriptors.uavTables[m_frameRuntime.frameIndex % kFrameCount];
         ssaoContext.compute.device = m_services.device ? m_services.device->GetDevice() : nullptr;
         ssaoContext.compute.commandList = m_commandResources.graphicsList.Get();
         ssaoContext.compute.descriptorManager = m_services.descriptorManager.get();
@@ -78,7 +78,7 @@ Renderer::ExecuteSSAOInRenderGraph() {
         ssaoContext.compute.frameConstantsRoot = compactRoot ? 0u : 1u;
         ssaoContext.compute.srvTableRoot = compactRoot ? 1u : 3u;
         ssaoContext.compute.uavTableRoot = compactRoot ? 2u : 6u;
-        ssaoContext.compute.target = m_ssaoResources.resources.texture.Get();
+        ssaoContext.compute.target = m_ssao.State().resources.texture.Get();
         ssaoContext.compute.depth = m_depthResources.resources.buffer.Get();
         ssaoContext.compute.srvTable = std::span<DescriptorHandle>(ssaoSrvTable.data(), srvTableSize);
         ssaoContext.compute.uavTable = std::span<DescriptorHandle>(ssaoUavTable.data(), uavTableSize);
@@ -89,8 +89,8 @@ Renderer::ExecuteSSAOInRenderGraph() {
         ssaoContext.graphics.rootSignature = m_pipelineState.rootSignature.get();
         ssaoContext.graphics.frameConstants = m_constantBuffers.currentFrameGPU;
         ssaoContext.graphics.pipeline = m_pipelineState.ssao.get();
-        ssaoContext.graphics.target = m_ssaoResources.resources.texture.Get();
-        ssaoContext.graphics.targetRtv = m_ssaoResources.resources.rtv;
+        ssaoContext.graphics.target = m_ssao.State().resources.texture.Get();
+        ssaoContext.graphics.targetRtv = m_ssao.State().resources.rtv;
         ssaoContext.graphics.depth = m_depthResources.resources.buffer.Get();
         ssaoContext.graphics.srvTable = std::span<DescriptorHandle>(ssaoSrvTable.data(), ssaoSrvTable.size());
     }
@@ -111,7 +111,7 @@ Renderer::ExecuteSSAOInRenderGraph() {
         }
     } else {
         m_depthResources.resources.resourceState = m_services.renderGraph->GetResourceState(depthHandle);
-        m_ssaoResources.resources.resourceState = m_services.renderGraph->GetResourceState(ssaoHandle);
+        m_ssao.State().resources.resourceState = m_services.renderGraph->GetResourceState(ssaoHandle);
         result.executed = true;
     }
     m_services.renderGraph->EndFrame();

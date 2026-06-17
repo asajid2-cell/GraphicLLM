@@ -298,8 +298,8 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
                 ? depthHandle
                 : m_services.renderGraph->ImportResource(m_depthResources.resources.buffer.Get(), m_depthResources.resources.resourceState, "Depth_Post");
         }
-        if (m_ssaoResources.resources.texture) {
-            ssaoHandle = m_services.renderGraph->ImportResource(m_ssaoResources.resources.texture.Get(), m_ssaoResources.resources.resourceState, "SSAO");
+        if (m_ssao.State().resources.texture) {
+            ssaoHandle = m_services.renderGraph->ImportResource(m_ssao.State().resources.texture.Get(), m_ssao.State().resources.resourceState, "SSAO");
         }
         if (m_ssrResources.resources.color) {
             ssrHandle = m_services.renderGraph->ImportResource(m_ssrResources.resources.color.Get(), m_ssrResources.resources.resourceState, "SSRColor");
@@ -763,7 +763,7 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
         executeContext.descriptorUpdate.bloomFallback = (m_bloomResources.resources.activeLevels > 1)
             ? m_bloomResources.resources.texA[1].Get()
             : m_bloomResources.resources.texA[0].Get();
-        executeContext.descriptorUpdate.ssao = m_ssaoResources.resources.texture.Get();
+        executeContext.descriptorUpdate.ssao = m_ssao.State().resources.texture.Get();
         executeContext.descriptorUpdate.history = m_temporalScreenState.historyColor.Get();
         executeContext.descriptorUpdate.depth = m_depthResources.resources.buffer.Get();
         executeContext.descriptorUpdate.normalRoughness = postNormalResource;
@@ -1171,7 +1171,7 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
             const uint32_t level = (m_bloomResources.resources.activeLevels > 1) ? 1u : 0u;
             m_bloomResources.resources.resourceState[level][0] = m_services.renderGraph->GetResourceState(bloomHandle);
         }
-        if (ssaoHandle.IsValid()) m_ssaoResources.resources.resourceState = m_services.renderGraph->GetResourceState(ssaoHandle);
+        if (ssaoHandle.IsValid()) m_ssao.State().resources.resourceState = m_services.renderGraph->GetResourceState(ssaoHandle);
         if (ssrHandle.IsValid()) m_ssrResources.resources.resourceState = m_services.renderGraph->GetResourceState(ssrHandle);
         if (historyHandle.IsValid()) m_temporalScreenState.historyState = m_services.renderGraph->GetResourceState(historyHandle);
         if (depthPpHandle.IsValid()) m_depthResources.resources.resourceState = m_services.renderGraph->GetResourceState(depthPpHandle);

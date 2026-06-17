@@ -111,12 +111,79 @@ void PlaceFloor(std::vector<std::shared_ptr<SceneCommand>>& out, float width, fl
     out.push_back(std::move(cmd));
 }
 
+// Place a real asset at an EXPLICIT uniform scale (used for tiled walls, where
+// every segment must share one scale to line up). Ground-snapped by the executor.
+void PlaceExplicit(std::vector<std::shared_ptr<SceneCommand>>& out, const Scene::AssetCatalog& cat,
+                   const std::string& key, float scale, float x, float z, float yawDeg,
+                   const glm::vec4& color = glm::vec4(1.0f)) {
+    if (!cat.ResolvePath(key)) {
+        return;
+    }
+    auto cmd = std::make_shared<AddEntityCommand>();
+    cmd->entityType = AddEntityCommand::EntityType::Model;
+    cmd->asset = key;
+    cmd->name = key;
+    cmd->position = glm::vec3(x, 0.0f, z);
+    cmd->scale = glm::vec3(scale);
+    cmd->color = color;
+    cmd->roughness = 0.85f;
+    cmd->rotationEuler = glm::vec3(0.0f, yawDeg, 0.0f);
+    cmd->hasRotation = true;
+    cmd->autoPlace = false;
+    cmd->allowPlacementJitter = false;
+    cmd->disableCollisionAvoidance = true;
+    out.push_back(std::move(cmd));
+}
+
+// Build a room shell: floor + a perimeter of tiled real wall segments (interior
+// width x depth, centered at origin). Each wall is scaled to ~segLen m so the
+// segments tile cleanly; a center gap is left on the +Z (front) side as a
+// doorway. Falls back to a bare floor if no wall asset is available.
+void BuildRoomShell(std::vector<std::shared_ptr<SceneCommand>>& out, const Scene::AssetCatalog& cat,
+                    FootprintCache& c, float width, float depth, const glm::vec4& floorColor) {
+    PlaceFloor(out, width, depth, floorColor);
+
+    const std::string wallKey = "wall";
+    if (!cat.ResolvePath(wallKey)) {
+        return;
+    }
+    const Footprint fp = Measure(cat, c, wallKey);
+    const float wallLen = std::max(fp.size.x, fp.size.z);
+    if (!fp.valid || wallLen < 1e-3f) {
+        return;
+    }
+    const float segLen = 2.0f;
+    const float scale = segLen / wallLen;
+    const bool longAxisX = fp.size.x >= fp.size.z;
+    const float backYaw = longAxisX ? 0.0f : 90.0f; // align wall length to X for front/back runs
+    const float sideYaw = longAxisX ? 90.0f : 0.0f; // align wall length to Z for left/right runs
+    const glm::vec4 wallColor(0.78f, 0.76f, 0.72f, 1.0f);
+
+    const int nx = std::max(1, static_cast<int>(std::ceil(width / segLen)));
+    const float spanX = static_cast<float>(nx) * segLen;
+    for (int i = 0; i < nx; ++i) {
+        const float x = -spanX * 0.5f + segLen * (static_cast<float>(i) + 0.5f);
+        PlaceExplicit(out, cat, wallKey, scale, x, -depth * 0.5f, backYaw, wallColor); // back (-Z)
+        const bool doorwayGap = (nx >= 3 && i == nx / 2);                              // entrance on +Z
+        if (!doorwayGap) {
+            PlaceExplicit(out, cat, wallKey, scale, x, depth * 0.5f, backYaw, wallColor); // front (+Z)
+        }
+    }
+    const int nz = std::max(1, static_cast<int>(std::ceil(depth / segLen)));
+    const float spanZ = static_cast<float>(nz) * segLen;
+    for (int i = 0; i < nz; ++i) {
+        const float z = -spanZ * 0.5f + segLen * (static_cast<float>(i) + 0.5f);
+        PlaceExplicit(out, cat, wallKey, scale, -width * 0.5f, z, sideYaw, wallColor); // left (-X)
+        PlaceExplicit(out, cat, wallKey, scale, width * 0.5f, z, sideYaw, wallColor);  // right (+X)
+    }
+}
+
 // ---- recipes ---------------------------------------------------------------
 // Facing convention: yaw 0 faces +Z. These yaws are an initial layout; a visual
 // pass may flip a piece 180 deg if a Kenney asset's authored front differs.
 
 void BuildLivingRoom(std::vector<std::shared_ptr<SceneCommand>>& out, const Scene::AssetCatalog& cat, FootprintCache& c) {
-    PlaceFloor(out, 7.5f, 7.5f, glm::vec4(0.55f, 0.5f, 0.46f, 1.0f));
+    BuildRoomShell(out, cat, c, 7.5f, 7.5f, glm::vec4(0.55f, 0.5f, 0.46f, 1.0f));
     Place(out, cat, c, "rugRectangle", 3.0f, 0.0f, -0.4f, 0.0f, glm::vec4(0.4f, 0.32f, 0.3f, 1.0f));
     Place(out, cat, c, "loungeSofa", 2.1f, 0.0f, -2.3f, 0.0f);     // back, faces +Z
     Place(out, cat, c, "tableCoffee", 1.1f, 0.0f, -0.5f, 0.0f);
@@ -130,7 +197,7 @@ void BuildLivingRoom(std::vector<std::shared_ptr<SceneCommand>>& out, const Scen
 }
 
 void BuildBedroom(std::vector<std::shared_ptr<SceneCommand>>& out, const Scene::AssetCatalog& cat, FootprintCache& c) {
-    PlaceFloor(out, 7.0f, 7.0f, glm::vec4(0.5f, 0.46f, 0.5f, 1.0f));
+    BuildRoomShell(out, cat, c, 7.0f, 7.0f, glm::vec4(0.5f, 0.46f, 0.5f, 1.0f));
     Place(out, cat, c, "bedDouble", 2.2f, 0.0f, -2.0f, 0.0f);
     Place(out, cat, c, "sideTable", 0.5f, -1.6f, -2.8f, 0.0f);
     Place(out, cat, c, "sideTable", 0.5f, 1.6f, -2.8f, 0.0f);
@@ -142,7 +209,7 @@ void BuildBedroom(std::vector<std::shared_ptr<SceneCommand>>& out, const Scene::
 }
 
 void BuildOffice(std::vector<std::shared_ptr<SceneCommand>>& out, const Scene::AssetCatalog& cat, FootprintCache& c) {
-    PlaceFloor(out, 7.0f, 7.0f, glm::vec4(0.5f, 0.5f, 0.52f, 1.0f));
+    BuildRoomShell(out, cat, c, 7.0f, 7.0f, glm::vec4(0.5f, 0.5f, 0.52f, 1.0f));
     Place(out, cat, c, "deskCorner", 1.6f, -1.0f, -2.0f, 0.0f);
     Place(out, cat, c, "chairDesk", 0.7f, -1.0f, -1.0f, 180.0f);
     Place(out, cat, c, "computerScreen", 0.5f, -1.4f, -2.4f, 180.0f);
@@ -154,7 +221,7 @@ void BuildOffice(std::vector<std::shared_ptr<SceneCommand>>& out, const Scene::A
 }
 
 void BuildKitchen(std::vector<std::shared_ptr<SceneCommand>>& out, const Scene::AssetCatalog& cat, FootprintCache& c) {
-    PlaceFloor(out, 7.0f, 7.0f, glm::vec4(0.6f, 0.58f, 0.55f, 1.0f));
+    BuildRoomShell(out, cat, c, 7.0f, 7.0f, glm::vec4(0.6f, 0.58f, 0.55f, 1.0f));
     // Counter run along the back wall.
     const float backZ = -2.8f;
     Place(out, cat, c, "kitchenCabinet", 0.9f, -2.0f, backZ, 0.0f);

@@ -59,6 +59,42 @@ Footprint Measure(const Scene::AssetCatalog& catalog, FootprintCache& cache, con
     return fp;
 }
 
+// Plausible albedo for an asset by keyword, so untextured catalog meshes don't
+// all render flat white. Used when a recipe doesn't pass an explicit color.
+glm::vec4 ColorForKey(const std::string& k) {
+    auto has = [&](const char* n) { return k.find(n) != std::string::npos; };
+    if (has("sofa") || has("couch") || has("chair") || has("cushion") || has("stool") || has("bed") ||
+        has("lounge")) {
+        return glm::vec4(0.43f, 0.46f, 0.52f, 1.0f); // upholstery blue-gray
+    }
+    if (has("television") || has("computer") || has("screen") || has("speaker") || has("laptop") ||
+        has("radio") || has("monitor")) {
+        return glm::vec4(0.09f, 0.09f, 0.11f, 1.0f); // dark electronics
+    }
+    if (has("fridge") || has("stove") || has("sink") || has("hood") || has("microwave") || has("oven") ||
+        has("dishwasher") || has("washer") || has("dryer")) {
+        return glm::vec4(0.78f, 0.79f, 0.82f, 1.0f); // brushed appliance
+    }
+    if (has("lamp")) {
+        return glm::vec4(0.88f, 0.80f, 0.55f, 1.0f); // warm shade
+    }
+    if (has("rug") || has("doormat")) {
+        return glm::vec4(0.45f, 0.32f, 0.28f, 1.0f);
+    }
+    if (has("plant") || has("fern") || has("grass") || has("bush") || has("rooibos")) {
+        return glm::vec4(0.27f, 0.40f, 0.19f, 1.0f); // foliage
+    }
+    if (has("rock") || has("boulder") || has("stone")) {
+        return glm::vec4(0.50f, 0.49f, 0.46f, 1.0f);
+    }
+    if (has("table") || has("desk") || has("cabinet") || has("bookcase") || has("shelf") || has("sidetable") ||
+        has("coat") || has("bar") || has("wood") || has("stump") || has("trunk") || has("branch") ||
+        has("bench") || has("dresser") || has("wardrobe") || has("drawer")) {
+        return glm::vec4(0.40f, 0.28f, 0.17f, 1.0f); // wood
+    }
+    return glm::vec4(0.72f, 0.71f, 0.70f, 1.0f); // neutral
+}
+
 // Emit one real catalog asset, normalized so its largest horizontal extent ~=
 // targetFootprint meters, placed at (x,0,z), yawed yawDeg about Y, ground-snapped
 // by the executor. Returns false (and emits nothing) if the asset can't resolve.
@@ -85,7 +121,7 @@ bool Place(std::vector<std::shared_ptr<SceneCommand>>& out,
     cmd->name = key;
     cmd->position = glm::vec3(x, 0.0f, z);
     cmd->scale = glm::vec3(scale);
-    cmd->color = color;
+    cmd->color = (color == glm::vec4(1.0f)) ? ColorForKey(ToLower(key)) : color;
     cmd->roughness = 0.7f;
     cmd->rotationEuler = glm::vec3(0.0f, yawDeg, 0.0f);
     cmd->hasRotation = true;
@@ -142,39 +178,43 @@ void PlaceExplicit(std::vector<std::shared_ptr<SceneCommand>>& out, const Scene:
 void BuildRoomShell(std::vector<std::shared_ptr<SceneCommand>>& out, const Scene::AssetCatalog& cat,
                     FootprintCache& c, float width, float depth, const glm::vec4& floorColor) {
     PlaceFloor(out, width, depth, floorColor);
+    (void)cat;
+    (void)c;
 
-    const std::string wallKey = "wall";
-    if (!cat.ResolvePath(wallKey)) {
-        return;
-    }
-    const Footprint fp = Measure(cat, c, wallKey);
-    const float wallLen = std::max(fp.size.x, fp.size.z);
-    if (!fp.valid || wallLen < 1e-3f) {
-        return;
-    }
-    const float segLen = 2.0f;
-    const float scale = segLen / wallLen;
-    const bool longAxisX = fp.size.x >= fp.size.z;
-    const float backYaw = longAxisX ? 0.0f : 90.0f; // align wall length to X for front/back runs
-    const float sideYaw = longAxisX ? 90.0f : 0.0f; // align wall length to Z for left/right runs
-    const glm::vec4 wallColor(0.78f, 0.76f, 0.72f, 1.0f);
+    // Solid box walls (one colored unit-cube per side, scaled) read far better
+    // than tiled, gapped, untextured Kenney wall panels. The front (+Z) wall is
+    // split around a central doorway so the room reads as enterable, and the
+    // camera looks in over the tops.
+    const glm::vec4 wallColor(0.82f, 0.78f, 0.72f, 1.0f);
+    const float wallH = 2.8f;
+    const float wallTh = 0.16f;
+    const float hw = width * 0.5f;
+    const float hd = depth * 0.5f;
 
-    const int nx = std::max(1, static_cast<int>(std::ceil(width / segLen)));
-    const float spanX = static_cast<float>(nx) * segLen;
-    for (int i = 0; i < nx; ++i) {
-        const float x = -spanX * 0.5f + segLen * (static_cast<float>(i) + 0.5f);
-        PlaceExplicit(out, cat, wallKey, scale, x, -depth * 0.5f, backYaw, wallColor); // back (-Z)
-        const bool doorwayGap = (nx >= 3 && i == nx / 2);                              // entrance on +Z
-        if (!doorwayGap) {
-            PlaceExplicit(out, cat, wallKey, scale, x, depth * 0.5f, backYaw, wallColor); // front (+Z)
-        }
-    }
-    const int nz = std::max(1, static_cast<int>(std::ceil(depth / segLen)));
-    const float spanZ = static_cast<float>(nz) * segLen;
-    for (int i = 0; i < nz; ++i) {
-        const float z = -spanZ * 0.5f + segLen * (static_cast<float>(i) + 0.5f);
-        PlaceExplicit(out, cat, wallKey, scale, -width * 0.5f, z, sideYaw, wallColor); // left (-X)
-        PlaceExplicit(out, cat, wallKey, scale, width * 0.5f, z, sideYaw, wallColor);  // right (+X)
+    auto boxWall = [&](const std::string& tag, float cx, float cz, float sx, float sz) {
+        auto cmd = std::make_shared<AddEntityCommand>();
+        cmd->entityType = AddEntityCommand::EntityType::Cube; // unit cube (+/-0.5)
+        cmd->name = tag;
+        cmd->position = glm::vec3(cx, wallH * 0.5f, cz); // base on the floor
+        cmd->scale = glm::vec3(sx, wallH, sz);
+        cmd->color = wallColor;
+        cmd->metallic = 0.0f;
+        cmd->roughness = 0.92f;
+        cmd->allowPlacementJitter = false;
+        cmd->disableCollisionAvoidance = true;
+        out.push_back(std::move(cmd));
+    };
+
+    boxWall("Wall_Back", 0.0f, -hd, width, wallTh);
+    boxWall("Wall_Left", -hw, 0.0f, wallTh, depth);
+    boxWall("Wall_Right", hw, 0.0f, wallTh, depth);
+
+    const float doorW = 2.4f;
+    const float segW = (width - doorW) * 0.5f;
+    if (segW > 0.1f) {
+        const float off = doorW * 0.5f + segW * 0.5f;
+        boxWall("Wall_FrontL", -off, hd, segW, wallTh);
+        boxWall("Wall_FrontR", off, hd, segW, wallTh);
     }
 }
 
@@ -263,6 +303,45 @@ std::optional<std::string> MatchSceneRecipe(const std::string& prompt) {
 
 std::vector<std::string> AvailableSceneRecipes() {
     return {"living_room", "bedroom", "office", "kitchen"};
+}
+
+ScenePromptRoute RouteScenePrompt(const std::string& prompt) {
+    const std::string p = ToLower(prompt);
+    auto has = [&](const char* n) { return p.find(n) != std::string::npos; };
+
+    // Outdoor / biome prompts -> hero scenes (beach is the rebuilt real one).
+    if (has("beach") || has("shore") || has("coast") || has("ocean") || has("seaside") || has("sand")) {
+        return {"beach", ""};
+    }
+    if (has("forest") || has("woods") || has("creek") || has("jungle") || has("shrine")) {
+        return {"forest_creek_shrine", ""};
+    }
+    if (has("desert") || has("dune") || has("relic")) {
+        return {"desert_relic_gallery", ""};
+    }
+    if (has("neon") || has("cyberpunk") || has("alley") || has("market")) {
+        return {"neon_alley_material_market", ""};
+    }
+    if (has("rain") || has("pavilion")) {
+        return {"rain_glass_pavilion", ""};
+    }
+
+    // Indoor rooms -> procedural recipe.
+    if (has("bedroom") || has("bed room") || has("bed")) {
+        return {"recipe", "bedroom"};
+    }
+    if (has("kitchen") || has("cook")) {
+        return {"recipe", "kitchen"};
+    }
+    if (has("office") || has("study") || has("workspace") || has("desk")) {
+        return {"recipe", "office"};
+    }
+    if (has("living") || has("lounge") || has("sofa") || has("couch") || has("room")) {
+        return {"recipe", "living_room"};
+    }
+
+    // Default: a furnished living room.
+    return {"recipe", "living_room"};
 }
 
 std::vector<std::shared_ptr<SceneCommand>> BuildSceneRecipe(const std::string& recipeName,

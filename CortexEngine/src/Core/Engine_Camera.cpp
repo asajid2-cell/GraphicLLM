@@ -786,7 +786,8 @@ void Engine::InitializeCameraController() {
     // Model-authored scenes carry their own camera in the seed. Preserve that
     // camera so generated framing variants can be validated in runtime instead
     // of being overwritten by the generic scene default.
-    if (m_currentScenePreset != ScenePreset::ModelAuthoredScene) {
+    if (m_currentScenePreset != ScenePreset::ModelAuthoredScene &&
+        m_currentScenePreset != ScenePreset::RecipeRoom) {
         SetCameraToSceneDefault(transform);
     } else {
         glm::vec3 forward = glm::normalize(transform.rotation * glm::vec3(0.0f, 0.0f, 1.0f));

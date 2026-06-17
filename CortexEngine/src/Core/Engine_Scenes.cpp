@@ -7,6 +7,8 @@
 
 #include "Scene/Components.h"
 #include "Scene/TerrainNoise.h"
+#include "LLM/SceneRecipes.h"
+#include "LLM/CommandQueue.h"
 #include "Utils/MeshGenerator.h"
 #include "Utils/GLTFLoader.h"
 #include "Graphics/RendererControlApplier.h"
@@ -1071,6 +1073,9 @@ void Engine::RebuildScene(ScenePreset preset) {
     case ScenePreset::OutdoorSunsetBeach:
         BuildOutdoorSunsetBeachScene();
         break;
+    case ScenePreset::RecipeRoom:
+        BuildRecipeScene();
+        break;
     case ScenePreset::LiquidGallery:
         BuildLiquidGalleryScene();
         break;
@@ -1116,6 +1121,7 @@ void Engine::RebuildScene(ScenePreset preset) {
     case ScenePreset::MaterialLab:       presetName = "Material Lab"; break;
     case ScenePreset::GlassWaterCourtyard:presetName = "Glass and Water Courtyard"; break;
     case ScenePreset::OutdoorSunsetBeach:presetName = "Outdoor Sunset Beach"; break;
+    case ScenePreset::RecipeRoom:        presetName = "Procedural Recipe"; break;
     case ScenePreset::LiquidGallery:     presetName = "Liquid Gallery"; break;
     case ScenePreset::CoastalCliffFoundry:presetName = "Coastal Cliff Foundry"; break;
     case ScenePreset::RainGlassPavilion: presetName = "Rain Glass Pavilion"; break;
@@ -2621,6 +2627,71 @@ void Engine::BuildOutdoorSunsetBeachScene() {
         placeNature("Beach_Bush_A", scannedBushMesh, 1.5f, -6.3f, -1.3f, 0.0f, leafCol, 0.7f);
         placeNature("Beach_Bush_B", scannedBushMesh, 1.3f, 6.0f, -1.1f, 90.0f, leafCol, 0.7f);
     }
+}
+
+void Engine::BuildRecipeScene() {
+    std::string recipe = m_recipeName;
+    if (const char* env = std::getenv("CORTEX_SCENE_RECIPE"); env && *env) {
+        recipe = env;
+    }
+    spdlog::info("Building scene: procedural recipe '{}'", recipe);
+
+    if (auto* renderer = m_renderer.get()) {
+        renderer->SetEnvironmentPreset("neutral_procedural");
+        renderer->SetIBLEnabled(true);
+        renderer->SetIBLIntensity(0.55f, 0.55f);
+        renderer->SetBackgroundPresentation(true, 0.95f, 0.0f);
+        renderer->SetAmbientLighting(glm::vec3(0.22f, 0.23f, 0.26f), 1.0f);
+        renderer->SetExposure(1.0f);
+        renderer->SetSunDirection(glm::normalize(glm::vec3(-0.35f, 0.82f, 0.45f)));
+        renderer->SetShadowBias(0.0035f);
+        renderer->SetShadowPCFRadius(2.5f);
+    }
+
+    // Soft key light from above so the interior reads with shape + shadow.
+    {
+        entt::entity e = m_registry->CreateEntity();
+        m_registry->AddComponent<Scene::TagComponent>(e, "Recipe_KeyLight");
+        auto& t = m_registry->AddComponent<TransformComponent>(e);
+        t.position = glm::vec3(2.5f, 6.5f, -2.0f);
+        t.rotation = glm::quatLookAtLH(glm::normalize(glm::vec3(-0.3f, -1.0f, 0.4f)), glm::vec3(0.0f, 1.0f, 0.0f));
+        auto& l = m_registry->AddComponent<Scene::LightComponent>(e);
+        l.type = Scene::LightType::Spot;
+        l.color = glm::vec3(1.0f, 0.97f, 0.92f);
+        l.intensity = 16.0f;
+        l.range = 24.0f;
+        l.innerConeDegrees = 48.0f;
+        l.outerConeDegrees = 80.0f;
+        l.castsShadows = true;
+    }
+
+    // Elevated 3/4 camera that sees over the ~2m walls into the room.
+    {
+        entt::entity cam = m_registry->CreateEntity();
+        m_registry->AddComponent<Scene::TagComponent>(cam, "MainCamera");
+        auto& t = m_registry->AddComponent<TransformComponent>(cam);
+        t.position = glm::vec3(6.8f, 6.2f, -8.8f);
+        const glm::vec3 target(0.0f, 0.4f, 0.6f);
+        t.rotation = glm::quatLookAtLH(glm::normalize(target - t.position), glm::vec3(0.0f, 1.0f, 0.0f));
+        auto& c = m_registry->AddComponent<Scene::CameraComponent>(cam);
+        c.fov = 50.0f;
+        ConfigureShowcaseCameraClip(c, 120.0f);
+        c.isActive = true;
+        m_activeCameraEntity = cam;
+    }
+
+    // Build the recipe onto the now-empty scene. A LOCAL command queue is used
+    // because the engine's m_commandQueue is not constructed until after scene
+    // initialization runs (RebuildScene happens during Engine init).
+    LLM::CommandQueue recipeQueue;
+    auto cmds = LLM::BuildSceneRecipe(recipe, recipeQueue.EnsureCatalog());
+    if (cmds.empty()) {
+        spdlog::warn("Recipe '{}' produced no commands; empty scene", recipe);
+    } else {
+        recipeQueue.PushBatch(cmds);
+        recipeQueue.ExecuteAll(m_registry.get(), m_renderer.get());
+    }
+    spdlog::info("Recipe scene '{}' built ({} commands)", recipe, cmds.size());
 }
 
 void Engine::BuildLiquidGalleryScene() {

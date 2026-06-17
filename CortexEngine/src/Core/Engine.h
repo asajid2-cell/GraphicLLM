@@ -172,6 +172,7 @@ private:
         NeonAlleyMaterialMarket = 15,
         ForestCreekShrine = 16,
         ModelAuthoredScene = 17,
+        RecipeRoom = 18,
     };
 
     void ProcessInput();
@@ -192,6 +193,7 @@ private:
     void BuildLiquidGalleryScene();
     void BuildGlassWaterCourtyardScene();
     void BuildOutdoorSunsetBeachScene();
+    void BuildRecipeScene(); // procedural recipe (rooms/outdoor) as a standalone scene
     void BuildCoastalCliffFoundryScene();
     void BuildRainGlassPavilionScene();
     void BuildDesertRelicGalleryScene();
@@ -383,6 +385,7 @@ private:
 
     // Current scene preset used when (re)building the ECS layout.
     ScenePreset m_currentScenePreset = ScenePreset::RTShowcase;
+    std::string m_recipeName = "living_room"; // active recipe for RecipeRoom (set by prompt routing)
 
     // Startup quality mode used to decide whether curated scenes (RT showcase)
     // should enable their full high-quality settings or stay on the safe

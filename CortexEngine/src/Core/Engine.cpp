@@ -695,9 +695,24 @@ Result<void> Engine::Initialize(const EngineConfig& config) {
         spdlog::info("Render backend: {}", useVoxel ? "VoxelExperimental" : "RasterDX12");
     }
 
-    // Choose initial scene preset based on configuration string, if provided.
-    if (!config.initialScenePreset.empty()) {
-        std::string sceneLower = config.initialScenePreset;
+    // Text-to-scene: a free-text prompt (CORTEX_SCENE_PROMPT) routes to the
+    // best-matching scene + recipe when no explicit --scene was given. (config
+    // is const, so the resolved scene key lives in a local.)
+    std::string requestedScene = config.initialScenePreset;
+    if (requestedScene.empty()) {
+        if (const char* prompt = std::getenv("CORTEX_SCENE_PROMPT"); prompt && *prompt) {
+            auto route = LLM::RouteScenePrompt(prompt);
+            requestedScene = route.sceneString;
+            if (!route.recipe.empty()) {
+                m_recipeName = route.recipe;
+            }
+            spdlog::info("Scene prompt '{}' -> scene='{}' recipe='{}'", prompt, route.sceneString, route.recipe);
+        }
+    }
+
+    // Choose initial scene preset based on the resolved scene key, if provided.
+    if (!requestedScene.empty()) {
+        std::string sceneLower = requestedScene;
         std::transform(sceneLower.begin(), sceneLower.end(), sceneLower.begin(),
                        [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
 
@@ -752,6 +767,9 @@ Result<void> Engine::Initialize(const EngineConfig& config) {
                    sceneLower == "generated_scene" ||
                    sceneLower == "prompt_scene") {
             m_currentScenePreset = ScenePreset::ModelAuthoredScene;
+        } else if (sceneLower == "recipe" || sceneLower == "room" || sceneLower == "recipe_room" ||
+                   sceneLower == "generate") {
+            m_currentScenePreset = ScenePreset::RecipeRoom;
         } else if (sceneLower == "effects_showcase" || sceneLower == "effectsshowcase" || sceneLower == "effects") {
             m_currentScenePreset = ScenePreset::EffectsShowcase;
         } else if (sceneLower == "temporal" ||
@@ -1462,9 +1480,11 @@ void Engine::Update(float deltaTime) {
     }
 
     // Headless/demo hook: CORTEX_SCENE_RECIPE=<living_room|bedroom|office|kitchen>
-    // builds that scene from the real asset catalog at startup (no LLM needed).
-    // Combine with --smoke-frames / --exit-after-visual-validation to capture it.
-    if (!m_startupSceneRecipeSubmitted && m_commandQueue) {
+    // builds that recipe ADDITIVELY onto whatever scene booted. Skipped when the
+    // RecipeRoom preset is active, since BuildRecipeScene already builds it as a
+    // clean standalone scene (avoids a double build).
+    if (m_currentScenePreset != ScenePreset::RecipeRoom &&
+        !m_startupSceneRecipeSubmitted && m_commandQueue) {
         if (const char* recipeEnv = std::getenv("CORTEX_SCENE_RECIPE"); recipeEnv && *recipeEnv) {
             m_startupSceneRecipeSubmitted = true;
             auto cmds = LLM::BuildSceneRecipe(recipeEnv, m_commandQueue->EnsureCatalog());
@@ -2364,6 +2384,7 @@ void Engine::InitializeScene() {
     case ScenePreset::MaterialLab:
     case ScenePreset::GlassWaterCourtyard:
     case ScenePreset::OutdoorSunsetBeach:
+    case ScenePreset::RecipeRoom:
     case ScenePreset::LiquidGallery:
     case ScenePreset::CoastalCliffFoundry:
     case ScenePreset::RainGlassPavilion:

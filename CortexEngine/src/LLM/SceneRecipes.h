@@ -25,6 +25,16 @@ struct SceneCommand;
 // recipe key (e.g. "living_room", "kitchen", "bedroom", "office"); else nullopt.
 [[nodiscard]] std::optional<std::string> MatchSceneRecipe(const std::string& prompt);
 
+// Text-to-scene routing: maps ANY free-text prompt to the best-matching scene.
+// `sceneString` is an engine scene key (e.g. "recipe", "beach", "forest_creek_shrine");
+// `recipe` is the recipe name when sceneString=="recipe" (else empty). Always
+// returns a usable scene (defaults to a living-room recipe).
+struct ScenePromptRoute {
+    std::string sceneString;
+    std::string recipe;
+};
+[[nodiscard]] ScenePromptRoute RouteScenePrompt(const std::string& prompt);
+
 // All recipe keys this module can build.
 [[nodiscard]] std::vector<std::string> AvailableSceneRecipes();
 

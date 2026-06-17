@@ -61,8 +61,8 @@ Result<void> Renderer::Initialize(DX12Device* device, Window* window) {
     spdlog::info("Initializing Renderer...");
 
     // Detect basic DXR ray tracing support (optional path).
-    m_rtRuntimeState.supported = false;
-    m_rtRuntimeState.enabled = false;
+    m_rt.RuntimeState().supported = false;
+    m_rt.RuntimeState().enabled = false;
     {
         const bool forceNoDxr = [] {
             const char* value = std::getenv("CORTEX_FORCE_DXR_UNSUPPORTED");
@@ -79,7 +79,7 @@ Result<void> Renderer::Initialize(DX12Device* device, Window* window) {
                                                                 &options5,
                                                                 sizeof(options5));
                 if (SUCCEEDED(featHr) && options5.RaytracingTier != D3D12_RAYTRACING_TIER_NOT_SUPPORTED) {
-                    m_rtRuntimeState.supported = true;
+                    m_rt.RuntimeState().supported = true;
                     spdlog::info("DXR ray tracing supported (tier {}).",
                                  static_cast<int>(options5.RaytracingTier));
                 } else {
@@ -253,14 +253,14 @@ Result<void> Renderer::Initialize(DX12Device* device, Window* window) {
 
     // Initialize ray tracing context if DXR is supported. If this fails for any
     // reason, hard-disable ray tracing so the toggle becomes inert.
-    if (m_rtRuntimeState.supported) {
+    if (m_rt.RuntimeState().supported) {
         m_services.rayTracingContext = std::make_unique<DX12RaytracingContext>();
         auto rtResult = m_services.rayTracingContext->Initialize(device, m_services.descriptorManager.get());
         if (rtResult.IsErr()) {
             spdlog::warn("DXR context initialization failed: {}", rtResult.Error());
             m_services.rayTracingContext.reset();
-            m_rtRuntimeState.supported = false;
-            m_rtRuntimeState.enabled = false;
+            m_rt.RuntimeState().supported = false;
+            m_rt.RuntimeState().enabled = false;
         } else {
             // Set flush callback so RT context can force GPU sync when resizing buffers
             m_services.rayTracingContext->SetFlushCallback([this]() {
@@ -382,7 +382,7 @@ Result<void> Renderer::Initialize(DX12Device* device, Window* window) {
     // RT reflections buffer is also optional and only meaningful when the
     // DXR path is active. For now we allocate it eagerly when ray tracing is
     // supported so the post-process path can consume it in a future pass.
-    if (m_rtRuntimeState.supported && m_services.rayTracingContext) {
+    if (m_rt.RuntimeState().supported && m_services.rayTracingContext) {
         auto rtReflResult = CreateRTReflectionResources();
         if (rtReflResult.IsErr()) {
             spdlog::warn("Failed to create RT reflection buffer: {}", rtReflResult.Error());

@@ -127,7 +127,7 @@ Result<void> Renderer::InitializePostProcessDescriptorTable() {
             handle = {};
         }
     }
-    m_rtReflectionSignalState.descriptors.ResetHandles();
+    m_rt.ReflectionSignalState().descriptors.ResetHandles();
     m_localReflectionRadianceState.descriptors.Reset();
     m_ssao.State().descriptors.descriptorTablesValid = false;
     for (auto& table : m_ssao.State().descriptors.srvTables) {
@@ -140,13 +140,13 @@ Result<void> Renderer::InitializePostProcessDescriptorTable() {
             handle = {};
         }
     }
-    m_rtDenoiseState.descriptorTablesValid = false;
-    for (auto& table : m_rtDenoiseState.srvTables) {
+    m_rt.DenoiseState().descriptorTablesValid = false;
+    for (auto& table : m_rt.DenoiseState().srvTables) {
         for (auto& handle : table) {
             handle = {};
         }
     }
-    for (auto& table : m_rtDenoiseState.uavTables) {
+    for (auto& table : m_rt.DenoiseState().uavTables) {
         for (auto& handle : table) {
             handle = {};
         }
@@ -157,10 +157,10 @@ Result<void> Renderer::InitializePostProcessDescriptorTable() {
             handle = {};
         }
     }
-    for (auto& handle : m_rtReflectionTargets.dispatchClearUAVs) {
+    for (auto& handle : m_rt.ReflectionTargets().dispatchClearUAVs) {
         handle = {};
     }
-    for (auto& handle : m_rtReflectionTargets.postClearUAVs) {
+    for (auto& handle : m_rt.ReflectionTargets().postClearUAVs) {
         handle = {};
     }
 
@@ -208,11 +208,11 @@ Result<void> Renderer::InitializePostProcessDescriptorTable() {
     if (ssaoUavTableResult.IsErr()) {
         return ssaoUavTableResult;
     }
-    auto rtDenoiseSrvTableResult = allocateTableSet(m_rtDenoiseState.srvTables, "RT denoise SRV");
+    auto rtDenoiseSrvTableResult = allocateTableSet(m_rt.DenoiseState().srvTables, "RT denoise SRV");
     if (rtDenoiseSrvTableResult.IsErr()) {
         return rtDenoiseSrvTableResult;
     }
-    auto rtDenoiseUavTableResult = allocateTableSet(m_rtDenoiseState.uavTables, "RT denoise UAV");
+    auto rtDenoiseUavTableResult = allocateTableSet(m_rt.DenoiseState().uavTables, "RT denoise UAV");
     if (rtDenoiseUavTableResult.IsErr()) {
         return rtDenoiseUavTableResult;
     }
@@ -245,13 +245,13 @@ Result<void> Renderer::InitializePostProcessDescriptorTable() {
         return temporalMaskStatsUavTableResult;
     }
     auto rtReflectionSignalStatsSrvResult = allocateTableSet(
-        m_rtReflectionSignalState.descriptors.srvTables,
+        m_rt.ReflectionSignalState().descriptors.srvTables,
         "RT reflection signal stats SRV");
     if (rtReflectionSignalStatsSrvResult.IsErr()) {
         return rtReflectionSignalStatsSrvResult;
     }
     auto rtReflectionSignalStatsUavResult = allocateTableSet(
-        m_rtReflectionSignalState.descriptors.uavTables,
+        m_rt.ReflectionSignalState().descriptors.uavTables,
         "RT reflection signal stats UAV");
     if (rtReflectionSignalStatsUavResult.IsErr()) {
         return rtReflectionSignalStatsUavResult;
@@ -268,11 +268,11 @@ Result<void> Renderer::InitializePostProcessDescriptorTable() {
             label);
     };
 
-    auto rtDispatchClearResult = allocateHandleSet(m_rtReflectionTargets.dispatchClearUAVs, "RT reflection dispatch clear UAV");
+    auto rtDispatchClearResult = allocateHandleSet(m_rt.ReflectionTargets().dispatchClearUAVs, "RT reflection dispatch clear UAV");
     if (rtDispatchClearResult.IsErr()) {
         return rtDispatchClearResult;
     }
-    auto rtPostClearResult = allocateHandleSet(m_rtReflectionTargets.postClearUAVs, "RT reflection post clear UAV");
+    auto rtPostClearResult = allocateHandleSet(m_rt.ReflectionTargets().postClearUAVs, "RT reflection post clear UAV");
     if (rtPostClearResult.IsErr()) {
         return rtPostClearResult;
     }
@@ -307,9 +307,9 @@ Result<void> Renderer::InitializePostProcessDescriptorTable() {
     validateTableSet(m_ssao.State().descriptors.srvTables, ssaoSrvValid, "SSAO SRV");
     validateTableSet(m_ssao.State().descriptors.uavTables, ssaoUavValid, "SSAO UAV");
     m_ssao.State().descriptors.descriptorTablesValid = ssaoSrvValid && ssaoUavValid;
-    validateTableSet(m_rtDenoiseState.srvTables, rtDenoiseSrvValid, "RT denoise SRV");
-    validateTableSet(m_rtDenoiseState.uavTables, rtDenoiseUavValid, "RT denoise UAV");
-    m_rtDenoiseState.descriptorTablesValid = rtDenoiseSrvValid && rtDenoiseUavValid;
+    validateTableSet(m_rt.DenoiseState().srvTables, rtDenoiseSrvValid, "RT denoise SRV");
+    validateTableSet(m_rt.DenoiseState().uavTables, rtDenoiseUavValid, "RT denoise UAV");
+    m_rt.DenoiseState().descriptorTablesValid = rtDenoiseSrvValid && rtDenoiseUavValid;
     validateTableSet(m_localReflectionRadianceState.descriptors.srvTables,
                      localRadianceSrvValid,
                      "Local reflection radiance SRV");
@@ -324,13 +324,13 @@ Result<void> Renderer::InitializePostProcessDescriptorTable() {
     validateTableSet(m_temporalMaskState.statsSrvTables, temporalMaskStatsSrvValid, "Temporal mask stats SRV");
     validateTableSet(m_temporalMaskState.statsUavTables, temporalMaskStatsUavValid, "Temporal mask stats UAV");
     m_temporalMaskState.statsDescriptorTablesValid = temporalMaskStatsSrvValid && temporalMaskStatsUavValid;
-    validateTableSet(m_rtReflectionSignalState.descriptors.srvTables,
+    validateTableSet(m_rt.ReflectionSignalState().descriptors.srvTables,
                      rtReflectionSignalStatsSrvValid,
                      "RT reflection signal stats SRV");
-    validateTableSet(m_rtReflectionSignalState.descriptors.uavTables,
+    validateTableSet(m_rt.ReflectionSignalState().descriptors.uavTables,
                      rtReflectionSignalStatsUavValid,
                      "RT reflection signal stats UAV");
-    m_rtReflectionSignalState.descriptors.valid =
+    m_rt.ReflectionSignalState().descriptors.valid =
         rtReflectionSignalStatsSrvValid && rtReflectionSignalStatsUavValid;
     validateTableSet(m_bloom.State().descriptors.srvTables, m_bloom.State().descriptors.srvTableValid, "Bloom");
     return Result<void>::Ok();
@@ -382,8 +382,8 @@ void Renderer::UpdatePostProcessDescriptorTable() {
     context.wantsHzbDebug = (m_debugViewState.mode == 32u);
     context.ssr = m_ssr.State().resources.color.Get();
     context.velocity = m_temporal.ScreenState().velocityBuffer.Get();
-    context.rtReflection = m_rtReflectionTargets.color.Get();
-    context.rtReflectionHistory = m_rtReflectionTargets.history.Get();
+    context.rtReflection = m_rt.ReflectionTargets().color.Get();
+    context.rtReflectionHistory = m_rt.ReflectionTargets().history.Get();
     context.emissiveMetallic = emissiveMetallicRes;
     context.materialExt1 = materialExt1Res;
     context.materialExt2 = materialExt2Res;

@@ -34,11 +34,11 @@ void Renderer::BeginFrame() {
     // Reset per-frame RT reflection write flag so history updates only occur
     // on frames where the DXR reflections pass actually ran.
     m_frameLifecycle.rtReflectionWrittenThisFrame = false;
-    m_rtDenoiseState.ResetFrame();
+    m_rt.DenoiseState().ResetFrame();
     m_temporalMaskState.builtThisFrame = false;
     m_frameDiagnostics.contract.temporalMask.built = false;
-    m_rtReflectionSignalState.ResetFrame();
-    m_rtReflectionReadiness.ResetFrame();
+    m_rt.ReflectionSignalState().ResetFrame();
+    m_rt.ReflectionReadiness().ResetFrame();
 
     // Wait for this frame's command allocator/descriptor segment to be available
     m_frameRuntime.frameIndex = m_services.window->GetCurrentBackBufferIndex();
@@ -156,7 +156,7 @@ void Renderer::BeginFrame() {
             spdlog::warn("Failed to recreate RT shadow mask on resize: {}", rtMaskResult.Error());
         }
 
-        if (m_rtRuntimeState.supported && m_services.rayTracingContext) {
+        if (m_rt.RuntimeState().supported && m_services.rayTracingContext) {
             auto rtReflResult = CreateRTReflectionResources();
             if (rtReflResult.IsErr()) {
                 spdlog::warn("Failed to recreate RT reflection buffer on resize: {}", rtReflResult.Error());

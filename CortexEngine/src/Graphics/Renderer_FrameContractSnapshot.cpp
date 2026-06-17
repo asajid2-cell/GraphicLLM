@@ -656,8 +656,8 @@ void Renderer::UpdateFrameContractSnapshot(Scene::ECS_Registry* registry,
     addResource("temporal_rejection_mask_stats", m_temporalMaskState.statsBuffer.Get(), 0, 0);
     addResource("taa_history", m_temporal.ScreenState().historyColor.Get(), contract.renderWidth, contract.renderHeight);
     addResource("taa_intermediate", m_temporal.ScreenState().taaIntermediate.Get(), contract.renderWidth, contract.renderHeight);
-    addResource("rt_shadow_mask", m_rtShadowTargets.mask.Get(), contract.renderWidth, contract.renderHeight);
-    addResource("rt_shadow_history", m_rtShadowTargets.history.Get(), contract.renderWidth, contract.renderHeight);
+    addResource("rt_shadow_mask", m_rt.ShadowTargets().mask.Get(), contract.renderWidth, contract.renderHeight);
+    addResource("rt_shadow_history", m_rt.ShadowTargets().history.Get(), contract.renderWidth, contract.renderHeight);
     const uint32_t expectedReflectionWidth = m_framePlanning.rtPlan.budget.reflectionWidth > 0
         ? m_framePlanning.rtPlan.budget.reflectionWidth
         : halfWidth;
@@ -670,12 +670,12 @@ void Renderer::UpdateFrameContractSnapshot(Scene::ECS_Registry* registry,
     const uint32_t expectedGIHeight = m_framePlanning.rtPlan.budget.giHeight > 0
         ? m_framePlanning.rtPlan.budget.giHeight
         : halfHeight;
-    addResource("rt_reflection", m_rtReflectionTargets.color.Get(), expectedReflectionWidth, expectedReflectionHeight);
-    addResource("rt_reflection_signal_stats", m_rtReflectionSignalState.rawResources.statsBuffer.Get(), 0, 0);
-    addResource("rt_reflection_history", m_rtReflectionTargets.history.Get(), expectedReflectionWidth, expectedReflectionHeight);
-    addResource("rt_reflection_history_signal_stats", m_rtReflectionSignalState.historyResources.statsBuffer.Get(), 0, 0);
-    addResource("rt_gi", m_rtGITargets.color.Get(), expectedGIWidth, expectedGIHeight);
-    addResource("rt_gi_history", m_rtGITargets.history.Get(), expectedGIWidth, expectedGIHeight);
+    addResource("rt_reflection", m_rt.ReflectionTargets().color.Get(), expectedReflectionWidth, expectedReflectionHeight);
+    addResource("rt_reflection_signal_stats", m_rt.ReflectionSignalState().rawResources.statsBuffer.Get(), 0, 0);
+    addResource("rt_reflection_history", m_rt.ReflectionTargets().history.Get(), expectedReflectionWidth, expectedReflectionHeight);
+    addResource("rt_reflection_history_signal_stats", m_rt.ReflectionSignalState().historyResources.statsBuffer.Get(), 0, 0);
+    addResource("rt_gi", m_rt.GITargets().color.Get(), expectedGIWidth, expectedGIHeight);
+    addResource("rt_gi_history", m_rt.GITargets().history.Get(), expectedGIWidth, expectedGIHeight);
     addResource("shadow_map",
                 m_shadows.Resources().resources.map.Get(),
                 static_cast<uint32_t>(m_shadows.Resources().controls.mapSize),
@@ -911,8 +911,8 @@ void Renderer::UpdateFrameContractSnapshot(Scene::ECS_Registry* registry,
     contract.motionVectors = m_frameDiagnostics.contract.motionVectors;
     contract.temporalMask = m_frameDiagnostics.contract.temporalMask;
 
-    contract.rayTracing.supported = m_rtRuntimeState.supported;
-    contract.rayTracing.enabled = m_rtRuntimeState.enabled;
+    contract.rayTracing.supported = m_rt.RuntimeState().supported;
+    contract.rayTracing.enabled = m_rt.RuntimeState().enabled;
     contract.rayTracing.warmingUp = IsRTWarmingUp();
     ApplyBudgetPlanToContract(contract.budget, m_framePlanning.budgetPlan);
     const auto assetMem = m_assetRuntime.registry.GetMemoryBreakdown();
@@ -929,59 +929,59 @@ void Renderer::UpdateFrameContractSnapshot(Scene::ECS_Registry* registry,
     contract.assetMemory.rtStructureBudgetExceeded =
         contract.budget.rtStructureBudgetBytes > 0 && assetMem.rtStructureBytes > contract.budget.rtStructureBudgetBytes;
     ApplyRTPlanToContract(contract.rayTracing, m_framePlanning.rtPlan);
-    contract.rayTracing.denoiserExecuted = m_rtDenoiseState.executedThisFrame;
-    contract.rayTracing.denoiserPasses = m_rtDenoiseState.passCountThisFrame;
-    contract.rayTracing.denoiserUsesDepthNormalRejection = m_rtDenoiseState.usedDepthNormalRejectionThisFrame;
-    contract.rayTracing.denoiserUsesVelocityReprojection = m_rtDenoiseState.usedVelocityThisFrame;
-    contract.rayTracing.denoiserUsesDisocclusionRejection = m_rtDenoiseState.usedDisocclusionRejectionThisFrame;
-    contract.rayTracing.shadowDenoiseAlpha = m_rtDenoiseState.shadowAlpha;
-    contract.rayTracing.reflectionDenoiseAlpha = m_rtDenoiseState.reflectionAlpha;
-    contract.rayTracing.giDenoiseAlpha = m_rtDenoiseState.giAlpha;
-    contract.rayTracing.reflectionRequestedDenoiseAlpha = m_rtDenoiseState.reflectionHistoryAlpha;
-    contract.rayTracing.reflectionCompositionStrength = m_rtDenoiseState.reflectionCompositionStrength;
-    contract.rayTracing.reflectionRoughnessThreshold = m_rtDenoiseState.reflectionRoughnessThreshold;
-    contract.rayTracing.reflectionHistoryMaxBlend = m_rtDenoiseState.reflectionHistoryMaxBlend;
-    contract.rayTracing.reflectionFireflyClampLuma = m_rtDenoiseState.reflectionFireflyClampLuma;
-    contract.rayTracing.reflectionSignalScale = m_rtDenoiseState.reflectionSignalScale;
-    contract.rayTracing.giStrength = m_rtDenoiseState.giStrength;
-    contract.rayTracing.giRayDistance = m_rtDenoiseState.giRayDistance;
-    contract.rayTracing.reflectionDispatchReady = m_rtReflectionReadiness.ready;
-    contract.rayTracing.reflectionHasPipeline = m_rtReflectionReadiness.hasPipeline;
-    contract.rayTracing.reflectionHasTLAS = m_rtReflectionReadiness.hasTLAS;
-    contract.rayTracing.reflectionHasMaterialBuffer = m_rtReflectionReadiness.hasMaterialBuffer;
-    contract.rayTracing.reflectionHasOutput = m_rtReflectionReadiness.hasOutput;
-    contract.rayTracing.reflectionHasDepth = m_rtReflectionReadiness.hasDepth;
-    contract.rayTracing.reflectionHasNormalRoughness = m_rtReflectionReadiness.hasNormalRoughness;
-    contract.rayTracing.reflectionHasMaterialExt2 = m_rtReflectionReadiness.hasMaterialExt2;
-    contract.rayTracing.reflectionHasEnvironmentTable = m_rtReflectionReadiness.hasEnvironmentTable;
-    contract.rayTracing.reflectionHasFrameConstants = m_rtReflectionReadiness.hasFrameConstants;
-    contract.rayTracing.reflectionHasDispatchDescriptors = m_rtReflectionReadiness.hasDispatchDescriptors;
-    contract.rayTracing.reflectionDispatchWidth = m_rtReflectionReadiness.dispatchWidth;
-    contract.rayTracing.reflectionDispatchHeight = m_rtReflectionReadiness.dispatchHeight;
-    contract.rayTracing.reflectionReadinessReason = m_rtReflectionReadiness.reason;
-    contract.rayTracing.reflectionSignalStatsCaptured = m_rtReflectionSignalState.rawCapturedThisFrame;
-    contract.rayTracing.reflectionSignalValid = m_rtReflectionSignalState.raw.valid;
-    contract.rayTracing.reflectionSignalSampleFrame = m_rtReflectionSignalState.raw.sampleFrame;
-    contract.rayTracing.reflectionSignalPixelCount = m_rtReflectionSignalState.raw.pixelCount;
-    contract.rayTracing.reflectionSignalAvgLuma = m_rtReflectionSignalState.raw.avgLuma;
-    contract.rayTracing.reflectionSignalMaxLuma = m_rtReflectionSignalState.raw.maxLuma;
-    contract.rayTracing.reflectionSignalNonZeroRatio = m_rtReflectionSignalState.raw.nonZeroRatio;
-    contract.rayTracing.reflectionSignalBrightRatio = m_rtReflectionSignalState.raw.brightRatio;
-    contract.rayTracing.reflectionSignalOutlierRatio = m_rtReflectionSignalState.raw.outlierRatio;
-    contract.rayTracing.reflectionSignalReadbackLatencyFrames = m_rtReflectionSignalState.raw.readbackLatencyFrames;
+    contract.rayTracing.denoiserExecuted = m_rt.DenoiseState().executedThisFrame;
+    contract.rayTracing.denoiserPasses = m_rt.DenoiseState().passCountThisFrame;
+    contract.rayTracing.denoiserUsesDepthNormalRejection = m_rt.DenoiseState().usedDepthNormalRejectionThisFrame;
+    contract.rayTracing.denoiserUsesVelocityReprojection = m_rt.DenoiseState().usedVelocityThisFrame;
+    contract.rayTracing.denoiserUsesDisocclusionRejection = m_rt.DenoiseState().usedDisocclusionRejectionThisFrame;
+    contract.rayTracing.shadowDenoiseAlpha = m_rt.DenoiseState().shadowAlpha;
+    contract.rayTracing.reflectionDenoiseAlpha = m_rt.DenoiseState().reflectionAlpha;
+    contract.rayTracing.giDenoiseAlpha = m_rt.DenoiseState().giAlpha;
+    contract.rayTracing.reflectionRequestedDenoiseAlpha = m_rt.DenoiseState().reflectionHistoryAlpha;
+    contract.rayTracing.reflectionCompositionStrength = m_rt.DenoiseState().reflectionCompositionStrength;
+    contract.rayTracing.reflectionRoughnessThreshold = m_rt.DenoiseState().reflectionRoughnessThreshold;
+    contract.rayTracing.reflectionHistoryMaxBlend = m_rt.DenoiseState().reflectionHistoryMaxBlend;
+    contract.rayTracing.reflectionFireflyClampLuma = m_rt.DenoiseState().reflectionFireflyClampLuma;
+    contract.rayTracing.reflectionSignalScale = m_rt.DenoiseState().reflectionSignalScale;
+    contract.rayTracing.giStrength = m_rt.DenoiseState().giStrength;
+    contract.rayTracing.giRayDistance = m_rt.DenoiseState().giRayDistance;
+    contract.rayTracing.reflectionDispatchReady = m_rt.ReflectionReadiness().ready;
+    contract.rayTracing.reflectionHasPipeline = m_rt.ReflectionReadiness().hasPipeline;
+    contract.rayTracing.reflectionHasTLAS = m_rt.ReflectionReadiness().hasTLAS;
+    contract.rayTracing.reflectionHasMaterialBuffer = m_rt.ReflectionReadiness().hasMaterialBuffer;
+    contract.rayTracing.reflectionHasOutput = m_rt.ReflectionReadiness().hasOutput;
+    contract.rayTracing.reflectionHasDepth = m_rt.ReflectionReadiness().hasDepth;
+    contract.rayTracing.reflectionHasNormalRoughness = m_rt.ReflectionReadiness().hasNormalRoughness;
+    contract.rayTracing.reflectionHasMaterialExt2 = m_rt.ReflectionReadiness().hasMaterialExt2;
+    contract.rayTracing.reflectionHasEnvironmentTable = m_rt.ReflectionReadiness().hasEnvironmentTable;
+    contract.rayTracing.reflectionHasFrameConstants = m_rt.ReflectionReadiness().hasFrameConstants;
+    contract.rayTracing.reflectionHasDispatchDescriptors = m_rt.ReflectionReadiness().hasDispatchDescriptors;
+    contract.rayTracing.reflectionDispatchWidth = m_rt.ReflectionReadiness().dispatchWidth;
+    contract.rayTracing.reflectionDispatchHeight = m_rt.ReflectionReadiness().dispatchHeight;
+    contract.rayTracing.reflectionReadinessReason = m_rt.ReflectionReadiness().reason;
+    contract.rayTracing.reflectionSignalStatsCaptured = m_rt.ReflectionSignalState().rawCapturedThisFrame;
+    contract.rayTracing.reflectionSignalValid = m_rt.ReflectionSignalState().raw.valid;
+    contract.rayTracing.reflectionSignalSampleFrame = m_rt.ReflectionSignalState().raw.sampleFrame;
+    contract.rayTracing.reflectionSignalPixelCount = m_rt.ReflectionSignalState().raw.pixelCount;
+    contract.rayTracing.reflectionSignalAvgLuma = m_rt.ReflectionSignalState().raw.avgLuma;
+    contract.rayTracing.reflectionSignalMaxLuma = m_rt.ReflectionSignalState().raw.maxLuma;
+    contract.rayTracing.reflectionSignalNonZeroRatio = m_rt.ReflectionSignalState().raw.nonZeroRatio;
+    contract.rayTracing.reflectionSignalBrightRatio = m_rt.ReflectionSignalState().raw.brightRatio;
+    contract.rayTracing.reflectionSignalOutlierRatio = m_rt.ReflectionSignalState().raw.outlierRatio;
+    contract.rayTracing.reflectionSignalReadbackLatencyFrames = m_rt.ReflectionSignalState().raw.readbackLatencyFrames;
     contract.rayTracing.reflectionHistorySignalStatsCaptured =
-        m_rtReflectionSignalState.historyCapturedThisFrame;
-    contract.rayTracing.reflectionHistorySignalValid = m_rtReflectionSignalState.history.valid;
-    contract.rayTracing.reflectionHistorySignalSampleFrame = m_rtReflectionSignalState.history.sampleFrame;
-    contract.rayTracing.reflectionHistorySignalPixelCount = m_rtReflectionSignalState.history.pixelCount;
-    contract.rayTracing.reflectionHistorySignalAvgLuma = m_rtReflectionSignalState.history.avgLuma;
-    contract.rayTracing.reflectionHistorySignalMaxLuma = m_rtReflectionSignalState.history.maxLuma;
-    contract.rayTracing.reflectionHistorySignalNonZeroRatio = m_rtReflectionSignalState.history.nonZeroRatio;
-    contract.rayTracing.reflectionHistorySignalBrightRatio = m_rtReflectionSignalState.history.brightRatio;
-    contract.rayTracing.reflectionHistorySignalOutlierRatio = m_rtReflectionSignalState.history.outlierRatio;
-    contract.rayTracing.reflectionHistorySignalAvgLumaDelta = m_rtReflectionSignalState.history.avgLumaDelta;
+        m_rt.ReflectionSignalState().historyCapturedThisFrame;
+    contract.rayTracing.reflectionHistorySignalValid = m_rt.ReflectionSignalState().history.valid;
+    contract.rayTracing.reflectionHistorySignalSampleFrame = m_rt.ReflectionSignalState().history.sampleFrame;
+    contract.rayTracing.reflectionHistorySignalPixelCount = m_rt.ReflectionSignalState().history.pixelCount;
+    contract.rayTracing.reflectionHistorySignalAvgLuma = m_rt.ReflectionSignalState().history.avgLuma;
+    contract.rayTracing.reflectionHistorySignalMaxLuma = m_rt.ReflectionSignalState().history.maxLuma;
+    contract.rayTracing.reflectionHistorySignalNonZeroRatio = m_rt.ReflectionSignalState().history.nonZeroRatio;
+    contract.rayTracing.reflectionHistorySignalBrightRatio = m_rt.ReflectionSignalState().history.brightRatio;
+    contract.rayTracing.reflectionHistorySignalOutlierRatio = m_rt.ReflectionSignalState().history.outlierRatio;
+    contract.rayTracing.reflectionHistorySignalAvgLumaDelta = m_rt.ReflectionSignalState().history.avgLumaDelta;
     contract.rayTracing.reflectionHistorySignalReadbackLatencyFrames =
-        m_rtReflectionSignalState.history.readbackLatencyFrames;
+        m_rt.ReflectionSignalState().history.readbackLatencyFrames;
     contract.rayTracing.pendingBLAS = m_services.rayTracingContext ? m_services.rayTracingContext->GetPendingBLASCount() : 0;
     contract.rayTracing.pendingRendererBLASJobs = m_assetRuntime.gpuJobs.pendingBLASJobs;
     contract.rayTracing.tlasInstances = m_services.rayTracingContext ? m_services.rayTracingContext->GetLastTLASInstanceCount() : 0;

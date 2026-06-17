@@ -336,10 +336,10 @@ void Renderer::UpdateEnvironmentDescriptorTable() {
 
     EnvironmentDescriptorTableInputs inputs;
     inputs.shadowMapSRV = m_shadows.Resources().resources.srv;
-    inputs.rtShadowMaskSRV = m_rtShadowTargets.maskSRV;
-    inputs.rtShadowHistorySRV = m_rtShadowTargets.historySRV;
-    inputs.rtGISRV = m_rtGITargets.srv;
-    inputs.rtGIHistorySRV = m_rtGITargets.historySRV;
+    inputs.rtShadowMaskSRV = m_rt.ShadowTargets().maskSRV;
+    inputs.rtShadowHistorySRV = m_rt.ShadowTargets().historySRV;
+    inputs.rtGISRV = m_rt.GITargets().srv;
+    inputs.rtGIHistorySRV = m_rt.GITargets().historySRV;
     inputs.shadowFallback = m_materialFallbacks.roughness;
     inputs.diffuseFallback = m_materialFallbacks.albedo;
     inputs.specularFallback = m_materialFallbacks.albedo;

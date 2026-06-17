@@ -182,12 +182,12 @@ void Renderer::CycleDebugViewMode() {
     }
     spdlog::info("Debug view mode: {}", label);
     if (m_debugViewState.mode == 20u || m_debugViewState.mode == 30u || m_debugViewState.mode == 31u) {
-        const bool rtSupported = m_rtRuntimeState.supported;
-        const bool rtEnabled = m_rtRuntimeState.enabled;
-        const bool reflEnabled = m_rtRuntimeState.reflectionsEnabled;
-        const bool hasReflRes = (m_rtReflectionTargets.color != nullptr);
-        const bool hasReflSrv = m_rtReflectionTargets.srv.IsValid();
-        const bool hasReflHistSrv = m_rtReflectionTargets.historySRV.IsValid();
+        const bool rtSupported = m_rt.RuntimeState().supported;
+        const bool rtEnabled = m_rt.RuntimeState().enabled;
+        const bool reflEnabled = m_rt.RuntimeState().reflectionsEnabled;
+        const bool hasReflRes = (m_rt.ReflectionTargets().color != nullptr);
+        const bool hasReflSrv = m_rt.ReflectionTargets().srv.IsValid();
+        const bool hasReflHistSrv = m_rt.ReflectionTargets().historySRV.IsValid();
         spdlog::info("RTRefl debug: rtSupported={} rtEnabled={} reflEnabled={} reflRes={} reflSRV={} reflHistSRV={} postTable={}",
                      rtSupported, rtEnabled, reflEnabled, hasReflRes, hasReflSrv, hasReflHistSrv, m_temporal.ScreenState().postProcessSrvTableValid);
         if (m_services.rayTracingContext) {

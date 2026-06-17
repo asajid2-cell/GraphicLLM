@@ -37,10 +37,10 @@ FrameExecutionContext Renderer::BuildFrameExecutionContext(Scene::ECS_Registry* 
 
     FrameFeaturePlanInputs featureInputs{};
     featureInputs.debug = LoadRuntimeFrameDebugSwitches();
-    featureInputs.rayTracingSupported = m_rtRuntimeState.supported;
-    featureInputs.rayTracingEnabled = m_rtRuntimeState.requested;
-    featureInputs.rtReflectionsEnabled = m_rtRuntimeState.reflectionsEnabled;
-    featureInputs.rtGIEnabled = m_rtRuntimeState.giEnabled;
+    featureInputs.rayTracingSupported = m_rt.RuntimeState().supported;
+    featureInputs.rayTracingEnabled = m_rt.RuntimeState().requested;
+    featureInputs.rtReflectionsEnabled = m_rt.RuntimeState().reflectionsEnabled;
+    featureInputs.rtGIEnabled = m_rt.RuntimeState().giEnabled;
     featureInputs.shadowsEnabled = m_shadows.Resources().controls.enabled;
     featureInputs.gpuCullingEnabled = m_gpuCullingState.enabled;
     featureInputs.visibilityBufferEnabled = m_visibilityBufferState.enabled;
@@ -53,8 +53,8 @@ FrameExecutionContext Renderer::BuildFrameExecutionContext(Scene::ECS_Registry* 
     featureInputs.fogEnabled = m_fogState.enabled;
     featureInputs.voxelBackendEnabled = m_voxel.IsBackendEnabled();
     featureInputs.hasRayTracingContext = (m_services.rayTracingContext != nullptr);
-    featureInputs.hasRTReflectionColor = (m_rtReflectionTargets.color != nullptr);
-    featureInputs.hasRTGIColor = (m_rtGITargets.color != nullptr);
+    featureInputs.hasRTReflectionColor = (m_rt.ReflectionTargets().color != nullptr);
+    featureInputs.hasRTGIColor = (m_rt.GITargets().color != nullptr);
     featureInputs.hasShadowMap = (m_shadows.Resources().resources.map != nullptr);
     featureInputs.hasShadowPipeline = pipelineReadiness.shadow;
     featureInputs.hasGPUCulling = (m_services.gpuCulling != nullptr);

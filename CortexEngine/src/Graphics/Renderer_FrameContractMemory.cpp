@@ -81,15 +81,7 @@ uint64_t EstimateResourceBytes(ID3D12Resource* resource) {
 } // namespace
 
 bool Renderer::IsRTWarmingUp() const {
-    if (!m_rtRuntimeState.supported || !m_rtRuntimeState.enabled || !m_services.rayTracingContext) {
-        return false;
-    }
-    // Consider RT "warming up" while there are outstanding BLAS jobs either
-    // in the renderer's queue or pending inside the DXR context.
-    if (m_assetRuntime.gpuJobs.pendingBLASJobs > 0) {
-        return true;
-    }
-    return m_services.rayTracingContext->GetPendingBLASCount() > 0;
+    return m_rt.IsRTWarmingUp(m_services.rayTracingContext.get(), m_assetRuntime.gpuJobs.pendingBLASJobs);
 }
 
 Renderer::VRAMBreakdown Renderer::GetEstimatedVRAMBreakdown() const {
@@ -121,14 +113,14 @@ Renderer::VRAMBreakdown Renderer::GetEstimatedVRAMBreakdown() const {
     addResource(breakdown.renderTargetBytes, m_mainTargets.candidateBeautyV3.resources.ldrOutput.Get());
     addResource(breakdown.renderTargetBytes, m_temporal.ScreenState().velocityBuffer.Get());
 
-    addResource(breakdown.postProcessBytes, m_rtShadowTargets.mask.Get());
-    addResource(breakdown.postProcessBytes, m_rtShadowTargets.history.Get());
+    addResource(breakdown.postProcessBytes, m_rt.ShadowTargets().mask.Get());
+    addResource(breakdown.postProcessBytes, m_rt.ShadowTargets().history.Get());
     addResource(breakdown.postProcessBytes, m_ssao.State().resources.texture.Get());
     addResource(breakdown.postProcessBytes, m_ssr.State().resources.color.Get());
-    addResource(breakdown.postProcessBytes, m_rtReflectionTargets.color.Get());
-    addResource(breakdown.postProcessBytes, m_rtReflectionTargets.history.Get());
-    addResource(breakdown.postProcessBytes, m_rtGITargets.color.Get());
-    addResource(breakdown.postProcessBytes, m_rtGITargets.history.Get());
+    addResource(breakdown.postProcessBytes, m_rt.ReflectionTargets().color.Get());
+    addResource(breakdown.postProcessBytes, m_rt.ReflectionTargets().history.Get());
+    addResource(breakdown.postProcessBytes, m_rt.GITargets().color.Get());
+    addResource(breakdown.postProcessBytes, m_rt.GITargets().history.Get());
     addResource(breakdown.postProcessBytes, m_temporal.ScreenState().historyColor.Get());
     addResource(breakdown.postProcessBytes, m_temporal.ScreenState().taaIntermediate.Get());
 
@@ -148,7 +140,7 @@ Renderer::VRAMBreakdown Renderer::GetEstimatedVRAMBreakdown() const {
     // Add acceleration-structure memory usage when DXR is active. This folds
     // BLAS/TLAS buffers into the on-screen VRAM estimate so heavy RT scenes
     // surface their additional footprint to the user.
-    if (m_services.rayTracingContext && m_rtRuntimeState.supported) {
+    if (m_services.rayTracingContext && m_rt.RuntimeState().supported) {
         breakdown.rtStructureBytes = m_services.rayTracingContext->GetAccelerationStructureBytes();
         // Mirror RT structure usage into the asset registry so the memory
         // inspector can report it alongside textures/geometry.

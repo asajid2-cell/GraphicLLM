@@ -29,7 +29,7 @@ void Renderer::ValidateFrameContract() {
     context.overlayPipelineReady = pipelineReadiness.overlay;
     context.readOnlyDepthStencilViewReady = m_depthResources.descriptors.readOnlyDsv.IsValid();
     context.rtReflectionWrittenThisFrame = m_frameLifecycle.rtReflectionWrittenThisFrame;
-    context.rtReflectionDenoisedThisFrame = m_rtDenoiseState.reflectionDenoisedThisFrame;
+    context.rtReflectionDenoisedThisFrame = m_rt.DenoiseState().reflectionDenoisedThisFrame;
 
     auto& contract = m_frameDiagnostics.contract.contract;
     if (contract.particles.executed && contract.draws.particleInstances > 0) {

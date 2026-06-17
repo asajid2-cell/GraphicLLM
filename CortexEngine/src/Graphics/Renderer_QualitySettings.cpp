@@ -194,8 +194,8 @@ void Renderer::SetRenderScale(float scale) {
         const unsigned int width = std::max(1u, m_services.window->GetWidth());
         const unsigned int height = std::max(1u, m_services.window->GetHeight());
         const bool heavyEffects =
-            m_rtRuntimeState.enabled || m_ssr.State().controls.enabled || m_ssao.State().controls.enabled ||
-            m_rtRuntimeState.reflectionsEnabled || m_rtRuntimeState.giEnabled;
+            m_rt.RuntimeState().enabled || m_ssr.State().controls.enabled || m_ssao.State().controls.enabled ||
+            m_rt.RuntimeState().reflectionsEnabled || m_rt.RuntimeState().giEnabled;
 
         if (m_services.device) {
             const auto budget = BudgetPlanner::BuildPlan(

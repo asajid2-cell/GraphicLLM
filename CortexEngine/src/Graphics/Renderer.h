@@ -55,6 +55,7 @@
 #include "Graphics/Subsystems/ParticleSubsystem.h"
 #include "Graphics/Subsystems/WaterSubsystem.h"
 #include "Graphics/RendererRTState.h"
+#include "Graphics/Subsystems/RTSubsystem.h"
 #include "Graphics/RendererSSAOState.h"
 #include "Graphics/Subsystems/SSAOSubsystem.h"
 #include "Graphics/RendererServiceState.h"
@@ -754,6 +755,7 @@ private:
     void RenderRayTracedReflections();
     void UpdateRTFramePlan(const FrameFeaturePlan& featurePlan);
     void ExecuteRTDenoisePass(const char* frameNormalRoughnessResource);
+    RTContext MakeRTContext();
     void RenderParticles(Scene::ECS_Registry* registry);
     ParticleRenderContext MakeParticleRenderContext();
 
@@ -818,12 +820,7 @@ public:
     // Graphics resources
     RendererServiceState m_services;
 
-    RTDenoisePassState m_rtDenoiseState;
-    RTReflectionSignalStatsState m_rtReflectionSignalState;
-    RTShadowTargetState m_rtShadowTargets;
-    RTReflectionTargetState m_rtReflectionTargets;
-    RTGITargetState m_rtGITargets;
-    RTReflectionReadinessState m_rtReflectionReadiness;
+    RTSubsystem m_rt;
 
     RendererCommandResourceState m_commandResources;
 
@@ -876,7 +873,6 @@ public:
     // Cached camera parameters and history used by culling, RT, and temporal passes.
     RendererCameraFrameState m_cameraState;
 
-    RTRuntimeState m_rtRuntimeState;
     GpuCullingRuntimeState m_gpuCullingState;
     RendererVisibilityBufferState m_visibilityBufferState;
     RendererFrameLifecycleState m_frameLifecycle;

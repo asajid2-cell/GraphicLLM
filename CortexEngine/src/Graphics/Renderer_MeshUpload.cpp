@@ -277,7 +277,7 @@ Result<void> Renderer::UploadMesh(std::shared_ptr<Scene::MeshData> mesh) {
     // job so RT acceleration structures can converge incrementally. When ray
     // tracing is disabled at runtime we skip BLAS work entirely to avoid
     // consuming acceleration-structure memory on 8 GB-class GPUs.
-    if (m_rtRuntimeState.supported && m_services.rayTracingContext && m_rtRuntimeState.enabled) {
+    if (m_rt.RuntimeState().supported && m_services.rayTracingContext && m_rt.RuntimeState().enabled) {
         m_services.rayTracingContext->RebuildBLASForMesh(mesh);
 
         GpuJob job{};

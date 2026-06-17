@@ -104,18 +104,18 @@ Renderer::FeatureState Renderer::GetFeatureState() const {
 
 Renderer::RayTracingState Renderer::GetRayTracingState() const {
     RayTracingState state{};
-    state.supported = m_rtRuntimeState.supported;
-    state.requested = m_rtRuntimeState.requested;
-    state.enabled = m_rtRuntimeState.enabled;
-    state.reflectionsEnabled = m_rtRuntimeState.reflectionsEnabled;
-    state.giEnabled = m_rtRuntimeState.giEnabled;
+    state.supported = m_rt.RuntimeState().supported;
+    state.requested = m_rt.RuntimeState().requested;
+    state.enabled = m_rt.RuntimeState().enabled;
+    state.reflectionsEnabled = m_rt.RuntimeState().reflectionsEnabled;
+    state.giEnabled = m_rt.RuntimeState().giEnabled;
     state.warmingUp = IsRTWarmingUp();
-    state.reflectionDenoiseAlpha = m_rtDenoiseState.reflectionHistoryAlpha;
-    state.reflectionCompositionStrength = m_rtDenoiseState.reflectionCompositionStrength;
-    state.reflectionRoughnessThreshold = m_rtDenoiseState.reflectionRoughnessThreshold;
-    state.reflectionHistoryMaxBlend = m_rtDenoiseState.reflectionHistoryMaxBlend;
-    state.reflectionFireflyClampLuma = m_rtDenoiseState.reflectionFireflyClampLuma;
-    state.reflectionSignalScale = m_rtDenoiseState.reflectionSignalScale;
+    state.reflectionDenoiseAlpha = m_rt.DenoiseState().reflectionHistoryAlpha;
+    state.reflectionCompositionStrength = m_rt.DenoiseState().reflectionCompositionStrength;
+    state.reflectionRoughnessThreshold = m_rt.DenoiseState().reflectionRoughnessThreshold;
+    state.reflectionHistoryMaxBlend = m_rt.DenoiseState().reflectionHistoryMaxBlend;
+    state.reflectionFireflyClampLuma = m_rt.DenoiseState().reflectionFireflyClampLuma;
+    state.reflectionSignalScale = m_rt.DenoiseState().reflectionSignalScale;
     return state;
 }
 
@@ -147,12 +147,12 @@ Renderer::HealthState Renderer::BuildHealthState() const {
         ? "runtime"
         : m_qualityRuntimeState.activeGraphicsPresetId;
     state.graphicsPresetDirtyFromUI = m_qualityRuntimeState.graphicsPresetDirtyFromUI;
-    state.rayTracingRequested = m_rtRuntimeState.requested ||
-                                m_rtRuntimeState.enabled ||
-                                m_rtRuntimeState.reflectionsEnabled ||
-                                m_rtRuntimeState.giEnabled;
-    state.rayTracingEffective = m_rtRuntimeState.supported &&
-                                m_rtRuntimeState.enabled &&
+    state.rayTracingRequested = m_rt.RuntimeState().requested ||
+                                m_rt.RuntimeState().enabled ||
+                                m_rt.RuntimeState().reflectionsEnabled ||
+                                m_rt.RuntimeState().giEnabled;
+    state.rayTracingEffective = m_rt.RuntimeState().supported &&
+                                m_rt.RuntimeState().enabled &&
                                 !m_frameLifecycle.deviceRemoved;
     state.environmentLoaded = m_environmentState.HasResidentEnvironment();
     state.activeEnvironment = m_environmentState.ActiveEnvironmentName();
@@ -367,18 +367,18 @@ void Renderer::ReportDeviceRemoved(const char* context,
         rs(m_depthResources.resources.resourceState),
         rs(m_shadows.Resources().resources.resourceState),
         rs(m_mainTargets.hdr.resources.state),
-        rs(m_rtShadowTargets.maskState),
-        rs(m_rtShadowTargets.historyState),
+        rs(m_rt.ShadowTargets().maskState),
+        rs(m_rt.ShadowTargets().historyState),
         rs(m_mainTargets.normalRoughness.resources.state),
         rs(m_ssao.State().resources.resourceState),
         rs(m_ssr.State().resources.resourceState),
         rs(m_temporal.ScreenState().velocityState),
         rs(m_temporal.ScreenState().historyState),
         rs(m_temporal.ScreenState().taaIntermediateState),
-        rs(m_rtReflectionTargets.colorState),
-        rs(m_rtReflectionTargets.historyState),
-        rs(m_rtGITargets.colorState),
-        rs(m_rtGITargets.historyState));
+        rs(m_rt.ReflectionTargets().colorState),
+        rs(m_rt.ReflectionTargets().historyState),
+        rs(m_rt.GITargets().colorState),
+        rs(m_rt.GITargets().historyState));
 
     // Attempt to query DRED (Device Removed Extended Data) so we can log the
     // last command list / breadcrumb and any page-fault information the GPU
@@ -511,10 +511,10 @@ void Renderer::LogDiagnostics() const {
                  m_shadows.Resources().controls.enabled,
                  m_environmentState.enabled);
     spdlog::info("RT: supported={} enabled={} reflections={} GI={}",
-                 m_rtRuntimeState.supported,
-                 m_rtRuntimeState.enabled,
-                 m_rtRuntimeState.reflectionsEnabled,
-                 m_rtRuntimeState.giEnabled);
+                 m_rt.RuntimeState().supported,
+                 m_rt.RuntimeState().enabled,
+                 m_rt.RuntimeState().reflectionsEnabled,
+                 m_rt.RuntimeState().giEnabled);
 
     spdlog::info("Resource states: depth=0x{:X} hdr=0x{:X} ssr=0x{:X}",
                  static_cast<uint32_t>(m_depthResources.resources.resourceState),

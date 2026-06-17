@@ -710,8 +710,8 @@ void Renderer::PopulateFrameDebugAndPostConstants(FrameConstants& frameData,
     // dispatches mean the forward shader does not own the RT shadow mask.
     const bool rtShadowMaskOwnedThisFrame =
         m_framePlanning.rtPlan.dispatchShadows &&
-        m_rtShadowTargets.mask &&
-        m_rtShadowTargets.maskSRV.IsValid();
+        m_rt.ShadowTargets().mask &&
+        m_rt.ShadowTargets().maskSRV.IsValid();
     const bool rtReflPipelineReady =
         m_framePlanning.rtPlan.enabled &&
         m_services.rayTracingContext &&
@@ -808,7 +808,7 @@ void Renderer::PopulateFrameDebugAndPostConstants(FrameConstants& frameData,
     if (m_ssr.State().frame.activeThisFrame) {
         postFxFlags |= 1u;
     }
-    if (rtReflPipelineReady && m_rtRuntimeState.reflectionsEnabled) {
+    if (rtReflPipelineReady && m_rt.RuntimeState().reflectionsEnabled) {
         postFxFlags |= 2u;
     }
     if (rtReflPipelineReady && m_temporalHistory.manager.CanReproject(TemporalHistoryId::RTReflection)) {
@@ -821,9 +821,9 @@ void Renderer::PopulateFrameDebugAndPostConstants(FrameConstants& frameData,
         postFxFlags |= 16u;
     }
     const uint32_t rtReflectionComposition =
-        static_cast<uint32_t>(glm::clamp(m_rtDenoiseState.reflectionCompositionStrength, 0.0f, 1.0f) * 7.0f + 0.5f);
+        static_cast<uint32_t>(glm::clamp(m_rt.DenoiseState().reflectionCompositionStrength, 0.0f, 1.0f) * 7.0f + 0.5f);
     const uint32_t rtReflectionAlpha =
-        static_cast<uint32_t>(glm::clamp(m_rtDenoiseState.reflectionHistoryAlpha, 0.0f, 1.0f) * 255.0f + 0.5f);
+        static_cast<uint32_t>(glm::clamp(m_rt.DenoiseState().reflectionHistoryAlpha, 0.0f, 1.0f) * 255.0f + 0.5f);
     postFxFlags |= (rtReflectionComposition & 0x7u) << 5u;
     postFxFlags |= m_postProcessState.EncodedLensDirtByte() << 8u;
     postFxFlags |= (rtReflectionAlpha & 0xFFu) << 16u;
@@ -880,15 +880,15 @@ void Renderer::PopulateFrameDebugAndPostConstants(FrameConstants& frameData,
         m_postProcessState.EffectiveMotionBlur(),
         m_postProcessState.EffectiveDepthOfField());
     frameData.rtReflectionParams = glm::vec4(
-        m_rtDenoiseState.reflectionRoughnessThreshold,
-        m_rtDenoiseState.reflectionHistoryMaxBlend,
-        m_rtDenoiseState.reflectionFireflyClampLuma,
-        m_rtDenoiseState.reflectionSignalScale);
+        m_rt.DenoiseState().reflectionRoughnessThreshold,
+        m_rt.DenoiseState().reflectionHistoryMaxBlend,
+        m_rt.DenoiseState().reflectionFireflyClampLuma,
+        m_rt.DenoiseState().reflectionSignalScale);
     frameData.cinematicParams = glm::vec4(
         static_cast<float>(m_postProcessState.ToneMapperMode()),
         glm::radians(m_environmentState.rotationDegrees),
-        m_rtDenoiseState.giStrength,
-        m_rtDenoiseState.giRayDistance);
+        m_rt.DenoiseState().giStrength,
+        m_rt.DenoiseState().giRayDistance);
     const glm::vec4 sceneLocalEnvironmentProfile = BuildSceneLocalEnvironmentV3ProfileParams();
     frameData.cinematicDofParams = glm::vec4(
         m_postProcessState.dofFocusDistance,

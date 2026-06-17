@@ -1,86 +1,72 @@
-﻿#include "Renderer.h"
+#include "Renderer.h"
 
-#include "Graphics/RendererGeometryUtils.h"
-#include "Scene/ECS_Registry.h"
-
-#include <algorithm>
-#include <cstdlib>
-#include <memory>
-#include <string>
-#include <vector>
-
-#include <spdlog/spdlog.h>
+// RTSubsystem context builder + frame-plan forwarder. The ray-tracing family
+// (shadows, reflections, GI, denoise, signal stats) lives in
+// Graphics/Subsystems/RTSubsystem; MakeRTContext snapshots the per-frame
+// Renderer dependencies it needs.
 namespace Cortex::Graphics {
 
-namespace {
+RTContext Renderer::MakeRTContext() {
+    RTContext ctx{};
+    ctx.device = m_services.device;
+    ctx.descriptorManager = m_services.descriptorManager.get();
+    ctx.rayTracingContext = m_services.rayTracingContext.get();
+    ctx.rtDenoiser = m_services.rtDenoiser.get();
+    ctx.rtReflectionSignalStats = m_services.rtReflectionSignalStats.get();
+    ctx.visibilityBuffer = m_services.visibilityBuffer.get();
+    ctx.window = m_services.window;
+    ctx.commandList = m_commandResources.graphicsList.Get();
 
-void GetTextureSize(ID3D12Resource* resource, uint32_t& width, uint32_t& height) {
-    width = 0;
-    height = 0;
-    if (!resource) {
-        return;
-    }
-    const D3D12_RESOURCE_DESC desc = resource->GetDesc();
-    if (desc.Dimension == D3D12_RESOURCE_DIMENSION_TEXTURE2D) {
-        width = static_cast<uint32_t>(desc.Width);
-        height = desc.Height;
-    }
+    ctx.frameConstants = m_constantBuffers.currentFrameGPU;
+    ctx.frameIndex = m_frameRuntime.frameIndex;
+    ctx.absoluteFrameIndex = m_frameRuntime.absoluteFrameIndex;
+    ctx.renderFrameCounter = m_frameLifecycle.renderFrameCounter;
+    ctx.internalRenderWidth = GetInternalRenderWidth();
+    ctx.internalRenderHeight = GetInternalRenderHeight();
+
+    ctx.depthBuffer = m_depthResources.resources.buffer.Get();
+    ctx.depthState = &m_depthResources.resources.resourceState;
+    ctx.depthSrv = m_depthResources.descriptors.srv;
+
+    ctx.hdrColor = m_mainTargets.hdr.resources.color.Get();
+    ctx.normalRoughness = m_mainTargets.normalRoughness.resources.texture.Get();
+    ctx.normalRoughnessState = &m_mainTargets.normalRoughness.resources.state;
+    ctx.normalRoughnessSrv = m_mainTargets.normalRoughness.descriptors.srv;
+
+    ctx.maskTexture = m_temporalMaskState.texture.Get();
+    ctx.maskState = &m_temporalMaskState.resourceState;
+    ctx.maskSrv = m_temporalMaskState.srv;
+    ctx.maskBuiltThisFrame = m_temporalMaskState.builtThisFrame;
+
+    ctx.velocityBuffer = m_temporal.ScreenState().velocityBuffer.Get();
+    ctx.velocityState = &m_temporal.ScreenState().velocityState;
+    ctx.velocitySrv = m_temporal.ScreenState().velocitySRV;
+
+    ctx.environment = &m_environmentState;
+    ctx.visibilityBufferRenderedThisFrame = m_visibilityBufferState.renderedThisFrame;
+    ctx.debugViewMode = m_debugViewState.mode;
+    ctx.historyManager = &m_temporalHistory.manager;
+
+    ctx.framePlanning = &m_framePlanning;
+    ctx.assetRuntime = &m_assetRuntime;
+    ctx.rtReflectionWrittenThisFrame = &m_frameLifecycle.rtReflectionWrittenThisFrame;
+
+    ctx.updateEnvironmentTable = [this]() { UpdateEnvironmentDescriptorTable(); };
+    ctx.recordFramePass = [this](const char* name,
+                                 bool planned,
+                                 bool executed,
+                                 uint32_t drawCount,
+                                 std::initializer_list<const char*> reads,
+                                 std::initializer_list<const char*> writes,
+                                 bool fallbackUsed,
+                                 const char* fallbackReason) {
+        RecordFramePass(name, planned, executed, drawCount, reads, writes, fallbackUsed, fallbackReason);
+    };
+    return ctx;
 }
 
-} // namespace
 void Renderer::UpdateRTFramePlan(const FrameFeaturePlan& featurePlan) {
-    uint32_t reflectionWidth = 0;
-    uint32_t reflectionHeight = 0;
-    uint32_t giWidth = 0;
-    uint32_t giHeight = 0;
-    GetTextureSize(m_rtReflectionTargets.color.Get(), reflectionWidth, reflectionHeight);
-    GetTextureSize(m_rtGITargets.color.Get(), giWidth, giHeight);
-
-    RTSchedulerInputs inputs{};
-    inputs.frameNumber = m_frameLifecycle.renderFrameCounter;
-    inputs.dedicatedVideoMemoryBytes = m_services.device ? m_services.device->GetDedicatedVideoMemoryBytes() : 0;
-    inputs.renderWidth = GetInternalRenderWidth();
-    inputs.renderHeight = GetInternalRenderHeight();
-    inputs.currentReflectionWidth = reflectionWidth;
-    inputs.currentReflectionHeight = reflectionHeight;
-    inputs.currentGIWidth = giWidth;
-    inputs.currentGIHeight = giHeight;
-    inputs.tlasCandidateCount = m_framePlanning.sceneSnapshot.IsValidForFrame(m_frameLifecycle.renderFrameCounter)
-        ? static_cast<uint32_t>(m_framePlanning.sceneSnapshot.rtCandidateIndices.size())
-        : 0u;
-    inputs.pendingRendererBLASJobs = m_assetRuntime.gpuJobs.pendingBLASJobs;
-    inputs.pendingContextBLAS = m_services.rayTracingContext ? m_services.rayTracingContext->GetPendingBLASCount() : 0;
-    m_framePlanning.budgetPlan = BudgetPlanner::BuildPlan(
-        inputs.dedicatedVideoMemoryBytes,
-        m_services.window ? std::max(1u, m_services.window->GetWidth()) : inputs.renderWidth,
-        m_services.window ? std::max(1u, m_services.window->GetHeight()) : inputs.renderHeight);
-    m_assetRuntime.registry.SetBudgets(m_framePlanning.budgetPlan.textureBudgetBytes,
-                               m_framePlanning.budgetPlan.environmentBudgetBytes,
-                               m_framePlanning.budgetPlan.geometryBudgetBytes,
-                               m_framePlanning.budgetPlan.rtStructureBudgetBytes);
-    inputs.rendererBudget = m_framePlanning.budgetPlan;
-    inputs.rendererBudgetValid = true;
-    inputs.requested =
-        featurePlan.planned.rayTracingEnabled && !featurePlan.runMinimalFrame && !featurePlan.runVoxelBackend;
-    inputs.supported = m_rtRuntimeState.supported;
-    inputs.contextReady = m_services.rayTracingContext != nullptr;
-    inputs.warmingUp = IsRTWarmingUp();
-    inputs.shadowPipelineReady = m_services.rayTracingContext && m_services.rayTracingContext->HasPipeline();
-    inputs.reflectionFeatureRequested = m_rtRuntimeState.reflectionsEnabled;
-    inputs.reflectionPipelineReady = m_services.rayTracingContext && m_services.rayTracingContext->HasReflectionPipeline();
-    inputs.reflectionResourceReady = m_rtReflectionTargets.color != nullptr && m_rtReflectionTargets.uav.IsValid();
-    inputs.giFeatureRequested = m_rtRuntimeState.giEnabled;
-    inputs.giPipelineReady = m_services.rayTracingContext && m_services.rayTracingContext->HasGIPipeline();
-    inputs.giResourceReady = m_rtGITargets.color != nullptr && m_rtGITargets.uav.IsValid();
-    inputs.depthReady = m_depthResources.resources.buffer != nullptr && m_depthResources.descriptors.srv.IsValid();
-    inputs.shadowMaskReady = m_rtShadowTargets.mask != nullptr && m_rtShadowTargets.maskUAV.IsValid();
-
-    m_framePlanning.rtPlan = RTScheduler::BuildFramePlan(inputs);
-    if (m_services.rayTracingContext) {
-        m_services.rayTracingContext->SetAccelerationStructureBudgets(
-            m_framePlanning.rtPlan.budget.maxBLASTotalBytes,
-            m_framePlanning.rtPlan.budget.maxBLASBuildBytesPerFrame);
-    }
+    m_rt.UpdateRTFramePlan(featurePlan, MakeRTContext());
 }
 
 } // namespace Cortex::Graphics

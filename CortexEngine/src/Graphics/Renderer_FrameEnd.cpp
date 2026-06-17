@@ -168,14 +168,14 @@ void Renderer::EndFrame() {
 
     // Before presenting, update the RT shadow history buffer so the next
     // frame's temporal smoothing has valid data.
-    if (m_rtRuntimeState.supported && m_rtRuntimeState.enabled && !m_rtDenoiseState.shadowDenoisedThisFrame &&
-        m_framePlanning.rtPlan.dispatchShadows && m_rtShadowTargets.mask && m_rtShadowTargets.history) {
+    if (m_rt.RuntimeState().supported && m_rt.RuntimeState().enabled && !m_rt.DenoiseState().shadowDenoisedThisFrame &&
+        m_framePlanning.rtPlan.dispatchShadows && m_rt.ShadowTargets().mask && m_rt.ShadowTargets().history) {
         RTHistoryCopyPass::CopyContext copyContext{};
         copyContext.commandList = m_commandResources.graphicsList.Get();
-        copyContext.source = m_rtShadowTargets.mask.Get();
-        copyContext.sourceState = &m_rtShadowTargets.maskState;
-        copyContext.history = m_rtShadowTargets.history.Get();
-        copyContext.historyState = &m_rtShadowTargets.historyState;
+        copyContext.source = m_rt.ShadowTargets().mask.Get();
+        copyContext.sourceState = &m_rt.ShadowTargets().maskState;
+        copyContext.history = m_rt.ShadowTargets().history.Get();
+        copyContext.historyState = &m_rt.ShadowTargets().historyState;
         if (RTHistoryCopyPass::CopyToHistoryAndReturnToShaderResource(copyContext)) {
             MarkRTShadowHistoryValid();
         }
@@ -183,14 +183,14 @@ void Renderer::EndFrame() {
 
       // Update RT GI history buffer in lock-step with the RT GI color buffer
       // so temporal accumulation in the shader has a stable previous frame.
-      if (m_rtRuntimeState.supported && m_rtRuntimeState.enabled && !m_rtDenoiseState.giDenoisedThisFrame &&
-          m_framePlanning.rtPlan.dispatchGI && m_rtGITargets.color && m_rtGITargets.history) {
+      if (m_rt.RuntimeState().supported && m_rt.RuntimeState().enabled && !m_rt.DenoiseState().giDenoisedThisFrame &&
+          m_framePlanning.rtPlan.dispatchGI && m_rt.GITargets().color && m_rt.GITargets().history) {
           RTHistoryCopyPass::CopyContext copyContext{};
           copyContext.commandList = m_commandResources.graphicsList.Get();
-          copyContext.source = m_rtGITargets.color.Get();
-          copyContext.sourceState = &m_rtGITargets.colorState;
-          copyContext.history = m_rtGITargets.history.Get();
-          copyContext.historyState = &m_rtGITargets.historyState;
+          copyContext.source = m_rt.GITargets().color.Get();
+          copyContext.sourceState = &m_rt.GITargets().colorState;
+          copyContext.history = m_rt.GITargets().history.Get();
+          copyContext.historyState = &m_rt.GITargets().historyState;
           if (RTHistoryCopyPass::CopyToHistoryAndReturnToShaderResource(copyContext)) {
               MarkRTGIHistoryValid();
           }
@@ -202,14 +202,14 @@ void Renderer::EndFrame() {
       // blend against the previous frame when g_DebugMode.w indicates that
       // RT history is valid. If no reflection rays were traced this frame,
       // skip the copy so we do not treat uninitialized data as valid history.
-      if (m_rtRuntimeState.supported && m_rtRuntimeState.enabled && !m_rtDenoiseState.reflectionDenoisedThisFrame &&
-          m_frameLifecycle.rtReflectionWrittenThisFrame && m_rtReflectionTargets.color && m_rtReflectionTargets.history) {
+      if (m_rt.RuntimeState().supported && m_rt.RuntimeState().enabled && !m_rt.DenoiseState().reflectionDenoisedThisFrame &&
+          m_frameLifecycle.rtReflectionWrittenThisFrame && m_rt.ReflectionTargets().color && m_rt.ReflectionTargets().history) {
           RTHistoryCopyPass::CopyContext copyContext{};
           copyContext.commandList = m_commandResources.graphicsList.Get();
-          copyContext.source = m_rtReflectionTargets.color.Get();
-          copyContext.sourceState = &m_rtReflectionTargets.colorState;
-          copyContext.history = m_rtReflectionTargets.history.Get();
-          copyContext.historyState = &m_rtReflectionTargets.historyState;
+          copyContext.source = m_rt.ReflectionTargets().color.Get();
+          copyContext.sourceState = &m_rt.ReflectionTargets().colorState;
+          copyContext.history = m_rt.ReflectionTargets().history.Get();
+          copyContext.historyState = &m_rt.ReflectionTargets().historyState;
           if (RTHistoryCopyPass::CopyToHistoryAndReturnToShaderResource(copyContext)) {
               MarkRTReflectionHistoryValid();
           }
@@ -225,7 +225,7 @@ void Renderer::EndFrame() {
             {m_ssr.State().resources.color.Get(), &m_ssr.State().resources.resourceState},
             {m_temporal.ScreenState().velocityBuffer.Get(), &m_temporal.ScreenState().velocityState},
             {m_temporal.ScreenState().taaIntermediate.Get(), &m_temporal.ScreenState().taaIntermediateState},
-            {m_rtReflectionTargets.color.Get(), &m_rtReflectionTargets.colorState},
+            {m_rt.ReflectionTargets().color.Get(), &m_rt.ReflectionTargets().colorState},
             {m_mainTargets.normalRoughness.resources.texture.Get(), &m_mainTargets.normalRoughness.resources.state},
         };
         EndFrameShaderResourcePass::TransitionContext transitionContext{};

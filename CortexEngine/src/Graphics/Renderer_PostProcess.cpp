@@ -28,8 +28,8 @@ void Renderer::RenderPostProcess() {
             {wantsHzbDebug ? m_hzb.State().resources.texture.Get() : nullptr, &m_hzb.State().resources.resourceState, hzbDebugState},
             {m_temporal.ScreenState().velocityBuffer.Get(), &m_temporal.ScreenState().velocityState, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE},
             {m_temporal.ScreenState().taaIntermediate.Get(), &m_temporal.ScreenState().taaIntermediateState, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE},
-            {m_rtReflectionTargets.color.Get(), &m_rtReflectionTargets.colorState, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE},
-            {m_rtReflectionTargets.history.Get(), &m_rtReflectionTargets.historyState, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE},
+            {m_rt.ReflectionTargets().color.Get(), &m_rt.ReflectionTargets().colorState, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE},
+            {m_rt.ReflectionTargets().history.Get(), &m_rt.ReflectionTargets().historyState, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE},
         };
         PostProcessTargetPass::PrepareContext prepareContext{};
         prepareContext.commandList = m_commandResources.graphicsList.Get();
@@ -47,7 +47,7 @@ void Renderer::RenderPostProcess() {
     // reflection dispatch is disabled so debug view 20 can validate SRV binding.
     // NOTE: This is gated behind env vars and debug view modes; it should not
     // affect normal rendering.
-    if (m_rtReflectionTargets.color) {
+    if (m_rt.ReflectionTargets().color) {
         static bool s_checkedRtReflPostClear = false;
         static int  s_rtReflPostClearMode = 0;
         if (!s_checkedRtReflPostClear) {
@@ -63,17 +63,17 @@ void Renderer::RenderPostProcess() {
 
         const bool rtReflDebugView =
             (m_debugViewState.mode == 20u || m_debugViewState.mode == 30u || m_debugViewState.mode == 31u);
-        if (rtReflDebugView && s_rtReflPostClearMode != 0 && m_services.descriptorManager && m_services.device && m_rtReflectionTargets.uav.IsValid()) {
-            DescriptorHandle clearUav = m_rtReflectionTargets.postClearUAVs[m_frameRuntime.frameIndex % kFrameCount];
+        if (rtReflDebugView && s_rtReflPostClearMode != 0 && m_services.descriptorManager && m_services.device && m_rt.ReflectionTargets().uav.IsValid()) {
+            DescriptorHandle clearUav = m_rt.ReflectionTargets().postClearUAVs[m_frameRuntime.frameIndex % kFrameCount];
             if (clearUav.IsValid()) {
                 RTReflectionDebugClearPass::ClearContext clearContext{};
                 clearContext.commandList = m_commandResources.graphicsList.Get();
                 clearContext.device = m_services.device->GetDevice();
                 clearContext.descriptorHeap = m_services.descriptorManager->GetCBV_SRV_UAV_Heap();
-                clearContext.reflectionColor = m_rtReflectionTargets.color.Get();
-                clearContext.reflectionState = &m_rtReflectionTargets.colorState;
+                clearContext.reflectionColor = m_rt.ReflectionTargets().color.Get();
+                clearContext.reflectionState = &m_rt.ReflectionTargets().colorState;
                 clearContext.shaderVisibleUav = clearUav;
-                clearContext.cpuUav = m_rtReflectionTargets.uav;
+                clearContext.cpuUav = m_rt.ReflectionTargets().uav;
                 clearContext.clearMode = s_rtReflPostClearMode;
                 if (!RTReflectionDebugClearPass::ClearForDebugView(clearContext)) {
                     spdlog::warn("Renderer: RT reflection post debug clear failed");

@@ -100,9 +100,9 @@ void Renderer::RecordFramePass(const char* name,
         if (resource == "velocity") return resourceBytes(m_temporal.ScreenState().velocityBuffer.Get());
         if (resource == "temporal_rejection_mask") return resourceBytes(m_temporalMaskState.texture.Get());
         if (resource == "taa_history") return resourceBytes(m_temporal.ScreenState().historyColor.Get());
-        if (resource == "rt_shadow_mask") return resourceBytes(m_rtShadowTargets.mask.Get());
-        if (resource == "rt_gi") return resourceBytes(m_rtGITargets.color.Get());
-        if (resource == "rt_reflection") return resourceBytes(m_rtReflectionTargets.color.Get());
+        if (resource == "rt_shadow_mask") return resourceBytes(m_rt.ShadowTargets().mask.Get());
+        if (resource == "rt_gi") return resourceBytes(m_rt.GITargets().color.Get());
+        if (resource == "rt_reflection") return resourceBytes(m_rt.ReflectionTargets().color.Get());
         if (resource == "shadow_map") return resourceBytes(m_shadows.Resources().resources.map.Get());
         if (resource == "hzb") return resourceBytes(m_hzb.State().resources.texture.Get());
         if (resource == "back_buffer" && m_services.window) return resourceBytes(m_services.window->GetCurrentBackBuffer());

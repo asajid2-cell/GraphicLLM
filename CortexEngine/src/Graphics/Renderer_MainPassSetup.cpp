@@ -16,10 +16,10 @@ void Renderer::PrepareMainPass() {
     context.depthBuffer = m_depthResources.resources.buffer.Get();
     context.depthState = &m_depthResources.resources.resourceState;
     context.depthDsv = m_depthResources.descriptors.dsv;
-    context.rtShadowMask = m_rtShadowTargets.mask.Get();
-    context.rtShadowMaskState = &m_rtShadowTargets.maskState;
-    context.rtGIColor = m_rtGITargets.color.Get();
-    context.rtGIColorState = &m_rtGITargets.colorState;
+    context.rtShadowMask = m_rt.ShadowTargets().mask.Get();
+    context.rtShadowMaskState = &m_rt.ShadowTargets().maskState;
+    context.rtGIColor = m_rt.GITargets().color.Get();
+    context.rtGIColorState = &m_rt.GITargets().colorState;
     context.hdrColor = m_mainTargets.hdr.resources.color.Get();
     context.hdrState = &m_mainTargets.hdr.resources.state;
     context.hdrRtv = m_mainTargets.hdr.descriptors.rtv;

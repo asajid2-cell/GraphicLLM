@@ -110,10 +110,10 @@ Renderer::ExecuteVisibilityBufferInRenderGraph(Scene::ECS_Registry* registry) {
             m_mainTargets.hdr.resources.state,
             m_shadows.Resources().resources.map.Get(),
             m_shadows.Resources().resources.resourceState,
-            m_rtShadowTargets.mask.Get(),
-            m_rtShadowTargets.maskState,
-            m_rtGITargets.color.Get(),
-            m_rtGITargets.colorState,
+            m_rt.ShadowTargets().mask.Get(),
+            m_rt.ShadowTargets().maskState,
+            m_rt.GITargets().color.Get(),
+            m_rt.GITargets().colorState,
             m_mainTargets.lightingV3.resources.directLighting.Get(),
             m_mainTargets.lightingV3.resources.directLightingUnshadowed.Get(),
             m_mainTargets.lightingV3.resources.shadowVisibility.Get(),
@@ -242,8 +242,8 @@ Renderer::ExecuteVisibilityBufferInRenderGraph(Scene::ECS_Registry* registry) {
         vbGraphContext.deferredLighting.depthState = &m_depthResources.resources.resourceState;
         vbGraphContext.deferredLighting.hdrState = &m_mainTargets.hdr.resources.state;
         vbGraphContext.deferredLighting.shadowState = &m_shadows.Resources().resources.resourceState;
-        vbGraphContext.deferredLighting.rtShadowState = &m_rtShadowTargets.maskState;
-        vbGraphContext.deferredLighting.rtGIState = &m_rtGITargets.colorState;
+        vbGraphContext.deferredLighting.rtShadowState = &m_rt.ShadowTargets().maskState;
+        vbGraphContext.deferredLighting.rtGIState = &m_rt.GITargets().colorState;
         vbGraphContext.deferredLighting.shadowValid = vbResources.shadow.IsValid();
         vbGraphContext.deferredLighting.rtShadowValid = vbResources.rtShadow.IsValid();
         vbGraphContext.deferredLighting.rtGIValid = vbResources.rtGI.IsValid();
@@ -287,8 +287,8 @@ Renderer::ExecuteVisibilityBufferInRenderGraph(Scene::ECS_Registry* registry) {
         vbGraphContext.fullSceneLightingV3.depthState = &m_depthResources.resources.resourceState;
         vbGraphContext.fullSceneLightingV3.lightingSplitState = &m_mainTargets.lightingV3.resources.state;
         vbGraphContext.fullSceneLightingV3.shadowState = &m_shadows.Resources().resources.resourceState;
-        vbGraphContext.fullSceneLightingV3.rtShadowState = &m_rtShadowTargets.maskState;
-        vbGraphContext.fullSceneLightingV3.rtGIState = &m_rtGITargets.colorState;
+        vbGraphContext.fullSceneLightingV3.rtShadowState = &m_rt.ShadowTargets().maskState;
+        vbGraphContext.fullSceneLightingV3.rtGIState = &m_rt.GITargets().colorState;
         vbGraphContext.fullSceneLightingV3.enabled = fullSceneLightingV3Enabled;
         vbGraphContext.fullSceneLightingV3.shadowValid = vbResources.shadow.IsValid();
         vbGraphContext.fullSceneLightingV3.rtShadowValid = vbResources.rtShadow.IsValid();
@@ -316,8 +316,8 @@ Renderer::ExecuteVisibilityBufferInRenderGraph(Scene::ECS_Registry* registry) {
             m_depthResources.resources.resourceState = m_services.renderGraph->GetResourceState(vbResources.depth);
             m_mainTargets.hdr.resources.state = m_services.renderGraph->GetResourceState(vbResources.hdr);
             if (vbResources.shadow.IsValid()) m_shadows.Resources().resources.resourceState = m_services.renderGraph->GetResourceState(vbResources.shadow);
-            if (vbResources.rtShadow.IsValid()) m_rtShadowTargets.maskState = m_services.renderGraph->GetResourceState(vbResources.rtShadow);
-            if (vbResources.rtGI.IsValid()) m_rtGITargets.colorState = m_services.renderGraph->GetResourceState(vbResources.rtGI);
+            if (vbResources.rtShadow.IsValid()) m_rt.ShadowTargets().maskState = m_services.renderGraph->GetResourceState(vbResources.rtShadow);
+            if (vbResources.rtGI.IsValid()) m_rt.GITargets().colorState = m_services.renderGraph->GetResourceState(vbResources.rtGI);
             if (vbResources.directLighting.IsValid()) {
                 m_mainTargets.lightingV3.resources.state = m_services.renderGraph->GetResourceState(vbResources.directLighting);
             }

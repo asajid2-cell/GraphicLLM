@@ -72,35 +72,35 @@ bool Renderer::GetRTGIEnabled() const {
 }
 
 float Renderer::GetRTReflectionDenoiseAlpha() const {
-    return m_rtDenoiseState.reflectionHistoryAlpha;
+    return m_rt.DenoiseState().reflectionHistoryAlpha;
 }
 
 float Renderer::GetRTReflectionCompositionStrength() const {
-    return m_rtDenoiseState.reflectionCompositionStrength;
+    return m_rt.DenoiseState().reflectionCompositionStrength;
 }
 
 float Renderer::GetRTReflectionRoughnessThreshold() const {
-    return m_rtDenoiseState.reflectionRoughnessThreshold;
+    return m_rt.DenoiseState().reflectionRoughnessThreshold;
 }
 
 float Renderer::GetRTReflectionHistoryMaxBlend() const {
-    return m_rtDenoiseState.reflectionHistoryMaxBlend;
+    return m_rt.DenoiseState().reflectionHistoryMaxBlend;
 }
 
 float Renderer::GetRTReflectionFireflyClampLuma() const {
-    return m_rtDenoiseState.reflectionFireflyClampLuma;
+    return m_rt.DenoiseState().reflectionFireflyClampLuma;
 }
 
 float Renderer::GetRTReflectionSignalScale() const {
-    return m_rtDenoiseState.reflectionSignalScale;
+    return m_rt.DenoiseState().reflectionSignalScale;
 }
 
 float Renderer::GetRTGIStrength() const {
-    return m_rtDenoiseState.giStrength;
+    return m_rt.DenoiseState().giStrength;
 }
 
 float Renderer::GetRTGIRayDistance() const {
-    return m_rtDenoiseState.giRayDistance;
+    return m_rt.DenoiseState().giRayDistance;
 }
 
 bool Renderer::IsRayTracingSupported() const {
@@ -311,39 +311,39 @@ void Renderer::SetAreaLightSizeScale(float scale) {
 }
 
 void Renderer::SetRayTracingEnabled(bool enabled) {
-    const bool oldRequested = m_rtRuntimeState.requested;
-    const bool newValue = enabled && m_rtRuntimeState.supported;
-    m_rtRuntimeState.requested = enabled;
-    if (m_rtRuntimeState.enabled == newValue) {
-        if (enabled && !m_rtRuntimeState.supported && oldRequested != enabled) {
+    const bool oldRequested = m_rt.RuntimeState().requested;
+    const bool newValue = enabled && m_rt.RuntimeState().supported;
+    m_rt.RuntimeState().requested = enabled;
+    if (m_rt.RuntimeState().enabled == newValue) {
+        if (enabled && !m_rt.RuntimeState().supported && oldRequested != enabled) {
             spdlog::info("Ray tracing toggle requested, but DXR is not supported on this device.");
         }
         return;
     }
-    if (enabled && !m_rtRuntimeState.supported) {
+    if (enabled && !m_rt.RuntimeState().supported) {
         spdlog::info("Ray tracing toggle requested, but DXR is not supported on this device.");
         return;
     }
-    m_rtRuntimeState.enabled = newValue;
-    InvalidateRTShadowHistory(m_rtRuntimeState.enabled ? "feature_enabled" : "feature_disabled");
-    InvalidateRTReflectionHistory(m_rtRuntimeState.enabled ? "feature_enabled" : "feature_disabled");
-    InvalidateRTGIHistory(m_rtRuntimeState.enabled ? "feature_enabled" : "feature_disabled");
-    spdlog::info("Ray tracing {}", m_rtRuntimeState.enabled ? "ENABLED" : "DISABLED");
+    m_rt.RuntimeState().enabled = newValue;
+    InvalidateRTShadowHistory(m_rt.RuntimeState().enabled ? "feature_enabled" : "feature_disabled");
+    InvalidateRTReflectionHistory(m_rt.RuntimeState().enabled ? "feature_enabled" : "feature_disabled");
+    InvalidateRTGIHistory(m_rt.RuntimeState().enabled ? "feature_enabled" : "feature_disabled");
+    spdlog::info("Ray tracing {}", m_rt.RuntimeState().enabled ? "ENABLED" : "DISABLED");
 }
 
 void Renderer::SetRTReflectionsEnabled(bool enabled) {
-    if (m_rtRuntimeState.reflectionsEnabled == enabled) {
+    if (m_rt.RuntimeState().reflectionsEnabled == enabled) {
         return;
     }
-    m_rtRuntimeState.reflectionsEnabled = enabled;
+    m_rt.RuntimeState().reflectionsEnabled = enabled;
     InvalidateRTReflectionHistory(enabled ? "feature_enabled" : "feature_disabled");
 }
 
 void Renderer::SetRTGIEnabled(bool enabled) {
-    if (m_rtRuntimeState.giEnabled == enabled) {
+    if (m_rt.RuntimeState().giEnabled == enabled) {
         return;
     }
-    m_rtRuntimeState.giEnabled = enabled;
+    m_rt.RuntimeState().giEnabled = enabled;
     InvalidateRTGIHistory(enabled ? "feature_enabled" : "feature_disabled");
 }
 
@@ -359,12 +359,12 @@ void Renderer::SetRTReflectionTuning(float denoiseAlpha,
     const float historyBlend = std::clamp(historyMaxBlend, 0.0f, 0.5f);
     const float fireflyClamp = std::clamp(fireflyClampLuma, 4.0f, 32.0f);
     const float scale = std::clamp(signalScale, 0.0f, 2.0f);
-    const bool alphaChanged = std::abs(alpha - m_rtDenoiseState.reflectionHistoryAlpha) > 1e-4f;
-    const bool strengthChanged = std::abs(strength - m_rtDenoiseState.reflectionCompositionStrength) > 1e-4f;
-    const bool roughnessChanged = std::abs(roughness - m_rtDenoiseState.reflectionRoughnessThreshold) > 1e-4f;
-    const bool historyBlendChanged = std::abs(historyBlend - m_rtDenoiseState.reflectionHistoryMaxBlend) > 1e-4f;
-    const bool fireflyChanged = std::abs(fireflyClamp - m_rtDenoiseState.reflectionFireflyClampLuma) > 1e-4f;
-    const bool scaleChanged = std::abs(scale - m_rtDenoiseState.reflectionSignalScale) > 1e-4f;
+    const bool alphaChanged = std::abs(alpha - m_rt.DenoiseState().reflectionHistoryAlpha) > 1e-4f;
+    const bool strengthChanged = std::abs(strength - m_rt.DenoiseState().reflectionCompositionStrength) > 1e-4f;
+    const bool roughnessChanged = std::abs(roughness - m_rt.DenoiseState().reflectionRoughnessThreshold) > 1e-4f;
+    const bool historyBlendChanged = std::abs(historyBlend - m_rt.DenoiseState().reflectionHistoryMaxBlend) > 1e-4f;
+    const bool fireflyChanged = std::abs(fireflyClamp - m_rt.DenoiseState().reflectionFireflyClampLuma) > 1e-4f;
+    const bool scaleChanged = std::abs(scale - m_rt.DenoiseState().reflectionSignalScale) > 1e-4f;
     if (!alphaChanged &&
         !strengthChanged &&
         !roughnessChanged &&
@@ -374,28 +374,28 @@ void Renderer::SetRTReflectionTuning(float denoiseAlpha,
         return;
     }
 
-    m_rtDenoiseState.reflectionHistoryAlpha = alpha;
-    m_rtDenoiseState.reflectionAlpha = alpha;
-    m_rtDenoiseState.reflectionCompositionStrength = strength;
-    m_rtDenoiseState.reflectionRoughnessThreshold = roughness;
-    m_rtDenoiseState.reflectionHistoryMaxBlend = historyBlend;
-    m_rtDenoiseState.reflectionFireflyClampLuma = fireflyClamp;
-    m_rtDenoiseState.reflectionSignalScale = scale;
+    m_rt.DenoiseState().reflectionHistoryAlpha = alpha;
+    m_rt.DenoiseState().reflectionAlpha = alpha;
+    m_rt.DenoiseState().reflectionCompositionStrength = strength;
+    m_rt.DenoiseState().reflectionRoughnessThreshold = roughness;
+    m_rt.DenoiseState().reflectionHistoryMaxBlend = historyBlend;
+    m_rt.DenoiseState().reflectionFireflyClampLuma = fireflyClamp;
+    m_rt.DenoiseState().reflectionSignalScale = scale;
     if (alphaChanged || roughnessChanged || historyBlendChanged || fireflyChanged || scaleChanged) {
         InvalidateRTReflectionHistory("tuning_changed");
     }
     spdlog::info("RT reflection tuning: denoiseAlpha={} compositionStrength={} roughnessThreshold={} historyMaxBlend={} fireflyClampLuma={} signalScale={}",
-                 m_rtDenoiseState.reflectionHistoryAlpha,
-                 m_rtDenoiseState.reflectionCompositionStrength,
-                 m_rtDenoiseState.reflectionRoughnessThreshold,
-                 m_rtDenoiseState.reflectionHistoryMaxBlend,
-                 m_rtDenoiseState.reflectionFireflyClampLuma,
-                 m_rtDenoiseState.reflectionSignalScale);
+                 m_rt.DenoiseState().reflectionHistoryAlpha,
+                 m_rt.DenoiseState().reflectionCompositionStrength,
+                 m_rt.DenoiseState().reflectionRoughnessThreshold,
+                 m_rt.DenoiseState().reflectionHistoryMaxBlend,
+                 m_rt.DenoiseState().reflectionFireflyClampLuma,
+                 m_rt.DenoiseState().reflectionSignalScale);
 }
 
 void Renderer::SetRTGITuning(float strength, float rayDistance) {
-    m_rtDenoiseState.giStrength = std::clamp(strength, 0.0f, 1.0f);
-    m_rtDenoiseState.giRayDistance = std::clamp(rayDistance, 0.5f, 20.0f);
+    m_rt.DenoiseState().giStrength = std::clamp(strength, 0.0f, 1.0f);
+    m_rt.DenoiseState().giRayDistance = std::clamp(rayDistance, 0.5f, 20.0f);
 }
 
 } // namespace Cortex::Graphics

@@ -224,7 +224,7 @@ Renderer::MainSceneEffectsResult Renderer::ExecuteMainSceneEffectsFramePhase(con
         RenderRayTracedReflections();
         FramePhase::EndGpuScope(m_commandResources.graphicsList.Get());
         RecordFramePass("RTReflections",
-                        m_rtRuntimeState.reflectionsEnabled,
+                        m_rt.RuntimeState().reflectionsEnabled,
                         m_frameLifecycle.rtReflectionWrittenThisFrame,
                         0,
                         {"depth",

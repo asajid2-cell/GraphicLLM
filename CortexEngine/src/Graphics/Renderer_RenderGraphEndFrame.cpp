@@ -413,12 +413,12 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
         if (m_temporal.ScreenState().taaIntermediate) {
             taaHandle = m_services.renderGraph->ImportResource(m_temporal.ScreenState().taaIntermediate.Get(), m_temporal.ScreenState().taaIntermediateState, "TAAIntermediate");
         }
-        if (m_rtReflectionTargets.color) {
-            rtReflHandle = m_services.renderGraph->ImportResource(m_rtReflectionTargets.color.Get(), m_rtReflectionTargets.colorState, "RTReflection");
+        if (m_rt.ReflectionTargets().color) {
+            rtReflHandle = m_services.renderGraph->ImportResource(m_rt.ReflectionTargets().color.Get(), m_rt.ReflectionTargets().colorState, "RTReflection");
         }
-        if (m_rtReflectionTargets.history) {
+        if (m_rt.ReflectionTargets().history) {
             rtReflHistHandle =
-                m_services.renderGraph->ImportResource(m_rtReflectionTargets.history.Get(), m_rtReflectionTargets.historyState, "RTReflectionHistory");
+                m_services.renderGraph->ImportResource(m_rt.ReflectionTargets().history.Get(), m_rt.ReflectionTargets().historyState, "RTReflectionHistory");
         }
 
         backBufferHandle = m_services.renderGraph->ImportResource(
@@ -772,8 +772,8 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
         executeContext.descriptorUpdate.wantsHzbDebug = wantsHzbDebug;
         executeContext.descriptorUpdate.ssr = m_ssr.State().resources.color.Get();
         executeContext.descriptorUpdate.velocity = m_temporal.ScreenState().velocityBuffer.Get();
-        executeContext.descriptorUpdate.rtReflection = m_rtReflectionTargets.color.Get();
-        executeContext.descriptorUpdate.rtReflectionHistory = m_rtReflectionTargets.history.Get();
+        executeContext.descriptorUpdate.rtReflection = m_rt.ReflectionTargets().color.Get();
+        executeContext.descriptorUpdate.rtReflectionHistory = m_rt.ReflectionTargets().history.Get();
         executeContext.descriptorUpdate.emissiveMetallic = postEmissiveMetallicResource;
         executeContext.descriptorUpdate.materialExt1 = postMaterialExt1Resource;
         executeContext.descriptorUpdate.materialExt2 = postMaterialExt2Resource;
@@ -789,7 +789,7 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
         executeContext.draw.srvTable = std::span<DescriptorHandle>(postTable.data(), postTable.size());
         executeContext.draw.shadowAndEnvironmentTable = m_environmentState.shadowAndEnvDescriptors[0];
         executeContext.backBufferUsedAsRenderTarget = &m_frameLifecycle.backBufferUsedAsRTThisFrame;
-        if (m_rtReflectionTargets.color) {
+        if (m_rt.ReflectionTargets().color) {
             static bool s_checkedRtReflPostClear = false;
             static int s_rtReflPostClearMode = 0;
             if (!s_checkedRtReflPostClear) {
@@ -806,17 +806,17 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
                 (m_debugViewState.mode == 20u || m_debugViewState.mode == 30u || m_debugViewState.mode == 31u);
             executeContext.runRtReflectionDebugClear =
                 rtReflDebugView && s_rtReflPostClearMode != 0 && m_services.descriptorManager &&
-                m_services.device && m_rtReflectionTargets.uav.IsValid() &&
-                m_rtReflectionTargets.postClearUAVs[m_frameRuntime.frameIndex % kFrameCount].IsValid();
+                m_services.device && m_rt.ReflectionTargets().uav.IsValid() &&
+                m_rt.ReflectionTargets().postClearUAVs[m_frameRuntime.frameIndex % kFrameCount].IsValid();
             if (executeContext.runRtReflectionDebugClear) {
                 executeContext.rtReflectionDebugClear.commandList = m_commandResources.graphicsList.Get();
                 executeContext.rtReflectionDebugClear.device = m_services.device->GetDevice();
                 executeContext.rtReflectionDebugClear.descriptorHeap = m_services.descriptorManager->GetCBV_SRV_UAV_Heap();
-                executeContext.rtReflectionDebugClear.reflectionColor = m_rtReflectionTargets.color.Get();
-                executeContext.rtReflectionDebugClear.reflectionState = &m_rtReflectionTargets.colorState;
+                executeContext.rtReflectionDebugClear.reflectionColor = m_rt.ReflectionTargets().color.Get();
+                executeContext.rtReflectionDebugClear.reflectionState = &m_rt.ReflectionTargets().colorState;
                 executeContext.rtReflectionDebugClear.shaderVisibleUav =
-                    m_rtReflectionTargets.postClearUAVs[m_frameRuntime.frameIndex % kFrameCount];
-                executeContext.rtReflectionDebugClear.cpuUav = m_rtReflectionTargets.uav;
+                    m_rt.ReflectionTargets().postClearUAVs[m_frameRuntime.frameIndex % kFrameCount];
+                executeContext.rtReflectionDebugClear.cpuUav = m_rt.ReflectionTargets().uav;
                 executeContext.rtReflectionDebugClear.clearMode = s_rtReflPostClearMode;
             }
         }
@@ -1199,8 +1199,8 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
         }
         if (velocityHandle.IsValid()) m_temporal.ScreenState().velocityState = m_services.renderGraph->GetResourceState(velocityHandle);
         if (taaHandle.IsValid()) m_temporal.ScreenState().taaIntermediateState = m_services.renderGraph->GetResourceState(taaHandle);
-        if (rtReflHandle.IsValid()) m_rtReflectionTargets.colorState = m_services.renderGraph->GetResourceState(rtReflHandle);
-        if (rtReflHistHandle.IsValid()) m_rtReflectionTargets.historyState = m_services.renderGraph->GetResourceState(rtReflHistHandle);
+        if (rtReflHandle.IsValid()) m_rt.ReflectionTargets().colorState = m_services.renderGraph->GetResourceState(rtReflHandle);
+        if (rtReflHistHandle.IsValid()) m_rt.ReflectionTargets().historyState = m_services.renderGraph->GetResourceState(rtReflHistHandle);
         if (candidateBeautyHandle.IsValid()) {
             m_mainTargets.candidateBeautyV3.resources.state =
                 m_services.renderGraph->GetResourceState(candidateBeautyHandle);

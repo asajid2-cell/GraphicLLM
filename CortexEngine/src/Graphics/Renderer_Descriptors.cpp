@@ -377,8 +377,8 @@ void Renderer::UpdatePostProcessDescriptorTable() {
     context.history = m_temporalScreenState.historyColor.Get();
     context.depth = m_depthResources.resources.buffer.Get();
     context.normalRoughness = normalRes;
-    context.hzb = m_hzbResources.resources.texture.Get();
-    context.hzbMipCount = m_hzbResources.resources.mipCount;
+    context.hzb = m_hzb.State().resources.texture.Get();
+    context.hzbMipCount = m_hzb.State().resources.mipCount;
     context.wantsHzbDebug = (m_debugViewState.mode == 32u);
     context.ssr = m_ssrResources.resources.color.Get();
     context.velocity = m_temporalScreenState.velocityBuffer.Get();

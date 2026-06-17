@@ -207,18 +207,18 @@ void Renderer::AdjustHZBDebugMip(int delta) {
         return;
     }
 
-    if (m_hzbResources.resources.mipCount <= 1) {
-        m_hzbResources.debug.debugMip = 0;
+    if (m_hzb.State().resources.mipCount <= 1) {
+        m_hzb.State().debug.debugMip = 0;
         return;
     }
 
-    const int maxMip = static_cast<int>(m_hzbResources.resources.mipCount) - 1;
-    const int next = std::clamp(static_cast<int>(m_hzbResources.debug.debugMip) + delta, 0, maxMip);
-    if (static_cast<uint32_t>(next) == m_hzbResources.debug.debugMip) {
+    const int maxMip = static_cast<int>(m_hzb.State().resources.mipCount) - 1;
+    const int next = std::clamp(static_cast<int>(m_hzb.State().debug.debugMip) + delta, 0, maxMip);
+    if (static_cast<uint32_t>(next) == m_hzb.State().debug.debugMip) {
         return;
     }
-    m_hzbResources.debug.debugMip = static_cast<uint32_t>(next);
-    spdlog::info("HZB debug mip set to {}/{}", m_hzbResources.debug.debugMip, maxMip);
+    m_hzb.State().debug.debugMip = static_cast<uint32_t>(next);
+    spdlog::info("HZB debug mip set to {}/{}", m_hzb.State().debug.debugMip, maxMip);
 }
 
 void Renderer::SetDebugViewMode(int mode) {

@@ -278,17 +278,17 @@ Renderer::MainSceneEffectsResult Renderer::ExecuteMainSceneEffectsFramePhase(con
             auto resResult = CreateHZBResources();
             if (resResult.IsErr()) {
                 spdlog::warn("HZB RG: {}", resResult.Error());
-            } else if (!m_hzbResources.resources.texture || m_hzbResources.resources.mipCount == 0 ||
-                       m_hzbResources.descriptors.mipSRVStaging.size() != m_hzbResources.resources.mipCount ||
-                       m_hzbResources.descriptors.mipUAVStaging.size() != m_hzbResources.resources.mipCount) {
+            } else if (!m_hzb.State().resources.texture || m_hzb.State().resources.mipCount == 0 ||
+                       m_hzb.State().descriptors.mipSRVStaging.size() != m_hzb.State().resources.mipCount ||
+                       m_hzb.State().descriptors.mipUAVStaging.size() != m_hzb.State().resources.mipCount) {
                 spdlog::warn("HZB RG: invalid resources (texture={}, mips={}, srvs={}, uavs={})",
-                             static_cast<bool>(m_hzbResources.resources.texture),
-                             m_hzbResources.resources.mipCount,
-                             m_hzbResources.descriptors.mipSRVStaging.size(),
-                             m_hzbResources.descriptors.mipUAVStaging.size());
-            } else if (!m_hzbResources.descriptors.mipSRVStaging.empty() && !m_hzbResources.descriptors.mipSRVStaging[0].IsValid()) {
+                             static_cast<bool>(m_hzb.State().resources.texture),
+                             m_hzb.State().resources.mipCount,
+                             m_hzb.State().descriptors.mipSRVStaging.size(),
+                             m_hzb.State().descriptors.mipUAVStaging.size());
+            } else if (!m_hzb.State().descriptors.mipSRVStaging.empty() && !m_hzb.State().descriptors.mipSRVStaging[0].IsValid()) {
                 spdlog::warn("HZB RG: staging SRV handle invalid (mip0 cpu ptr=0)");
-            } else if (!m_hzbResources.descriptors.mipUAVStaging.empty() && !m_hzbResources.descriptors.mipUAVStaging[0].IsValid()) {
+            } else if (!m_hzb.State().descriptors.mipUAVStaging.empty() && !m_hzb.State().descriptors.mipUAVStaging[0].IsValid()) {
                 spdlog::warn("HZB RG: staging UAV handle invalid (mip0 cpu ptr=0)");
             } else {
                 result.rgHasPendingHzb = true;
@@ -297,7 +297,7 @@ Renderer::MainSceneEffectsResult Renderer::ExecuteMainSceneEffectsFramePhase(con
             FramePhase::BeginGpuScope(m_commandResources.graphicsList.Get(), "HZB", "Visibility");
             BuildHZBFromDepth();
             FramePhase::EndGpuScope(m_commandResources.graphicsList.Get());
-            RecordFramePass("HZB", true, m_hzbResources.resources.valid, 0, {"depth"}, {"hzb"});
+            RecordFramePass("HZB", true, m_hzb.State().resources.valid, 0, {"depth"}, {"hzb"});
         }
     }
 

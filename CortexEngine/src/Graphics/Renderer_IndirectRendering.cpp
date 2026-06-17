@@ -224,16 +224,16 @@ namespace Cortex::Graphics {
 
         bool useHzbOcclusion = false;
         if (!s_disableGpuCullHzb &&
-            m_hzbResources.resources.valid && m_hzbResources.capture.captureValid && m_hzbResources.resources.texture && m_hzbResources.resources.mipCount > 0) {
+            m_hzb.State().resources.valid && m_hzb.State().capture.captureValid && m_hzb.State().resources.texture && m_hzb.State().resources.mipCount > 0) {
             // Require the HZB capture to be from the immediately previous frame.
-            if (m_hzbResources.capture.captureFrameCounter + 1u == m_frameLifecycle.renderFrameCounter) {
+            if (m_hzb.State().capture.captureFrameCounter + 1u == m_frameLifecycle.renderFrameCounter) {
                 const bool relaxedGate = (std::getenv("CORTEX_GPUCULL_HZB_RELAXED") != nullptr);
                 if (relaxedGate) {
                     useHzbOcclusion = true;
                 } else {
-                    const float dist = glm::length(m_cameraState.positionWS - m_hzbResources.capture.captureCameraPosWS);
+                    const float dist = glm::length(m_cameraState.positionWS - m_hzb.State().capture.captureCameraPosWS);
                     const glm::vec3 fwdNow = glm::normalize(m_cameraState.forwardWS);
-                    const glm::vec3 fwdThen = glm::normalize(m_hzbResources.capture.captureCameraForwardWS);
+                    const glm::vec3 fwdThen = glm::normalize(m_hzb.State().capture.captureCameraForwardWS);
                     const float dotFwd = glm::clamp(glm::dot(fwdNow, fwdThen), -1.0f, 1.0f);
                     // Public-release default: previous-frame occlusion is only
                     // accepted for small camera deltas. This favors stability
@@ -253,10 +253,10 @@ namespace Cortex::Graphics {
         if (freezeCulling) {
             useHzbOcclusion = false;
         }
-        if (useHzbOcclusion && m_hzbResources.resources.texture) {
+        if (useHzbOcclusion && m_hzb.State().resources.texture) {
             const bool hzbReady = VisibilityBufferResourcePass::PrepareHZBForCulling(
                 m_commandResources.graphicsList.Get(),
-                {m_hzbResources.resources.texture.Get(), &m_hzbResources.resources.resourceState});
+                {m_hzb.State().resources.texture.Get(), &m_hzb.State().resources.resourceState});
             if (!hzbReady) {
                 useHzbOcclusion = false;
             }
@@ -264,15 +264,15 @@ namespace Cortex::Graphics {
         m_gpuCullingState.hzbOcclusionUsedThisFrame = useHzbOcclusion;
 
         m_services.gpuCulling->SetHZBForOcclusion(
-            useHzbOcclusion ? m_hzbResources.resources.texture.Get() : nullptr,
-            m_hzbResources.resources.width,
-            m_hzbResources.resources.height,
-            m_hzbResources.resources.mipCount,
-            m_hzbResources.capture.captureViewMatrix,
-            m_hzbResources.capture.captureViewProjMatrix,
-            m_hzbResources.capture.captureCameraPosWS,
-            m_hzbResources.capture.captureNearPlane,
-            m_hzbResources.capture.captureFarPlane,
+            useHzbOcclusion ? m_hzb.State().resources.texture.Get() : nullptr,
+            m_hzb.State().resources.width,
+            m_hzb.State().resources.height,
+            m_hzb.State().resources.mipCount,
+            m_hzb.State().capture.captureViewMatrix,
+            m_hzb.State().capture.captureViewProjMatrix,
+            m_hzb.State().capture.captureCameraPosWS,
+            m_hzb.State().capture.captureNearPlane,
+            m_hzb.State().capture.captureFarPlane,
             useHzbOcclusion);
 
         {

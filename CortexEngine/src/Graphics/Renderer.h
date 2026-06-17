@@ -45,6 +45,7 @@
 #include "Graphics/RendererEnvironmentState.h"
 #include "Graphics/RendererGPUCullingState.h"
 #include "Graphics/RendererHZBState.h"
+#include "Graphics/Subsystems/HZBSubsystem.h"
 #include "Graphics/RendererLocalShadowState.h"
 #include "Graphics/RendererLocalReflectionState.h"
 #include "Graphics/RendererMainTargetState.h"
@@ -732,6 +733,7 @@ private:
     void UpdateRTReflectionSignalStatsFromReadback();
     void BuildHZBFromDepth();
     void AddHZBFromDepthPasses_RG(RenderGraph& graph, RGResourceHandle depthHandle, RGResourceHandle hzbHandle);
+    HZBContext MakeHZBContext();
     Result<void> InitializeTAAResolveDescriptorTable();
     void UpdateTAAResolveDescriptorTable();
     Result<void> InitializePostProcessDescriptorTable();
@@ -851,7 +853,7 @@ public:
     RendererAssetRuntimeState m_assetRuntime;
 
     DepthTargetState m_depthResources;
-    HZBPassState m_hzbResources;
+    HZBSubsystem m_hzb;
 
     ShadowMapPassState<kShadowArraySize, kShadowCascadeCount> m_shadowResources;
     EnvironmentLightingState m_environmentState;

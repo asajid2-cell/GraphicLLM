@@ -32,7 +32,7 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
     const bool canRunRg = (m_services.renderGraph && m_services.device && m_commandResources.graphicsList && m_services.descriptorManager);
     const bool wantsRgHzbThisFrame =
         inputs.hzbPending && inputs.useRenderGraphHZB && canRunRg && m_depthResources.resources.buffer &&
-        m_depthResources.descriptors.srv.IsValid() && m_hzbResources.resources.texture;
+        m_depthResources.descriptors.srv.IsValid() && m_hzb.State().resources.texture;
     const bool wantsRgPostThisFrame =
         inputs.runPostProcess && inputs.useRenderGraphPost && canRunRg && m_pipelineState.postProcess &&
         m_mainTargets.hdr.resources.color && m_services.window && m_services.window->GetCurrentBackBuffer();
@@ -191,7 +191,7 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
     RGResourceHandle hzbHandle{};
     if (wantsRgHzbThisFrame) {
         depthHandle = m_services.renderGraph->ImportResource(m_depthResources.resources.buffer.Get(), m_depthResources.resources.resourceState, "Depth");
-        hzbHandle = m_services.renderGraph->ImportResource(m_hzbResources.resources.texture.Get(), m_hzbResources.resources.resourceState, "HZB");
+        hzbHandle = m_services.renderGraph->ImportResource(m_hzb.State().resources.texture.Get(), m_hzb.State().resources.resourceState, "HZB");
         AddHZBFromDepthPasses_RG(*m_services.renderGraph, depthHandle, hzbHandle);
     }
 
@@ -545,8 +545,8 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
         }
 
         const bool wantsHzbDebug = (m_debugViewState.mode == 32u);
-        if (wantsHzbDebug && m_hzbResources.resources.texture && !hzbHandle.IsValid()) {
-            hzbHandle = m_services.renderGraph->ImportResource(m_hzbResources.resources.texture.Get(), m_hzbResources.resources.resourceState, "HZB_Debug");
+        if (wantsHzbDebug && m_hzb.State().resources.texture && !hzbHandle.IsValid()) {
+            hzbHandle = m_services.renderGraph->ImportResource(m_hzb.State().resources.texture.Get(), m_hzb.State().resources.resourceState, "HZB_Debug");
         }
 
         if (wantsSceneLocalEnvironmentV3ThisFrame) {
@@ -767,8 +767,8 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
         executeContext.descriptorUpdate.history = m_temporalScreenState.historyColor.Get();
         executeContext.descriptorUpdate.depth = m_depthResources.resources.buffer.Get();
         executeContext.descriptorUpdate.normalRoughness = postNormalResource;
-        executeContext.descriptorUpdate.hzb = m_hzbResources.resources.texture.Get();
-        executeContext.descriptorUpdate.hzbMipCount = m_hzbResources.resources.mipCount;
+        executeContext.descriptorUpdate.hzb = m_hzb.State().resources.texture.Get();
+        executeContext.descriptorUpdate.hzbMipCount = m_hzb.State().resources.mipCount;
         executeContext.descriptorUpdate.wantsHzbDebug = wantsHzbDebug;
         executeContext.descriptorUpdate.ssr = m_ssrResources.resources.color.Get();
         executeContext.descriptorUpdate.velocity = m_temporalScreenState.velocityBuffer.Get();
@@ -1145,17 +1145,17 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
 
     if (wantsRgHzbThisFrame) {
         m_depthResources.resources.resourceState = m_services.renderGraph->GetResourceState(depthHandle);
-        m_hzbResources.resources.resourceState = m_services.renderGraph->GetResourceState(hzbHandle);
-        m_hzbResources.resources.valid = true;
+        m_hzb.State().resources.resourceState = m_services.renderGraph->GetResourceState(hzbHandle);
+        m_hzb.State().resources.valid = true;
 
-        m_hzbResources.capture.captureViewMatrix = m_constantBuffers.frameCPU.viewMatrix;
-        m_hzbResources.capture.captureViewProjMatrix = m_constantBuffers.frameCPU.viewProjectionMatrix;
-        m_hzbResources.capture.captureCameraPosWS = m_cameraState.positionWS;
-        m_hzbResources.capture.captureCameraForwardWS = glm::normalize(m_cameraState.forwardWS);
-        m_hzbResources.capture.captureNearPlane = m_cameraState.nearPlane;
-        m_hzbResources.capture.captureFarPlane = m_cameraState.farPlane;
-        m_hzbResources.capture.captureFrameCounter = m_frameLifecycle.renderFrameCounter;
-        m_hzbResources.capture.captureValid = true;
+        m_hzb.State().capture.captureViewMatrix = m_constantBuffers.frameCPU.viewMatrix;
+        m_hzb.State().capture.captureViewProjMatrix = m_constantBuffers.frameCPU.viewProjectionMatrix;
+        m_hzb.State().capture.captureCameraPosWS = m_cameraState.positionWS;
+        m_hzb.State().capture.captureCameraForwardWS = glm::normalize(m_cameraState.forwardWS);
+        m_hzb.State().capture.captureNearPlane = m_cameraState.nearPlane;
+        m_hzb.State().capture.captureFarPlane = m_cameraState.farPlane;
+        m_hzb.State().capture.captureFrameCounter = m_frameLifecycle.renderFrameCounter;
+        m_hzb.State().capture.captureValid = true;
         result.ranHZB = true;
         RecordFramePass("HZB", true, true, 0,
                         {"depth"},
@@ -1303,7 +1303,7 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
             m_mainTargets.reflectionV3.resources.historyRejectionState =
                 m_services.renderGraph->GetResourceState(reflectionHistoryRejectionHandle);
         }
-        if (hzbHandle.IsValid() && (m_debugViewState.mode == 32u)) m_hzbResources.resources.resourceState = m_services.renderGraph->GetResourceState(hzbHandle);
+        if (hzbHandle.IsValid() && (m_debugViewState.mode == 32u)) m_hzb.State().resources.resourceState = m_services.renderGraph->GetResourceState(hzbHandle);
         if (wantsFusedBloomThisFrame && !useFusedBloomTransients) {
             for (uint32_t level = 0; level < m_bloomResources.resources.activeLevels; ++level) {
                 if (bloomA[level].IsValid()) {

@@ -692,18 +692,18 @@ void Renderer::UpdateFrameContractSnapshot(Scene::ECS_Registry* registry,
     contract.culling.cullingFrozen = m_gpuCullingState.freeze || (std::getenv("CORTEX_GPUCULL_FREEZE") != nullptr);
     contract.culling.visibilityBufferPlanned = m_visibilityBufferState.plannedThisFrame;
     contract.culling.visibilityBufferRendered = m_visibilityBufferState.renderedThisFrame;
-    contract.culling.hzbResourceValid = m_hzbResources.resources.texture != nullptr;
-    contract.culling.hzbValid = m_hzbResources.resources.valid;
-    contract.culling.hzbCaptureValid = m_hzbResources.capture.captureValid;
+    contract.culling.hzbResourceValid = m_hzb.State().resources.texture != nullptr;
+    contract.culling.hzbValid = m_hzb.State().resources.valid;
+    contract.culling.hzbCaptureValid = m_hzb.State().capture.captureValid;
     contract.culling.hzbOcclusionUsedByVisibilityBuffer = m_visibilityBufferState.hzbOcclusionUsedThisFrame;
     contract.culling.hzbOcclusionUsedByGpuCulling = m_gpuCullingState.hzbOcclusionUsedThisFrame;
-    contract.culling.hzbWidth = m_hzbResources.resources.width;
-    contract.culling.hzbHeight = m_hzbResources.resources.height;
-    contract.culling.hzbMipCount = m_hzbResources.resources.mipCount;
-    contract.culling.hzbCaptureFrame = m_hzbResources.capture.captureFrameCounter;
+    contract.culling.hzbWidth = m_hzb.State().resources.width;
+    contract.culling.hzbHeight = m_hzb.State().resources.height;
+    contract.culling.hzbMipCount = m_hzb.State().resources.mipCount;
+    contract.culling.hzbCaptureFrame = m_hzb.State().capture.captureFrameCounter;
     contract.culling.hzbAgeFrames =
-        (m_hzbResources.capture.captureValid && m_frameLifecycle.renderFrameCounter >= m_hzbResources.capture.captureFrameCounter)
-            ? (m_frameLifecycle.renderFrameCounter - m_hzbResources.capture.captureFrameCounter)
+        (m_hzb.State().capture.captureValid && m_frameLifecycle.renderFrameCounter >= m_hzb.State().capture.captureFrameCounter)
+            ? (m_frameLifecycle.renderFrameCounter - m_hzb.State().capture.captureFrameCounter)
             : 0;
     if (m_services.gpuCulling) {
         const auto stats = m_services.gpuCulling->GetDebugStats();

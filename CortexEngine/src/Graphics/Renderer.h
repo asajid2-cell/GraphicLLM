@@ -62,6 +62,7 @@
 #include "Graphics/RendererVisibilityBufferState.h"
 #include "Graphics/RendererUploadState.h"
 #include "Graphics/RendererVoxelState.h"
+#include "Graphics/Subsystems/VoxelSubsystem.h"
 #include "Graphics/TemporalRejectionMask.h"
 #include "Graphics/TextureUploadQueue.h"
 #include "Graphics/TextureUploadReceipt.h"
@@ -890,7 +891,7 @@ public:
     RendererTemporalHistoryState m_temporalHistory;
     RendererFrameDiagnosticsState m_frameDiagnostics;
 
-    VoxelRenderState m_voxelState;
+    VoxelSubsystem m_voxel;
 
     // Global fractal surface parameters (applied uniformly to all materials).
     RendererFractalSurfaceState m_fractalSurfaceState;

@@ -307,6 +307,7 @@ set(CORTEX_SOURCES
     src/Graphics/Renderer_WaterSurfaces.cpp
     src/Graphics/Renderer_Bloom.cpp
     src/Graphics/Subsystems/DebugLineSubsystem.cpp
+    src/Graphics/Subsystems/VoxelSubsystem.cpp
     src/Graphics/Renderer_SSAO.cpp
     src/Graphics/ManyLightReservoir.cpp
     src/Graphics/DiffuseRadianceCache.cpp

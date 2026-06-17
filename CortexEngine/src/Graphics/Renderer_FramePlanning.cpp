@@ -51,7 +51,7 @@ FrameExecutionContext Renderer::BuildFrameExecutionContext(Scene::ECS_Registry* 
     featureInputs.fxaaEnabled = m_postProcessState.fxaaEnabled;
     featureInputs.iblEnabled = m_environmentState.enabled;
     featureInputs.fogEnabled = m_fogState.enabled;
-    featureInputs.voxelBackendEnabled = m_voxelState.backendEnabled;
+    featureInputs.voxelBackendEnabled = m_voxel.IsBackendEnabled();
     featureInputs.hasRayTracingContext = (m_services.rayTracingContext != nullptr);
     featureInputs.hasRTReflectionColor = (m_rtReflectionTargets.color != nullptr);
     featureInputs.hasRTGIColor = (m_rtGITargets.color != nullptr);

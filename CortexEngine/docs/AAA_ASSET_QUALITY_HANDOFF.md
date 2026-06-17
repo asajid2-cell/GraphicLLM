@@ -14424,3 +14424,79 @@ Current interpretation:
 - Engineering readiness is still proven by six gates.
 - The remaining warning debt is now classified and bounded. Future unknown
   warnings will fail the readiness audit unless explicitly run in triage mode.
+
+### V3 Packet-Shard Warning Demotion - 2026-06-09
+
+Scope:
+
+- Updated `tools/build_full_scene_shader_v3_matrix_decision.py`.
+- Updated `tools/validate_full_scene_shader_pipeline_v3_plan.py`.
+- Updated `docs/FULL_SCENE_SHADER_PIPELINE_V3.md`.
+
+Implemented:
+
+- The aggregate matrix now moves expected subset-packet coverage messages into
+  `packet_shard_coverage_notes` when the combined matrix has full required
+  family/motion coverage.
+- Release `warnings` now exclude those expected packet-shard notes and keep
+  real review debt visible.
+- The validator now requires:
+  - `is_packet_shard_coverage_warning`;
+  - `packet_shard_coverage_notes`;
+  - `packet_shard_coverage_note_count`.
+
+Validation:
+
+```powershell
+python -m py_compile CortexEngine\tools\build_full_scene_shader_v3_matrix_decision.py CortexEngine\tools\validate_full_scene_shader_pipeline_v3_plan.py
+python CortexEngine\tools\validate_full_scene_shader_pipeline_v3_plan.py
+
+python CortexEngine\tools\build_full_scene_shader_v3_matrix_decision.py `
+  --packet-root <13 packet roots from v3_default_beauty_promotion_mixed_matrix6_20260609> `
+  --required-families stress_rt_showcase_reflection_closeup,gallery,kitchen,office,gym,concert,red_room,stadium `
+  --required-motion-modes static,mouse_jitter,camera_sweep,light_sweep `
+  --output-json CortexEngine\build\captures\v3_default_beauty_promotion_mixed_matrix7_20260609\v3_matrix_decision.json `
+  --output-md CortexEngine\build\captures\v3_default_beauty_promotion_mixed_matrix7_20260609\v3_matrix_decision.md
+
+python CortexEngine\tools\build_full_scene_shader_v3_readiness_audit.py `
+  --default-promotion-matrix CortexEngine\build\captures\v3_default_beauty_promotion_mixed_matrix7_20260609\v3_matrix_decision.json `
+  --scene-local-matrix CortexEngine\build\captures\v3_scene_local_resource_contract_matrix1_20260609\scene_local_resource_contract_matrix.json `
+  --material-quality-matrix CortexEngine\build\captures\v3_material_quality_matrix1_20260609\material_quality_matrix.json `
+  --shadow-matrix CortexEngine\build\captures\v3_lighting_shadow_promotion_matrix1_20260609\lighting_shadow_promotion_matrix.json `
+  --reflection-matrix CortexEngine\build\captures\v3_reflection_promotion_matrix1_20260609\reflection_promotion_matrix.json `
+  --release-visual-review-matrix CortexEngine\build\captures\v3_release_visual_review_matrix1_20260609\release_visual_review_matrix.json `
+  --output-json CortexEngine\build\captures\v3_full_scene_shader_readiness_audit4_20260609\readiness_audit.json `
+  --output-md CortexEngine\build\captures\v3_full_scene_shader_readiness_audit4_20260609\readiness_audit.md
+```
+
+Evidence:
+
+- Matrix:
+  `build\captures\v3_default_beauty_promotion_mixed_matrix7_20260609\v3_matrix_decision.md/json`.
+- Audit:
+  `build\captures\v3_full_scene_shader_readiness_audit4_20260609\readiness_audit.md/json`.
+- Matrix7 results:
+  - `default_beauty_promotable=true`;
+  - `full_matrix_ready=true`;
+  - warnings `16`;
+  - `packet_shard_coverage_note_count=33`;
+  - promoted family/motion coverage remains complete.
+- Audit4 results:
+  - `engineering_readiness_ready=true`;
+  - `ready_gate_count=6/6`;
+  - failures `0`;
+  - warnings `31`;
+  - `release_warning_debt_classified=true`;
+  - `unknown_warning_count=0`;
+  - category counts:
+    - `class_authored_material_defaults=20`;
+    - `legacy_visual_quality_context_warning=7`;
+    - `lighting_balance_review_warning=1`;
+    - `optional_material_signal_warning=3`.
+
+Current interpretation:
+
+- Expected aggregate-suite shard coverage is no longer counted as release
+  warning debt.
+- The remaining warning debt is actual material/lighting/legacy visual review
+  debt.

@@ -47,6 +47,15 @@ def normalize_packet_root(raw: str, *, packet_list_path: Path | None = None, sui
     return (ROOT / path).resolve()
 
 
+def is_packet_shard_coverage_warning(warning: str) -> bool:
+    lowered = warning.lower()
+    return (
+        "missing required families" in lowered
+        or "missing required motion modes" in lowered
+        or "motion promotion evidence requires capture_sequence_count" in lowered
+    )
+
+
 def packet_row(packet_root: Path, packet_status: dict[str, Any] | None = None) -> dict[str, Any]:
     manifest_path = packet_root / "manifest.json"
     promotion_path = packet_root / "promotion_decision.json"
@@ -174,7 +183,7 @@ def build_matrix(
         }
     )
     failures: list[str] = []
-    warnings: list[str] = []
+    packet_warning_records: list[str] = []
     aggregate_candidate_blockers: dict[str, int] = {}
     aggregate_requested_candidate_blockers: dict[str, int] = {}
     aggregate_candidate_review_blockers: dict[str, int] = {}
@@ -187,7 +196,7 @@ def build_matrix(
         for failure in row.get("failures", []):
             failures.append(f"{row.get('packet_root')}: {failure}")
         for warning in row.get("warnings", []):
-            warnings.append(f"{row.get('packet_root')}: {warning}")
+            packet_warning_records.append(f"{row.get('packet_root')}: {warning}")
         predicates = row.get("candidate_beauty_predicates", {})
         if isinstance(predicates, dict):
             blockers = predicates.get("blocker_counts", {})
@@ -239,6 +248,13 @@ def build_matrix(
         failures.append("missing required motion modes: " + ", ".join(missing_motion_modes))
 
     full_matrix_ready = not failures
+    warnings: list[str] = []
+    packet_shard_coverage_notes: list[str] = []
+    for warning in packet_warning_records:
+        if full_matrix_ready and is_packet_shard_coverage_warning(warning):
+            packet_shard_coverage_notes.append(warning)
+        else:
+            warnings.append(warning)
     candidate_beauty_review_ready = (
         full_matrix_ready
         and total_candidate_requested_reports > 0
@@ -337,6 +353,8 @@ def build_matrix(
         ),
         "material_quality_min_score": min(material_quality_scores) if material_quality_scores else 0.0,
         "material_quality_blocker_counts": dict(sorted(aggregate_material_quality_blockers.items())),
+        "packet_shard_coverage_note_count": len(packet_shard_coverage_notes),
+        "packet_shard_coverage_notes": packet_shard_coverage_notes,
         "packets": rows,
         "failures": failures,
         "warnings": warnings,
@@ -370,6 +388,7 @@ def write_markdown(path: Path, matrix: dict[str, Any]) -> None:
         f"- packet default promotion blocker counts: `{json.dumps(matrix.get('packet_default_beauty_promotion_blocker_counts', {}), sort_keys=True)}`",
         f"- material quality min score: `{float(matrix.get('material_quality_min_score', 0.0) or 0.0):.4f}`",
         f"- material quality blocker counts: `{json.dumps(matrix.get('material_quality_blocker_counts', {}), sort_keys=True)}`",
+        f"- packet shard coverage notes: `{matrix.get('packet_shard_coverage_note_count', 0)}`",
         "",
         "| Packet | Motion | Families | Exit | Passed | Status | Candidate Review | Promoted Reports | Material Score | Candidate Ready | Requested Blockers | Default Blockers |",
         "|---|---|---|---:|---|---|---|---:|---:|---:|---|---|",
@@ -414,6 +433,9 @@ def write_markdown(path: Path, matrix: dict[str, Any]) -> None:
     if matrix["warnings"]:
         lines.extend(["", "## Warnings", ""])
         lines.extend(f"- {warning}" for warning in matrix["warnings"])
+    if matrix.get("packet_shard_coverage_notes"):
+        lines.extend(["", "## Packet Shard Coverage Notes", ""])
+        lines.extend(f"- {note}" for note in matrix["packet_shard_coverage_notes"])
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 

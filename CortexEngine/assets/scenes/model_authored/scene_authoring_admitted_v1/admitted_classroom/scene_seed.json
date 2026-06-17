@@ -1,0 +1,5975 @@
+{
+  "schema": "cortex.model_authored_scene_seed.v1",
+  "id": "sak_school_classroom_day_after_school_classroom_with_board_teacher_desk_student_rows_and_warm_day_v1__metric_restage_left_recenter",
+  "scene_family": "school_classroom_day",
+  "status": "MODEL_AUTHORED_VIEW_METRIC_RESTAGE_VARIANT",
+  "generator": {
+    "name": "scene_authoring_kernel_v1",
+    "mode": "brief_to_semantic_graph_to_seed",
+    "prompt": "after school classroom with board teacher desk student rows and warm daylight",
+    "construction_layers": [
+      "brief_compiler_v1",
+      "semantic_graph_native_constructor_v1",
+      "asset_affordance_catalog_v1",
+      "assembly_template_solver_v1",
+      "scene_graph_kernel_v1"
+    ]
+  },
+  "environment": {
+    "preset": "neutral_procedural",
+    "art_lighting_preset": "scene_local_authoring_kernel",
+    "graphics_preset": "hero_final_art",
+    "ibl_enabled": false,
+    "ibl_diffuse_intensity": 0.0,
+    "ibl_specular_intensity": 0.0,
+    "allow_hdri_background": false,
+    "allow_hdri_reflections": false,
+    "visible_background": "authored_geometry_only",
+    "ambient_source": "scene_authored_lights",
+    "reflection_policy": "scene_local_no_hdri"
+  },
+  "camera": {
+    "position": [
+      -2.35,
+      1.45,
+      -1.92
+    ],
+    "target": [
+      0.0,
+      1.05,
+      1.0
+    ],
+    "fov": 58.0,
+    "class": "hero"
+  },
+  "validation_view_overrides": {
+    "board_teacher_context": {
+      "target_nudge": [
+        -0.24,
+        0.02,
+        0.08
+      ],
+      "position_nudge": [
+        0.14,
+        0.0,
+        -0.04
+      ],
+      "fov_add": 0.0,
+      "source": "model_scene_view_metric_restage_grid",
+      "source_candidate_report": "docs/media/final_art/generated/model_authored/model_authored_multiview_novel_classroom_physical_minutia_repaired.json",
+      "source_baseline_report": null,
+      "preset": "left_recenter",
+      "previous": {},
+      "composition_mode": "additive_bounded_view_nudge",
+      "affected_views": [
+        "board_teacher_context",
+        "student_rows_low"
+      ],
+      "adaptive_focal_policy": null
+    },
+    "student_rows_low": {
+      "target_nudge": [
+        -0.24,
+        0.02,
+        0.08
+      ],
+      "position_nudge": [
+        0.14,
+        0.0,
+        -0.04
+      ],
+      "fov_add": 0.0,
+      "source": "model_scene_view_metric_restage_grid",
+      "source_candidate_report": "docs/media/final_art/generated/model_authored/model_authored_multiview_novel_classroom_physical_minutia_repaired.json",
+      "source_baseline_report": null,
+      "preset": "left_recenter",
+      "previous": {},
+      "composition_mode": "additive_bounded_view_nudge",
+      "affected_views": [
+        "board_teacher_context",
+        "student_rows_low"
+      ],
+      "adaptive_focal_policy": null
+    }
+  },
+  "materials": {
+    "room_wall_warm": {
+      "color": [
+        0.62,
+        0.58,
+        0.5,
+        1.0
+      ],
+      "metallic": 0.0,
+      "roughness": 0.82,
+      "preset": "paint"
+    },
+    "room_wall_cool": {
+      "color": [
+        0.48,
+        0.56,
+        0.62,
+        1.0
+      ],
+      "metallic": 0.0,
+      "roughness": 0.84,
+      "preset": "paint"
+    },
+    "dark_wall": {
+      "color": [
+        0.05,
+        0.045,
+        0.055,
+        1.0
+      ],
+      "metallic": 0.0,
+      "roughness": 0.78,
+      "preset": "paint"
+    },
+    "floor_tile": {
+      "color": [
+        0.42,
+        0.43,
+        0.41,
+        1.0
+      ],
+      "metallic": 0.0,
+      "roughness": 0.74,
+      "preset": "matte_tile"
+    },
+    "floor_wood": {
+      "color": [
+        0.62,
+        0.43,
+        0.22,
+        1.0
+      ],
+      "metallic": 0.0,
+      "roughness": 0.56,
+      "preset": "wood"
+    },
+    "floor_dark": {
+      "color": [
+        0.08,
+        0.075,
+        0.085,
+        1.0
+      ],
+      "metallic": 0.0,
+      "roughness": 0.7,
+      "preset": "paint"
+    },
+    "wall_deep_red": {
+      "color": [
+        0.32,
+        0.025,
+        0.035,
+        1.0
+      ],
+      "metallic": 0.0,
+      "roughness": 0.78,
+      "preset": "paint"
+    },
+    "velvet_red": {
+      "color": [
+        0.55,
+        0.03,
+        0.055,
+        1.0
+      ],
+      "metallic": 0.0,
+      "roughness": 0.62,
+      "preset": "fabric"
+    },
+    "field_green": {
+      "color": [
+        0.05,
+        0.34,
+        0.12,
+        1.0
+      ],
+      "metallic": 0.0,
+      "roughness": 0.72,
+      "preset": "turf"
+    },
+    "counter_dark": {
+      "color": [
+        0.08,
+        0.075,
+        0.07,
+        1.0
+      ],
+      "metallic": 0.0,
+      "roughness": 0.38,
+      "preset": "stone"
+    },
+    "cabinet_warm": {
+      "color": [
+        0.36,
+        0.21,
+        0.11,
+        1.0
+      ],
+      "metallic": 0.0,
+      "roughness": 0.55,
+      "preset": "wood"
+    },
+    "metal_dark": {
+      "color": [
+        0.025,
+        0.026,
+        0.028,
+        1.0
+      ],
+      "metallic": 0.65,
+      "roughness": 0.34,
+      "preset": "brushed_metal"
+    },
+    "plastic_blue": {
+      "color": [
+        0.05,
+        0.28,
+        0.7,
+        1.0
+      ],
+      "metallic": 0.0,
+      "roughness": 0.52,
+      "preset": "paint"
+    },
+    "accent_orange": {
+      "color": [
+        1.0,
+        0.43,
+        0.05,
+        1.0
+      ],
+      "metallic": 0.0,
+      "roughness": 0.42,
+      "preset": "paint"
+    },
+    "accent_cyan": {
+      "color": [
+        0.0,
+        0.75,
+        1.0,
+        1.0
+      ],
+      "metallic": 0.0,
+      "roughness": 0.4,
+      "emissive": [
+        0.0,
+        0.28,
+        0.55
+      ],
+      "emissive_strength": 0.15,
+      "preset": "paint"
+    },
+    "accent_magenta": {
+      "color": [
+        0.95,
+        0.05,
+        0.62,
+        1.0
+      ],
+      "metallic": 0.0,
+      "roughness": 0.44,
+      "emissive": [
+        0.18,
+        0.01,
+        0.12
+      ],
+      "emissive_strength": 0.12,
+      "preset": "paint"
+    },
+    "glass_soft": {
+      "color": [
+        0.72,
+        0.88,
+        0.96,
+        0.42
+      ],
+      "roughness": 0.055,
+      "transmission": 0.45,
+      "ior": 1.46,
+      "alpha": "blend",
+      "preset": "glass"
+    },
+    "warm_light": {
+      "color": [
+        1.0,
+        0.62,
+        0.28,
+        1.0
+      ],
+      "emissive": [
+        1.0,
+        0.48,
+        0.18
+      ],
+      "emissive_strength": 0.45,
+      "roughness": 0.25,
+      "preset": "emissive"
+    },
+    "paper": {
+      "color": [
+        0.84,
+        0.79,
+        0.68,
+        1.0
+      ],
+      "metallic": 0.0,
+      "roughness": 0.86,
+      "preset": "paper"
+    }
+  },
+  "lights": [
+    {
+      "id": "sak_classroom_window_fill",
+      "role": "window_fill_light",
+      "type": "point",
+      "position": [
+        -1.85,
+        1.85,
+        0.1
+      ],
+      "color": [
+        0.84,
+        0.92,
+        1.0
+      ],
+      "intensity": 7.2,
+      "range": 5.2,
+      "casts_shadows": false,
+      "scene_authoring_kernel_v1": {
+        "source": "scene_local_lighting_contract",
+        "variant": 1
+      }
+    },
+    {
+      "id": "sak_classroom_board_lift",
+      "role": "board_fill_light",
+      "type": "point",
+      "position": [
+        -0.65,
+        1.75,
+        1.52
+      ],
+      "color": [
+        1.0,
+        0.82,
+        0.58
+      ],
+      "intensity": 2.8,
+      "range": 2.8,
+      "casts_shadows": false,
+      "scene_authoring_kernel_v1": {
+        "source": "scene_local_lighting_contract",
+        "variant": 1
+      }
+    },
+    {
+      "id": "sak_classroom_row_key",
+      "role": "ceiling_key_light",
+      "type": "spot",
+      "position": [
+        0.85,
+        2.72,
+        -0.55
+      ],
+      "target": [
+        0.0,
+        0.7,
+        -0.48
+      ],
+      "color": [
+        1.0,
+        0.82,
+        0.58
+      ],
+      "intensity": 5.4,
+      "range": 4.5,
+      "inner_cone_degrees": 32.0,
+      "outer_cone_degrees": 64.0,
+      "casts_shadows": false,
+      "scene_authoring_kernel_v1": {
+        "source": "scene_local_lighting_contract",
+        "variant": 1
+      }
+    }
+  ],
+  "objects": [
+    {
+      "id": "sak_classroom_floor",
+      "role": "room_floor",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "floor_wood",
+      "support": "ground",
+      "assembly_id": "room_shell",
+      "transform": {
+        "position": [
+          0.0,
+          0.035,
+          0.0
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          5.2,
+          0.07,
+          5.0
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "floor",
+        "variant": 1
+      }
+    },
+    {
+      "id": "sak_classroom_back_wall",
+      "role": "room_wall",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "room_wall_cool",
+      "support": "ground",
+      "assembly_id": "room_shell",
+      "transform": {
+        "position": [
+          0.0,
+          1.45,
+          2.5
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          5.2,
+          2.9,
+          0.08
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "wall",
+        "variant": 1
+      }
+    },
+    {
+      "id": "sak_classroom_left_wall",
+      "role": "room_wall",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "room_wall_cool",
+      "support": "ground",
+      "assembly_id": "room_shell",
+      "transform": {
+        "position": [
+          -2.6,
+          1.45,
+          0.0
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.08,
+          2.9,
+          5.0
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "wall",
+        "variant": 1
+      }
+    },
+    {
+      "id": "sak_classroom_right_wall",
+      "role": "room_wall",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "room_wall_cool",
+      "support": "ground",
+      "assembly_id": "room_shell",
+      "transform": {
+        "position": [
+          2.6,
+          1.45,
+          0.0
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.08,
+          2.9,
+          5.0
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "wall",
+        "variant": 1
+      }
+    },
+    {
+      "id": "sak_classroom_ceiling",
+      "role": "room_ceiling",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "room_wall_cool",
+      "support": "ground",
+      "assembly_id": "room_shell",
+      "transform": {
+        "position": [
+          0.0,
+          2.94,
+          0.0
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          5.2,
+          0.08,
+          5.0
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "ceiling",
+        "variant": 1
+      }
+    },
+    {
+      "id": "sak_classroom_base_trim_back",
+      "role": "architectural_baseboard",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "metal_dark",
+      "support": "sak_classroom_floor",
+      "assembly_id": "room_shell",
+      "transform": {
+        "position": [
+          0.0,
+          0.13,
+          2.445
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          5.04,
+          0.045,
+          0.035
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "wall_detail",
+        "variant": 1
+      }
+    },
+    {
+      "id": "sak_classroom_base_trim_left",
+      "role": "architectural_baseboard",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "metal_dark",
+      "support": "sak_classroom_floor",
+      "assembly_id": "room_shell",
+      "transform": {
+        "position": [
+          -2.545,
+          0.13,
+          0.0
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.035,
+          0.045,
+          4.84
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "wall_detail",
+        "variant": 1
+      }
+    },
+    {
+      "id": "sak_classroom_base_trim_right",
+      "role": "architectural_baseboard",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "metal_dark",
+      "support": "sak_classroom_floor",
+      "assembly_id": "room_shell",
+      "transform": {
+        "position": [
+          2.545,
+          0.13,
+          0.0
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.035,
+          0.045,
+          4.84
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "wall_detail",
+        "variant": 1
+      }
+    },
+    {
+      "id": "sak_classroom_crown_trim_back",
+      "role": "architectural_baseboard",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "metal_dark",
+      "support": "sak_classroom_floor",
+      "assembly_id": "room_shell",
+      "transform": {
+        "position": [
+          0.0,
+          2.72,
+          2.445
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          5.04,
+          0.035,
+          0.035
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "wall_detail",
+        "variant": 1
+      }
+    },
+    {
+      "id": "sak_classroom_crown_trim_left",
+      "role": "architectural_baseboard",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "metal_dark",
+      "support": "sak_classroom_floor",
+      "assembly_id": "room_shell",
+      "transform": {
+        "position": [
+          -2.545,
+          2.72,
+          0.0
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.035,
+          0.035,
+          4.84
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "wall_detail",
+        "variant": 1
+      }
+    },
+    {
+      "id": "sak_classroom_crown_trim_right",
+      "role": "architectural_baseboard",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "metal_dark",
+      "support": "sak_classroom_floor",
+      "assembly_id": "room_shell",
+      "transform": {
+        "position": [
+          2.545,
+          2.72,
+          0.0
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.035,
+          0.035,
+          4.84
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "wall_detail",
+        "variant": 1
+      }
+    },
+    {
+      "id": "sak_classroom_corner_post_0",
+      "role": "architectural_corner_post",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "metal_dark",
+      "support": "sak_classroom_floor",
+      "assembly_id": "room_shell",
+      "transform": {
+        "position": [
+          -2.545,
+          1.45,
+          2.445
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.055,
+          2.72,
+          0.055
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "wall_detail",
+        "variant": 1
+      }
+    },
+    {
+      "id": "sak_classroom_corner_post_1",
+      "role": "architectural_corner_post",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "metal_dark",
+      "support": "sak_classroom_floor",
+      "assembly_id": "room_shell",
+      "transform": {
+        "position": [
+          2.545,
+          1.45,
+          2.445
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.055,
+          2.72,
+          0.055
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "wall_detail",
+        "variant": 1
+      }
+    },
+    {
+      "id": "sak_classroom_back_wall_vertical_trim_0",
+      "role": "wall_panel_trim",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "metal_dark",
+      "support": "sak_classroom_floor",
+      "assembly_id": "room_shell",
+      "transform": {
+        "position": [
+          -2.2,
+          1.508,
+          2.438
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.018,
+          1.566,
+          0.018
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "wall_detail",
+        "variant": 1
+      }
+    },
+    {
+      "id": "sak_classroom_back_wall_vertical_trim_1",
+      "role": "wall_panel_trim",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "metal_dark",
+      "support": "sak_classroom_floor",
+      "assembly_id": "room_shell",
+      "transform": {
+        "position": [
+          -1.1,
+          1.508,
+          2.438
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.018,
+          1.566,
+          0.018
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "wall_detail",
+        "variant": 1
+      }
+    },
+    {
+      "id": "sak_classroom_back_wall_vertical_trim_2",
+      "role": "wall_panel_trim",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "metal_dark",
+      "support": "sak_classroom_floor",
+      "assembly_id": "room_shell",
+      "transform": {
+        "position": [
+          0.0,
+          1.508,
+          2.438
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.018,
+          1.566,
+          0.018
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "wall_detail",
+        "variant": 1
+      }
+    },
+    {
+      "id": "sak_classroom_back_wall_vertical_trim_3",
+      "role": "wall_panel_trim",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "metal_dark",
+      "support": "sak_classroom_floor",
+      "assembly_id": "room_shell",
+      "transform": {
+        "position": [
+          1.1,
+          1.508,
+          2.438
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.018,
+          1.566,
+          0.018
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "wall_detail",
+        "variant": 1
+      }
+    },
+    {
+      "id": "sak_classroom_back_wall_vertical_trim_4",
+      "role": "wall_panel_trim",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "metal_dark",
+      "support": "sak_classroom_floor",
+      "assembly_id": "room_shell",
+      "transform": {
+        "position": [
+          2.2,
+          1.508,
+          2.438
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.018,
+          1.566,
+          0.018
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "wall_detail",
+        "variant": 1
+      }
+    },
+    {
+      "id": "sak_classroom_back_wall_horizontal_trim_0",
+      "role": "wall_panel_trim",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "metal_dark",
+      "support": "sak_classroom_floor",
+      "assembly_id": "room_shell",
+      "transform": {
+        "position": [
+          0.0,
+          0.986,
+          2.436
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          4.264,
+          0.018,
+          0.018
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "wall_detail",
+        "variant": 1
+      }
+    },
+    {
+      "id": "sak_classroom_back_wall_horizontal_trim_1",
+      "role": "wall_panel_trim",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "metal_dark",
+      "support": "sak_classroom_floor",
+      "assembly_id": "room_shell",
+      "transform": {
+        "position": [
+          0.0,
+          1.798,
+          2.436
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          4.264,
+          0.018,
+          0.018
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "wall_detail",
+        "variant": 1
+      }
+    },
+    {
+      "id": "sak_classroom_back_wall_horizontal_trim_2",
+      "role": "wall_panel_trim",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "metal_dark",
+      "support": "sak_classroom_floor",
+      "assembly_id": "room_shell",
+      "transform": {
+        "position": [
+          0.0,
+          2.378,
+          2.436
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          4.264,
+          0.018,
+          0.018
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "wall_detail",
+        "variant": 1
+      }
+    },
+    {
+      "id": "sak_classroom_left_wall_vertical_trim_0",
+      "role": "wall_panel_trim",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "metal_dark",
+      "support": "sak_classroom_floor",
+      "assembly_id": "room_shell",
+      "transform": {
+        "position": [
+          -2.538,
+          1.45,
+          -1.2
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.018,
+          1.334,
+          0.018
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "wall_detail",
+        "variant": 1
+      }
+    },
+    {
+      "id": "sak_classroom_left_wall_vertical_trim_1",
+      "role": "wall_panel_trim",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "metal_dark",
+      "support": "sak_classroom_floor",
+      "assembly_id": "room_shell",
+      "transform": {
+        "position": [
+          -2.538,
+          1.45,
+          0.4
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.018,
+          1.334,
+          0.018
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "wall_detail",
+        "variant": 1
+      }
+    },
+    {
+      "id": "sak_classroom_left_wall_vertical_trim_2",
+      "role": "wall_panel_trim",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "metal_dark",
+      "support": "sak_classroom_floor",
+      "assembly_id": "room_shell",
+      "transform": {
+        "position": [
+          -2.538,
+          1.45,
+          1.8
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.018,
+          1.334,
+          0.018
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "wall_detail",
+        "variant": 1
+      }
+    },
+    {
+      "id": "sak_classroom_right_wall_vertical_trim_0",
+      "role": "wall_panel_trim",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "metal_dark",
+      "support": "sak_classroom_floor",
+      "assembly_id": "room_shell",
+      "transform": {
+        "position": [
+          2.538,
+          1.45,
+          -1.2
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.018,
+          1.334,
+          0.018
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "wall_detail",
+        "variant": 1
+      }
+    },
+    {
+      "id": "sak_classroom_right_wall_vertical_trim_1",
+      "role": "wall_panel_trim",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "metal_dark",
+      "support": "sak_classroom_floor",
+      "assembly_id": "room_shell",
+      "transform": {
+        "position": [
+          2.538,
+          1.45,
+          0.4
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.018,
+          1.334,
+          0.018
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "wall_detail",
+        "variant": 1
+      }
+    },
+    {
+      "id": "sak_classroom_right_wall_vertical_trim_2",
+      "role": "wall_panel_trim",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "metal_dark",
+      "support": "sak_classroom_floor",
+      "assembly_id": "room_shell",
+      "transform": {
+        "position": [
+          2.538,
+          1.45,
+          1.8
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.018,
+          1.334,
+          0.018
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "wall_detail",
+        "variant": 1
+      }
+    },
+    {
+      "id": "sak_classroom_board",
+      "role": "chalkboard",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "dark_wall",
+      "support": "sak_classroom_back_wall",
+      "assembly_id": "teaching_wall",
+      "transform": {
+        "position": [
+          0.0,
+          1.55,
+          2.06
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          1.7,
+          0.72,
+          0.035
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "board",
+        "variant": 1
+      },
+      "attached_to": "sak_classroom_back_wall"
+    },
+    {
+      "id": "sak_classroom_chalk_tray",
+      "role": "chalk_tray",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "paper",
+      "support": "sak_classroom_board",
+      "assembly_id": "teaching_wall",
+      "transform": {
+        "position": [
+          0.0,
+          1.16,
+          2.015
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          1.34,
+          0.035,
+          0.035
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "decor",
+        "variant": 1
+      },
+      "attached_to": "sak_classroom_board"
+    },
+    {
+      "id": "sak_teacher_desk",
+      "role": "desk",
+      "kind": "kenney_asset",
+      "runtime_asset": "assets/models/kenney_furniture_kit/desk/desk.gltf",
+      "material": "cabinet_warm",
+      "support": "sak_classroom_floor",
+      "assembly_id": "teacher_zone",
+      "transform": {
+        "position": [
+          0.0,
+          0.07,
+          1.05
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          2.0,
+          2.0,
+          2.0
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "desk",
+        "asset_id": "desk_basic",
+        "anchors": {
+          "floor_contact": [
+            0,
+            0,
+            0
+          ],
+          "work_surface": [
+            0,
+            0.72,
+            0
+          ]
+        },
+        "license": "Kenney CC0",
+        "scale_contract": {
+          "requested_scale": [
+            2.0,
+            2.0,
+            2.0
+          ],
+          "resolved_scale": [
+            2.0,
+            2.0,
+            2.0
+          ],
+          "semantic_floor": 1.5,
+          "physical_size": {
+            "requested_scale": [
+              2.0,
+              2.0,
+              2.0
+            ],
+            "semantic_floor_scale": 1.5,
+            "resolved_scale": [
+              2.0,
+              2.0,
+              2.0
+            ],
+            "native_extent": [
+              0.73448,
+              0.38441,
+              0.3923
+            ],
+            "min_extent": [
+              1.05,
+              0.7,
+              0.55
+            ],
+            "max_extent": [
+              2.2,
+              1.15,
+              1.15
+            ],
+            "resolved_extent": [
+              1.46895,
+              0.76882,
+              0.7846
+            ],
+            "physical_contract": "PASS",
+            "adjustment_reasons": []
+          }
+        },
+        "variant": 1
+      }
+    },
+    {
+      "id": "sak_teacher_papers",
+      "role": "teacher_prop",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "paper",
+      "support": "sak_teacher_desk",
+      "assembly_id": "teacher_zone",
+      "transform": {
+        "position": [
+          -0.24,
+          0.8523152194023133,
+          0.96
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.34,
+          0.025,
+          0.24
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "paper_prop",
+        "variant": 1
+      }
+    },
+    {
+      "id": "sak_teacher_mug",
+      "role": "teacher_prop",
+      "kind": "primitive",
+      "primitive": "cylinder",
+      "material": "accent_orange",
+      "support": "sak_teacher_desk",
+      "assembly_id": "teacher_zone",
+      "transform": {
+        "position": [
+          -0.028,
+          0.9098152194023132,
+          1.0734
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.08,
+          0.14,
+          0.08
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "desk_prop",
+        "variant": 1
+      }
+    },
+    {
+      "id": "sak_student_desk_0",
+      "role": "student_desk",
+      "kind": "kenney_asset",
+      "runtime_asset": "assets/models/kenney_furniture_kit/desk/desk.gltf",
+      "material": "cabinet_warm",
+      "support": "sak_classroom_floor",
+      "assembly_id": "student_row_0",
+      "transform": {
+        "position": [
+          -1.25,
+          0.07,
+          0.15
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          1.5,
+          1.82098,
+          1.5
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "desk",
+        "asset_id": "desk_basic",
+        "anchors": {
+          "floor_contact": [
+            0,
+            0,
+            0
+          ],
+          "work_surface": [
+            0,
+            0.72,
+            0
+          ]
+        },
+        "license": "Kenney CC0",
+        "scale_contract": {
+          "requested_scale": [
+            0.55,
+            0.55,
+            0.55
+          ],
+          "resolved_scale": [
+            1.5,
+            1.82098,
+            1.5
+          ],
+          "semantic_floor": 1.5,
+          "physical_size": {
+            "requested_scale": [
+              0.55,
+              0.55,
+              0.55
+            ],
+            "semantic_floor_scale": 1.5,
+            "resolved_scale": [
+              1.5,
+              1.82098,
+              1.5
+            ],
+            "native_extent": [
+              0.73448,
+              0.38441,
+              0.3923
+            ],
+            "min_extent": [
+              1.05,
+              0.7,
+              0.55
+            ],
+            "max_extent": [
+              2.2,
+              1.15,
+              1.15
+            ],
+            "resolved_extent": [
+              1.10171,
+              0.7,
+              0.58845
+            ],
+            "physical_contract": "PASS",
+            "adjustment_reasons": [
+              "axis_1_raised_to_min_extent"
+            ]
+          }
+        },
+        "variant": 1
+      }
+    },
+    {
+      "id": "sak_student_chair_0",
+      "role": "chair",
+      "kind": "kenney_asset",
+      "runtime_asset": "assets/models/kenney_furniture_kit/chairDesk/chairDesk.gltf",
+      "material": "plastic_blue",
+      "support": "sak_classroom_floor",
+      "assembly_id": "student_row_0",
+      "transform": {
+        "position": [
+          -1.53586,
+          0.07,
+          -0.63423
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0002,
+          0.0
+        ],
+        "scale": [
+          1.49276,
+          1.35,
+          1.52721
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "chair",
+        "asset_id": "chair_desk",
+        "anchors": {
+          "floor_contact": [
+            0,
+            0,
+            0
+          ],
+          "front": [
+            0,
+            0,
+            1
+          ]
+        },
+        "license": "Kenney CC0",
+        "scale_contract": {
+          "requested_scale": [
+            0.54,
+            0.54,
+            0.54
+          ],
+          "resolved_scale": [
+            1.49276,
+            1.35,
+            1.52721
+          ],
+          "semantic_floor": 1.35,
+          "physical_size": {
+            "requested_scale": [
+              0.54,
+              0.54,
+              0.54
+            ],
+            "semantic_floor_scale": 1.35,
+            "resolved_scale": [
+              1.49276,
+              1.35,
+              1.52721
+            ],
+            "native_extent": [
+              0.33495,
+              0.6076,
+              0.3143
+            ],
+            "min_extent": [
+              0.5,
+              0.78,
+              0.48
+            ],
+            "max_extent": [
+              0.95,
+              1.3,
+              1.0
+            ],
+            "resolved_extent": [
+              0.5,
+              0.82026,
+              0.48
+            ],
+            "physical_contract": "PASS",
+            "adjustment_reasons": [
+              "axis_0_raised_to_min_extent",
+              "axis_2_raised_to_min_extent"
+            ]
+          }
+        },
+        "variant": 1
+      },
+      "scene_graph_kernel_v1": {
+        "faces": "sak_classroom_board",
+        "slot_target": "sak_student_desk_0",
+        "slot_index": 0,
+        "front_yaw_offset_degrees": 180.0
+      },
+      "facing_target": "sak_student_desk_0",
+      "facing_relation": "seat_faces_numbered_work_anchor",
+      "facing_tolerance_degrees": 55.0,
+      "constructor_tags": [
+        "facing_relation_compiled"
+      ]
+    },
+    {
+      "id": "sak_student_paper_0",
+      "role": "paper_prop",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "paper",
+      "support": "sak_student_desk_0",
+      "assembly_id": "student_row_0",
+      "transform": {
+        "position": [
+          -1.585,
+          0.7779985691136122,
+          0.13
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.22,
+          0.014,
+          0.16
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "paper_prop",
+        "variant": 1
+      }
+    },
+    {
+      "id": "sak_student_book_0",
+      "role": "book",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "accent_orange",
+      "support": "sak_student_desk_0",
+      "assembly_id": "student_row_0",
+      "transform": {
+        "position": [
+          -1.333,
+          0.7909985691136122,
+          0.21
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.18,
+          0.04,
+          0.13
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "book",
+        "variant": 1
+      }
+    },
+    {
+      "id": "sak_student_desk_1",
+      "role": "student_desk",
+      "kind": "kenney_asset",
+      "runtime_asset": "assets/models/kenney_furniture_kit/desk/desk.gltf",
+      "material": "cabinet_warm",
+      "support": "sak_classroom_floor",
+      "assembly_id": "student_row_0",
+      "transform": {
+        "position": [
+          0.0,
+          0.07,
+          0.15
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          1.5,
+          1.82098,
+          1.5
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "desk",
+        "asset_id": "desk_basic",
+        "anchors": {
+          "floor_contact": [
+            0,
+            0,
+            0
+          ],
+          "work_surface": [
+            0,
+            0.72,
+            0
+          ]
+        },
+        "license": "Kenney CC0",
+        "scale_contract": {
+          "requested_scale": [
+            0.55,
+            0.55,
+            0.55
+          ],
+          "resolved_scale": [
+            1.5,
+            1.82098,
+            1.5
+          ],
+          "semantic_floor": 1.5,
+          "physical_size": {
+            "requested_scale": [
+              0.55,
+              0.55,
+              0.55
+            ],
+            "semantic_floor_scale": 1.5,
+            "resolved_scale": [
+              1.5,
+              1.82098,
+              1.5
+            ],
+            "native_extent": [
+              0.73448,
+              0.38441,
+              0.3923
+            ],
+            "min_extent": [
+              1.05,
+              0.7,
+              0.55
+            ],
+            "max_extent": [
+              2.2,
+              1.15,
+              1.15
+            ],
+            "resolved_extent": [
+              1.10171,
+              0.7,
+              0.58845
+            ],
+            "physical_contract": "PASS",
+            "adjustment_reasons": [
+              "axis_1_raised_to_min_extent"
+            ]
+          }
+        },
+        "variant": 1
+      }
+    },
+    {
+      "id": "sak_student_chair_1",
+      "role": "chair",
+      "kind": "kenney_asset",
+      "runtime_asset": "assets/models/kenney_furniture_kit/chairDesk/chairDesk.gltf",
+      "material": "plastic_blue",
+      "support": "sak_classroom_floor",
+      "assembly_id": "student_row_0",
+      "transform": {
+        "position": [
+          -0.28586,
+          0.07,
+          -0.63423
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0002,
+          0.0
+        ],
+        "scale": [
+          1.49276,
+          1.35,
+          1.52721
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "chair",
+        "asset_id": "chair_desk",
+        "anchors": {
+          "floor_contact": [
+            0,
+            0,
+            0
+          ],
+          "front": [
+            0,
+            0,
+            1
+          ]
+        },
+        "license": "Kenney CC0",
+        "scale_contract": {
+          "requested_scale": [
+            0.54,
+            0.54,
+            0.54
+          ],
+          "resolved_scale": [
+            1.49276,
+            1.35,
+            1.52721
+          ],
+          "semantic_floor": 1.35,
+          "physical_size": {
+            "requested_scale": [
+              0.54,
+              0.54,
+              0.54
+            ],
+            "semantic_floor_scale": 1.35,
+            "resolved_scale": [
+              1.49276,
+              1.35,
+              1.52721
+            ],
+            "native_extent": [
+              0.33495,
+              0.6076,
+              0.3143
+            ],
+            "min_extent": [
+              0.5,
+              0.78,
+              0.48
+            ],
+            "max_extent": [
+              0.95,
+              1.3,
+              1.0
+            ],
+            "resolved_extent": [
+              0.5,
+              0.82026,
+              0.48
+            ],
+            "physical_contract": "PASS",
+            "adjustment_reasons": [
+              "axis_0_raised_to_min_extent",
+              "axis_2_raised_to_min_extent"
+            ]
+          }
+        },
+        "variant": 1
+      },
+      "scene_graph_kernel_v1": {
+        "faces": "sak_student_desk_1",
+        "slot_target": "sak_student_desk_1",
+        "slot_index": 0
+      },
+      "facing_target": "sak_student_desk_1",
+      "facing_relation": "seat_faces_numbered_work_anchor",
+      "facing_tolerance_degrees": 55.0,
+      "constructor_tags": [
+        "facing_relation_compiled"
+      ]
+    },
+    {
+      "id": "sak_student_paper_1",
+      "role": "paper_prop",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "paper",
+      "support": "sak_student_desk_1",
+      "assembly_id": "student_row_0",
+      "transform": {
+        "position": [
+          -0.335,
+          0.7779985691136122,
+          0.13
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.22,
+          0.014,
+          0.16
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "paper_prop",
+        "variant": 1
+      }
+    },
+    {
+      "id": "sak_student_book_1",
+      "role": "book",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "accent_cyan",
+      "support": "sak_student_desk_1",
+      "assembly_id": "student_row_0",
+      "transform": {
+        "position": [
+          -0.083,
+          0.7909985691136122,
+          0.21
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.18,
+          0.04,
+          0.13
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "book",
+        "variant": 1
+      }
+    },
+    {
+      "id": "sak_student_desk_2",
+      "role": "student_desk",
+      "kind": "kenney_asset",
+      "runtime_asset": "assets/models/kenney_furniture_kit/desk/desk.gltf",
+      "material": "cabinet_warm",
+      "support": "sak_classroom_floor",
+      "assembly_id": "student_row_0",
+      "transform": {
+        "position": [
+          1.25,
+          0.07,
+          0.15
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          1.5,
+          1.82098,
+          1.5
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "desk",
+        "asset_id": "desk_basic",
+        "anchors": {
+          "floor_contact": [
+            0,
+            0,
+            0
+          ],
+          "work_surface": [
+            0,
+            0.72,
+            0
+          ]
+        },
+        "license": "Kenney CC0",
+        "scale_contract": {
+          "requested_scale": [
+            0.55,
+            0.55,
+            0.55
+          ],
+          "resolved_scale": [
+            1.5,
+            1.82098,
+            1.5
+          ],
+          "semantic_floor": 1.5,
+          "physical_size": {
+            "requested_scale": [
+              0.55,
+              0.55,
+              0.55
+            ],
+            "semantic_floor_scale": 1.5,
+            "resolved_scale": [
+              1.5,
+              1.82098,
+              1.5
+            ],
+            "native_extent": [
+              0.73448,
+              0.38441,
+              0.3923
+            ],
+            "min_extent": [
+              1.05,
+              0.7,
+              0.55
+            ],
+            "max_extent": [
+              2.2,
+              1.15,
+              1.15
+            ],
+            "resolved_extent": [
+              1.10171,
+              0.7,
+              0.58845
+            ],
+            "physical_contract": "PASS",
+            "adjustment_reasons": [
+              "axis_1_raised_to_min_extent"
+            ]
+          }
+        },
+        "variant": 1
+      }
+    },
+    {
+      "id": "sak_student_chair_2",
+      "role": "chair",
+      "kind": "kenney_asset",
+      "runtime_asset": "assets/models/kenney_furniture_kit/chairDesk/chairDesk.gltf",
+      "material": "plastic_blue",
+      "support": "sak_classroom_floor",
+      "assembly_id": "student_row_0",
+      "transform": {
+        "position": [
+          0.96414,
+          0.07,
+          -0.63423
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0002,
+          0.0
+        ],
+        "scale": [
+          1.49276,
+          1.35,
+          1.52721
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "chair",
+        "asset_id": "chair_desk",
+        "anchors": {
+          "floor_contact": [
+            0,
+            0,
+            0
+          ],
+          "front": [
+            0,
+            0,
+            1
+          ]
+        },
+        "license": "Kenney CC0",
+        "scale_contract": {
+          "requested_scale": [
+            0.54,
+            0.54,
+            0.54
+          ],
+          "resolved_scale": [
+            1.49276,
+            1.35,
+            1.52721
+          ],
+          "semantic_floor": 1.35,
+          "physical_size": {
+            "requested_scale": [
+              0.54,
+              0.54,
+              0.54
+            ],
+            "semantic_floor_scale": 1.35,
+            "resolved_scale": [
+              1.49276,
+              1.35,
+              1.52721
+            ],
+            "native_extent": [
+              0.33495,
+              0.6076,
+              0.3143
+            ],
+            "min_extent": [
+              0.5,
+              0.78,
+              0.48
+            ],
+            "max_extent": [
+              0.95,
+              1.3,
+              1.0
+            ],
+            "resolved_extent": [
+              0.5,
+              0.82026,
+              0.48
+            ],
+            "physical_contract": "PASS",
+            "adjustment_reasons": [
+              "axis_0_raised_to_min_extent",
+              "axis_2_raised_to_min_extent"
+            ]
+          }
+        },
+        "variant": 1
+      },
+      "scene_graph_kernel_v1": {
+        "faces": "sak_student_desk_2",
+        "slot_target": "sak_student_desk_2",
+        "slot_index": 0
+      },
+      "facing_target": "sak_student_desk_2",
+      "facing_relation": "seat_faces_numbered_work_anchor",
+      "facing_tolerance_degrees": 55.0,
+      "constructor_tags": [
+        "facing_relation_compiled"
+      ]
+    },
+    {
+      "id": "sak_student_paper_2",
+      "role": "paper_prop",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "paper",
+      "support": "sak_student_desk_2",
+      "assembly_id": "student_row_0",
+      "transform": {
+        "position": [
+          0.915,
+          0.7779985691136122,
+          0.13
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.22,
+          0.014,
+          0.16
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "paper_prop",
+        "variant": 1
+      }
+    },
+    {
+      "id": "sak_student_book_2",
+      "role": "book",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "accent_orange",
+      "support": "sak_student_desk_2",
+      "assembly_id": "student_row_0",
+      "transform": {
+        "position": [
+          1.167,
+          0.7909985691136122,
+          0.21
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.18,
+          0.04,
+          0.13
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "book",
+        "variant": 1
+      }
+    },
+    {
+      "id": "sak_student_desk_3",
+      "role": "student_desk",
+      "kind": "kenney_asset",
+      "runtime_asset": "assets/models/kenney_furniture_kit/desk/desk.gltf",
+      "material": "cabinet_warm",
+      "support": "sak_classroom_floor",
+      "assembly_id": "student_row_1",
+      "transform": {
+        "position": [
+          -1.17,
+          0.07,
+          -1.45
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          1.5,
+          1.82098,
+          1.5
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "desk",
+        "asset_id": "desk_basic",
+        "anchors": {
+          "floor_contact": [
+            0,
+            0,
+            0
+          ],
+          "work_surface": [
+            0,
+            0.72,
+            0
+          ]
+        },
+        "license": "Kenney CC0",
+        "scale_contract": {
+          "requested_scale": [
+            0.55,
+            0.55,
+            0.55
+          ],
+          "resolved_scale": [
+            1.5,
+            1.82098,
+            1.5
+          ],
+          "semantic_floor": 1.5,
+          "physical_size": {
+            "requested_scale": [
+              0.55,
+              0.55,
+              0.55
+            ],
+            "semantic_floor_scale": 1.5,
+            "resolved_scale": [
+              1.5,
+              1.82098,
+              1.5
+            ],
+            "native_extent": [
+              0.73448,
+              0.38441,
+              0.3923
+            ],
+            "min_extent": [
+              1.05,
+              0.7,
+              0.55
+            ],
+            "max_extent": [
+              2.2,
+              1.15,
+              1.15
+            ],
+            "resolved_extent": [
+              1.10171,
+              0.7,
+              0.58845
+            ],
+            "physical_contract": "PASS",
+            "adjustment_reasons": [
+              "axis_1_raised_to_min_extent"
+            ]
+          }
+        },
+        "variant": 1
+      }
+    },
+    {
+      "id": "sak_student_chair_3",
+      "role": "chair",
+      "kind": "kenney_asset",
+      "runtime_asset": "assets/models/kenney_furniture_kit/chairDesk/chairDesk.gltf",
+      "material": "plastic_blue",
+      "support": "sak_classroom_floor",
+      "assembly_id": "student_row_1",
+      "transform": {
+        "position": [
+          -1.45586,
+          0.07,
+          -2.23423
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0002,
+          0.0
+        ],
+        "scale": [
+          1.49276,
+          1.35,
+          1.52721
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "chair",
+        "asset_id": "chair_desk",
+        "anchors": {
+          "floor_contact": [
+            0,
+            0,
+            0
+          ],
+          "front": [
+            0,
+            0,
+            1
+          ]
+        },
+        "license": "Kenney CC0",
+        "scale_contract": {
+          "requested_scale": [
+            0.54,
+            0.54,
+            0.54
+          ],
+          "resolved_scale": [
+            1.49276,
+            1.35,
+            1.52721
+          ],
+          "semantic_floor": 1.35,
+          "physical_size": {
+            "requested_scale": [
+              0.54,
+              0.54,
+              0.54
+            ],
+            "semantic_floor_scale": 1.35,
+            "resolved_scale": [
+              1.49276,
+              1.35,
+              1.52721
+            ],
+            "native_extent": [
+              0.33495,
+              0.6076,
+              0.3143
+            ],
+            "min_extent": [
+              0.5,
+              0.78,
+              0.48
+            ],
+            "max_extent": [
+              0.95,
+              1.3,
+              1.0
+            ],
+            "resolved_extent": [
+              0.5,
+              0.82026,
+              0.48
+            ],
+            "physical_contract": "PASS",
+            "adjustment_reasons": [
+              "axis_0_raised_to_min_extent",
+              "axis_2_raised_to_min_extent"
+            ]
+          }
+        },
+        "variant": 1
+      },
+      "scene_graph_kernel_v1": {
+        "faces": "sak_student_desk_3",
+        "slot_target": "sak_student_desk_3",
+        "slot_index": 0
+      },
+      "facing_target": "sak_student_desk_3",
+      "facing_relation": "seat_faces_numbered_work_anchor",
+      "facing_tolerance_degrees": 55.0,
+      "constructor_tags": [
+        "facing_relation_compiled"
+      ]
+    },
+    {
+      "id": "sak_student_paper_3",
+      "role": "paper_prop",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "paper",
+      "support": "sak_student_desk_3",
+      "assembly_id": "student_row_1",
+      "transform": {
+        "position": [
+          -1.505,
+          0.7779985691136122,
+          -1.47
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.22,
+          0.014,
+          0.16
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "paper_prop",
+        "variant": 1
+      }
+    },
+    {
+      "id": "sak_student_book_3",
+      "role": "book",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "accent_cyan",
+      "support": "sak_student_desk_3",
+      "assembly_id": "student_row_1",
+      "transform": {
+        "position": [
+          -1.253,
+          0.7909985691136122,
+          -1.39
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.18,
+          0.04,
+          0.13
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "book",
+        "variant": 1
+      }
+    },
+    {
+      "id": "sak_student_desk_4",
+      "role": "student_desk",
+      "kind": "kenney_asset",
+      "runtime_asset": "assets/models/kenney_furniture_kit/desk/desk.gltf",
+      "material": "cabinet_warm",
+      "support": "sak_classroom_floor",
+      "assembly_id": "student_row_1",
+      "transform": {
+        "position": [
+          0.08,
+          0.07,
+          -1.45
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          1.5,
+          1.82098,
+          1.5
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "desk",
+        "asset_id": "desk_basic",
+        "anchors": {
+          "floor_contact": [
+            0,
+            0,
+            0
+          ],
+          "work_surface": [
+            0,
+            0.72,
+            0
+          ]
+        },
+        "license": "Kenney CC0",
+        "scale_contract": {
+          "requested_scale": [
+            0.55,
+            0.55,
+            0.55
+          ],
+          "resolved_scale": [
+            1.5,
+            1.82098,
+            1.5
+          ],
+          "semantic_floor": 1.5,
+          "physical_size": {
+            "requested_scale": [
+              0.55,
+              0.55,
+              0.55
+            ],
+            "semantic_floor_scale": 1.5,
+            "resolved_scale": [
+              1.5,
+              1.82098,
+              1.5
+            ],
+            "native_extent": [
+              0.73448,
+              0.38441,
+              0.3923
+            ],
+            "min_extent": [
+              1.05,
+              0.7,
+              0.55
+            ],
+            "max_extent": [
+              2.2,
+              1.15,
+              1.15
+            ],
+            "resolved_extent": [
+              1.10171,
+              0.7,
+              0.58845
+            ],
+            "physical_contract": "PASS",
+            "adjustment_reasons": [
+              "axis_1_raised_to_min_extent"
+            ]
+          }
+        },
+        "variant": 1
+      }
+    },
+    {
+      "id": "sak_student_chair_4",
+      "role": "chair",
+      "kind": "kenney_asset",
+      "runtime_asset": "assets/models/kenney_furniture_kit/chairDesk/chairDesk.gltf",
+      "material": "plastic_blue",
+      "support": "sak_classroom_floor",
+      "assembly_id": "student_row_1",
+      "transform": {
+        "position": [
+          -0.20586,
+          0.07,
+          -2.23423
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0002,
+          0.0
+        ],
+        "scale": [
+          1.49276,
+          1.35,
+          1.52721
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "chair",
+        "asset_id": "chair_desk",
+        "anchors": {
+          "floor_contact": [
+            0,
+            0,
+            0
+          ],
+          "front": [
+            0,
+            0,
+            1
+          ]
+        },
+        "license": "Kenney CC0",
+        "scale_contract": {
+          "requested_scale": [
+            0.54,
+            0.54,
+            0.54
+          ],
+          "resolved_scale": [
+            1.49276,
+            1.35,
+            1.52721
+          ],
+          "semantic_floor": 1.35,
+          "physical_size": {
+            "requested_scale": [
+              0.54,
+              0.54,
+              0.54
+            ],
+            "semantic_floor_scale": 1.35,
+            "resolved_scale": [
+              1.49276,
+              1.35,
+              1.52721
+            ],
+            "native_extent": [
+              0.33495,
+              0.6076,
+              0.3143
+            ],
+            "min_extent": [
+              0.5,
+              0.78,
+              0.48
+            ],
+            "max_extent": [
+              0.95,
+              1.3,
+              1.0
+            ],
+            "resolved_extent": [
+              0.5,
+              0.82026,
+              0.48
+            ],
+            "physical_contract": "PASS",
+            "adjustment_reasons": [
+              "axis_0_raised_to_min_extent",
+              "axis_2_raised_to_min_extent"
+            ]
+          }
+        },
+        "variant": 1
+      },
+      "scene_graph_kernel_v1": {
+        "faces": "sak_student_desk_4",
+        "slot_target": "sak_student_desk_4",
+        "slot_index": 0
+      },
+      "facing_target": "sak_student_desk_4",
+      "facing_relation": "seat_faces_numbered_work_anchor",
+      "facing_tolerance_degrees": 55.0,
+      "constructor_tags": [
+        "facing_relation_compiled"
+      ]
+    },
+    {
+      "id": "sak_student_paper_4",
+      "role": "paper_prop",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "paper",
+      "support": "sak_student_desk_4",
+      "assembly_id": "student_row_1",
+      "transform": {
+        "position": [
+          -0.255,
+          0.7779985691136122,
+          -1.47
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.22,
+          0.014,
+          0.16
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "paper_prop",
+        "variant": 1
+      }
+    },
+    {
+      "id": "sak_student_book_4",
+      "role": "book",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "accent_orange",
+      "support": "sak_student_desk_4",
+      "assembly_id": "student_row_1",
+      "transform": {
+        "position": [
+          -0.003,
+          0.7909985691136122,
+          -1.39
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.18,
+          0.04,
+          0.13
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "book",
+        "variant": 1
+      }
+    },
+    {
+      "id": "sak_student_desk_5",
+      "role": "student_desk",
+      "kind": "kenney_asset",
+      "runtime_asset": "assets/models/kenney_furniture_kit/desk/desk.gltf",
+      "material": "cabinet_warm",
+      "support": "sak_classroom_floor",
+      "assembly_id": "student_row_1",
+      "transform": {
+        "position": [
+          1.33,
+          0.07,
+          -1.45
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          1.5,
+          1.82098,
+          1.5
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "desk",
+        "asset_id": "desk_basic",
+        "anchors": {
+          "floor_contact": [
+            0,
+            0,
+            0
+          ],
+          "work_surface": [
+            0,
+            0.72,
+            0
+          ]
+        },
+        "license": "Kenney CC0",
+        "scale_contract": {
+          "requested_scale": [
+            0.55,
+            0.55,
+            0.55
+          ],
+          "resolved_scale": [
+            1.5,
+            1.82098,
+            1.5
+          ],
+          "semantic_floor": 1.5,
+          "physical_size": {
+            "requested_scale": [
+              0.55,
+              0.55,
+              0.55
+            ],
+            "semantic_floor_scale": 1.5,
+            "resolved_scale": [
+              1.5,
+              1.82098,
+              1.5
+            ],
+            "native_extent": [
+              0.73448,
+              0.38441,
+              0.3923
+            ],
+            "min_extent": [
+              1.05,
+              0.7,
+              0.55
+            ],
+            "max_extent": [
+              2.2,
+              1.15,
+              1.15
+            ],
+            "resolved_extent": [
+              1.10171,
+              0.7,
+              0.58845
+            ],
+            "physical_contract": "PASS",
+            "adjustment_reasons": [
+              "axis_1_raised_to_min_extent"
+            ]
+          }
+        },
+        "variant": 1
+      }
+    },
+    {
+      "id": "sak_student_chair_5",
+      "role": "chair",
+      "kind": "kenney_asset",
+      "runtime_asset": "assets/models/kenney_furniture_kit/chairDesk/chairDesk.gltf",
+      "material": "plastic_blue",
+      "support": "sak_classroom_floor",
+      "assembly_id": "student_row_1",
+      "transform": {
+        "position": [
+          1.04414,
+          0.07,
+          -2.23423
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0002,
+          0.0
+        ],
+        "scale": [
+          1.49276,
+          1.35,
+          1.52721
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "chair",
+        "asset_id": "chair_desk",
+        "anchors": {
+          "floor_contact": [
+            0,
+            0,
+            0
+          ],
+          "front": [
+            0,
+            0,
+            1
+          ]
+        },
+        "license": "Kenney CC0",
+        "scale_contract": {
+          "requested_scale": [
+            0.54,
+            0.54,
+            0.54
+          ],
+          "resolved_scale": [
+            1.49276,
+            1.35,
+            1.52721
+          ],
+          "semantic_floor": 1.35,
+          "physical_size": {
+            "requested_scale": [
+              0.54,
+              0.54,
+              0.54
+            ],
+            "semantic_floor_scale": 1.35,
+            "resolved_scale": [
+              1.49276,
+              1.35,
+              1.52721
+            ],
+            "native_extent": [
+              0.33495,
+              0.6076,
+              0.3143
+            ],
+            "min_extent": [
+              0.5,
+              0.78,
+              0.48
+            ],
+            "max_extent": [
+              0.95,
+              1.3,
+              1.0
+            ],
+            "resolved_extent": [
+              0.5,
+              0.82026,
+              0.48
+            ],
+            "physical_contract": "PASS",
+            "adjustment_reasons": [
+              "axis_0_raised_to_min_extent",
+              "axis_2_raised_to_min_extent"
+            ]
+          }
+        },
+        "variant": 1
+      },
+      "scene_graph_kernel_v1": {
+        "faces": "sak_student_desk_5",
+        "slot_target": "sak_student_desk_5",
+        "slot_index": 0
+      },
+      "facing_target": "sak_student_desk_5",
+      "facing_relation": "seat_faces_numbered_work_anchor",
+      "facing_tolerance_degrees": 55.0,
+      "constructor_tags": [
+        "facing_relation_compiled"
+      ]
+    },
+    {
+      "id": "sak_student_paper_5",
+      "role": "paper_prop",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "paper",
+      "support": "sak_student_desk_5",
+      "assembly_id": "student_row_1",
+      "transform": {
+        "position": [
+          0.995,
+          0.7779985691136122,
+          -1.47
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.22,
+          0.014,
+          0.16
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "paper_prop",
+        "variant": 1
+      }
+    },
+    {
+      "id": "sak_student_book_5",
+      "role": "book",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "accent_cyan",
+      "support": "sak_student_desk_5",
+      "assembly_id": "student_row_1",
+      "transform": {
+        "position": [
+          1.247,
+          0.7909985691136122,
+          -1.39
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.18,
+          0.04,
+          0.13
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "book",
+        "variant": 1
+      }
+    },
+    {
+      "id": "sak_classroom_chalk_line_0",
+      "role": "chalk_marks",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "paper",
+      "support": "sak_classroom_board",
+      "assembly_id": "teaching_wall",
+      "transform": {
+        "position": [
+          -0.2,
+          1.38,
+          2.02
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.72,
+          0.018,
+          0.008
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "decor",
+        "variant": 1
+      },
+      "attached_to": "sak_classroom_board"
+    },
+    {
+      "id": "sak_classroom_chalk_line_1",
+      "role": "chalk_marks",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "paper",
+      "support": "sak_classroom_board",
+      "assembly_id": "teaching_wall",
+      "transform": {
+        "position": [
+          0.0,
+          1.55,
+          2.02
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.64,
+          0.018,
+          0.008
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "decor",
+        "variant": 1
+      },
+      "attached_to": "sak_classroom_board"
+    },
+    {
+      "id": "sak_classroom_chalk_line_2",
+      "role": "chalk_marks",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "paper",
+      "support": "sak_classroom_board",
+      "assembly_id": "teaching_wall",
+      "transform": {
+        "position": [
+          0.2,
+          1.72,
+          2.02
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.56,
+          0.018,
+          0.008
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "decor",
+        "variant": 1
+      },
+      "attached_to": "sak_classroom_board"
+    },
+    {
+      "id": "sak_classroom_bulletin_board",
+      "role": "bulletin_board",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "accent_orange",
+      "support": "sak_classroom_back_wall",
+      "assembly_id": "wall_dressing",
+      "transform": {
+        "position": [
+          -1.85,
+          1.42,
+          2.055
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.62,
+          0.46,
+          0.024
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "decor",
+        "variant": 1
+      },
+      "attached_to": "sak_classroom_back_wall"
+    },
+    {
+      "id": "sak_classroom_wall_clock",
+      "role": "wall_clock",
+      "kind": "primitive",
+      "primitive": "sphere",
+      "material": "paper",
+      "support": "sak_classroom_back_wall",
+      "assembly_id": "wall_dressing",
+      "transform": {
+        "position": [
+          1.78,
+          1.82,
+          2.05
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.18,
+          0.18,
+          0.03
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "decor",
+        "variant": 1
+      },
+      "attached_to": "sak_classroom_back_wall"
+    },
+    {
+      "id": "sak_classroom_ceiling_light_0",
+      "role": "ceiling_light",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "warm_light",
+      "support": "sak_classroom_ceiling",
+      "assembly_id": "lighting",
+      "transform": {
+        "position": [
+          -1.1,
+          2.74,
+          0.0
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.44,
+          0.035,
+          0.18
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "light",
+        "variant": 1
+      }
+    },
+    {
+      "id": "sak_classroom_ceiling_light_1",
+      "role": "ceiling_light",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "warm_light",
+      "support": "sak_classroom_ceiling",
+      "assembly_id": "lighting",
+      "transform": {
+        "position": [
+          0.0,
+          2.74,
+          0.0
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.44,
+          0.035,
+          0.18
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "light",
+        "variant": 1
+      }
+    },
+    {
+      "id": "sak_classroom_ceiling_light_2",
+      "role": "ceiling_light",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "warm_light",
+      "support": "sak_classroom_ceiling",
+      "assembly_id": "lighting",
+      "transform": {
+        "position": [
+          1.1,
+          2.74,
+          0.0
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.44,
+          0.035,
+          0.18
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "light",
+        "variant": 1
+      }
+    },
+    {
+      "id": "sak_classroom_floor_detail_0",
+      "role": "floor_detail_line",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "paper",
+      "support": "sak_classroom_floor",
+      "assembly_id": "floor_detail",
+      "transform": {
+        "position": [
+          0.0,
+          0.082,
+          -1.45
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          4.55,
+          0.008,
+          0.018
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "floor_detail",
+        "variant": 1
+      }
+    },
+    {
+      "id": "sak_classroom_floor_detail_1",
+      "role": "floor_detail_line",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "paper",
+      "support": "sak_classroom_floor",
+      "assembly_id": "floor_detail",
+      "transform": {
+        "position": [
+          0.0,
+          0.082,
+          -0.72
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          4.55,
+          0.008,
+          0.018
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "floor_detail",
+        "variant": 1
+      }
+    },
+    {
+      "id": "sak_classroom_floor_detail_2",
+      "role": "floor_detail_line",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "paper",
+      "support": "sak_classroom_floor",
+      "assembly_id": "floor_detail",
+      "transform": {
+        "position": [
+          0.0,
+          0.082,
+          0.02
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          4.55,
+          0.008,
+          0.018
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "floor_detail",
+        "variant": 1
+      }
+    },
+    {
+      "id": "sak_classroom_floor_detail_3",
+      "role": "floor_detail_line",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "paper",
+      "support": "sak_classroom_floor",
+      "assembly_id": "floor_detail",
+      "transform": {
+        "position": [
+          0.0,
+          0.082,
+          0.76
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          4.55,
+          0.008,
+          0.018
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "floor_detail",
+        "variant": 1
+      }
+    },
+    {
+      "id": "sak_classroom_floor_detail_x_0",
+      "role": "floor_detail_line",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "dark_wall",
+      "support": "sak_classroom_floor",
+      "assembly_id": "floor_detail",
+      "transform": {
+        "position": [
+          -1.55,
+          0.083,
+          -0.45
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.018,
+          0.008,
+          2.72
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "floor_detail",
+        "variant": 1
+      }
+    },
+    {
+      "id": "sak_classroom_floor_detail_x_1",
+      "role": "floor_detail_line",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "dark_wall",
+      "support": "sak_classroom_floor",
+      "assembly_id": "floor_detail",
+      "transform": {
+        "position": [
+          -0.78,
+          0.083,
+          -0.45
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.018,
+          0.008,
+          2.72
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "floor_detail",
+        "variant": 1
+      }
+    },
+    {
+      "id": "sak_classroom_floor_detail_x_2",
+      "role": "floor_detail_line",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "dark_wall",
+      "support": "sak_classroom_floor",
+      "assembly_id": "floor_detail",
+      "transform": {
+        "position": [
+          0.0,
+          0.083,
+          -0.45
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.018,
+          0.008,
+          2.72
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "floor_detail",
+        "variant": 1
+      }
+    },
+    {
+      "id": "sak_classroom_floor_detail_x_3",
+      "role": "floor_detail_line",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "dark_wall",
+      "support": "sak_classroom_floor",
+      "assembly_id": "floor_detail",
+      "transform": {
+        "position": [
+          0.78,
+          0.083,
+          -0.45
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.018,
+          0.008,
+          2.72
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "floor_detail",
+        "variant": 1
+      }
+    },
+    {
+      "id": "sak_classroom_floor_detail_x_4",
+      "role": "floor_detail_line",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "dark_wall",
+      "support": "sak_classroom_floor",
+      "assembly_id": "floor_detail",
+      "transform": {
+        "position": [
+          1.55,
+          0.083,
+          -0.45
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.018,
+          0.008,
+          2.72
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "floor_detail",
+        "variant": 1
+      }
+    },
+    {
+      "id": "sak_classroom_front_books_mesh_0",
+      "role": "classroom_book_mesh",
+      "kind": "kenney_asset",
+      "runtime_asset": "assets/models/kenney_furniture_kit/books/books.gltf",
+      "material": "accent_orange",
+      "support": "sak_student_desk_1",
+      "assembly_id": "student_row_0",
+      "transform": {
+        "position": [
+          -0.72,
+          0.7709985691136122,
+          0.13955
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.52,
+          0.52,
+          0.52
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "book",
+        "asset_id": "books",
+        "anchors": {
+          "support_contact": [
+            0,
+            0,
+            0
+          ]
+        },
+        "license": "Kenney CC0",
+        "scale_contract": {
+          "requested_scale": [
+            0.52,
+            0.52,
+            0.52
+          ],
+          "resolved_scale": [
+            0.52,
+            0.52,
+            0.52
+          ],
+          "semantic_floor": 0.0,
+          "physical_size": {
+            "requested_scale": [
+              0.52,
+              0.52,
+              0.52
+            ],
+            "semantic_floor_scale": 0.0,
+            "resolved_scale": [
+              0.52,
+              0.52,
+              0.52
+            ]
+          }
+        },
+        "variant": 1
+      }
+    },
+    {
+      "id": "sak_classroom_front_books_mesh_1",
+      "role": "classroom_book_mesh",
+      "kind": "kenney_asset",
+      "runtime_asset": "assets/models/kenney_furniture_kit/books/books.gltf",
+      "material": "accent_cyan",
+      "support": "sak_student_desk_2",
+      "assembly_id": "student_row_0",
+      "transform": {
+        "position": [
+          0.72,
+          0.7709985691136122,
+          0.13955
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.52,
+          0.52,
+          0.52
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "book",
+        "asset_id": "books",
+        "anchors": {
+          "support_contact": [
+            0,
+            0,
+            0
+          ]
+        },
+        "license": "Kenney CC0",
+        "scale_contract": {
+          "requested_scale": [
+            0.52,
+            0.52,
+            0.52
+          ],
+          "resolved_scale": [
+            0.52,
+            0.52,
+            0.52
+          ],
+          "semantic_floor": 0.0,
+          "physical_size": {
+            "requested_scale": [
+              0.52,
+              0.52,
+              0.52
+            ],
+            "semantic_floor_scale": 0.0,
+            "resolved_scale": [
+              0.52,
+              0.52,
+              0.52
+            ]
+          }
+        },
+        "variant": 1
+      }
+    },
+    {
+      "id": "sak_classroom_storage_mesh",
+      "role": "classroom_storage_mesh",
+      "kind": "kenney_asset",
+      "runtime_asset": "assets/models/kenney_furniture_kit/bookcaseOpen/bookcaseOpen.gltf",
+      "material": "cabinet_warm",
+      "support": "sak_classroom_floor",
+      "assembly_id": "wall_dressing",
+      "transform": {
+        "position": [
+          2.05,
+          0.07,
+          1.18
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          1.875,
+          1.35,
+          1.35
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "shelf",
+        "asset_id": "bookcase_open",
+        "anchors": {
+          "floor_contact": [
+            0,
+            0,
+            0
+          ],
+          "front": [
+            0,
+            0,
+            -1
+          ]
+        },
+        "license": "Kenney CC0",
+        "scale_contract": {
+          "requested_scale": [
+            0.62,
+            0.62,
+            0.62
+          ],
+          "resolved_scale": [
+            1.875,
+            1.35,
+            1.35
+          ],
+          "semantic_floor": 1.35,
+          "physical_size": {
+            "requested_scale": [
+              0.62,
+              0.62,
+              0.62
+            ],
+            "semantic_floor_scale": 1.35,
+            "resolved_scale": [
+              1.875,
+              1.35,
+              1.35
+            ],
+            "native_extent": [
+              0.4,
+              0.88,
+              0.25
+            ],
+            "min_extent": [
+              0.75,
+              1.1,
+              0.28
+            ],
+            "max_extent": [
+              2.3,
+              2.3,
+              0.8
+            ],
+            "resolved_extent": [
+              0.75,
+              1.188,
+              0.3375
+            ],
+            "physical_contract": "PASS",
+            "adjustment_reasons": [
+              "axis_0_raised_to_min_extent"
+            ]
+          }
+        },
+        "variant": 1
+      }
+    },
+    {
+      "id": "sak_classroom_window",
+      "role": "window",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "glass_soft",
+      "support": "sak_classroom_left_wall",
+      "assembly_id": "wall_dressing",
+      "transform": {
+        "position": [
+          -2.54,
+          1.45,
+          0.52
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.016,
+          0.62,
+          0.72
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "window",
+        "variant": 1
+      },
+      "attached_to": "sak_classroom_left_wall"
+    },
+    {
+      "id": "sak_classroom_window_frame_0",
+      "role": "window_frame",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "paper",
+      "support": "sak_classroom_window",
+      "assembly_id": "wall_dressing",
+      "transform": {
+        "position": [
+          -2.5,
+          1.22,
+          0.52
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.012,
+          0.026,
+          0.76
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "window",
+        "variant": 1
+      },
+      "attached_to": "sak_classroom_window"
+    },
+    {
+      "id": "sak_classroom_window_frame_1",
+      "role": "window_frame",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "paper",
+      "support": "sak_classroom_window",
+      "assembly_id": "wall_dressing",
+      "transform": {
+        "position": [
+          -2.5,
+          1.45,
+          0.52
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.012,
+          0.026,
+          0.76
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "window",
+        "variant": 1
+      },
+      "attached_to": "sak_classroom_window"
+    },
+    {
+      "id": "sak_classroom_window_frame_2",
+      "role": "window_frame",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "paper",
+      "support": "sak_classroom_window",
+      "assembly_id": "wall_dressing",
+      "transform": {
+        "position": [
+          -2.5,
+          1.68,
+          0.52
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.012,
+          0.026,
+          0.76
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "window",
+        "variant": 1
+      },
+      "attached_to": "sak_classroom_window"
+    }
+  ],
+  "semantic_scene_graph": {
+    "schema": "cortex.scene_authoring_kernel.semantic_graph.v1",
+    "prompt": "after school classroom with board teacher desk student rows and warm daylight",
+    "family": "school_classroom_day",
+    "variant": 1,
+    "nodes": [
+      {
+        "id": "sak_classroom_floor",
+        "category": "floor",
+        "role": "room_floor",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_classroom_back_wall",
+        "category": "wall",
+        "role": "room_wall",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_classroom_left_wall",
+        "category": "wall",
+        "role": "room_wall",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_classroom_right_wall",
+        "category": "wall",
+        "role": "room_wall",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_classroom_ceiling",
+        "category": "ceiling",
+        "role": "room_ceiling",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_classroom_base_trim_back",
+        "category": "wall_detail",
+        "role": "architectural_baseboard",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_classroom_base_trim_left",
+        "category": "wall_detail",
+        "role": "architectural_baseboard",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_classroom_base_trim_right",
+        "category": "wall_detail",
+        "role": "architectural_baseboard",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_classroom_crown_trim_back",
+        "category": "wall_detail",
+        "role": "architectural_baseboard",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_classroom_crown_trim_left",
+        "category": "wall_detail",
+        "role": "architectural_baseboard",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_classroom_crown_trim_right",
+        "category": "wall_detail",
+        "role": "architectural_baseboard",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_classroom_corner_post_0",
+        "category": "wall_detail",
+        "role": "architectural_corner_post",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_classroom_corner_post_1",
+        "category": "wall_detail",
+        "role": "architectural_corner_post",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_classroom_back_wall_vertical_trim_0",
+        "category": "wall_detail",
+        "role": "wall_panel_trim",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_classroom_back_wall_vertical_trim_1",
+        "category": "wall_detail",
+        "role": "wall_panel_trim",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_classroom_back_wall_vertical_trim_2",
+        "category": "wall_detail",
+        "role": "wall_panel_trim",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_classroom_back_wall_vertical_trim_3",
+        "category": "wall_detail",
+        "role": "wall_panel_trim",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_classroom_back_wall_vertical_trim_4",
+        "category": "wall_detail",
+        "role": "wall_panel_trim",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_classroom_back_wall_horizontal_trim_0",
+        "category": "wall_detail",
+        "role": "wall_panel_trim",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_classroom_back_wall_horizontal_trim_1",
+        "category": "wall_detail",
+        "role": "wall_panel_trim",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_classroom_back_wall_horizontal_trim_2",
+        "category": "wall_detail",
+        "role": "wall_panel_trim",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_classroom_left_wall_vertical_trim_0",
+        "category": "wall_detail",
+        "role": "wall_panel_trim",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_classroom_left_wall_vertical_trim_1",
+        "category": "wall_detail",
+        "role": "wall_panel_trim",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_classroom_left_wall_vertical_trim_2",
+        "category": "wall_detail",
+        "role": "wall_panel_trim",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_classroom_right_wall_vertical_trim_0",
+        "category": "wall_detail",
+        "role": "wall_panel_trim",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_classroom_right_wall_vertical_trim_1",
+        "category": "wall_detail",
+        "role": "wall_panel_trim",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_classroom_right_wall_vertical_trim_2",
+        "category": "wall_detail",
+        "role": "wall_panel_trim",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_classroom_board",
+        "category": "board",
+        "role": "chalkboard",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_classroom_chalk_tray",
+        "category": "decor",
+        "role": "chalk_tray",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_teacher_desk",
+        "category": "desk",
+        "role": "desk",
+        "asset_id": "desk_basic",
+        "anchors": {
+          "floor_contact": [
+            0,
+            0,
+            0
+          ],
+          "work_surface": [
+            0,
+            0.72,
+            0
+          ]
+        },
+        "constraints": []
+      },
+      {
+        "id": "sak_teacher_papers",
+        "category": "paper_prop",
+        "role": "teacher_prop",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_teacher_mug",
+        "category": "desk_prop",
+        "role": "teacher_prop",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_student_desk_0",
+        "category": "desk",
+        "role": "student_desk",
+        "asset_id": "desk_basic",
+        "anchors": {
+          "floor_contact": [
+            0,
+            0,
+            0
+          ],
+          "work_surface": [
+            0,
+            0.72,
+            0
+          ]
+        },
+        "constraints": []
+      },
+      {
+        "id": "sak_student_chair_0",
+        "category": "chair",
+        "role": "chair",
+        "asset_id": "chair_desk",
+        "anchors": {
+          "floor_contact": [
+            0,
+            0,
+            0
+          ],
+          "front": [
+            0,
+            0,
+            1
+          ]
+        },
+        "constraints": []
+      },
+      {
+        "id": "sak_student_paper_0",
+        "category": "paper_prop",
+        "role": "paper_prop",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_student_book_0",
+        "category": "book",
+        "role": "book",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_student_desk_1",
+        "category": "desk",
+        "role": "student_desk",
+        "asset_id": "desk_basic",
+        "anchors": {
+          "floor_contact": [
+            0,
+            0,
+            0
+          ],
+          "work_surface": [
+            0,
+            0.72,
+            0
+          ]
+        },
+        "constraints": []
+      },
+      {
+        "id": "sak_student_chair_1",
+        "category": "chair",
+        "role": "chair",
+        "asset_id": "chair_desk",
+        "anchors": {
+          "floor_contact": [
+            0,
+            0,
+            0
+          ],
+          "front": [
+            0,
+            0,
+            1
+          ]
+        },
+        "constraints": []
+      },
+      {
+        "id": "sak_student_paper_1",
+        "category": "paper_prop",
+        "role": "paper_prop",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_student_book_1",
+        "category": "book",
+        "role": "book",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_student_desk_2",
+        "category": "desk",
+        "role": "student_desk",
+        "asset_id": "desk_basic",
+        "anchors": {
+          "floor_contact": [
+            0,
+            0,
+            0
+          ],
+          "work_surface": [
+            0,
+            0.72,
+            0
+          ]
+        },
+        "constraints": []
+      },
+      {
+        "id": "sak_student_chair_2",
+        "category": "chair",
+        "role": "chair",
+        "asset_id": "chair_desk",
+        "anchors": {
+          "floor_contact": [
+            0,
+            0,
+            0
+          ],
+          "front": [
+            0,
+            0,
+            1
+          ]
+        },
+        "constraints": []
+      },
+      {
+        "id": "sak_student_paper_2",
+        "category": "paper_prop",
+        "role": "paper_prop",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_student_book_2",
+        "category": "book",
+        "role": "book",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_student_desk_3",
+        "category": "desk",
+        "role": "student_desk",
+        "asset_id": "desk_basic",
+        "anchors": {
+          "floor_contact": [
+            0,
+            0,
+            0
+          ],
+          "work_surface": [
+            0,
+            0.72,
+            0
+          ]
+        },
+        "constraints": []
+      },
+      {
+        "id": "sak_student_chair_3",
+        "category": "chair",
+        "role": "chair",
+        "asset_id": "chair_desk",
+        "anchors": {
+          "floor_contact": [
+            0,
+            0,
+            0
+          ],
+          "front": [
+            0,
+            0,
+            1
+          ]
+        },
+        "constraints": []
+      },
+      {
+        "id": "sak_student_paper_3",
+        "category": "paper_prop",
+        "role": "paper_prop",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_student_book_3",
+        "category": "book",
+        "role": "book",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_student_desk_4",
+        "category": "desk",
+        "role": "student_desk",
+        "asset_id": "desk_basic",
+        "anchors": {
+          "floor_contact": [
+            0,
+            0,
+            0
+          ],
+          "work_surface": [
+            0,
+            0.72,
+            0
+          ]
+        },
+        "constraints": []
+      },
+      {
+        "id": "sak_student_chair_4",
+        "category": "chair",
+        "role": "chair",
+        "asset_id": "chair_desk",
+        "anchors": {
+          "floor_contact": [
+            0,
+            0,
+            0
+          ],
+          "front": [
+            0,
+            0,
+            1
+          ]
+        },
+        "constraints": []
+      },
+      {
+        "id": "sak_student_paper_4",
+        "category": "paper_prop",
+        "role": "paper_prop",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_student_book_4",
+        "category": "book",
+        "role": "book",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_student_desk_5",
+        "category": "desk",
+        "role": "student_desk",
+        "asset_id": "desk_basic",
+        "anchors": {
+          "floor_contact": [
+            0,
+            0,
+            0
+          ],
+          "work_surface": [
+            0,
+            0.72,
+            0
+          ]
+        },
+        "constraints": []
+      },
+      {
+        "id": "sak_student_chair_5",
+        "category": "chair",
+        "role": "chair",
+        "asset_id": "chair_desk",
+        "anchors": {
+          "floor_contact": [
+            0,
+            0,
+            0
+          ],
+          "front": [
+            0,
+            0,
+            1
+          ]
+        },
+        "constraints": []
+      },
+      {
+        "id": "sak_student_paper_5",
+        "category": "paper_prop",
+        "role": "paper_prop",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_student_book_5",
+        "category": "book",
+        "role": "book",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_classroom_chalk_line_0",
+        "category": "decor",
+        "role": "chalk_marks",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_classroom_chalk_line_1",
+        "category": "decor",
+        "role": "chalk_marks",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_classroom_chalk_line_2",
+        "category": "decor",
+        "role": "chalk_marks",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_classroom_bulletin_board",
+        "category": "decor",
+        "role": "bulletin_board",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_classroom_wall_clock",
+        "category": "decor",
+        "role": "wall_clock",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_classroom_ceiling_light_0",
+        "category": "light",
+        "role": "ceiling_light",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_classroom_ceiling_light_1",
+        "category": "light",
+        "role": "ceiling_light",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_classroom_ceiling_light_2",
+        "category": "light",
+        "role": "ceiling_light",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_classroom_floor_detail_0",
+        "category": "floor_detail",
+        "role": "floor_detail_line",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_classroom_floor_detail_1",
+        "category": "floor_detail",
+        "role": "floor_detail_line",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_classroom_floor_detail_2",
+        "category": "floor_detail",
+        "role": "floor_detail_line",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_classroom_floor_detail_3",
+        "category": "floor_detail",
+        "role": "floor_detail_line",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_classroom_floor_detail_x_0",
+        "category": "floor_detail",
+        "role": "floor_detail_line",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_classroom_floor_detail_x_1",
+        "category": "floor_detail",
+        "role": "floor_detail_line",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_classroom_floor_detail_x_2",
+        "category": "floor_detail",
+        "role": "floor_detail_line",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_classroom_floor_detail_x_3",
+        "category": "floor_detail",
+        "role": "floor_detail_line",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_classroom_floor_detail_x_4",
+        "category": "floor_detail",
+        "role": "floor_detail_line",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_classroom_front_books_mesh_0",
+        "category": "book",
+        "role": "classroom_book_mesh",
+        "asset_id": "books",
+        "anchors": {
+          "support_contact": [
+            0,
+            0,
+            0
+          ]
+        },
+        "constraints": []
+      },
+      {
+        "id": "sak_classroom_front_books_mesh_1",
+        "category": "book",
+        "role": "classroom_book_mesh",
+        "asset_id": "books",
+        "anchors": {
+          "support_contact": [
+            0,
+            0,
+            0
+          ]
+        },
+        "constraints": []
+      },
+      {
+        "id": "sak_classroom_storage_mesh",
+        "category": "shelf",
+        "role": "classroom_storage_mesh",
+        "asset_id": "bookcase_open",
+        "anchors": {
+          "floor_contact": [
+            0,
+            0,
+            0
+          ],
+          "front": [
+            0,
+            0,
+            -1
+          ]
+        },
+        "constraints": []
+      },
+      {
+        "id": "sak_classroom_window",
+        "category": "window",
+        "role": "window",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_classroom_window_frame_0",
+        "category": "window",
+        "role": "window_frame",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_classroom_window_frame_1",
+        "category": "window",
+        "role": "window_frame",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_classroom_window_frame_2",
+        "category": "window",
+        "role": "window_frame",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      }
+    ],
+    "relations": [
+      {
+        "type": "supports",
+        "source": "ground",
+        "target": "sak_classroom_floor",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_classroom_floor",
+        "target": "room_shell",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "ground",
+        "target": "sak_classroom_back_wall",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_classroom_back_wall",
+        "target": "room_shell",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "ground",
+        "target": "sak_classroom_left_wall",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_classroom_left_wall",
+        "target": "room_shell",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "ground",
+        "target": "sak_classroom_right_wall",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_classroom_right_wall",
+        "target": "room_shell",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "ground",
+        "target": "sak_classroom_ceiling",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_classroom_ceiling",
+        "target": "room_shell",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_classroom_floor",
+        "target": "sak_classroom_base_trim_back",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_classroom_base_trim_back",
+        "target": "room_shell",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_classroom_floor",
+        "target": "sak_classroom_base_trim_left",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_classroom_base_trim_left",
+        "target": "room_shell",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_classroom_floor",
+        "target": "sak_classroom_base_trim_right",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_classroom_base_trim_right",
+        "target": "room_shell",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_classroom_floor",
+        "target": "sak_classroom_crown_trim_back",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_classroom_crown_trim_back",
+        "target": "room_shell",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_classroom_floor",
+        "target": "sak_classroom_crown_trim_left",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_classroom_crown_trim_left",
+        "target": "room_shell",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_classroom_floor",
+        "target": "sak_classroom_crown_trim_right",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_classroom_crown_trim_right",
+        "target": "room_shell",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_classroom_floor",
+        "target": "sak_classroom_corner_post_0",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_classroom_corner_post_0",
+        "target": "room_shell",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_classroom_floor",
+        "target": "sak_classroom_corner_post_1",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_classroom_corner_post_1",
+        "target": "room_shell",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_classroom_floor",
+        "target": "sak_classroom_back_wall_vertical_trim_0",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_classroom_back_wall_vertical_trim_0",
+        "target": "room_shell",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_classroom_floor",
+        "target": "sak_classroom_back_wall_vertical_trim_1",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_classroom_back_wall_vertical_trim_1",
+        "target": "room_shell",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_classroom_floor",
+        "target": "sak_classroom_back_wall_vertical_trim_2",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_classroom_back_wall_vertical_trim_2",
+        "target": "room_shell",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_classroom_floor",
+        "target": "sak_classroom_back_wall_vertical_trim_3",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_classroom_back_wall_vertical_trim_3",
+        "target": "room_shell",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_classroom_floor",
+        "target": "sak_classroom_back_wall_vertical_trim_4",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_classroom_back_wall_vertical_trim_4",
+        "target": "room_shell",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_classroom_floor",
+        "target": "sak_classroom_back_wall_horizontal_trim_0",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_classroom_back_wall_horizontal_trim_0",
+        "target": "room_shell",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_classroom_floor",
+        "target": "sak_classroom_back_wall_horizontal_trim_1",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_classroom_back_wall_horizontal_trim_1",
+        "target": "room_shell",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_classroom_floor",
+        "target": "sak_classroom_back_wall_horizontal_trim_2",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_classroom_back_wall_horizontal_trim_2",
+        "target": "room_shell",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_classroom_floor",
+        "target": "sak_classroom_left_wall_vertical_trim_0",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_classroom_left_wall_vertical_trim_0",
+        "target": "room_shell",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_classroom_floor",
+        "target": "sak_classroom_left_wall_vertical_trim_1",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_classroom_left_wall_vertical_trim_1",
+        "target": "room_shell",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_classroom_floor",
+        "target": "sak_classroom_left_wall_vertical_trim_2",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_classroom_left_wall_vertical_trim_2",
+        "target": "room_shell",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_classroom_floor",
+        "target": "sak_classroom_right_wall_vertical_trim_0",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_classroom_right_wall_vertical_trim_0",
+        "target": "room_shell",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_classroom_floor",
+        "target": "sak_classroom_right_wall_vertical_trim_1",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_classroom_right_wall_vertical_trim_1",
+        "target": "room_shell",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_classroom_floor",
+        "target": "sak_classroom_right_wall_vertical_trim_2",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_classroom_right_wall_vertical_trim_2",
+        "target": "room_shell",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_classroom_back_wall",
+        "target": "sak_classroom_board",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "attached_to",
+        "source": "sak_classroom_board",
+        "target": "sak_classroom_back_wall",
+        "reason": "constructor_attachment"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_classroom_board",
+        "target": "teaching_wall",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_classroom_board",
+        "target": "sak_classroom_chalk_tray",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "attached_to",
+        "source": "sak_classroom_chalk_tray",
+        "target": "sak_classroom_board",
+        "reason": "constructor_attachment"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_classroom_chalk_tray",
+        "target": "teaching_wall",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_classroom_floor",
+        "target": "sak_teacher_desk",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_teacher_desk",
+        "target": "teacher_zone",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_teacher_desk",
+        "target": "sak_teacher_papers",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_teacher_papers",
+        "target": "teacher_zone",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_teacher_desk",
+        "target": "sak_teacher_mug",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_teacher_mug",
+        "target": "teacher_zone",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_classroom_floor",
+        "target": "sak_student_desk_0",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_student_desk_0",
+        "target": "student_row_0",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_classroom_floor",
+        "target": "sak_student_chair_0",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_student_chair_0",
+        "target": "student_row_0",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "faces",
+        "source": "sak_student_chair_0",
+        "target": "sak_classroom_board",
+        "reason": "classroom_attention_relation"
+      },
+      {
+        "type": "supports",
+        "source": "sak_student_desk_0",
+        "target": "sak_student_paper_0",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_student_paper_0",
+        "target": "student_row_0",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_student_desk_0",
+        "target": "sak_student_book_0",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_student_book_0",
+        "target": "student_row_0",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_classroom_floor",
+        "target": "sak_student_desk_1",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_student_desk_1",
+        "target": "student_row_0",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_classroom_floor",
+        "target": "sak_student_chair_1",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_student_chair_1",
+        "target": "student_row_0",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "faces",
+        "source": "sak_student_chair_1",
+        "target": "sak_classroom_board",
+        "reason": "classroom_attention_relation"
+      },
+      {
+        "type": "supports",
+        "source": "sak_student_desk_1",
+        "target": "sak_student_paper_1",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_student_paper_1",
+        "target": "student_row_0",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_student_desk_1",
+        "target": "sak_student_book_1",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_student_book_1",
+        "target": "student_row_0",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_classroom_floor",
+        "target": "sak_student_desk_2",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_student_desk_2",
+        "target": "student_row_0",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_classroom_floor",
+        "target": "sak_student_chair_2",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_student_chair_2",
+        "target": "student_row_0",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "faces",
+        "source": "sak_student_chair_2",
+        "target": "sak_classroom_board",
+        "reason": "classroom_attention_relation"
+      },
+      {
+        "type": "supports",
+        "source": "sak_student_desk_2",
+        "target": "sak_student_paper_2",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_student_paper_2",
+        "target": "student_row_0",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_student_desk_2",
+        "target": "sak_student_book_2",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_student_book_2",
+        "target": "student_row_0",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_classroom_floor",
+        "target": "sak_student_desk_3",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_student_desk_3",
+        "target": "student_row_1",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_classroom_floor",
+        "target": "sak_student_chair_3",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_student_chair_3",
+        "target": "student_row_1",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "faces",
+        "source": "sak_student_chair_3",
+        "target": "sak_classroom_board",
+        "reason": "classroom_attention_relation"
+      },
+      {
+        "type": "supports",
+        "source": "sak_student_desk_3",
+        "target": "sak_student_paper_3",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_student_paper_3",
+        "target": "student_row_1",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_student_desk_3",
+        "target": "sak_student_book_3",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_student_book_3",
+        "target": "student_row_1",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_classroom_floor",
+        "target": "sak_student_desk_4",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_student_desk_4",
+        "target": "student_row_1",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_classroom_floor",
+        "target": "sak_student_chair_4",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_student_chair_4",
+        "target": "student_row_1",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "faces",
+        "source": "sak_student_chair_4",
+        "target": "sak_classroom_board",
+        "reason": "classroom_attention_relation"
+      },
+      {
+        "type": "supports",
+        "source": "sak_student_desk_4",
+        "target": "sak_student_paper_4",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_student_paper_4",
+        "target": "student_row_1",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_student_desk_4",
+        "target": "sak_student_book_4",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_student_book_4",
+        "target": "student_row_1",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_classroom_floor",
+        "target": "sak_student_desk_5",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_student_desk_5",
+        "target": "student_row_1",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_classroom_floor",
+        "target": "sak_student_chair_5",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_student_chair_5",
+        "target": "student_row_1",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "faces",
+        "source": "sak_student_chair_5",
+        "target": "sak_classroom_board",
+        "reason": "classroom_attention_relation"
+      },
+      {
+        "type": "supports",
+        "source": "sak_student_desk_5",
+        "target": "sak_student_paper_5",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_student_paper_5",
+        "target": "student_row_1",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_student_desk_5",
+        "target": "sak_student_book_5",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_student_book_5",
+        "target": "student_row_1",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_classroom_board",
+        "target": "sak_classroom_chalk_line_0",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "attached_to",
+        "source": "sak_classroom_chalk_line_0",
+        "target": "sak_classroom_board",
+        "reason": "constructor_attachment"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_classroom_chalk_line_0",
+        "target": "teaching_wall",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_classroom_board",
+        "target": "sak_classroom_chalk_line_1",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "attached_to",
+        "source": "sak_classroom_chalk_line_1",
+        "target": "sak_classroom_board",
+        "reason": "constructor_attachment"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_classroom_chalk_line_1",
+        "target": "teaching_wall",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_classroom_board",
+        "target": "sak_classroom_chalk_line_2",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "attached_to",
+        "source": "sak_classroom_chalk_line_2",
+        "target": "sak_classroom_board",
+        "reason": "constructor_attachment"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_classroom_chalk_line_2",
+        "target": "teaching_wall",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_classroom_back_wall",
+        "target": "sak_classroom_bulletin_board",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "attached_to",
+        "source": "sak_classroom_bulletin_board",
+        "target": "sak_classroom_back_wall",
+        "reason": "constructor_attachment"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_classroom_bulletin_board",
+        "target": "wall_dressing",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_classroom_back_wall",
+        "target": "sak_classroom_wall_clock",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "attached_to",
+        "source": "sak_classroom_wall_clock",
+        "target": "sak_classroom_back_wall",
+        "reason": "constructor_attachment"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_classroom_wall_clock",
+        "target": "wall_dressing",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_classroom_ceiling",
+        "target": "sak_classroom_ceiling_light_0",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_classroom_ceiling_light_0",
+        "target": "lighting",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_classroom_ceiling",
+        "target": "sak_classroom_ceiling_light_1",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_classroom_ceiling_light_1",
+        "target": "lighting",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_classroom_ceiling",
+        "target": "sak_classroom_ceiling_light_2",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_classroom_ceiling_light_2",
+        "target": "lighting",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_classroom_floor",
+        "target": "sak_classroom_floor_detail_0",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_classroom_floor_detail_0",
+        "target": "floor_detail",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_classroom_floor",
+        "target": "sak_classroom_floor_detail_1",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_classroom_floor_detail_1",
+        "target": "floor_detail",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_classroom_floor",
+        "target": "sak_classroom_floor_detail_2",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_classroom_floor_detail_2",
+        "target": "floor_detail",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_classroom_floor",
+        "target": "sak_classroom_floor_detail_3",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_classroom_floor_detail_3",
+        "target": "floor_detail",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_classroom_floor",
+        "target": "sak_classroom_floor_detail_x_0",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_classroom_floor_detail_x_0",
+        "target": "floor_detail",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_classroom_floor",
+        "target": "sak_classroom_floor_detail_x_1",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_classroom_floor_detail_x_1",
+        "target": "floor_detail",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_classroom_floor",
+        "target": "sak_classroom_floor_detail_x_2",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_classroom_floor_detail_x_2",
+        "target": "floor_detail",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_classroom_floor",
+        "target": "sak_classroom_floor_detail_x_3",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_classroom_floor_detail_x_3",
+        "target": "floor_detail",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_classroom_floor",
+        "target": "sak_classroom_floor_detail_x_4",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_classroom_floor_detail_x_4",
+        "target": "floor_detail",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_student_desk_1",
+        "target": "sak_classroom_front_books_mesh_0",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_classroom_front_books_mesh_0",
+        "target": "student_row_0",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_student_desk_2",
+        "target": "sak_classroom_front_books_mesh_1",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_classroom_front_books_mesh_1",
+        "target": "student_row_0",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_classroom_floor",
+        "target": "sak_classroom_storage_mesh",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_classroom_storage_mesh",
+        "target": "wall_dressing",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_classroom_left_wall",
+        "target": "sak_classroom_window",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "attached_to",
+        "source": "sak_classroom_window",
+        "target": "sak_classroom_left_wall",
+        "reason": "constructor_attachment"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_classroom_window",
+        "target": "wall_dressing",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_classroom_window",
+        "target": "sak_classroom_window_frame_0",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "attached_to",
+        "source": "sak_classroom_window_frame_0",
+        "target": "sak_classroom_window",
+        "reason": "constructor_attachment"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_classroom_window_frame_0",
+        "target": "wall_dressing",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_classroom_window",
+        "target": "sak_classroom_window_frame_1",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "attached_to",
+        "source": "sak_classroom_window_frame_1",
+        "target": "sak_classroom_window",
+        "reason": "constructor_attachment"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_classroom_window_frame_1",
+        "target": "wall_dressing",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_classroom_window",
+        "target": "sak_classroom_window_frame_2",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "attached_to",
+        "source": "sak_classroom_window_frame_2",
+        "target": "sak_classroom_window",
+        "reason": "constructor_attachment"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_classroom_window_frame_2",
+        "target": "wall_dressing",
+        "reason": "constructor_assembly"
+      }
+    ],
+    "validation_view_overrides": {},
+    "warnings": []
+  },
+  "scene_authoring_kernel_v1": {
+    "prompt": "after school classroom with board teacher desk student rows and warm daylight",
+    "family": "school_classroom_day",
+    "variant": 1,
+    "graph_node_count": 80,
+    "graph_relation_count": 177,
+    "warnings": [],
+    "completion_claim_allowed": false,
+    "human_review_required": true
+  },
+  "scene_graph_kernel_v1": {
+    "status": "repaired"
+  },
+  "view_metric_restage_grid": {
+    "schema": 1,
+    "source_seed": "artifacts/scene_authoring_kernel_v1/physical_minutia_repair_batch_v8/novel_classroom/physical_minutia_repaired_scene_seed.json",
+    "candidate_report": "docs/media/final_art/generated/model_authored/model_authored_multiview_novel_classroom_physical_minutia_repaired.json",
+    "baseline_report": null,
+    "affected_views": [
+      "board_teacher_context",
+      "student_rows_low"
+    ],
+    "only_force_views": true,
+    "preset": "left_recenter",
+    "adaptive_focal_policy": null,
+    "completion_claim_allowed": false
+  },
+  "metadata": {
+    "facing_relation_compilation": {
+      "schema": 1,
+      "source": "tools/model_scene_facing_relation_compiler.py",
+      "change_count": 6,
+      "skipped_count": 0,
+      "completion_claim_allowed": false,
+      "human_review_required": true
+    }
+  }
+}

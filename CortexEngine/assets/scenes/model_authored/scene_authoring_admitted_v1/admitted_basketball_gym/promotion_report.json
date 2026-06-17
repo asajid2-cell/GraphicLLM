@@ -1,0 +1,14 @@
+{
+  "schema": "cortex.scene_authoring.admitted_selected_promotion.v1",
+  "ledger_item": "L001",
+  "id": "admitted_basketball_gym",
+  "status": "PROMOTED_FOR_HUMAN_REVIEW",
+  "selected_policy": "spatial_relation_repaired",
+  "selected_report": "docs/media/final_art/generated/model_authored/model_authored_multiview_admitted_basketball_gym_spatial_relation_repaired.json",
+  "source_seed": "artifacts/scene_authoring_kernel_v1/admitted_spatial_relation_repair_batch_v1/admitted_basketball_gym/spatial_relation_repaired_scene_seed.json",
+  "promoted_seed": "assets/scenes/model_authored/scene_authoring_admitted_v1/admitted_basketball_gym/scene_seed.json",
+  "evidence_status": "MULTIVIEW_RENDERED_NEEDS_HUMAN_REVIEW",
+  "notes": "Basketball gym admitted candidate with courtside and bleacher seating facing the rim, plus superseded above-rim net strings deactivated after SGK replacement net validation and rendered multiview revalidation.",
+  "completion_claim_allowed": false,
+  "human_review_required": true
+}

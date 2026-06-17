@@ -1,0 +1,14 @@
+{
+  "schema": "cortex.scene_authoring.admitted_selected_promotion.v1",
+  "ledger_item": "L001",
+  "id": "admitted_kitchen",
+  "status": "PROMOTED_FOR_HUMAN_REVIEW",
+  "selected_policy": "facing_relation_compiled",
+  "selected_report": "docs/media/final_art/generated/model_authored/model_authored_multiview_admitted_kitchen_facing_relation_compiled.json",
+  "source_seed": "artifacts/scene_authoring_kernel_v1/admitted_facing_relation_batch_v4/admitted_kitchen/facing_relation_scene_seed.json",
+  "promoted_seed": "assets/scenes/model_authored/scene_authoring_admitted_v1/admitted_kitchen/scene_seed.json",
+  "evidence_status": "MULTIVIEW_RENDERED_NEEDS_HUMAN_REVIEW",
+  "notes": "Kitchen admitted candidate with dining chairs facing the table after reusable facing-relation compilation and rendered multiview revalidation.",
+  "completion_claim_allowed": false,
+  "human_review_required": true
+}

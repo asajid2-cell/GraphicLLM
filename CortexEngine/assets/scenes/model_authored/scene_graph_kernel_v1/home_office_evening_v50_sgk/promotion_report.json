@@ -1,0 +1,14 @@
+{
+  "status": "PASS",
+  "seed": "artifacts/scene_graph_kernel_v1/batch_progress_scenes_v2/home_office_evening_v50_sgk/scene_seed.json",
+  "report": "artifacts/scene_graph_kernel_v1/batch_progress_scenes_v2/home_office_evening_v50_sgk/scene_graph_kernel_v1_report.json",
+  "graph": "artifacts/scene_graph_kernel_v1/batch_progress_scenes_v2/home_office_evening_v50_sgk/scene_graph_kernel_v1_graph.json",
+  "validation": "artifacts/scene_graph_kernel_v1/batch_progress_scenes_v2/home_office_evening_v50_sgk/scene_graph_kernel_v1_validation.json",
+  "change_count": 1,
+  "before_violation_count": 1,
+  "after_violation_count": 0,
+  "promoted": true,
+  "promoted_seed": "assets/scenes/model_authored/scene_graph_kernel_v1/home_office_evening_v50_sgk/scene_seed.json",
+  "scene_id": "home_office_evening_v50_sgk",
+  "source_seed": "assets/scenes/model_authored/scene_repair_intelligence_v1/home_office_evening_v50_sri/scene_seed.json"
+}

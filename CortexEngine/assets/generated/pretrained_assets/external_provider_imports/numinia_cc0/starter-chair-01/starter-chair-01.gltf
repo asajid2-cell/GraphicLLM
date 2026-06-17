@@ -1,0 +1,106 @@
+{
+  "asset": {
+    "version": "2.0",
+    "generator": "CortexEngine external provider importer"
+  },
+  "scene": 0,
+  "scenes": [
+    {
+      "nodes": [
+        0
+      ]
+    }
+  ],
+  "nodes": [
+    {
+      "mesh": 0
+    }
+  ],
+  "meshes": [
+    {
+      "primitives": [
+        {
+          "attributes": {
+            "POSITION": 0,
+            "NORMAL": 1,
+            "TEXCOORD_0": 2
+          },
+          "indices": 3,
+          "mode": 4
+        }
+      ]
+    }
+  ],
+  "buffers": [
+    {
+      "uri": "starter-chair-01.bin",
+      "byteLength": 108392
+    }
+  ],
+  "bufferViews": [
+    {
+      "buffer": 0,
+      "byteOffset": 0,
+      "byteLength": 25932,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteOffset": 25932,
+      "byteLength": 25932,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteOffset": 51864,
+      "byteLength": 17288,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteOffset": 69152,
+      "byteLength": 39240,
+      "target": 34963
+    }
+  ],
+  "accessors": [
+    {
+      "bufferView": 0,
+      "byteOffset": 0,
+      "componentType": 5126,
+      "count": 2161,
+      "type": "VEC3",
+      "min": [
+        -0.47562113404273987,
+        0.0,
+        -0.47453930974006653
+      ],
+      "max": [
+        0.47562113404273987,
+        0.9973956346511841,
+        0.47453930974006653
+      ]
+    },
+    {
+      "bufferView": 1,
+      "byteOffset": 0,
+      "componentType": 5126,
+      "count": 2161,
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 2,
+      "byteOffset": 0,
+      "componentType": 5126,
+      "count": 2161,
+      "type": "VEC2"
+    },
+    {
+      "bufferView": 3,
+      "byteOffset": 0,
+      "componentType": 5125,
+      "count": 9810,
+      "type": "SCALAR"
+    }
+  ]
+}

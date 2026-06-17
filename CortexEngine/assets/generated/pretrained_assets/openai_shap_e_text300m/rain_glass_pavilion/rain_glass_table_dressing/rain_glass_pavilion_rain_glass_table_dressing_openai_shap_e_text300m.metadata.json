@@ -1,0 +1,22 @@
+{
+  "schema": 1,
+  "job_id": "openai_shap_e_text300m/rain_glass_pavilion/rain_glass_table_dressing",
+  "prompt": "small tabletop still life of wet glass cups, chrome spheres, folded dark cloth, and water beads, separated prop set, reflective PBR materials",
+  "seed": 930141,
+  "steps": 16,
+  "guidance_scale": 10.0,
+  "triangle_count": 78000,
+  "bounds_meters": {
+    "min": [
+      -0.09024836868047714,
+      0.0,
+      -0.05774647742509842
+    ],
+    "max": [
+      0.09024836868047714,
+      0.18000000715255737,
+      0.05774647742509842
+    ]
+  },
+  "raw_generator": "openai_shap_e_text300m"
+}

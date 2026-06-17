@@ -1,0 +1,535 @@
+{
+  "schema": 1,
+  "id": "pretrained_rain_tabletop_shap_e_v1",
+  "version": 2,
+  "status": "arranged_for_runtime",
+  "units": "meters",
+  "coordinate_system": "y_up_right_handed",
+  "generator": {
+    "provider": "openai_shap_e_text300m",
+    "batch_id": "shap_e_rain_glass_pavilion_prototype",
+    "arranger": "cortex_scene_aware_arranger_v1",
+    "selected_candidate": "refined_dark_table_macro",
+    "authorship": "pretrained_generated_assets_plus_scene_aware_constraint_arrangement",
+    "feedback_model": "cortex_visual_scene_feedback_v1"
+  },
+  "intent": {
+    "one_sentence": "A camera-first rainy tabletop still life arranged from pretrained mesh assets.",
+    "art_goal": "Use generated assets as the visual subject while enforcing support, camera readability, material contrast, and depth layering.",
+    "forbidden_reads": [
+      "whole-scene generated blob",
+      "floating generated assets",
+      "unscored manual prop drift"
+    ]
+  },
+  "camera": {
+    "position": [
+      -1.12,
+      0.84,
+      0.15
+    ],
+    "target": [
+      -0.34,
+      0.71,
+      0.88
+    ],
+    "fov": 25.0
+  },
+  "assets": [
+    {
+      "asset_id": "rain_glass_pavilion_rain_tabletop_lantern_cluster_openai_shap_e_text300m",
+      "request_id": "rain_tabletop_lantern_cluster",
+      "role": "warm_fixture",
+      "source": "pretrained:rain_glass_pavilion_rain_tabletop_lantern_cluster_openai_shap_e_text300m",
+      "runtime_asset": "assets/generated/pretrained_assets/openai_shap_e_text300m/rain_glass_pavilion/rain_tabletop_lantern_cluster/rain_glass_pavilion_rain_tabletop_lantern_cluster_openai_shap_e_text300m.gltf",
+      "preview_image": "assets/generated/pretrained_assets/openai_shap_e_text300m/rain_glass_pavilion/rain_tabletop_lantern_cluster/rain_glass_pavilion_rain_tabletop_lantern_cluster_openai_shap_e_text300m.preview.png",
+      "transform": {
+        "position": [
+          -0.54,
+          0.705,
+          0.82
+        ],
+        "rotation_degrees": [
+          0.0,
+          24.0,
+          0.0
+        ],
+        "scale": [
+          0.48,
+          0.48,
+          0.48
+        ]
+      },
+      "support": "tabletop",
+      "contact": "mounted",
+      "bounds_meters": {
+        "min": [
+          -0.10570085793733597,
+          0.0,
+          -0.17499999701976776
+        ],
+        "max": [
+          0.10570085793733597,
+          0.20896688103675842,
+          0.17499999701976776
+        ]
+      },
+      "material_override": "pretrained_brass",
+      "art_reason": "Warm generated mesh anchors the left third without filling the frame."
+    },
+    {
+      "asset_id": "rain_glass_pavilion_rain_glass_table_dressing_openai_shap_e_text300m",
+      "request_id": "rain_glass_table_dressing",
+      "role": "glass_accent",
+      "source": "pretrained:rain_glass_pavilion_rain_glass_table_dressing_openai_shap_e_text300m",
+      "runtime_asset": "assets/generated/pretrained_assets/openai_shap_e_text300m/rain_glass_pavilion/rain_glass_table_dressing/rain_glass_pavilion_rain_glass_table_dressing_openai_shap_e_text300m.gltf",
+      "preview_image": "assets/generated/pretrained_assets/openai_shap_e_text300m/rain_glass_pavilion/rain_glass_table_dressing/rain_glass_pavilion_rain_glass_table_dressing_openai_shap_e_text300m.preview.png",
+      "transform": {
+        "position": [
+          0.06,
+          0.71,
+          1.05
+        ],
+        "rotation_degrees": [
+          0.0,
+          -14.0,
+          0.0
+        ],
+        "scale": [
+          0.5,
+          0.5,
+          0.5
+        ]
+      },
+      "support": "tabletop",
+      "contact": "mounted",
+      "bounds_meters": {
+        "min": [
+          -0.09024836868047714,
+          0.0,
+          -0.05774647742509842
+        ],
+        "max": [
+          0.09024836868047714,
+          0.18000000715255737,
+          0.05774647742509842
+        ]
+      },
+      "material_override": "pretrained_glass_accent",
+      "art_reason": "Noisy glass generated mesh is reduced and pushed behind the hero as a material accent."
+    },
+    {
+      "asset_id": "rain_glass_pavilion_rain_puddle_floor_patch_openai_shap_e_text300m",
+      "request_id": "rain_puddle_floor_patch",
+      "role": "wet_contact",
+      "source": "pretrained:rain_glass_pavilion_rain_puddle_floor_patch_openai_shap_e_text300m",
+      "runtime_asset": "assets/generated/pretrained_assets/openai_shap_e_text300m/rain_glass_pavilion/rain_puddle_floor_patch/rain_glass_pavilion_rain_puddle_floor_patch_openai_shap_e_text300m.gltf",
+      "preview_image": "assets/generated/pretrained_assets/openai_shap_e_text300m/rain_glass_pavilion/rain_puddle_floor_patch/rain_glass_pavilion_rain_puddle_floor_patch_openai_shap_e_text300m.preview.png",
+      "transform": {
+        "position": [
+          -0.44,
+          0.704,
+          0.92
+        ],
+        "rotation_degrees": [
+          0.0,
+          8.0,
+          0.0
+        ],
+        "scale": [
+          10.816,
+          1.0,
+          10.816
+        ]
+      },
+      "support": "tabletop",
+      "contact": "mounted",
+      "bounds_meters": {
+        "min": [
+          -0.010012687183916569,
+          0.0,
+          -0.00010192026093136519
+        ],
+        "max": [
+          0.010012687183916569,
+          0.019999999552965164,
+          0.00010192026093136519
+        ]
+      },
+      "material_override": "pretrained_wet_patch",
+      "art_reason": "Wet generated patch sits under the focal pair as a visible reflective tabletop detail."
+    },
+    {
+      "asset_id": "rain_glass_pavilion_rain_streak_window_panel_openai_shap_e_text300m",
+      "request_id": "rain_streak_window_panel",
+      "role": "foreground_frame",
+      "source": "pretrained:rain_glass_pavilion_rain_streak_window_panel_openai_shap_e_text300m",
+      "runtime_asset": "assets/generated/pretrained_assets/openai_shap_e_text300m/rain_glass_pavilion/rain_streak_window_panel/rain_glass_pavilion_rain_streak_window_panel_openai_shap_e_text300m.gltf",
+      "preview_image": "assets/generated/pretrained_assets/openai_shap_e_text300m/rain_glass_pavilion/rain_streak_window_panel/rain_glass_pavilion_rain_streak_window_panel_openai_shap_e_text300m.preview.png",
+      "transform": {
+        "position": [
+          0.52,
+          0.718,
+          1.38
+        ],
+        "rotation_degrees": [
+          0.0,
+          -12.0,
+          0.0
+        ],
+        "scale": [
+          0.58,
+          0.78,
+          0.18
+        ]
+      },
+      "support": "tabletop",
+      "contact": "mounted",
+      "bounds_meters": {
+        "min": [
+          -0.11313717812299728,
+          0.0,
+          -0.03999999910593033
+        ],
+        "max": [
+          0.11313717812299728,
+          0.2272692620754242,
+          0.03999999910593033
+        ]
+      },
+      "material_override": "pretrained_glass_accent",
+      "art_reason": "Rain-streak mesh becomes a rear depth cue instead of a foreground wall."
+    }
+  ],
+  "authored_groups": [
+    {
+      "id": "generated_focal_pair",
+      "parts": [
+        "rain_glass_pavilion_rain_tabletop_lantern_cluster_openai_shap_e_text300m",
+        "rain_glass_pavilion_rain_glass_table_dressing_openai_shap_e_text300m"
+      ],
+      "primary": true
+    },
+    {
+      "id": "generated_depth_layers",
+      "parts": [
+        "rain_glass_pavilion_rain_tabletop_lantern_cluster_openai_shap_e_text300m",
+        "rain_glass_pavilion_rain_glass_table_dressing_openai_shap_e_text300m",
+        "rain_glass_pavilion_rain_puddle_floor_patch_openai_shap_e_text300m",
+        "rain_glass_pavilion_rain_streak_window_panel_openai_shap_e_text300m"
+      ],
+      "primary": true
+    },
+    {
+      "id": "generated_wet_contact",
+      "parts": [
+        "rain_glass_pavilion_rain_puddle_floor_patch_openai_shap_e_text300m"
+      ],
+      "primary": false
+    }
+  ],
+  "runtime_overrides": {
+    "tabletop_vignette_screen": {
+      "transform": {
+        "position": [
+          0.22,
+          0.98,
+          1.42
+        ],
+        "rotation_degrees": [
+          0.0,
+          -5.0,
+          0.0
+        ],
+        "scale": [
+          4.35,
+          1.42,
+          0.055
+        ]
+      },
+      "art_reason": "Runtime-only dark backdrop suppresses bright room leakage after visual feedback identified right-side background distraction."
+    },
+    "table_glass_pane": {
+      "transform": {
+        "position": [
+          -0.34,
+          0.69,
+          1.0
+        ],
+        "rotation_degrees": [
+          0.0,
+          -12.0,
+          0.0
+        ],
+        "scale": [
+          0.1917,
+          1.0,
+          0.0958
+        ]
+      },
+      "art_reason": "Helper glass plane is exposed to visual feedback so it can be reduced if it dominates the capture."
+    },
+    "table_warm_tray": {
+      "transform": {
+        "position": [
+          -0.38,
+          0.675,
+          0.86
+        ],
+        "rotation_degrees": [
+          0.0,
+          -12.0,
+          0.0
+        ],
+        "scale": [
+          0.114,
+          0.008,
+          0.0389
+        ]
+      },
+      "art_reason": "Helper tray is exposed to visual feedback as a bounded support accent, not a hero subject."
+    },
+    "table_warm_cup": {
+      "transform": {
+        "position": [
+          -0.22,
+          0.715,
+          1.02
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.038,
+          0.3,
+          0.038
+        ]
+      },
+      "art_reason": "Helper cup is exposed to visual feedback so bright primitive accents can be reduced."
+    }
+  },
+  "validation": {
+    "requires_scene_aware_arrangement": true,
+    "minimum_arranger_score": 0.78,
+    "selected_score": 0.9534,
+    "minimum_pretrained_assets": 4,
+    "requires_projection_score": true,
+    "requires_visual_feedback_loop": true,
+    "last_feedback_defect_count": 2,
+    "last_feedback_correction_count": 3
+  },
+  "feedback_history": [
+    {
+      "timestamp": "2026-05-14T17:37:52",
+      "analysis_metrics": {
+        "right_bright_ratio": 0.1664,
+        "right_mean_luminance": 0.2489,
+        "center_mean_luminance": 0.2911,
+        "lower_center_near_white_ratio": 0.0841,
+        "focal_material_ratio": 0.1308,
+        "cool_noise_ratio_center_right": 0.0426,
+        "near_white_ratio": 0.0121,
+        "focal_centroid": [
+          0.4703,
+          0.4786
+        ]
+      },
+      "defects": [
+        {
+          "id": "helper_primitive_highlight_dominates",
+          "severity": 0.589,
+          "evidence": {
+            "lower_center_near_white_ratio": 0.0841
+          },
+          "reason": "A bright helper tray/panel in the lower center reads before the generated assets."
+        }
+      ],
+      "corrections": [
+        {
+          "target": "assets[role=wet_contact]",
+          "action": "expand_wet_generated_tabletop_patch",
+          "why": "Use generated wet detail to compete with bright helper geometry.",
+          "new_transform": {
+            "position": [
+              -0.39,
+              0.704,
+              0.89
+            ],
+            "rotation_degrees": [
+              0.0,
+              8.0,
+              0.0
+            ],
+            "scale": [
+              10.4,
+              1.0,
+              10.4
+            ]
+          }
+        },
+        {
+          "target": "runtime_overrides.table_glass_pane/table_warm_tray",
+          "action": "shrink_bright_helper_primitives",
+          "why": "The image model detected helper highlights dominating over generated assets.",
+          "new_table_glass_pane": {
+            "position": [
+              -0.34,
+              0.69,
+              0.95
+            ],
+            "rotation_degrees": [
+              0.0,
+              -12.0,
+              0.0
+            ],
+            "scale": [
+              0.2904,
+              1.0,
+              0.1452
+            ]
+          },
+          "new_table_warm_tray": {
+            "position": [
+              -0.38,
+              0.675,
+              0.86
+            ],
+            "rotation_degrees": [
+              0.0,
+              -12.0,
+              0.0
+            ],
+            "scale": [
+              0.1584,
+              0.008,
+              0.054
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "timestamp": "2026-05-14T17:39:12",
+      "analysis_metrics": {
+        "right_bright_ratio": 0.3042,
+        "right_mean_luminance": 0.3451,
+        "center_mean_luminance": 0.2705,
+        "lower_center_near_white_ratio": 0.0538,
+        "focal_material_ratio": 0.1497,
+        "cool_noise_ratio_center_right": 0.0493,
+        "near_white_ratio": 0.0096,
+        "focal_centroid": [
+          0.5959,
+          0.4721
+        ]
+      },
+      "defects": [
+        {
+          "id": "bright_right_background_leak",
+          "severity": 0.548,
+          "evidence": {
+            "right_bright_ratio": 0.3042,
+            "right_mean_luminance": 0.3451,
+            "center_mean_luminance": 0.2705
+          },
+          "reason": "The right edge is brighter than the focal area, so the room/background steals attention from the tabletop still life."
+        },
+        {
+          "id": "helper_primitive_highlight_dominates",
+          "severity": 0.377,
+          "evidence": {
+            "lower_center_near_white_ratio": 0.0538
+          },
+          "reason": "A bright helper tray/panel in the lower center reads before the generated assets."
+        }
+      ],
+      "corrections": [
+        {
+          "target": "runtime_overrides.tabletop_vignette_screen",
+          "action": "widen_and_pull_forward_dark_backdrop",
+          "why": "Suppress bright right-side room leak detected in capture.",
+          "new_transform": {
+            "position": [
+              0.22,
+              0.98,
+              1.42
+            ],
+            "rotation_degrees": [
+              0.0,
+              -5.0,
+              0.0
+            ],
+            "scale": [
+              4.35,
+              1.42,
+              0.055
+            ]
+          }
+        },
+        {
+          "target": "assets[role=wet_contact]",
+          "action": "expand_wet_generated_tabletop_patch",
+          "why": "Use generated wet detail to compete with bright helper geometry.",
+          "new_transform": {
+            "position": [
+              -0.44,
+              0.704,
+              0.92
+            ],
+            "rotation_degrees": [
+              0.0,
+              8.0,
+              0.0
+            ],
+            "scale": [
+              10.816,
+              1.0,
+              10.816
+            ]
+          }
+        },
+        {
+          "target": "runtime_overrides.table_glass_pane/table_warm_tray",
+          "action": "shrink_bright_helper_primitives",
+          "why": "The image model detected helper highlights dominating over generated assets.",
+          "new_table_glass_pane": {
+            "position": [
+              -0.34,
+              0.69,
+              1.0
+            ],
+            "rotation_degrees": [
+              0.0,
+              -12.0,
+              0.0
+            ],
+            "scale": [
+              0.1917,
+              1.0,
+              0.0958
+            ]
+          },
+          "new_table_warm_tray": {
+            "position": [
+              -0.38,
+              0.675,
+              0.86
+            ],
+            "rotation_degrees": [
+              0.0,
+              -12.0,
+              0.0
+            ],
+            "scale": [
+              0.114,
+              0.008,
+              0.0389
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

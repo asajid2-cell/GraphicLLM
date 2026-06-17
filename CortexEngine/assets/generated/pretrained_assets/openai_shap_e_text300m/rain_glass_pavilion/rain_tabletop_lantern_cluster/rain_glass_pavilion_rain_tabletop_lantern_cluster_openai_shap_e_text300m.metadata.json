@@ -1,0 +1,22 @@
+{
+  "schema": 1,
+  "job_id": "openai_shap_e_text300m/rain_glass_pavilion/rain_tabletop_lantern_cluster",
+  "prompt": "small brass and glass lantern cluster for a rainy pavilion table, warm glowing core, wet metal, transparent panes, cinematic prop, game ready PBR asset",
+  "seed": 930048,
+  "steps": 16,
+  "guidance_scale": 10.0,
+  "triangle_count": 76220,
+  "bounds_meters": {
+    "min": [
+      -0.10570085793733597,
+      0.0,
+      -0.17499999701976776
+    ],
+    "max": [
+      0.10570085793733597,
+      0.20896688103675842,
+      0.17499999701976776
+    ]
+  },
+  "raw_generator": "openai_shap_e_text300m"
+}

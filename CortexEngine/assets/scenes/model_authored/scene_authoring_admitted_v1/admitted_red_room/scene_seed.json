@@ -1,0 +1,6958 @@
+{
+  "schema": "cortex.model_authored_scene_seed.v1",
+  "id": "sak_red_light_room_moody_crimson_lounge_with_two_human_scale_sofas_facing_a_coffee_table_wa_v0__semantic_warning_repair__advisory_relation_detail_lod_repair",
+  "scene_family": "red_light_room",
+  "status": "MODEL_AUTHORED_ADVISORY_PROPOSAL",
+  "generator": {
+    "name": "scene_authoring_kernel_v1",
+    "mode": "brief_to_semantic_graph_to_seed",
+    "prompt": "moody crimson lounge with two human-scale sofas facing a coffee table, wall art, floor lamps, rug, and velvet atmosphere",
+    "construction_layers": [
+      "brief_compiler_v1",
+      "semantic_graph_native_constructor_v1",
+      "asset_affordance_catalog_v1",
+      "assembly_template_solver_v1",
+      "scene_graph_kernel_v1"
+    ]
+  },
+  "environment": {
+    "preset": "neutral_procedural",
+    "art_lighting_preset": "scene_local_authoring_kernel",
+    "graphics_preset": "hero_final_art",
+    "ibl_enabled": false,
+    "ibl_diffuse_intensity": 0.0,
+    "ibl_specular_intensity": 0.0,
+    "allow_hdri_background": false,
+    "allow_hdri_reflections": false,
+    "visible_background": "authored_geometry_only",
+    "ambient_source": "scene_authored_lights",
+    "reflection_policy": "scene_local_no_hdri"
+  },
+  "camera": {
+    "position": [
+      1.95,
+      1.28,
+      -1.65
+    ],
+    "target": [
+      0.0,
+      0.78,
+      0.62
+    ],
+    "fov": 58.0,
+    "class": "hero"
+  },
+  "validation_view_overrides": {},
+  "materials": {
+    "room_wall_warm": {
+      "color": [
+        0.62,
+        0.58,
+        0.5,
+        1.0
+      ],
+      "metallic": 0.0,
+      "roughness": 0.82,
+      "preset": "paint"
+    },
+    "room_wall_cool": {
+      "color": [
+        0.48,
+        0.56,
+        0.62,
+        1.0
+      ],
+      "metallic": 0.0,
+      "roughness": 0.84,
+      "preset": "paint"
+    },
+    "dark_wall": {
+      "color": [
+        0.05,
+        0.045,
+        0.055,
+        1.0
+      ],
+      "metallic": 0.0,
+      "roughness": 0.78,
+      "preset": "paint"
+    },
+    "floor_tile": {
+      "color": [
+        0.42,
+        0.43,
+        0.41,
+        1.0
+      ],
+      "metallic": 0.0,
+      "roughness": 0.74,
+      "preset": "matte_tile"
+    },
+    "floor_wood": {
+      "color": [
+        0.62,
+        0.43,
+        0.22,
+        1.0
+      ],
+      "metallic": 0.0,
+      "roughness": 0.56,
+      "preset": "wood"
+    },
+    "floor_dark": {
+      "color": [
+        0.08,
+        0.075,
+        0.085,
+        1.0
+      ],
+      "metallic": 0.0,
+      "roughness": 0.7,
+      "preset": "paint"
+    },
+    "wall_deep_red": {
+      "color": [
+        0.32,
+        0.025,
+        0.035,
+        1.0
+      ],
+      "metallic": 0.0,
+      "roughness": 0.78,
+      "preset": "paint"
+    },
+    "velvet_red": {
+      "color": [
+        0.55,
+        0.03,
+        0.055,
+        1.0
+      ],
+      "metallic": 0.0,
+      "roughness": 0.62,
+      "preset": "fabric"
+    },
+    "field_green": {
+      "color": [
+        0.05,
+        0.34,
+        0.12,
+        1.0
+      ],
+      "metallic": 0.0,
+      "roughness": 0.72,
+      "preset": "turf"
+    },
+    "counter_dark": {
+      "color": [
+        0.08,
+        0.075,
+        0.07,
+        1.0
+      ],
+      "metallic": 0.0,
+      "roughness": 0.38,
+      "preset": "stone"
+    },
+    "cabinet_warm": {
+      "color": [
+        0.36,
+        0.21,
+        0.11,
+        1.0
+      ],
+      "metallic": 0.0,
+      "roughness": 0.55,
+      "preset": "wood"
+    },
+    "metal_dark": {
+      "color": [
+        0.025,
+        0.026,
+        0.028,
+        1.0
+      ],
+      "metallic": 0.65,
+      "roughness": 0.34,
+      "preset": "brushed_metal"
+    },
+    "plastic_blue": {
+      "color": [
+        0.05,
+        0.28,
+        0.7,
+        1.0
+      ],
+      "metallic": 0.0,
+      "roughness": 0.52,
+      "preset": "paint"
+    },
+    "accent_orange": {
+      "color": [
+        1.0,
+        0.43,
+        0.05,
+        1.0
+      ],
+      "metallic": 0.0,
+      "roughness": 0.42,
+      "preset": "paint"
+    },
+    "accent_cyan": {
+      "color": [
+        0.0,
+        0.75,
+        1.0,
+        1.0
+      ],
+      "metallic": 0.0,
+      "roughness": 0.4,
+      "emissive": [
+        0.0,
+        0.28,
+        0.55
+      ],
+      "emissive_strength": 0.15,
+      "preset": "paint"
+    },
+    "accent_magenta": {
+      "color": [
+        0.95,
+        0.05,
+        0.62,
+        1.0
+      ],
+      "metallic": 0.0,
+      "roughness": 0.44,
+      "emissive": [
+        0.18,
+        0.01,
+        0.12
+      ],
+      "emissive_strength": 0.12,
+      "preset": "paint"
+    },
+    "glass_soft": {
+      "color": [
+        0.72,
+        0.88,
+        0.96,
+        0.42
+      ],
+      "roughness": 0.055,
+      "transmission": 0.45,
+      "ior": 1.46,
+      "alpha": "blend",
+      "preset": "glass"
+    },
+    "warm_light": {
+      "color": [
+        1.0,
+        0.62,
+        0.28,
+        1.0
+      ],
+      "emissive": [
+        1.0,
+        0.48,
+        0.18
+      ],
+      "emissive_strength": 0.45,
+      "roughness": 0.25,
+      "preset": "emissive"
+    },
+    "paper": {
+      "color": [
+        0.84,
+        0.79,
+        0.68,
+        1.0
+      ],
+      "metallic": 0.0,
+      "roughness": 0.86,
+      "preset": "paper"
+    },
+    "advisory_ceramic_blue": {
+      "color": [
+        0.05,
+        0.26,
+        0.62,
+        1.0
+      ],
+      "metallic": 0.0,
+      "roughness": 0.62,
+      "preset": "paint"
+    },
+    "advisory_ceramic_white": {
+      "color": [
+        0.86,
+        0.88,
+        0.82,
+        1.0
+      ],
+      "metallic": 0.0,
+      "roughness": 0.58,
+      "preset": "matte_tile"
+    },
+    "advisory_warm_amber": {
+      "color": [
+        0.95,
+        0.48,
+        0.12,
+        1.0
+      ],
+      "metallic": 0.0,
+      "roughness": 0.48,
+      "preset": "paint"
+    },
+    "advisory_leaf_green": {
+      "color": [
+        0.12,
+        0.42,
+        0.16,
+        1.0
+      ],
+      "metallic": 0.0,
+      "roughness": 0.66,
+      "preset": "paint"
+    },
+    "advisory_deep_red": {
+      "color": [
+        0.56,
+        0.05,
+        0.08,
+        1.0
+      ],
+      "metallic": 0.0,
+      "roughness": 0.55,
+      "preset": "paint"
+    },
+    "advisory_dark_ink": {
+      "color": [
+        0.015,
+        0.018,
+        0.02,
+        1.0
+      ],
+      "metallic": 0.0,
+      "roughness": 0.72,
+      "preset": "paint"
+    },
+    "advisory_chalk_white": {
+      "color": [
+        0.92,
+        0.94,
+        0.88,
+        1.0
+      ],
+      "metallic": 0.0,
+      "roughness": 0.9,
+      "preset": "chalk"
+    },
+    "advisory_school_yellow": {
+      "color": [
+        0.95,
+        0.72,
+        0.16,
+        1.0
+      ],
+      "metallic": 0.0,
+      "roughness": 0.62,
+      "preset": "paint"
+    },
+    "advisory_school_green": {
+      "color": [
+        0.06,
+        0.34,
+        0.16,
+        1.0
+      ],
+      "metallic": 0.0,
+      "roughness": 0.7,
+      "preset": "paint"
+    },
+    "advisory_net_soft": {
+      "color": [
+        0.94,
+        0.9,
+        0.78,
+        1.0
+      ],
+      "metallic": 0.0,
+      "roughness": 0.82,
+      "preset": "rope"
+    },
+    "advisory_brushed_chrome": {
+      "color": [
+        0.72,
+        0.74,
+        0.72,
+        1.0
+      ],
+      "metallic": 0.75,
+      "roughness": 0.32,
+      "preset": "brushed_metal"
+    }
+  },
+  "lights": [
+    {
+      "id": "sak_red_table_candle_pool",
+      "role": "table_practical_light",
+      "type": "point",
+      "position": [
+        -0.18,
+        0.78,
+        0.0
+      ],
+      "color": [
+        1.0,
+        0.18,
+        0.08
+      ],
+      "intensity": 2.8,
+      "range": 2.4,
+      "casts_shadows": false,
+      "scene_authoring_kernel_v1": {
+        "source": "scene_local_lighting_contract",
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_red_magenta_fill",
+      "role": "red_room_fill_light",
+      "type": "point",
+      "position": [
+        1.5,
+        1.45,
+        -0.72
+      ],
+      "color": [
+        0.9,
+        0.05,
+        0.32
+      ],
+      "intensity": 3.2,
+      "range": 3.0,
+      "casts_shadows": false,
+      "scene_authoring_kernel_v1": {
+        "source": "scene_local_lighting_contract",
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_red_sofa_key",
+      "role": "lounge_key_light",
+      "type": "spot",
+      "position": [
+        -1.4,
+        2.45,
+        -0.55
+      ],
+      "target": [
+        0.0,
+        0.62,
+        1.05
+      ],
+      "color": [
+        1.0,
+        0.32,
+        0.18
+      ],
+      "intensity": 4.5,
+      "range": 4.0,
+      "inner_cone_degrees": 28.0,
+      "outer_cone_degrees": 58.0,
+      "casts_shadows": false,
+      "scene_authoring_kernel_v1": {
+        "source": "scene_local_lighting_contract",
+        "variant": 0
+      }
+    }
+  ],
+  "objects": [
+    {
+      "id": "sak_red_floor",
+      "role": "room_floor",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "floor_dark",
+      "support": "ground",
+      "assembly_id": "room_shell",
+      "transform": {
+        "position": [
+          0.0,
+          0.035,
+          0.0
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          4.9,
+          0.07,
+          3.8
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "floor",
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_red_back_wall",
+      "role": "room_wall",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "wall_deep_red",
+      "support": "ground",
+      "assembly_id": "room_shell",
+      "transform": {
+        "position": [
+          0.0,
+          1.425,
+          1.9
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          4.9,
+          2.85,
+          0.08
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "wall",
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_red_left_wall",
+      "role": "room_wall",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "wall_deep_red",
+      "support": "ground",
+      "assembly_id": "room_shell",
+      "transform": {
+        "position": [
+          -2.45,
+          1.425,
+          0.0
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.08,
+          2.85,
+          3.8
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "wall",
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_red_right_wall",
+      "role": "room_wall",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "wall_deep_red",
+      "support": "ground",
+      "assembly_id": "room_shell",
+      "transform": {
+        "position": [
+          2.45,
+          1.425,
+          0.0
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.08,
+          2.85,
+          3.8
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "wall",
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_red_ceiling",
+      "role": "room_ceiling",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "wall_deep_red",
+      "support": "ground",
+      "assembly_id": "room_shell",
+      "transform": {
+        "position": [
+          0.0,
+          2.89,
+          0.0
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          4.9,
+          0.08,
+          3.8
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "ceiling",
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_red_base_trim_back",
+      "role": "architectural_baseboard",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "metal_dark",
+      "support": "sak_red_floor",
+      "assembly_id": "room_shell",
+      "transform": {
+        "position": [
+          0.0,
+          0.13,
+          1.845
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          4.74,
+          0.045,
+          0.035
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "wall_detail",
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_red_base_trim_left",
+      "role": "architectural_baseboard",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "metal_dark",
+      "support": "sak_red_floor",
+      "assembly_id": "room_shell",
+      "transform": {
+        "position": [
+          -2.395,
+          0.13,
+          0.0
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.035,
+          0.045,
+          3.64
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "wall_detail",
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_red_base_trim_right",
+      "role": "architectural_baseboard",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "metal_dark",
+      "support": "sak_red_floor",
+      "assembly_id": "room_shell",
+      "transform": {
+        "position": [
+          2.395,
+          0.13,
+          0.0
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.035,
+          0.045,
+          3.64
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "wall_detail",
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_red_crown_trim_back",
+      "role": "architectural_baseboard",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "metal_dark",
+      "support": "sak_red_floor",
+      "assembly_id": "room_shell",
+      "transform": {
+        "position": [
+          0.0,
+          2.67,
+          1.845
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          4.74,
+          0.035,
+          0.035
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "wall_detail",
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_red_crown_trim_left",
+      "role": "architectural_baseboard",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "metal_dark",
+      "support": "sak_red_floor",
+      "assembly_id": "room_shell",
+      "transform": {
+        "position": [
+          -2.395,
+          2.67,
+          0.0
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.035,
+          0.035,
+          3.64
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "wall_detail",
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_red_crown_trim_right",
+      "role": "architectural_baseboard",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "metal_dark",
+      "support": "sak_red_floor",
+      "assembly_id": "room_shell",
+      "transform": {
+        "position": [
+          2.395,
+          2.67,
+          0.0
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.035,
+          0.035,
+          3.64
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "wall_detail",
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_red_corner_post_0",
+      "role": "architectural_corner_post",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "metal_dark",
+      "support": "sak_red_floor",
+      "assembly_id": "room_shell",
+      "transform": {
+        "position": [
+          -2.395,
+          1.425,
+          1.845
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.055,
+          2.67,
+          0.055
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "wall_detail",
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_red_corner_post_1",
+      "role": "architectural_corner_post",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "metal_dark",
+      "support": "sak_red_floor",
+      "assembly_id": "room_shell",
+      "transform": {
+        "position": [
+          2.395,
+          1.425,
+          1.845
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.055,
+          2.67,
+          0.055
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "wall_detail",
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_red_back_wall_vertical_trim_0",
+      "role": "wall_panel_trim",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "metal_dark",
+      "support": "sak_red_floor",
+      "assembly_id": "room_shell",
+      "transform": {
+        "position": [
+          -2.05,
+          1.482,
+          1.838
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.018,
+          1.539,
+          0.018
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "wall_detail",
+        "variant": 0,
+        "detail_lod_repair": {
+          "source": "advisory_relation_detail_lod_repair",
+          "group": [
+            "room_shell",
+            "sak_red_floor",
+            "wall_panel_trim"
+          ],
+          "reason": "repeated micro-line primitive exceeds view-scale detail budget"
+        }
+      },
+      "renderable": false,
+      "visual_lod_hidden": true
+    },
+    {
+      "id": "sak_red_back_wall_vertical_trim_1",
+      "role": "wall_panel_trim",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "metal_dark",
+      "support": "sak_red_floor",
+      "assembly_id": "room_shell",
+      "transform": {
+        "position": [
+          -1.025,
+          1.482,
+          1.838
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.018,
+          1.539,
+          0.018
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "wall_detail",
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_red_back_wall_vertical_trim_2",
+      "role": "wall_panel_trim",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "metal_dark",
+      "support": "sak_red_floor",
+      "assembly_id": "room_shell",
+      "transform": {
+        "position": [
+          0.0,
+          1.482,
+          1.838
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.018,
+          1.539,
+          0.018
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "wall_detail",
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_red_back_wall_vertical_trim_3",
+      "role": "wall_panel_trim",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "metal_dark",
+      "support": "sak_red_floor",
+      "assembly_id": "room_shell",
+      "transform": {
+        "position": [
+          1.025,
+          1.482,
+          1.838
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.018,
+          1.539,
+          0.018
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "wall_detail",
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_red_back_wall_vertical_trim_4",
+      "role": "wall_panel_trim",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "metal_dark",
+      "support": "sak_red_floor",
+      "assembly_id": "room_shell",
+      "transform": {
+        "position": [
+          2.05,
+          1.482,
+          1.838
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.018,
+          1.539,
+          0.018
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "wall_detail",
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_red_back_wall_horizontal_trim_0",
+      "role": "wall_panel_trim",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "metal_dark",
+      "support": "sak_red_floor",
+      "assembly_id": "room_shell",
+      "transform": {
+        "position": [
+          0.0,
+          0.969,
+          1.836
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          4.018,
+          0.018,
+          0.018
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "wall_detail",
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_red_back_wall_horizontal_trim_1",
+      "role": "wall_panel_trim",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "metal_dark",
+      "support": "sak_red_floor",
+      "assembly_id": "room_shell",
+      "transform": {
+        "position": [
+          0.0,
+          1.767,
+          1.836
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          4.018,
+          0.018,
+          0.018
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "wall_detail",
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_red_back_wall_horizontal_trim_2",
+      "role": "wall_panel_trim",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "metal_dark",
+      "support": "sak_red_floor",
+      "assembly_id": "room_shell",
+      "transform": {
+        "position": [
+          0.0,
+          2.337,
+          1.836
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          4.018,
+          0.018,
+          0.018
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "wall_detail",
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_red_left_wall_vertical_trim_0",
+      "role": "wall_panel_trim",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "metal_dark",
+      "support": "sak_red_floor",
+      "assembly_id": "room_shell",
+      "transform": {
+        "position": [
+          -2.388,
+          1.425,
+          -0.912
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.018,
+          1.311,
+          0.018
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "wall_detail",
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_red_left_wall_vertical_trim_1",
+      "role": "wall_panel_trim",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "metal_dark",
+      "support": "sak_red_floor",
+      "assembly_id": "room_shell",
+      "transform": {
+        "position": [
+          -2.388,
+          1.425,
+          0.304
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.018,
+          1.311,
+          0.018
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "wall_detail",
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_red_left_wall_vertical_trim_2",
+      "role": "wall_panel_trim",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "metal_dark",
+      "support": "sak_red_floor",
+      "assembly_id": "room_shell",
+      "transform": {
+        "position": [
+          -2.388,
+          1.425,
+          1.368
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.018,
+          1.311,
+          0.018
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "wall_detail",
+        "variant": 0,
+        "detail_lod_repair": {
+          "source": "advisory_relation_detail_lod_repair",
+          "group": [
+            "room_shell",
+            "sak_red_floor",
+            "wall_panel_trim"
+          ],
+          "reason": "repeated micro-line primitive exceeds view-scale detail budget"
+        }
+      },
+      "renderable": false,
+      "visual_lod_hidden": true
+    },
+    {
+      "id": "sak_red_right_wall_vertical_trim_0",
+      "role": "wall_panel_trim",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "metal_dark",
+      "support": "sak_red_floor",
+      "assembly_id": "room_shell",
+      "transform": {
+        "position": [
+          2.388,
+          1.425,
+          -0.912
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.018,
+          1.311,
+          0.018
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "wall_detail",
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_red_right_wall_vertical_trim_1",
+      "role": "wall_panel_trim",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "metal_dark",
+      "support": "sak_red_floor",
+      "assembly_id": "room_shell",
+      "transform": {
+        "position": [
+          2.388,
+          1.425,
+          0.304
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.018,
+          1.311,
+          0.018
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "wall_detail",
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_red_right_wall_vertical_trim_2",
+      "role": "wall_panel_trim",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "metal_dark",
+      "support": "sak_red_floor",
+      "assembly_id": "room_shell",
+      "transform": {
+        "position": [
+          2.388,
+          1.425,
+          1.368
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.018,
+          1.311,
+          0.018
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "wall_detail",
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_red_sofa_main",
+      "role": "sofa_mesh",
+      "kind": "kenney_asset",
+      "runtime_asset": "assets/models/kenney_furniture_kit/loungeSofaLong/loungeSofaLong.gltf",
+      "material": "velvet_red",
+      "support": "sak_red_floor",
+      "assembly_id": "lounge_seating",
+      "transform": {
+        "position": [
+          0.0,
+          0.07,
+          1.05
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          1.32653,
+          1.41304,
+          1.25
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "sofa",
+        "asset_id": "sofa_long",
+        "anchors": {
+          "floor_contact": [
+            0,
+            0,
+            0
+          ],
+          "front": [
+            0,
+            0,
+            -1
+          ]
+        },
+        "license": "Kenney CC0",
+        "scale_contract": {
+          "requested_scale": [
+            1.05,
+            1.05,
+            1.05
+          ],
+          "resolved_scale": [
+            1.32653,
+            1.41304,
+            1.25
+          ],
+          "semantic_floor": 1.25,
+          "physical_size": {
+            "requested_scale": [
+              1.05,
+              1.05,
+              1.05
+            ],
+            "semantic_floor_scale": 1.25,
+            "resolved_scale": [
+              1.32653,
+              1.41304,
+              1.25
+            ],
+            "native_extent": [
+              0.98,
+              0.46,
+              0.82
+            ],
+            "min_extent": [
+              1.3,
+              0.65,
+              0.55
+            ],
+            "max_extent": [
+              2.7,
+              1.25,
+              1.2
+            ],
+            "resolved_extent": [
+              1.3,
+              0.65,
+              1.025
+            ],
+            "physical_contract": "PASS",
+            "adjustment_reasons": [
+              "axis_0_raised_to_min_extent",
+              "axis_1_raised_to_min_extent"
+            ]
+          }
+        },
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_red_lounge_chair_0",
+      "role": "sofa_mesh",
+      "kind": "kenney_asset",
+      "runtime_asset": "assets/models/kenney_furniture_kit/loungeChair/loungeChair.gltf",
+      "material": "velvet_red",
+      "support": "sak_red_floor",
+      "assembly_id": "lounge_seating",
+      "transform": {
+        "position": [
+          -1.35,
+          0.07,
+          0.25
+        ],
+        "rotation_degrees": [
+          0.0,
+          98.4617,
+          0.0
+        ],
+        "scale": [
+          2.65306,
+          1.41304,
+          1.34146
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "sofa",
+        "asset_id": "lounge_chair",
+        "anchors": {
+          "floor_contact": [
+            0,
+            0,
+            0
+          ],
+          "front": [
+            0,
+            0,
+            -1
+          ]
+        },
+        "license": "Kenney CC0",
+        "scale_contract": {
+          "requested_scale": [
+            0.78,
+            0.78,
+            0.78
+          ],
+          "resolved_scale": [
+            2.65306,
+            1.41304,
+            1.34146
+          ],
+          "semantic_floor": 1.25,
+          "physical_size": {
+            "requested_scale": [
+              0.78,
+              0.78,
+              0.78
+            ],
+            "semantic_floor_scale": 1.25,
+            "resolved_scale": [
+              2.65306,
+              1.41304,
+              1.34146
+            ],
+            "native_extent": [
+              0.49,
+              0.46,
+              0.41
+            ],
+            "min_extent": [
+              1.3,
+              0.65,
+              0.55
+            ],
+            "max_extent": [
+              2.7,
+              1.25,
+              1.2
+            ],
+            "resolved_extent": [
+              1.3,
+              0.65,
+              0.55
+            ],
+            "physical_contract": "PASS",
+            "adjustment_reasons": [
+              "axis_0_raised_to_min_extent",
+              "axis_1_raised_to_min_extent",
+              "axis_2_raised_to_min_extent"
+            ]
+          }
+        },
+        "variant": 0
+      },
+      "scene_graph_kernel_v1": {
+        "faces": "sak_red_table",
+        "front_yaw_offset_degrees": 0.0
+      },
+      "facing_target": "sak_red_table",
+      "facing_relation": "seat_faces_lounge_table_anchor",
+      "facing_tolerance_degrees": 55.0,
+      "constructor_tags": [
+        "facing_relation_compiled"
+      ]
+    },
+    {
+      "id": "sak_red_lounge_chair_1",
+      "role": "sofa_mesh",
+      "kind": "kenney_asset",
+      "runtime_asset": "assets/models/kenney_furniture_kit/loungeChair/loungeChair.gltf",
+      "material": "velvet_red",
+      "support": "sak_red_floor",
+      "assembly_id": "lounge_seating",
+      "transform": {
+        "position": [
+          1.49456,
+          0.07,
+          0.3376
+        ],
+        "rotation_degrees": [
+          0.0,
+          -121.2153,
+          0.0
+        ],
+        "scale": [
+          2.65306,
+          1.41304,
+          1.34146
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "sofa",
+        "asset_id": "lounge_chair",
+        "anchors": {
+          "floor_contact": [
+            0,
+            0,
+            0
+          ],
+          "front": [
+            0,
+            0,
+            -1
+          ]
+        },
+        "license": "Kenney CC0",
+        "scale_contract": {
+          "requested_scale": [
+            0.78,
+            0.78,
+            0.78
+          ],
+          "resolved_scale": [
+            2.65306,
+            1.41304,
+            1.34146
+          ],
+          "semantic_floor": 1.25,
+          "physical_size": {
+            "requested_scale": [
+              0.78,
+              0.78,
+              0.78
+            ],
+            "semantic_floor_scale": 1.25,
+            "resolved_scale": [
+              2.65306,
+              1.41304,
+              1.34146
+            ],
+            "native_extent": [
+              0.49,
+              0.46,
+              0.41
+            ],
+            "min_extent": [
+              1.3,
+              0.65,
+              0.55
+            ],
+            "max_extent": [
+              2.7,
+              1.25,
+              1.2
+            ],
+            "resolved_extent": [
+              1.3,
+              0.65,
+              0.55
+            ],
+            "physical_contract": "PASS",
+            "adjustment_reasons": [
+              "axis_0_raised_to_min_extent",
+              "axis_1_raised_to_min_extent",
+              "axis_2_raised_to_min_extent"
+            ]
+          }
+        },
+        "variant": 0
+      },
+      "scene_graph_kernel_v1": {
+        "faces": "sak_red_table",
+        "front_yaw_offset_degrees": 0.0
+      },
+      "facing_target": "sak_red_table",
+      "facing_relation": "seat_faces_lounge_table_anchor",
+      "facing_tolerance_degrees": 55.0,
+      "constructor_tags": [
+        "facing_relation_compiled"
+      ]
+    },
+    {
+      "id": "sak_red_lounge_chair_2",
+      "role": "sofa_mesh",
+      "kind": "kenney_asset",
+      "runtime_asset": "assets/models/kenney_furniture_kit/loungeChair/loungeChair.gltf",
+      "material": "velvet_red",
+      "support": "sak_red_floor",
+      "assembly_id": "lounge_seating",
+      "transform": {
+        "position": [
+          -1.62,
+          0.07,
+          -0.62
+        ],
+        "rotation_degrees": [
+          0.0,
+          77.3421,
+          0.0
+        ],
+        "scale": [
+          2.65306,
+          1.41304,
+          1.34146
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "sofa",
+        "asset_id": "lounge_chair",
+        "anchors": {
+          "floor_contact": [
+            0,
+            0,
+            0
+          ],
+          "front": [
+            0,
+            0,
+            -1
+          ]
+        },
+        "license": "Kenney CC0",
+        "scale_contract": {
+          "requested_scale": [
+            0.78,
+            0.78,
+            0.78
+          ],
+          "resolved_scale": [
+            2.65306,
+            1.41304,
+            1.34146
+          ],
+          "semantic_floor": 1.25,
+          "physical_size": {
+            "requested_scale": [
+              0.78,
+              0.78,
+              0.78
+            ],
+            "semantic_floor_scale": 1.25,
+            "resolved_scale": [
+              2.65306,
+              1.41304,
+              1.34146
+            ],
+            "native_extent": [
+              0.49,
+              0.46,
+              0.41
+            ],
+            "min_extent": [
+              1.3,
+              0.65,
+              0.55
+            ],
+            "max_extent": [
+              2.7,
+              1.25,
+              1.2
+            ],
+            "resolved_extent": [
+              1.3,
+              0.65,
+              0.55
+            ],
+            "physical_contract": "PASS",
+            "adjustment_reasons": [
+              "axis_0_raised_to_min_extent",
+              "axis_1_raised_to_min_extent",
+              "axis_2_raised_to_min_extent"
+            ]
+          }
+        },
+        "variant": 0
+      },
+      "scene_graph_kernel_v1": {
+        "faces": "sak_red_table",
+        "front_yaw_offset_degrees": 0.0
+      },
+      "facing_target": "sak_red_table",
+      "facing_relation": "seat_faces_lounge_table_anchor",
+      "facing_tolerance_degrees": 55.0,
+      "constructor_tags": [
+        "facing_relation_compiled"
+      ]
+    },
+    {
+      "id": "sak_red_table",
+      "role": "table_mesh",
+      "kind": "kenney_asset",
+      "runtime_asset": "assets/models/kenney_furniture_kit/tableCoffeeGlass/tableCoffeeGlass.gltf",
+      "material": "glass_soft",
+      "support": "sak_red_floor",
+      "assembly_id": "lounge_table",
+      "transform": {
+        "position": [
+          0.0,
+          0.07100000000000098,
+          0.04
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          1.28594,
+          2.69565,
+          1.625
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "table",
+        "asset_id": "coffee_table_glass",
+        "anchors": {
+          "floor_contact": [
+            0,
+            0,
+            0
+          ],
+          "top_surface": [
+            0,
+            0.42,
+            0
+          ]
+        },
+        "license": "Kenney CC0",
+        "scale_contract": {
+          "requested_scale": [
+            0.92,
+            0.92,
+            0.92
+          ],
+          "resolved_scale": [
+            1.28594,
+            2.69565,
+            1.625
+          ],
+          "semantic_floor": 1.0,
+          "physical_size": {
+            "requested_scale": [
+              0.92,
+              0.92,
+              0.92
+            ],
+            "semantic_floor_scale": 1.0,
+            "resolved_scale": [
+              1.28594,
+              2.69565,
+              1.625
+            ],
+            "native_extent": [
+              0.661,
+              0.23,
+              0.4
+            ],
+            "min_extent": [
+              0.85,
+              0.62,
+              0.65
+            ],
+            "max_extent": [
+              2.4,
+              1.05,
+              1.8
+            ],
+            "resolved_extent": [
+              0.85,
+              0.62,
+              0.65
+            ],
+            "physical_contract": "PASS",
+            "adjustment_reasons": [
+              "axis_0_raised_to_min_extent",
+              "axis_1_raised_to_min_extent",
+              "axis_2_raised_to_min_extent"
+            ]
+          }
+        },
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_red_table_glass_top",
+      "role": "glass_accent",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "glass_soft",
+      "support": "sak_red_table",
+      "assembly_id": "lounge_table",
+      "transform": {
+        "position": [
+          0.0,
+          0.7044995112471292,
+          0.04
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.92,
+          0.025,
+          0.44
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "table_detail",
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_red_table_prop_0",
+      "role": "warm_fixture",
+      "kind": "primitive",
+      "primitive": "sphere",
+      "material": "warm_light",
+      "support": "sak_red_table_glass_top",
+      "assembly_id": "lounge_table",
+      "transform": {
+        "position": [
+          -0.22,
+          0.7579995112471292,
+          -0.02
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.08,
+          0.08,
+          0.08
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "table_prop",
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_red_table_prop_1",
+      "role": "table_prop",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "accent_orange",
+      "support": "sak_red_table_glass_top",
+      "assembly_id": "lounge_table",
+      "transform": {
+        "position": [
+          0.18,
+          0.7579995112471292,
+          0.08
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.08,
+          0.08,
+          0.08
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "table_prop",
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_red_table_prop_2",
+      "role": "table_prop",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "paper",
+      "support": "sak_red_table_glass_top",
+      "assembly_id": "lounge_table",
+      "transform": {
+        "position": [
+          0.0,
+          0.7579995112471292,
+          0.18
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.08,
+          0.08,
+          0.08
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "table_prop",
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_red_soft_ottoman_0",
+      "role": "soft_prop",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "velvet_red",
+      "support": "sak_red_floor",
+      "assembly_id": "lounge_seating",
+      "transform": {
+        "position": [
+          -0.78,
+          0.2,
+          0.54
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.34,
+          0.26,
+          0.3
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "soft_prop",
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_red_soft_ottoman_1",
+      "role": "soft_prop",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "velvet_red",
+      "support": "sak_red_floor",
+      "assembly_id": "lounge_seating",
+      "transform": {
+        "position": [
+          0.76,
+          0.2,
+          0.52
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.34,
+          0.26,
+          0.3
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "soft_prop",
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_red_soft_ottoman_2",
+      "role": "soft_prop",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "velvet_red",
+      "support": "sak_red_floor",
+      "assembly_id": "lounge_seating",
+      "transform": {
+        "position": [
+          -0.42,
+          0.2,
+          -0.42
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.34,
+          0.26,
+          0.3
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "soft_prop",
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_red_soft_ottoman_3",
+      "role": "soft_prop",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "velvet_red",
+      "support": "sak_red_floor",
+      "assembly_id": "lounge_seating",
+      "transform": {
+        "position": [
+          0.46,
+          0.2,
+          -0.46
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.34,
+          0.26,
+          0.3
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "soft_prop",
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_red_floor_lamp_left",
+      "role": "floor_lamp_mesh",
+      "kind": "kenney_asset",
+      "runtime_asset": "assets/models/kenney_furniture_kit/lampRoundFloor/lampRoundFloor.gltf",
+      "material": "warm_light",
+      "support": "sak_red_floor",
+      "assembly_id": "red_room_lighting",
+      "transform": {
+        "position": [
+          -2.02,
+          0.07,
+          0.92
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.86,
+          0.86,
+          0.86
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "light",
+        "asset_id": "lamp_floor_round",
+        "anchors": {
+          "floor_contact": [
+            0,
+            0,
+            0
+          ]
+        },
+        "license": "Kenney CC0",
+        "scale_contract": {
+          "requested_scale": [
+            0.86,
+            0.86,
+            0.86
+          ],
+          "resolved_scale": [
+            0.86,
+            0.86,
+            0.86
+          ],
+          "semantic_floor": 0.0,
+          "physical_size": {
+            "requested_scale": [
+              0.86,
+              0.86,
+              0.86
+            ],
+            "semantic_floor_scale": 0.0,
+            "resolved_scale": [
+              0.86,
+              0.86,
+              0.86
+            ]
+          }
+        },
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_red_floor_lamp_right",
+      "role": "floor_lamp_mesh",
+      "kind": "kenney_asset",
+      "runtime_asset": "assets/models/kenney_furniture_kit/lampRoundFloor/lampRoundFloor.gltf",
+      "material": "warm_light",
+      "support": "sak_red_floor",
+      "assembly_id": "red_room_lighting",
+      "transform": {
+        "position": [
+          2.02,
+          0.07,
+          0.72
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.78,
+          0.78,
+          0.78
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "light",
+        "asset_id": "lamp_floor_round",
+        "anchors": {
+          "floor_contact": [
+            0,
+            0,
+            0
+          ]
+        },
+        "license": "Kenney CC0",
+        "scale_contract": {
+          "requested_scale": [
+            0.78,
+            0.78,
+            0.78
+          ],
+          "resolved_scale": [
+            0.78,
+            0.78,
+            0.78
+          ],
+          "semantic_floor": 0.0,
+          "physical_size": {
+            "requested_scale": [
+              0.78,
+              0.78,
+              0.78
+            ],
+            "semantic_floor_scale": 0.0,
+            "resolved_scale": [
+              0.78,
+              0.78,
+              0.78
+            ]
+          }
+        },
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_red_wall_light_0",
+      "role": "wall_light",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "warm_light",
+      "support": "sak_red_back_wall",
+      "assembly_id": "red_room_lighting",
+      "transform": {
+        "position": [
+          -1.35,
+          1.62,
+          1.875
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.22,
+          0.1,
+          0.018
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "light",
+        "variant": 0
+      },
+      "attached_to": "sak_red_back_wall"
+    },
+    {
+      "id": "sak_red_wall_light_1",
+      "role": "wall_light",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "warm_light",
+      "support": "sak_red_back_wall",
+      "assembly_id": "red_room_lighting",
+      "transform": {
+        "position": [
+          1.35,
+          1.5,
+          1.875
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.22,
+          0.1,
+          0.018
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "light",
+        "variant": 0
+      },
+      "attached_to": "sak_red_back_wall"
+    },
+    {
+      "id": "sak_red_wall_light_2",
+      "role": "wall_light",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "warm_light",
+      "support": "sak_red_back_wall",
+      "assembly_id": "red_room_lighting",
+      "transform": {
+        "position": [
+          -2.18,
+          1.18,
+          1.875
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.22,
+          0.1,
+          0.018
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "light",
+        "variant": 0
+      },
+      "attached_to": "sak_red_back_wall"
+    },
+    {
+      "id": "sak_red_wall_light_3",
+      "role": "wall_light",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "warm_light",
+      "support": "sak_red_back_wall",
+      "assembly_id": "red_room_lighting",
+      "transform": {
+        "position": [
+          2.18,
+          1.22,
+          1.875
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.22,
+          0.1,
+          0.018
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "light",
+        "variant": 0
+      },
+      "attached_to": "sak_red_back_wall"
+    },
+    {
+      "id": "sak_red_palette_panel_0",
+      "role": "palette_accent_panel",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "accent_magenta",
+      "support": "sak_red_back_wall",
+      "assembly_id": "red_room_lighting",
+      "transform": {
+        "position": [
+          -0.82,
+          1.42,
+          1.878
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.44,
+          0.28,
+          0.018
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "decor",
+        "variant": 0
+      },
+      "attached_to": "sak_red_back_wall"
+    },
+    {
+      "id": "sak_red_palette_panel_1",
+      "role": "palette_accent_panel",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "accent_orange",
+      "support": "sak_red_back_wall",
+      "assembly_id": "red_room_lighting",
+      "transform": {
+        "position": [
+          0.0,
+          1.62,
+          1.878
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.44,
+          0.28,
+          0.018
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "decor",
+        "variant": 0
+      },
+      "attached_to": "sak_red_back_wall"
+    },
+    {
+      "id": "sak_red_palette_panel_2",
+      "role": "palette_accent_panel",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "accent_cyan",
+      "support": "sak_red_back_wall",
+      "assembly_id": "red_room_lighting",
+      "transform": {
+        "position": [
+          0.82,
+          1.36,
+          1.878
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.44,
+          0.28,
+          0.018
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "decor",
+        "variant": 0
+      },
+      "attached_to": "sak_red_back_wall"
+    },
+    {
+      "id": "sak_red_palette_panel_3",
+      "role": "palette_accent_panel",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "velvet_red",
+      "support": "sak_red_back_wall",
+      "assembly_id": "red_room_lighting",
+      "transform": {
+        "position": [
+          1.86,
+          0.92,
+          1.878
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.44,
+          0.28,
+          0.018
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "decor",
+        "variant": 0
+      },
+      "attached_to": "sak_red_back_wall"
+    },
+    {
+      "id": "sak_red_floor_light_tile_0",
+      "role": "palette_accent_panel",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "accent_magenta",
+      "support": "sak_red_floor",
+      "assembly_id": "red_room_lighting",
+      "transform": {
+        "position": [
+          -1.05,
+          0.095,
+          -0.84
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.34,
+          0.018,
+          0.22
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "light",
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_red_floor_light_tile_1",
+      "role": "palette_accent_panel",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "accent_orange",
+      "support": "sak_red_floor",
+      "assembly_id": "red_room_lighting",
+      "transform": {
+        "position": [
+          -0.38,
+          0.095,
+          -0.92
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.34,
+          0.018,
+          0.22
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "light",
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_red_floor_light_tile_2",
+      "role": "palette_accent_panel",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "accent_cyan",
+      "support": "sak_red_floor",
+      "assembly_id": "red_room_lighting",
+      "transform": {
+        "position": [
+          0.38,
+          0.095,
+          -0.92
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.34,
+          0.018,
+          0.22
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "light",
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_red_floor_light_tile_3",
+      "role": "palette_accent_panel",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "warm_light",
+      "support": "sak_red_floor",
+      "assembly_id": "red_room_lighting",
+      "transform": {
+        "position": [
+          1.05,
+          0.095,
+          -0.84
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.34,
+          0.018,
+          0.22
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "light",
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_red_side_table_left",
+      "role": "side_table",
+      "kind": "kenney_asset",
+      "runtime_asset": "assets/models/kenney_furniture_kit/sideTable/sideTable.gltf",
+      "material": "cabinet_warm",
+      "support": "sak_red_floor",
+      "assembly_id": "lounge_decor",
+      "transform": {
+        "position": [
+          -1.92,
+          0.07,
+          0.28
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          1.59034,
+          1.61287,
+          2.95455
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "table",
+        "asset_id": "side_table",
+        "anchors": {
+          "floor_contact": [
+            0,
+            0,
+            0
+          ],
+          "top_surface": [
+            0,
+            0.45,
+            0
+          ]
+        },
+        "license": "Kenney CC0",
+        "scale_contract": {
+          "requested_scale": [
+            0.62,
+            0.62,
+            0.62
+          ],
+          "resolved_scale": [
+            1.59034,
+            1.61287,
+            2.95455
+          ],
+          "semantic_floor": 1.0,
+          "physical_size": {
+            "requested_scale": [
+              0.62,
+              0.62,
+              0.62
+            ],
+            "semantic_floor_scale": 1.0,
+            "resolved_scale": [
+              1.59034,
+              1.61287,
+              2.95455
+            ],
+            "native_extent": [
+              0.53448,
+              0.38441,
+              0.22
+            ],
+            "min_extent": [
+              0.85,
+              0.62,
+              0.65
+            ],
+            "max_extent": [
+              2.4,
+              1.05,
+              1.8
+            ],
+            "resolved_extent": [
+              0.85,
+              0.62,
+              0.65
+            ],
+            "physical_contract": "PASS",
+            "adjustment_reasons": [
+              "axis_0_raised_to_min_extent",
+              "axis_1_raised_to_min_extent",
+              "axis_2_raised_to_min_extent"
+            ]
+          }
+        },
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_red_rug_round",
+      "role": "floor_mat",
+      "kind": "kenney_asset",
+      "runtime_asset": "assets/models/kenney_furniture_kit/rugRound/rugRound.gltf",
+      "material": "accent_orange",
+      "support": "sak_red_floor",
+      "assembly_id": "lounge_decor",
+      "transform": {
+        "position": [
+          0.0,
+          0.07,
+          0.02
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          1.25,
+          1.25,
+          1.25
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "floor_detail",
+        "asset_id": "rug_round",
+        "anchors": {
+          "floor_contact": [
+            0,
+            0,
+            0
+          ]
+        },
+        "license": "Kenney CC0",
+        "scale_contract": {
+          "requested_scale": [
+            1.25,
+            1.25,
+            1.25
+          ],
+          "resolved_scale": [
+            1.25,
+            1.25,
+            1.25
+          ],
+          "semantic_floor": 0.0,
+          "physical_size": {
+            "requested_scale": [
+              1.25,
+              1.25,
+              1.25
+            ],
+            "semantic_floor_scale": 0.0,
+            "resolved_scale": [
+              1.25,
+              1.25,
+              1.25
+            ]
+          }
+        },
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_red_floor_shadow_line_z_0",
+      "role": "floor_detail_line",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "metal_dark",
+      "support": "sak_red_floor",
+      "assembly_id": "lounge_decor",
+      "transform": {
+        "position": [
+          0.0,
+          0.106,
+          -1.42
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          4.05,
+          0.01,
+          0.018
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "floor_detail",
+        "variant": 0,
+        "detail_lod_repair": {
+          "source": "advisory_relation_detail_lod_repair",
+          "group": [
+            "lounge_decor",
+            "sak_red_floor",
+            "floor_detail_line"
+          ],
+          "reason": "repeated micro-line primitive exceeds view-scale detail budget"
+        }
+      },
+      "renderable": false,
+      "visual_lod_hidden": true
+    },
+    {
+      "id": "sak_red_floor_light_line_z_0",
+      "role": "floor_detail_line",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "paper",
+      "support": "sak_red_floor",
+      "assembly_id": "lounge_decor",
+      "transform": {
+        "position": [
+          0.0,
+          0.112,
+          -1.36
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          3.3,
+          0.008,
+          0.012
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "floor_detail",
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_red_floor_shadow_line_z_1",
+      "role": "floor_detail_line",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "metal_dark",
+      "support": "sak_red_floor",
+      "assembly_id": "lounge_decor",
+      "transform": {
+        "position": [
+          0.0,
+          0.106,
+          -0.94
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          4.05,
+          0.01,
+          0.018
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "floor_detail",
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_red_floor_light_line_z_1",
+      "role": "floor_detail_line",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "paper",
+      "support": "sak_red_floor",
+      "assembly_id": "lounge_decor",
+      "transform": {
+        "position": [
+          0.0,
+          0.112,
+          -0.88
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          3.3,
+          0.008,
+          0.012
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "floor_detail",
+        "variant": 0,
+        "detail_lod_repair": {
+          "source": "advisory_relation_detail_lod_repair",
+          "group": [
+            "lounge_decor",
+            "sak_red_floor",
+            "floor_detail_line"
+          ],
+          "reason": "repeated micro-line primitive exceeds view-scale detail budget"
+        }
+      },
+      "renderable": false,
+      "visual_lod_hidden": true
+    },
+    {
+      "id": "sak_red_floor_shadow_line_z_2",
+      "role": "floor_detail_line",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "metal_dark",
+      "support": "sak_red_floor",
+      "assembly_id": "lounge_decor",
+      "transform": {
+        "position": [
+          0.0,
+          0.106,
+          -0.46
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          4.05,
+          0.01,
+          0.018
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "floor_detail",
+        "variant": 0,
+        "detail_lod_repair": {
+          "source": "advisory_relation_detail_lod_repair",
+          "group": [
+            "lounge_decor",
+            "sak_red_floor",
+            "floor_detail_line"
+          ],
+          "reason": "repeated micro-line primitive exceeds view-scale detail budget"
+        }
+      },
+      "renderable": false,
+      "visual_lod_hidden": true
+    },
+    {
+      "id": "sak_red_floor_light_line_z_2",
+      "role": "floor_detail_line",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "paper",
+      "support": "sak_red_floor",
+      "assembly_id": "lounge_decor",
+      "transform": {
+        "position": [
+          0.0,
+          0.112,
+          -0.4
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          3.3,
+          0.008,
+          0.012
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "floor_detail",
+        "variant": 0,
+        "detail_lod_repair": {
+          "source": "advisory_relation_detail_lod_repair",
+          "group": [
+            "lounge_decor",
+            "sak_red_floor",
+            "floor_detail_line"
+          ],
+          "reason": "repeated micro-line primitive exceeds view-scale detail budget"
+        }
+      },
+      "renderable": false,
+      "visual_lod_hidden": true
+    },
+    {
+      "id": "sak_red_floor_shadow_line_z_3",
+      "role": "floor_detail_line",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "metal_dark",
+      "support": "sak_red_floor",
+      "assembly_id": "lounge_decor",
+      "transform": {
+        "position": [
+          0.0,
+          0.106,
+          0.02
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          4.05,
+          0.01,
+          0.018
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "floor_detail",
+        "variant": 0,
+        "detail_lod_repair": {
+          "source": "advisory_relation_detail_lod_repair",
+          "group": [
+            "lounge_decor",
+            "sak_red_floor",
+            "floor_detail_line"
+          ],
+          "reason": "repeated micro-line primitive exceeds view-scale detail budget"
+        }
+      },
+      "renderable": false,
+      "visual_lod_hidden": true
+    },
+    {
+      "id": "sak_red_floor_light_line_z_3",
+      "role": "floor_detail_line",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "paper",
+      "support": "sak_red_floor",
+      "assembly_id": "lounge_decor",
+      "transform": {
+        "position": [
+          0.0,
+          0.112,
+          0.08
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          3.3,
+          0.008,
+          0.012
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "floor_detail",
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_red_floor_shadow_line_z_4",
+      "role": "floor_detail_line",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "metal_dark",
+      "support": "sak_red_floor",
+      "assembly_id": "lounge_decor",
+      "transform": {
+        "position": [
+          0.0,
+          0.106,
+          0.5
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          4.05,
+          0.01,
+          0.018
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "floor_detail",
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_red_floor_light_line_z_4",
+      "role": "floor_detail_line",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "paper",
+      "support": "sak_red_floor",
+      "assembly_id": "lounge_decor",
+      "transform": {
+        "position": [
+          0.0,
+          0.112,
+          0.56
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          3.3,
+          0.008,
+          0.012
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "floor_detail",
+        "variant": 0,
+        "detail_lod_repair": {
+          "source": "advisory_relation_detail_lod_repair",
+          "group": [
+            "lounge_decor",
+            "sak_red_floor",
+            "floor_detail_line"
+          ],
+          "reason": "repeated micro-line primitive exceeds view-scale detail budget"
+        }
+      },
+      "renderable": false,
+      "visual_lod_hidden": true
+    },
+    {
+      "id": "sak_red_floor_shadow_line_z_5",
+      "role": "floor_detail_line",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "metal_dark",
+      "support": "sak_red_floor",
+      "assembly_id": "lounge_decor",
+      "transform": {
+        "position": [
+          0.0,
+          0.106,
+          0.98
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          4.05,
+          0.01,
+          0.018
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "floor_detail",
+        "variant": 0,
+        "detail_lod_repair": {
+          "source": "advisory_relation_detail_lod_repair",
+          "group": [
+            "lounge_decor",
+            "sak_red_floor",
+            "floor_detail_line"
+          ],
+          "reason": "repeated micro-line primitive exceeds view-scale detail budget"
+        }
+      },
+      "renderable": false,
+      "visual_lod_hidden": true
+    },
+    {
+      "id": "sak_red_floor_light_line_z_5",
+      "role": "floor_detail_line",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "paper",
+      "support": "sak_red_floor",
+      "assembly_id": "lounge_decor",
+      "transform": {
+        "position": [
+          0.0,
+          0.112,
+          1.04
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          3.3,
+          0.008,
+          0.012
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "floor_detail",
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_red_floor_shadow_line_z_6",
+      "role": "floor_detail_line",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "metal_dark",
+      "support": "sak_red_floor",
+      "assembly_id": "lounge_decor",
+      "transform": {
+        "position": [
+          0.0,
+          0.106,
+          1.46
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          4.05,
+          0.01,
+          0.018
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "floor_detail",
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_red_floor_light_line_z_6",
+      "role": "floor_detail_line",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "paper",
+      "support": "sak_red_floor",
+      "assembly_id": "lounge_decor",
+      "transform": {
+        "position": [
+          0.0,
+          0.112,
+          1.52
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          3.3,
+          0.008,
+          0.012
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "floor_detail",
+        "variant": 0,
+        "detail_lod_repair": {
+          "source": "advisory_relation_detail_lod_repair",
+          "group": [
+            "lounge_decor",
+            "sak_red_floor",
+            "floor_detail_line"
+          ],
+          "reason": "repeated micro-line primitive exceeds view-scale detail budget"
+        }
+      },
+      "renderable": false,
+      "visual_lod_hidden": true
+    },
+    {
+      "id": "sak_red_floor_shadow_line_x_0",
+      "role": "floor_detail_line",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "metal_dark",
+      "support": "sak_red_floor",
+      "assembly_id": "lounge_decor",
+      "transform": {
+        "position": [
+          -1.84,
+          0.107,
+          0.02
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.018,
+          0.01,
+          3.1
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "floor_detail",
+        "variant": 0,
+        "detail_lod_repair": {
+          "source": "advisory_relation_detail_lod_repair",
+          "group": [
+            "lounge_decor",
+            "sak_red_floor",
+            "floor_detail_line"
+          ],
+          "reason": "repeated micro-line primitive exceeds view-scale detail budget"
+        }
+      },
+      "renderable": false,
+      "visual_lod_hidden": true
+    },
+    {
+      "id": "sak_red_floor_light_line_x_0",
+      "role": "floor_detail_line",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "paper",
+      "support": "sak_red_floor",
+      "assembly_id": "lounge_decor",
+      "transform": {
+        "position": [
+          -1.8,
+          0.113,
+          0.02
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.012,
+          0.008,
+          2.6
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "floor_detail",
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_red_floor_shadow_line_x_1",
+      "role": "floor_detail_line",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "metal_dark",
+      "support": "sak_red_floor",
+      "assembly_id": "lounge_decor",
+      "transform": {
+        "position": [
+          -1.22,
+          0.107,
+          0.02
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.018,
+          0.01,
+          3.1
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "floor_detail",
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_red_floor_light_line_x_1",
+      "role": "floor_detail_line",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "paper",
+      "support": "sak_red_floor",
+      "assembly_id": "lounge_decor",
+      "transform": {
+        "position": [
+          -1.18,
+          0.113,
+          0.02
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.012,
+          0.008,
+          2.6
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "floor_detail",
+        "variant": 0,
+        "detail_lod_repair": {
+          "source": "advisory_relation_detail_lod_repair",
+          "group": [
+            "lounge_decor",
+            "sak_red_floor",
+            "floor_detail_line"
+          ],
+          "reason": "repeated micro-line primitive exceeds view-scale detail budget"
+        }
+      },
+      "renderable": false,
+      "visual_lod_hidden": true
+    },
+    {
+      "id": "sak_red_floor_shadow_line_x_2",
+      "role": "floor_detail_line",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "metal_dark",
+      "support": "sak_red_floor",
+      "assembly_id": "lounge_decor",
+      "transform": {
+        "position": [
+          -0.6,
+          0.107,
+          0.02
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.018,
+          0.01,
+          3.1
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "floor_detail",
+        "variant": 0,
+        "detail_lod_repair": {
+          "source": "advisory_relation_detail_lod_repair",
+          "group": [
+            "lounge_decor",
+            "sak_red_floor",
+            "floor_detail_line"
+          ],
+          "reason": "repeated micro-line primitive exceeds view-scale detail budget"
+        }
+      },
+      "renderable": false,
+      "visual_lod_hidden": true
+    },
+    {
+      "id": "sak_red_floor_light_line_x_2",
+      "role": "floor_detail_line",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "paper",
+      "support": "sak_red_floor",
+      "assembly_id": "lounge_decor",
+      "transform": {
+        "position": [
+          -0.56,
+          0.113,
+          0.02
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.012,
+          0.008,
+          2.6
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "floor_detail",
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_red_floor_shadow_line_x_3",
+      "role": "floor_detail_line",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "metal_dark",
+      "support": "sak_red_floor",
+      "assembly_id": "lounge_decor",
+      "transform": {
+        "position": [
+          0.02,
+          0.107,
+          0.02
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.018,
+          0.01,
+          3.1
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "floor_detail",
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_red_floor_light_line_x_3",
+      "role": "floor_detail_line",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "paper",
+      "support": "sak_red_floor",
+      "assembly_id": "lounge_decor",
+      "transform": {
+        "position": [
+          0.06,
+          0.113,
+          0.02
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.012,
+          0.008,
+          2.6
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "floor_detail",
+        "variant": 0,
+        "detail_lod_repair": {
+          "source": "advisory_relation_detail_lod_repair",
+          "group": [
+            "lounge_decor",
+            "sak_red_floor",
+            "floor_detail_line"
+          ],
+          "reason": "repeated micro-line primitive exceeds view-scale detail budget"
+        }
+      },
+      "renderable": false,
+      "visual_lod_hidden": true
+    },
+    {
+      "id": "sak_red_floor_shadow_line_x_4",
+      "role": "floor_detail_line",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "metal_dark",
+      "support": "sak_red_floor",
+      "assembly_id": "lounge_decor",
+      "transform": {
+        "position": [
+          0.64,
+          0.107,
+          0.02
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.018,
+          0.01,
+          3.1
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "floor_detail",
+        "variant": 0,
+        "detail_lod_repair": {
+          "source": "advisory_relation_detail_lod_repair",
+          "group": [
+            "lounge_decor",
+            "sak_red_floor",
+            "floor_detail_line"
+          ],
+          "reason": "repeated micro-line primitive exceeds view-scale detail budget"
+        }
+      },
+      "renderable": false,
+      "visual_lod_hidden": true
+    },
+    {
+      "id": "sak_red_floor_light_line_x_4",
+      "role": "floor_detail_line",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "paper",
+      "support": "sak_red_floor",
+      "assembly_id": "lounge_decor",
+      "transform": {
+        "position": [
+          0.68,
+          0.113,
+          0.02
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.012,
+          0.008,
+          2.6
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "floor_detail",
+        "variant": 0,
+        "detail_lod_repair": {
+          "source": "advisory_relation_detail_lod_repair",
+          "group": [
+            "lounge_decor",
+            "sak_red_floor",
+            "floor_detail_line"
+          ],
+          "reason": "repeated micro-line primitive exceeds view-scale detail budget"
+        }
+      },
+      "renderable": false,
+      "visual_lod_hidden": true
+    },
+    {
+      "id": "sak_red_floor_shadow_line_x_5",
+      "role": "floor_detail_line",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "metal_dark",
+      "support": "sak_red_floor",
+      "assembly_id": "lounge_decor",
+      "transform": {
+        "position": [
+          1.26,
+          0.107,
+          0.02
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.018,
+          0.01,
+          3.1
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "floor_detail",
+        "variant": 0,
+        "detail_lod_repair": {
+          "source": "advisory_relation_detail_lod_repair",
+          "group": [
+            "lounge_decor",
+            "sak_red_floor",
+            "floor_detail_line"
+          ],
+          "reason": "repeated micro-line primitive exceeds view-scale detail budget"
+        }
+      },
+      "renderable": false,
+      "visual_lod_hidden": true
+    },
+    {
+      "id": "sak_red_floor_light_line_x_5",
+      "role": "floor_detail_line",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "paper",
+      "support": "sak_red_floor",
+      "assembly_id": "lounge_decor",
+      "transform": {
+        "position": [
+          1.3,
+          0.113,
+          0.02
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.012,
+          0.008,
+          2.6
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "floor_detail",
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_red_floor_shadow_line_x_6",
+      "role": "floor_detail_line",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "metal_dark",
+      "support": "sak_red_floor",
+      "assembly_id": "lounge_decor",
+      "transform": {
+        "position": [
+          1.88,
+          0.107,
+          0.02
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.018,
+          0.01,
+          3.1
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "floor_detail",
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_red_floor_light_line_x_6",
+      "role": "floor_detail_line",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "paper",
+      "support": "sak_red_floor",
+      "assembly_id": "lounge_decor",
+      "transform": {
+        "position": [
+          1.92,
+          0.113,
+          0.02
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.012,
+          0.008,
+          2.6
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "floor_detail",
+        "variant": 0,
+        "detail_lod_repair": {
+          "source": "advisory_relation_detail_lod_repair",
+          "group": [
+            "lounge_decor",
+            "sak_red_floor",
+            "floor_detail_line"
+          ],
+          "reason": "repeated micro-line primitive exceeds view-scale detail budget"
+        }
+      },
+      "renderable": false,
+      "visual_lod_hidden": true
+    },
+    {
+      "id": "sak_red_sofa_back_seam_0",
+      "role": "soft_prop",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "metal_dark",
+      "support": "sak_red_sofa_main",
+      "assembly_id": "lounge_seating",
+      "transform": {
+        "position": [
+          -0.55,
+          0.87,
+          0.89
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.018,
+          0.3,
+          0.035
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "sofa_detail",
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_red_sofa_back_seam_1",
+      "role": "soft_prop",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "metal_dark",
+      "support": "sak_red_sofa_main",
+      "assembly_id": "lounge_seating",
+      "transform": {
+        "position": [
+          0.0,
+          0.87,
+          0.89
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.018,
+          0.3,
+          0.035
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "sofa_detail",
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_red_sofa_back_seam_2",
+      "role": "soft_prop",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "metal_dark",
+      "support": "sak_red_sofa_main",
+      "assembly_id": "lounge_seating",
+      "transform": {
+        "position": [
+          0.55,
+          0.87,
+          0.89
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.018,
+          0.3,
+          0.035
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "sofa_detail",
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_red_table_dark_rail_0",
+      "role": "table_prop",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "metal_dark",
+      "support": "sak_red_table_glass_top",
+      "assembly_id": "lounge_table",
+      "transform": {
+        "position": [
+          -0.46,
+          0.7329995112471291,
+          0.04
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.03,
+          0.03,
+          0.56
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "table_detail",
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_red_table_dark_rail_1",
+      "role": "table_prop",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "metal_dark",
+      "support": "sak_red_table_glass_top",
+      "assembly_id": "lounge_table",
+      "transform": {
+        "position": [
+          0.46,
+          0.7329995112471291,
+          0.04
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.03,
+          0.03,
+          0.56
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "table_detail",
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_red_table_dark_crossrail_0",
+      "role": "table_prop",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "metal_dark",
+      "support": "sak_red_table_glass_top",
+      "assembly_id": "lounge_table",
+      "transform": {
+        "position": [
+          0.008,
+          0.7319995112471291,
+          -0.157
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.92,
+          0.028,
+          0.03
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "table_detail",
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_red_table_dark_crossrail_1",
+      "role": "table_prop",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "metal_dark",
+      "support": "sak_red_table_glass_top",
+      "assembly_id": "lounge_table",
+      "transform": {
+        "position": [
+          0.0,
+          0.7319995112471291,
+          0.24
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.92,
+          0.028,
+          0.03
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "table_detail",
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_red_curtain_0",
+      "role": "curtain",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "velvet_red",
+      "support": "sak_red_back_wall",
+      "assembly_id": "wall_dressing",
+      "transform": {
+        "position": [
+          -1.55,
+          1.36,
+          1.86
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.34,
+          1.72,
+          0.028
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "curtain",
+        "variant": 0
+      },
+      "attached_to": "sak_red_back_wall"
+    },
+    {
+      "id": "sak_red_curtain_edge_0",
+      "role": "wall_art",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "paper",
+      "support": "sak_red_back_wall",
+      "assembly_id": "wall_dressing",
+      "transform": {
+        "position": [
+          -1.37,
+          1.36,
+          1.842
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.018,
+          1.52,
+          0.012
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "decor",
+        "variant": 0
+      },
+      "attached_to": "sak_red_back_wall"
+    },
+    {
+      "id": "sak_red_curtain_1",
+      "role": "curtain",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "velvet_red",
+      "support": "sak_red_back_wall",
+      "assembly_id": "wall_dressing",
+      "transform": {
+        "position": [
+          -0.55,
+          1.36,
+          1.86
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.34,
+          1.72,
+          0.028
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "curtain",
+        "variant": 0
+      },
+      "attached_to": "sak_red_back_wall"
+    },
+    {
+      "id": "sak_red_curtain_edge_1",
+      "role": "wall_art",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "paper",
+      "support": "sak_red_back_wall",
+      "assembly_id": "wall_dressing",
+      "transform": {
+        "position": [
+          -0.37,
+          1.36,
+          1.842
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.018,
+          1.52,
+          0.012
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "decor",
+        "variant": 0
+      },
+      "attached_to": "sak_red_back_wall"
+    },
+    {
+      "id": "sak_red_curtain_2",
+      "role": "curtain",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "velvet_red",
+      "support": "sak_red_back_wall",
+      "assembly_id": "wall_dressing",
+      "transform": {
+        "position": [
+          0.55,
+          1.36,
+          1.86
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.34,
+          1.72,
+          0.028
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "curtain",
+        "variant": 0
+      },
+      "attached_to": "sak_red_back_wall"
+    },
+    {
+      "id": "sak_red_curtain_edge_2",
+      "role": "wall_art",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "paper",
+      "support": "sak_red_back_wall",
+      "assembly_id": "wall_dressing",
+      "transform": {
+        "position": [
+          0.73,
+          1.36,
+          1.842
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.018,
+          1.52,
+          0.012
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "decor",
+        "variant": 0
+      },
+      "attached_to": "sak_red_back_wall"
+    },
+    {
+      "id": "sak_red_curtain_3",
+      "role": "curtain",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "velvet_red",
+      "support": "sak_red_back_wall",
+      "assembly_id": "wall_dressing",
+      "transform": {
+        "position": [
+          1.55,
+          1.36,
+          1.86
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.34,
+          1.72,
+          0.028
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "curtain",
+        "variant": 0
+      },
+      "attached_to": "sak_red_back_wall"
+    },
+    {
+      "id": "sak_red_curtain_edge_3",
+      "role": "wall_art",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "paper",
+      "support": "sak_red_back_wall",
+      "assembly_id": "wall_dressing",
+      "transform": {
+        "position": [
+          1.73,
+          1.36,
+          1.842
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.018,
+          1.52,
+          0.012
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "decor",
+        "variant": 0
+      },
+      "attached_to": "sak_red_back_wall"
+    },
+    {
+      "id": "sak_red_back_wall_bright_rail_0",
+      "role": "wall_art",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "paper",
+      "support": "sak_red_back_wall",
+      "assembly_id": "wall_dressing",
+      "transform": {
+        "position": [
+          0.0,
+          0.82,
+          1.838
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          3.55,
+          0.018,
+          0.012
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "decor",
+        "variant": 0
+      },
+      "attached_to": "sak_red_back_wall"
+    },
+    {
+      "id": "sak_red_back_wall_bright_rail_1",
+      "role": "wall_art",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "paper",
+      "support": "sak_red_back_wall",
+      "assembly_id": "wall_dressing",
+      "transform": {
+        "position": [
+          0.0,
+          1.18,
+          1.838
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          3.55,
+          0.018,
+          0.012
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "decor",
+        "variant": 0
+      },
+      "attached_to": "sak_red_back_wall"
+    },
+    {
+      "id": "sak_red_back_wall_bright_rail_2",
+      "role": "wall_art",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "paper",
+      "support": "sak_red_back_wall",
+      "assembly_id": "wall_dressing",
+      "transform": {
+        "position": [
+          0.0,
+          1.54,
+          1.838
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          3.55,
+          0.018,
+          0.012
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "decor",
+        "variant": 0
+      },
+      "attached_to": "sak_red_back_wall"
+    },
+    {
+      "id": "sak_red_back_wall_bright_rail_3",
+      "role": "wall_art",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "paper",
+      "support": "sak_red_back_wall",
+      "assembly_id": "wall_dressing",
+      "transform": {
+        "position": [
+          0.0,
+          1.9,
+          1.838
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          3.55,
+          0.018,
+          0.012
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "decor",
+        "variant": 0
+      },
+      "attached_to": "sak_red_back_wall"
+    }
+  ],
+  "semantic_scene_graph": {
+    "schema": "cortex.scene_authoring_kernel.semantic_graph.v1",
+    "prompt": "moody crimson lounge with two human-scale sofas facing a coffee table, wall art, floor lamps, rug, and velvet atmosphere",
+    "family": "red_light_room",
+    "variant": 0,
+    "nodes": [
+      {
+        "id": "sak_red_floor",
+        "category": "floor",
+        "role": "room_floor",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_red_back_wall",
+        "category": "wall",
+        "role": "room_wall",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_red_left_wall",
+        "category": "wall",
+        "role": "room_wall",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_red_right_wall",
+        "category": "wall",
+        "role": "room_wall",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_red_ceiling",
+        "category": "ceiling",
+        "role": "room_ceiling",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_red_base_trim_back",
+        "category": "wall_detail",
+        "role": "architectural_baseboard",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_red_base_trim_left",
+        "category": "wall_detail",
+        "role": "architectural_baseboard",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_red_base_trim_right",
+        "category": "wall_detail",
+        "role": "architectural_baseboard",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_red_crown_trim_back",
+        "category": "wall_detail",
+        "role": "architectural_baseboard",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_red_crown_trim_left",
+        "category": "wall_detail",
+        "role": "architectural_baseboard",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_red_crown_trim_right",
+        "category": "wall_detail",
+        "role": "architectural_baseboard",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_red_corner_post_0",
+        "category": "wall_detail",
+        "role": "architectural_corner_post",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_red_corner_post_1",
+        "category": "wall_detail",
+        "role": "architectural_corner_post",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_red_back_wall_vertical_trim_0",
+        "category": "wall_detail",
+        "role": "wall_panel_trim",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_red_back_wall_vertical_trim_1",
+        "category": "wall_detail",
+        "role": "wall_panel_trim",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_red_back_wall_vertical_trim_2",
+        "category": "wall_detail",
+        "role": "wall_panel_trim",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_red_back_wall_vertical_trim_3",
+        "category": "wall_detail",
+        "role": "wall_panel_trim",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_red_back_wall_vertical_trim_4",
+        "category": "wall_detail",
+        "role": "wall_panel_trim",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_red_back_wall_horizontal_trim_0",
+        "category": "wall_detail",
+        "role": "wall_panel_trim",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_red_back_wall_horizontal_trim_1",
+        "category": "wall_detail",
+        "role": "wall_panel_trim",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_red_back_wall_horizontal_trim_2",
+        "category": "wall_detail",
+        "role": "wall_panel_trim",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_red_left_wall_vertical_trim_0",
+        "category": "wall_detail",
+        "role": "wall_panel_trim",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_red_left_wall_vertical_trim_1",
+        "category": "wall_detail",
+        "role": "wall_panel_trim",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_red_left_wall_vertical_trim_2",
+        "category": "wall_detail",
+        "role": "wall_panel_trim",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_red_right_wall_vertical_trim_0",
+        "category": "wall_detail",
+        "role": "wall_panel_trim",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_red_right_wall_vertical_trim_1",
+        "category": "wall_detail",
+        "role": "wall_panel_trim",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_red_right_wall_vertical_trim_2",
+        "category": "wall_detail",
+        "role": "wall_panel_trim",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_red_sofa_main",
+        "category": "sofa",
+        "role": "sofa_mesh",
+        "asset_id": "sofa_long",
+        "anchors": {
+          "floor_contact": [
+            0,
+            0,
+            0
+          ],
+          "front": [
+            0,
+            0,
+            -1
+          ]
+        },
+        "constraints": []
+      },
+      {
+        "id": "sak_red_lounge_chair_0",
+        "category": "sofa",
+        "role": "sofa_mesh",
+        "asset_id": "lounge_chair",
+        "anchors": {
+          "floor_contact": [
+            0,
+            0,
+            0
+          ],
+          "front": [
+            0,
+            0,
+            -1
+          ]
+        },
+        "constraints": []
+      },
+      {
+        "id": "sak_red_lounge_chair_1",
+        "category": "sofa",
+        "role": "sofa_mesh",
+        "asset_id": "lounge_chair",
+        "anchors": {
+          "floor_contact": [
+            0,
+            0,
+            0
+          ],
+          "front": [
+            0,
+            0,
+            -1
+          ]
+        },
+        "constraints": []
+      },
+      {
+        "id": "sak_red_lounge_chair_2",
+        "category": "sofa",
+        "role": "sofa_mesh",
+        "asset_id": "lounge_chair",
+        "anchors": {
+          "floor_contact": [
+            0,
+            0,
+            0
+          ],
+          "front": [
+            0,
+            0,
+            -1
+          ]
+        },
+        "constraints": []
+      },
+      {
+        "id": "sak_red_table",
+        "category": "table",
+        "role": "table_mesh",
+        "asset_id": "coffee_table_glass",
+        "anchors": {
+          "floor_contact": [
+            0,
+            0,
+            0
+          ],
+          "top_surface": [
+            0,
+            0.42,
+            0
+          ]
+        },
+        "constraints": []
+      },
+      {
+        "id": "sak_red_table_glass_top",
+        "category": "table_detail",
+        "role": "glass_accent",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_red_table_prop_0",
+        "category": "table_prop",
+        "role": "warm_fixture",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_red_table_prop_1",
+        "category": "table_prop",
+        "role": "table_prop",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_red_table_prop_2",
+        "category": "table_prop",
+        "role": "table_prop",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_red_soft_ottoman_0",
+        "category": "soft_prop",
+        "role": "soft_prop",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_red_soft_ottoman_1",
+        "category": "soft_prop",
+        "role": "soft_prop",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_red_soft_ottoman_2",
+        "category": "soft_prop",
+        "role": "soft_prop",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_red_soft_ottoman_3",
+        "category": "soft_prop",
+        "role": "soft_prop",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_red_floor_lamp_left",
+        "category": "light",
+        "role": "floor_lamp_mesh",
+        "asset_id": "lamp_floor_round",
+        "anchors": {
+          "floor_contact": [
+            0,
+            0,
+            0
+          ]
+        },
+        "constraints": []
+      },
+      {
+        "id": "sak_red_floor_lamp_right",
+        "category": "light",
+        "role": "floor_lamp_mesh",
+        "asset_id": "lamp_floor_round",
+        "anchors": {
+          "floor_contact": [
+            0,
+            0,
+            0
+          ]
+        },
+        "constraints": []
+      },
+      {
+        "id": "sak_red_wall_light_0",
+        "category": "light",
+        "role": "wall_light",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_red_wall_light_1",
+        "category": "light",
+        "role": "wall_light",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_red_wall_light_2",
+        "category": "light",
+        "role": "wall_light",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_red_wall_light_3",
+        "category": "light",
+        "role": "wall_light",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_red_palette_panel_0",
+        "category": "decor",
+        "role": "palette_accent_panel",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_red_palette_panel_1",
+        "category": "decor",
+        "role": "palette_accent_panel",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_red_palette_panel_2",
+        "category": "decor",
+        "role": "palette_accent_panel",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_red_palette_panel_3",
+        "category": "decor",
+        "role": "palette_accent_panel",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_red_floor_light_tile_0",
+        "category": "light",
+        "role": "palette_accent_panel",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_red_floor_light_tile_1",
+        "category": "light",
+        "role": "palette_accent_panel",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_red_floor_light_tile_2",
+        "category": "light",
+        "role": "palette_accent_panel",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_red_floor_light_tile_3",
+        "category": "light",
+        "role": "palette_accent_panel",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_red_side_table_left",
+        "category": "table",
+        "role": "side_table",
+        "asset_id": "side_table",
+        "anchors": {
+          "floor_contact": [
+            0,
+            0,
+            0
+          ],
+          "top_surface": [
+            0,
+            0.45,
+            0
+          ]
+        },
+        "constraints": []
+      },
+      {
+        "id": "sak_red_rug_round",
+        "category": "floor_detail",
+        "role": "floor_mat",
+        "asset_id": "rug_round",
+        "anchors": {
+          "floor_contact": [
+            0,
+            0,
+            0
+          ]
+        },
+        "constraints": []
+      },
+      {
+        "id": "sak_red_floor_shadow_line_z_0",
+        "category": "floor_detail",
+        "role": "floor_detail_line",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_red_floor_light_line_z_0",
+        "category": "floor_detail",
+        "role": "floor_detail_line",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_red_floor_shadow_line_z_1",
+        "category": "floor_detail",
+        "role": "floor_detail_line",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_red_floor_light_line_z_1",
+        "category": "floor_detail",
+        "role": "floor_detail_line",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_red_floor_shadow_line_z_2",
+        "category": "floor_detail",
+        "role": "floor_detail_line",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_red_floor_light_line_z_2",
+        "category": "floor_detail",
+        "role": "floor_detail_line",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_red_floor_shadow_line_z_3",
+        "category": "floor_detail",
+        "role": "floor_detail_line",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_red_floor_light_line_z_3",
+        "category": "floor_detail",
+        "role": "floor_detail_line",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_red_floor_shadow_line_z_4",
+        "category": "floor_detail",
+        "role": "floor_detail_line",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_red_floor_light_line_z_4",
+        "category": "floor_detail",
+        "role": "floor_detail_line",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_red_floor_shadow_line_z_5",
+        "category": "floor_detail",
+        "role": "floor_detail_line",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_red_floor_light_line_z_5",
+        "category": "floor_detail",
+        "role": "floor_detail_line",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_red_floor_shadow_line_z_6",
+        "category": "floor_detail",
+        "role": "floor_detail_line",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_red_floor_light_line_z_6",
+        "category": "floor_detail",
+        "role": "floor_detail_line",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_red_floor_shadow_line_x_0",
+        "category": "floor_detail",
+        "role": "floor_detail_line",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_red_floor_light_line_x_0",
+        "category": "floor_detail",
+        "role": "floor_detail_line",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_red_floor_shadow_line_x_1",
+        "category": "floor_detail",
+        "role": "floor_detail_line",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_red_floor_light_line_x_1",
+        "category": "floor_detail",
+        "role": "floor_detail_line",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_red_floor_shadow_line_x_2",
+        "category": "floor_detail",
+        "role": "floor_detail_line",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_red_floor_light_line_x_2",
+        "category": "floor_detail",
+        "role": "floor_detail_line",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_red_floor_shadow_line_x_3",
+        "category": "floor_detail",
+        "role": "floor_detail_line",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_red_floor_light_line_x_3",
+        "category": "floor_detail",
+        "role": "floor_detail_line",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_red_floor_shadow_line_x_4",
+        "category": "floor_detail",
+        "role": "floor_detail_line",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_red_floor_light_line_x_4",
+        "category": "floor_detail",
+        "role": "floor_detail_line",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_red_floor_shadow_line_x_5",
+        "category": "floor_detail",
+        "role": "floor_detail_line",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_red_floor_light_line_x_5",
+        "category": "floor_detail",
+        "role": "floor_detail_line",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_red_floor_shadow_line_x_6",
+        "category": "floor_detail",
+        "role": "floor_detail_line",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_red_floor_light_line_x_6",
+        "category": "floor_detail",
+        "role": "floor_detail_line",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_red_sofa_back_seam_0",
+        "category": "sofa_detail",
+        "role": "soft_prop",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_red_sofa_back_seam_1",
+        "category": "sofa_detail",
+        "role": "soft_prop",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_red_sofa_back_seam_2",
+        "category": "sofa_detail",
+        "role": "soft_prop",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_red_table_dark_rail_0",
+        "category": "table_detail",
+        "role": "table_prop",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_red_table_dark_rail_1",
+        "category": "table_detail",
+        "role": "table_prop",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_red_table_dark_crossrail_0",
+        "category": "table_detail",
+        "role": "table_prop",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_red_table_dark_crossrail_1",
+        "category": "table_detail",
+        "role": "table_prop",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_red_curtain_0",
+        "category": "curtain",
+        "role": "curtain",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_red_curtain_edge_0",
+        "category": "decor",
+        "role": "wall_art",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_red_curtain_1",
+        "category": "curtain",
+        "role": "curtain",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_red_curtain_edge_1",
+        "category": "decor",
+        "role": "wall_art",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_red_curtain_2",
+        "category": "curtain",
+        "role": "curtain",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_red_curtain_edge_2",
+        "category": "decor",
+        "role": "wall_art",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_red_curtain_3",
+        "category": "curtain",
+        "role": "curtain",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_red_curtain_edge_3",
+        "category": "decor",
+        "role": "wall_art",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_red_back_wall_bright_rail_0",
+        "category": "decor",
+        "role": "wall_art",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_red_back_wall_bright_rail_1",
+        "category": "decor",
+        "role": "wall_art",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_red_back_wall_bright_rail_2",
+        "category": "decor",
+        "role": "wall_art",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_red_back_wall_bright_rail_3",
+        "category": "decor",
+        "role": "wall_art",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      }
+    ],
+    "relations": [
+      {
+        "type": "supports",
+        "source": "ground",
+        "target": "sak_red_floor",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_red_floor",
+        "target": "room_shell",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "ground",
+        "target": "sak_red_back_wall",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_red_back_wall",
+        "target": "room_shell",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "ground",
+        "target": "sak_red_left_wall",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_red_left_wall",
+        "target": "room_shell",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "ground",
+        "target": "sak_red_right_wall",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_red_right_wall",
+        "target": "room_shell",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "ground",
+        "target": "sak_red_ceiling",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_red_ceiling",
+        "target": "room_shell",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_red_floor",
+        "target": "sak_red_base_trim_back",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_red_base_trim_back",
+        "target": "room_shell",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_red_floor",
+        "target": "sak_red_base_trim_left",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_red_base_trim_left",
+        "target": "room_shell",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_red_floor",
+        "target": "sak_red_base_trim_right",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_red_base_trim_right",
+        "target": "room_shell",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_red_floor",
+        "target": "sak_red_crown_trim_back",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_red_crown_trim_back",
+        "target": "room_shell",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_red_floor",
+        "target": "sak_red_crown_trim_left",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_red_crown_trim_left",
+        "target": "room_shell",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_red_floor",
+        "target": "sak_red_crown_trim_right",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_red_crown_trim_right",
+        "target": "room_shell",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_red_floor",
+        "target": "sak_red_corner_post_0",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_red_corner_post_0",
+        "target": "room_shell",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_red_floor",
+        "target": "sak_red_corner_post_1",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_red_corner_post_1",
+        "target": "room_shell",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_red_floor",
+        "target": "sak_red_back_wall_vertical_trim_0",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_red_back_wall_vertical_trim_0",
+        "target": "room_shell",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_red_floor",
+        "target": "sak_red_back_wall_vertical_trim_1",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_red_back_wall_vertical_trim_1",
+        "target": "room_shell",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_red_floor",
+        "target": "sak_red_back_wall_vertical_trim_2",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_red_back_wall_vertical_trim_2",
+        "target": "room_shell",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_red_floor",
+        "target": "sak_red_back_wall_vertical_trim_3",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_red_back_wall_vertical_trim_3",
+        "target": "room_shell",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_red_floor",
+        "target": "sak_red_back_wall_vertical_trim_4",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_red_back_wall_vertical_trim_4",
+        "target": "room_shell",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_red_floor",
+        "target": "sak_red_back_wall_horizontal_trim_0",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_red_back_wall_horizontal_trim_0",
+        "target": "room_shell",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_red_floor",
+        "target": "sak_red_back_wall_horizontal_trim_1",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_red_back_wall_horizontal_trim_1",
+        "target": "room_shell",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_red_floor",
+        "target": "sak_red_back_wall_horizontal_trim_2",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_red_back_wall_horizontal_trim_2",
+        "target": "room_shell",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_red_floor",
+        "target": "sak_red_left_wall_vertical_trim_0",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_red_left_wall_vertical_trim_0",
+        "target": "room_shell",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_red_floor",
+        "target": "sak_red_left_wall_vertical_trim_1",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_red_left_wall_vertical_trim_1",
+        "target": "room_shell",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_red_floor",
+        "target": "sak_red_left_wall_vertical_trim_2",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_red_left_wall_vertical_trim_2",
+        "target": "room_shell",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_red_floor",
+        "target": "sak_red_right_wall_vertical_trim_0",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_red_right_wall_vertical_trim_0",
+        "target": "room_shell",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_red_floor",
+        "target": "sak_red_right_wall_vertical_trim_1",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_red_right_wall_vertical_trim_1",
+        "target": "room_shell",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_red_floor",
+        "target": "sak_red_right_wall_vertical_trim_2",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_red_right_wall_vertical_trim_2",
+        "target": "room_shell",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_red_floor",
+        "target": "sak_red_sofa_main",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_red_sofa_main",
+        "target": "lounge_seating",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_red_floor",
+        "target": "sak_red_lounge_chair_0",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_red_lounge_chair_0",
+        "target": "lounge_seating",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "faces",
+        "source": "sak_red_lounge_chair_0",
+        "target": "sak_red_table",
+        "reason": "lounge_seating_faces_table"
+      },
+      {
+        "type": "supports",
+        "source": "sak_red_floor",
+        "target": "sak_red_lounge_chair_1",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_red_lounge_chair_1",
+        "target": "lounge_seating",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "faces",
+        "source": "sak_red_lounge_chair_1",
+        "target": "sak_red_table",
+        "reason": "lounge_seating_faces_table"
+      },
+      {
+        "type": "supports",
+        "source": "sak_red_floor",
+        "target": "sak_red_lounge_chair_2",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_red_lounge_chair_2",
+        "target": "lounge_seating",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "faces",
+        "source": "sak_red_lounge_chair_2",
+        "target": "sak_red_table",
+        "reason": "lounge_seating_faces_table"
+      },
+      {
+        "type": "supports",
+        "source": "sak_red_floor",
+        "target": "sak_red_table",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_red_table",
+        "target": "lounge_table",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_red_table",
+        "target": "sak_red_table_glass_top",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_red_table_glass_top",
+        "target": "lounge_table",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_red_table_glass_top",
+        "target": "sak_red_table_prop_0",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_red_table_prop_0",
+        "target": "lounge_table",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_red_table_glass_top",
+        "target": "sak_red_table_prop_1",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_red_table_prop_1",
+        "target": "lounge_table",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_red_table_glass_top",
+        "target": "sak_red_table_prop_2",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_red_table_prop_2",
+        "target": "lounge_table",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_red_floor",
+        "target": "sak_red_soft_ottoman_0",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_red_soft_ottoman_0",
+        "target": "lounge_seating",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_red_floor",
+        "target": "sak_red_soft_ottoman_1",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_red_soft_ottoman_1",
+        "target": "lounge_seating",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_red_floor",
+        "target": "sak_red_soft_ottoman_2",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_red_soft_ottoman_2",
+        "target": "lounge_seating",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_red_floor",
+        "target": "sak_red_soft_ottoman_3",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_red_soft_ottoman_3",
+        "target": "lounge_seating",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_red_floor",
+        "target": "sak_red_floor_lamp_left",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_red_floor_lamp_left",
+        "target": "red_room_lighting",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_red_floor",
+        "target": "sak_red_floor_lamp_right",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_red_floor_lamp_right",
+        "target": "red_room_lighting",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_red_back_wall",
+        "target": "sak_red_wall_light_0",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "attached_to",
+        "source": "sak_red_wall_light_0",
+        "target": "sak_red_back_wall",
+        "reason": "constructor_attachment"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_red_wall_light_0",
+        "target": "red_room_lighting",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_red_back_wall",
+        "target": "sak_red_wall_light_1",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "attached_to",
+        "source": "sak_red_wall_light_1",
+        "target": "sak_red_back_wall",
+        "reason": "constructor_attachment"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_red_wall_light_1",
+        "target": "red_room_lighting",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_red_back_wall",
+        "target": "sak_red_wall_light_2",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "attached_to",
+        "source": "sak_red_wall_light_2",
+        "target": "sak_red_back_wall",
+        "reason": "constructor_attachment"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_red_wall_light_2",
+        "target": "red_room_lighting",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_red_back_wall",
+        "target": "sak_red_wall_light_3",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "attached_to",
+        "source": "sak_red_wall_light_3",
+        "target": "sak_red_back_wall",
+        "reason": "constructor_attachment"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_red_wall_light_3",
+        "target": "red_room_lighting",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_red_back_wall",
+        "target": "sak_red_palette_panel_0",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "attached_to",
+        "source": "sak_red_palette_panel_0",
+        "target": "sak_red_back_wall",
+        "reason": "constructor_attachment"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_red_palette_panel_0",
+        "target": "red_room_lighting",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_red_back_wall",
+        "target": "sak_red_palette_panel_1",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "attached_to",
+        "source": "sak_red_palette_panel_1",
+        "target": "sak_red_back_wall",
+        "reason": "constructor_attachment"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_red_palette_panel_1",
+        "target": "red_room_lighting",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_red_back_wall",
+        "target": "sak_red_palette_panel_2",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "attached_to",
+        "source": "sak_red_palette_panel_2",
+        "target": "sak_red_back_wall",
+        "reason": "constructor_attachment"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_red_palette_panel_2",
+        "target": "red_room_lighting",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_red_back_wall",
+        "target": "sak_red_palette_panel_3",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "attached_to",
+        "source": "sak_red_palette_panel_3",
+        "target": "sak_red_back_wall",
+        "reason": "constructor_attachment"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_red_palette_panel_3",
+        "target": "red_room_lighting",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_red_floor",
+        "target": "sak_red_floor_light_tile_0",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_red_floor_light_tile_0",
+        "target": "red_room_lighting",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_red_floor",
+        "target": "sak_red_floor_light_tile_1",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_red_floor_light_tile_1",
+        "target": "red_room_lighting",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_red_floor",
+        "target": "sak_red_floor_light_tile_2",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_red_floor_light_tile_2",
+        "target": "red_room_lighting",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_red_floor",
+        "target": "sak_red_floor_light_tile_3",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_red_floor_light_tile_3",
+        "target": "red_room_lighting",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_red_floor",
+        "target": "sak_red_side_table_left",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_red_side_table_left",
+        "target": "lounge_decor",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_red_floor",
+        "target": "sak_red_rug_round",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_red_rug_round",
+        "target": "lounge_decor",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_red_floor",
+        "target": "sak_red_floor_shadow_line_z_0",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_red_floor_shadow_line_z_0",
+        "target": "lounge_decor",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_red_floor",
+        "target": "sak_red_floor_light_line_z_0",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_red_floor_light_line_z_0",
+        "target": "lounge_decor",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_red_floor",
+        "target": "sak_red_floor_shadow_line_z_1",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_red_floor_shadow_line_z_1",
+        "target": "lounge_decor",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_red_floor",
+        "target": "sak_red_floor_light_line_z_1",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_red_floor_light_line_z_1",
+        "target": "lounge_decor",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_red_floor",
+        "target": "sak_red_floor_shadow_line_z_2",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_red_floor_shadow_line_z_2",
+        "target": "lounge_decor",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_red_floor",
+        "target": "sak_red_floor_light_line_z_2",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_red_floor_light_line_z_2",
+        "target": "lounge_decor",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_red_floor",
+        "target": "sak_red_floor_shadow_line_z_3",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_red_floor_shadow_line_z_3",
+        "target": "lounge_decor",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_red_floor",
+        "target": "sak_red_floor_light_line_z_3",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_red_floor_light_line_z_3",
+        "target": "lounge_decor",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_red_floor",
+        "target": "sak_red_floor_shadow_line_z_4",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_red_floor_shadow_line_z_4",
+        "target": "lounge_decor",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_red_floor",
+        "target": "sak_red_floor_light_line_z_4",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_red_floor_light_line_z_4",
+        "target": "lounge_decor",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_red_floor",
+        "target": "sak_red_floor_shadow_line_z_5",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_red_floor_shadow_line_z_5",
+        "target": "lounge_decor",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_red_floor",
+        "target": "sak_red_floor_light_line_z_5",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_red_floor_light_line_z_5",
+        "target": "lounge_decor",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_red_floor",
+        "target": "sak_red_floor_shadow_line_z_6",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_red_floor_shadow_line_z_6",
+        "target": "lounge_decor",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_red_floor",
+        "target": "sak_red_floor_light_line_z_6",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_red_floor_light_line_z_6",
+        "target": "lounge_decor",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_red_floor",
+        "target": "sak_red_floor_shadow_line_x_0",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_red_floor_shadow_line_x_0",
+        "target": "lounge_decor",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_red_floor",
+        "target": "sak_red_floor_light_line_x_0",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_red_floor_light_line_x_0",
+        "target": "lounge_decor",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_red_floor",
+        "target": "sak_red_floor_shadow_line_x_1",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_red_floor_shadow_line_x_1",
+        "target": "lounge_decor",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_red_floor",
+        "target": "sak_red_floor_light_line_x_1",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_red_floor_light_line_x_1",
+        "target": "lounge_decor",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_red_floor",
+        "target": "sak_red_floor_shadow_line_x_2",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_red_floor_shadow_line_x_2",
+        "target": "lounge_decor",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_red_floor",
+        "target": "sak_red_floor_light_line_x_2",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_red_floor_light_line_x_2",
+        "target": "lounge_decor",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_red_floor",
+        "target": "sak_red_floor_shadow_line_x_3",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_red_floor_shadow_line_x_3",
+        "target": "lounge_decor",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_red_floor",
+        "target": "sak_red_floor_light_line_x_3",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_red_floor_light_line_x_3",
+        "target": "lounge_decor",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_red_floor",
+        "target": "sak_red_floor_shadow_line_x_4",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_red_floor_shadow_line_x_4",
+        "target": "lounge_decor",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_red_floor",
+        "target": "sak_red_floor_light_line_x_4",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_red_floor_light_line_x_4",
+        "target": "lounge_decor",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_red_floor",
+        "target": "sak_red_floor_shadow_line_x_5",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_red_floor_shadow_line_x_5",
+        "target": "lounge_decor",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_red_floor",
+        "target": "sak_red_floor_light_line_x_5",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_red_floor_light_line_x_5",
+        "target": "lounge_decor",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_red_floor",
+        "target": "sak_red_floor_shadow_line_x_6",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_red_floor_shadow_line_x_6",
+        "target": "lounge_decor",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_red_floor",
+        "target": "sak_red_floor_light_line_x_6",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_red_floor_light_line_x_6",
+        "target": "lounge_decor",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_red_sofa_main",
+        "target": "sak_red_sofa_back_seam_0",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_red_sofa_back_seam_0",
+        "target": "lounge_seating",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_red_sofa_main",
+        "target": "sak_red_sofa_back_seam_1",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_red_sofa_back_seam_1",
+        "target": "lounge_seating",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_red_sofa_main",
+        "target": "sak_red_sofa_back_seam_2",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_red_sofa_back_seam_2",
+        "target": "lounge_seating",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_red_table_glass_top",
+        "target": "sak_red_table_dark_rail_0",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_red_table_dark_rail_0",
+        "target": "lounge_table",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_red_table_glass_top",
+        "target": "sak_red_table_dark_rail_1",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_red_table_dark_rail_1",
+        "target": "lounge_table",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_red_table_glass_top",
+        "target": "sak_red_table_dark_crossrail_0",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_red_table_dark_crossrail_0",
+        "target": "lounge_table",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_red_table_glass_top",
+        "target": "sak_red_table_dark_crossrail_1",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_red_table_dark_crossrail_1",
+        "target": "lounge_table",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_red_back_wall",
+        "target": "sak_red_curtain_0",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "attached_to",
+        "source": "sak_red_curtain_0",
+        "target": "sak_red_back_wall",
+        "reason": "constructor_attachment"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_red_curtain_0",
+        "target": "wall_dressing",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_red_back_wall",
+        "target": "sak_red_curtain_edge_0",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "attached_to",
+        "source": "sak_red_curtain_edge_0",
+        "target": "sak_red_back_wall",
+        "reason": "constructor_attachment"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_red_curtain_edge_0",
+        "target": "wall_dressing",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_red_back_wall",
+        "target": "sak_red_curtain_1",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "attached_to",
+        "source": "sak_red_curtain_1",
+        "target": "sak_red_back_wall",
+        "reason": "constructor_attachment"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_red_curtain_1",
+        "target": "wall_dressing",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_red_back_wall",
+        "target": "sak_red_curtain_edge_1",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "attached_to",
+        "source": "sak_red_curtain_edge_1",
+        "target": "sak_red_back_wall",
+        "reason": "constructor_attachment"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_red_curtain_edge_1",
+        "target": "wall_dressing",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_red_back_wall",
+        "target": "sak_red_curtain_2",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "attached_to",
+        "source": "sak_red_curtain_2",
+        "target": "sak_red_back_wall",
+        "reason": "constructor_attachment"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_red_curtain_2",
+        "target": "wall_dressing",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_red_back_wall",
+        "target": "sak_red_curtain_edge_2",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "attached_to",
+        "source": "sak_red_curtain_edge_2",
+        "target": "sak_red_back_wall",
+        "reason": "constructor_attachment"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_red_curtain_edge_2",
+        "target": "wall_dressing",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_red_back_wall",
+        "target": "sak_red_curtain_3",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "attached_to",
+        "source": "sak_red_curtain_3",
+        "target": "sak_red_back_wall",
+        "reason": "constructor_attachment"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_red_curtain_3",
+        "target": "wall_dressing",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_red_back_wall",
+        "target": "sak_red_curtain_edge_3",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "attached_to",
+        "source": "sak_red_curtain_edge_3",
+        "target": "sak_red_back_wall",
+        "reason": "constructor_attachment"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_red_curtain_edge_3",
+        "target": "wall_dressing",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_red_back_wall",
+        "target": "sak_red_back_wall_bright_rail_0",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "attached_to",
+        "source": "sak_red_back_wall_bright_rail_0",
+        "target": "sak_red_back_wall",
+        "reason": "constructor_attachment"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_red_back_wall_bright_rail_0",
+        "target": "wall_dressing",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_red_back_wall",
+        "target": "sak_red_back_wall_bright_rail_1",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "attached_to",
+        "source": "sak_red_back_wall_bright_rail_1",
+        "target": "sak_red_back_wall",
+        "reason": "constructor_attachment"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_red_back_wall_bright_rail_1",
+        "target": "wall_dressing",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_red_back_wall",
+        "target": "sak_red_back_wall_bright_rail_2",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "attached_to",
+        "source": "sak_red_back_wall_bright_rail_2",
+        "target": "sak_red_back_wall",
+        "reason": "constructor_attachment"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_red_back_wall_bright_rail_2",
+        "target": "wall_dressing",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_red_back_wall",
+        "target": "sak_red_back_wall_bright_rail_3",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "attached_to",
+        "source": "sak_red_back_wall_bright_rail_3",
+        "target": "sak_red_back_wall",
+        "reason": "constructor_attachment"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_red_back_wall_bright_rail_3",
+        "target": "wall_dressing",
+        "reason": "constructor_assembly"
+      }
+    ],
+    "validation_view_overrides": {},
+    "warnings": []
+  },
+  "scene_authoring_kernel_v1": {
+    "prompt": "moody crimson lounge with two human-scale sofas facing a coffee table, wall art, floor lamps, rug, and velvet atmosphere",
+    "family": "red_light_room",
+    "variant": 0,
+    "graph_node_count": 103,
+    "graph_relation_count": 229,
+    "warnings": [],
+    "completion_claim_allowed": false,
+    "human_review_required": true
+  },
+  "scene_graph_kernel_v1": {
+    "status": "repaired"
+  },
+  "metadata": {
+    "semantic_warning_repair": {
+      "source": "run_scene_authoring_semantic_warning_repair_batch",
+      "source_scene_id": "sak_red_light_room_moody_crimson_lounge_with_two_human_scale_sofas_facing_a_coffee_table_wa_v0",
+      "source_assertion_count": 0,
+      "change_count": 0,
+      "skipped_count": 0,
+      "completion_claim_allowed": false
+    },
+    "detail_lod_repair": {
+      "groups": [
+        {
+          "group": [
+            "lounge_decor",
+            "sak_red_floor",
+            "floor_detail_line"
+          ],
+          "candidate_count": 28,
+          "kept_count": 12,
+          "hidden_count": 16
+        },
+        {
+          "group": [
+            "room_shell",
+            "sak_red_floor",
+            "wall_panel_trim"
+          ],
+          "candidate_count": 14,
+          "kept_count": 12,
+          "hidden_count": 2
+        }
+      ]
+    },
+    "advisory_proposal": {
+      "source": "run_scene_authoring_advisory_proposal_batch",
+      "proposal": "relation_detail_lod_repair",
+      "change_count": 18,
+      "completion_claim_allowed": false
+    },
+    "facing_relation_compilation": {
+      "schema": 1,
+      "source": "tools/model_scene_facing_relation_compiler.py",
+      "change_count": 3,
+      "skipped_count": 0,
+      "completion_claim_allowed": false,
+      "human_review_required": true
+    }
+  }
+}

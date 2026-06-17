@@ -1,0 +1,106 @@
+{
+  "asset": {
+    "version": "2.0",
+    "generator": "CortexEngine OBJ-to-glTF pretrained asset converter"
+  },
+  "scene": 0,
+  "scenes": [
+    {
+      "nodes": [
+        0
+      ]
+    }
+  ],
+  "nodes": [
+    {
+      "mesh": 0
+    }
+  ],
+  "meshes": [
+    {
+      "primitives": [
+        {
+          "attributes": {
+            "POSITION": 0,
+            "NORMAL": 1,
+            "TEXCOORD_0": 2
+          },
+          "indices": 3,
+          "mode": 4
+        }
+      ]
+    }
+  ],
+  "buffers": [
+    {
+      "uri": "rain_glass_pavilion_rain_puddle_floor_patch_openai_shap_e_text300m.bin",
+      "byteLength": 1418464
+    }
+  ],
+  "bufferViews": [
+    {
+      "buffer": 0,
+      "byteOffset": 0,
+      "byteLength": 303504,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteOffset": 303504,
+      "byteLength": 303504,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteOffset": 607008,
+      "byteLength": 202336,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteOffset": 809344,
+      "byteLength": 609120,
+      "target": 34963
+    }
+  ],
+  "accessors": [
+    {
+      "bufferView": 0,
+      "byteOffset": 0,
+      "componentType": 5126,
+      "count": 25292,
+      "type": "VEC3",
+      "min": [
+        -0.01001300010830164,
+        0.0,
+        -0.00010199999815085903
+      ],
+      "max": [
+        0.01001300010830164,
+        0.019999999552965164,
+        0.00010199999815085903
+      ]
+    },
+    {
+      "bufferView": 1,
+      "byteOffset": 0,
+      "componentType": 5126,
+      "count": 25292,
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 2,
+      "byteOffset": 0,
+      "componentType": 5126,
+      "count": 25292,
+      "type": "VEC2"
+    },
+    {
+      "bufferView": 3,
+      "byteOffset": 0,
+      "componentType": 5125,
+      "count": 152280,
+      "type": "SCALAR"
+    }
+  ]
+}

@@ -1,0 +1,22 @@
+{
+  "schema": 1,
+  "job_id": "openai_shap_e_text300m/basketball_gym/indoor_rim_net_bracket",
+  "prompt": "indoor basketball rim with orange metal hoop, white hanging net, black wall mounting bracket, clean game asset, separated object, no court, no room, no full scene",
+  "seed": 944231,
+  "steps": 24,
+  "guidance_scale": 12.0,
+  "triangle_count": 15432,
+  "bounds_meters": {
+    "min": [
+      -0.1451738029718399,
+      0.0,
+      -0.2750000059604645
+    ],
+    "max": [
+      0.1451738029718399,
+      0.166258305311203,
+      0.2750000059604645
+    ]
+  },
+  "raw_generator": "openai_shap_e_text300m"
+}

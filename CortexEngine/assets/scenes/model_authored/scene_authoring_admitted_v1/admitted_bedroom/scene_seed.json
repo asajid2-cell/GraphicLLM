@@ -1,0 +1,4917 @@
+{
+  "schema": "cortex.model_authored_scene_seed.v1",
+  "id": "sak_bedroom_evening_quiet_evening_bedroom_with_bed_nightstands_lamps_reading_chair_and_warm__v0",
+  "scene_family": "bedroom_evening",
+  "status": "MODEL_AUTHORED_SCENE_GRAPH_KERNEL_V1_REPAIRED",
+  "generator": {
+    "name": "scene_authoring_kernel_v1",
+    "mode": "brief_to_semantic_graph_to_seed",
+    "prompt": "quiet evening bedroom with bed nightstands lamps reading chair and warm rug",
+    "construction_layers": [
+      "brief_compiler_v1",
+      "semantic_graph_native_constructor_v1",
+      "asset_affordance_catalog_v1",
+      "assembly_template_solver_v1",
+      "scene_graph_kernel_v1"
+    ]
+  },
+  "environment": {
+    "preset": "neutral_procedural",
+    "art_lighting_preset": "scene_local_authoring_kernel",
+    "graphics_preset": "hero_final_art",
+    "ibl_enabled": false,
+    "ibl_diffuse_intensity": 0.0,
+    "ibl_specular_intensity": 0.0,
+    "allow_hdri_background": false,
+    "allow_hdri_reflections": false,
+    "visible_background": "authored_geometry_only",
+    "ambient_source": "scene_authored_lights",
+    "reflection_policy": "scene_local_no_hdri"
+  },
+  "camera": {
+    "position": [
+      -2.05,
+      1.32,
+      -1.62
+    ],
+    "target": [
+      0.1,
+      0.78,
+      0.52
+    ],
+    "fov": 58.0,
+    "class": "hero"
+  },
+  "validation_view_overrides": {
+    "left_three_quarter": {
+      "position_nudge": [
+        -0.18,
+        0.02,
+        -0.04
+      ],
+      "target_nudge": [
+        0.22,
+        0.0,
+        0.02
+      ],
+      "fov_add": 1.5,
+      "reason": "avoid_centered_bed_lamp_mass_in_oblique_review_view"
+    }
+  },
+  "materials": {
+    "room_wall_warm": {
+      "color": [
+        0.62,
+        0.58,
+        0.5,
+        1.0
+      ],
+      "metallic": 0.0,
+      "roughness": 0.82,
+      "preset": "paint"
+    },
+    "room_wall_cool": {
+      "color": [
+        0.48,
+        0.56,
+        0.62,
+        1.0
+      ],
+      "metallic": 0.0,
+      "roughness": 0.84,
+      "preset": "paint"
+    },
+    "dark_wall": {
+      "color": [
+        0.05,
+        0.045,
+        0.055,
+        1.0
+      ],
+      "metallic": 0.0,
+      "roughness": 0.78,
+      "preset": "paint"
+    },
+    "floor_tile": {
+      "color": [
+        0.42,
+        0.43,
+        0.41,
+        1.0
+      ],
+      "metallic": 0.0,
+      "roughness": 0.74,
+      "preset": "matte_tile"
+    },
+    "floor_wood": {
+      "color": [
+        0.62,
+        0.43,
+        0.22,
+        1.0
+      ],
+      "metallic": 0.0,
+      "roughness": 0.56,
+      "preset": "wood"
+    },
+    "floor_dark": {
+      "color": [
+        0.08,
+        0.075,
+        0.085,
+        1.0
+      ],
+      "metallic": 0.0,
+      "roughness": 0.7,
+      "preset": "paint"
+    },
+    "wall_deep_red": {
+      "color": [
+        0.32,
+        0.025,
+        0.035,
+        1.0
+      ],
+      "metallic": 0.0,
+      "roughness": 0.78,
+      "preset": "paint"
+    },
+    "velvet_red": {
+      "color": [
+        0.55,
+        0.03,
+        0.055,
+        1.0
+      ],
+      "metallic": 0.0,
+      "roughness": 0.62,
+      "preset": "fabric"
+    },
+    "field_green": {
+      "color": [
+        0.05,
+        0.34,
+        0.12,
+        1.0
+      ],
+      "metallic": 0.0,
+      "roughness": 0.72,
+      "preset": "turf"
+    },
+    "counter_dark": {
+      "color": [
+        0.08,
+        0.075,
+        0.07,
+        1.0
+      ],
+      "metallic": 0.0,
+      "roughness": 0.38,
+      "preset": "stone"
+    },
+    "cabinet_warm": {
+      "color": [
+        0.36,
+        0.21,
+        0.11,
+        1.0
+      ],
+      "metallic": 0.0,
+      "roughness": 0.55,
+      "preset": "wood"
+    },
+    "metal_dark": {
+      "color": [
+        0.025,
+        0.026,
+        0.028,
+        1.0
+      ],
+      "metallic": 0.65,
+      "roughness": 0.34,
+      "preset": "brushed_metal"
+    },
+    "plastic_blue": {
+      "color": [
+        0.05,
+        0.28,
+        0.7,
+        1.0
+      ],
+      "metallic": 0.0,
+      "roughness": 0.52,
+      "preset": "paint"
+    },
+    "accent_orange": {
+      "color": [
+        1.0,
+        0.43,
+        0.05,
+        1.0
+      ],
+      "metallic": 0.0,
+      "roughness": 0.42,
+      "preset": "paint"
+    },
+    "accent_cyan": {
+      "color": [
+        0.0,
+        0.75,
+        1.0,
+        1.0
+      ],
+      "metallic": 0.0,
+      "roughness": 0.4,
+      "emissive": [
+        0.0,
+        0.28,
+        0.55
+      ],
+      "emissive_strength": 0.15,
+      "preset": "paint"
+    },
+    "accent_magenta": {
+      "color": [
+        0.95,
+        0.05,
+        0.62,
+        1.0
+      ],
+      "metallic": 0.0,
+      "roughness": 0.44,
+      "emissive": [
+        0.18,
+        0.01,
+        0.12
+      ],
+      "emissive_strength": 0.12,
+      "preset": "paint"
+    },
+    "glass_soft": {
+      "color": [
+        0.72,
+        0.88,
+        0.96,
+        0.42
+      ],
+      "roughness": 0.055,
+      "transmission": 0.45,
+      "ior": 1.46,
+      "alpha": "blend",
+      "preset": "glass"
+    },
+    "warm_light": {
+      "color": [
+        1.0,
+        0.62,
+        0.28,
+        1.0
+      ],
+      "emissive": [
+        1.0,
+        0.48,
+        0.18
+      ],
+      "emissive_strength": 0.45,
+      "roughness": 0.25,
+      "preset": "emissive"
+    },
+    "paper": {
+      "color": [
+        0.84,
+        0.79,
+        0.68,
+        1.0
+      ],
+      "metallic": 0.0,
+      "roughness": 0.86,
+      "preset": "paper"
+    }
+  },
+  "lights": [
+    {
+      "id": "sak_bedroom_warm_pool",
+      "role": "warm_practical_pool",
+      "type": "point",
+      "position": [
+        0.1,
+        1.62,
+        -0.2
+      ],
+      "color": [
+        1.0,
+        0.58,
+        0.32
+      ],
+      "intensity": 0.75,
+      "range": 3.1,
+      "casts_shadows": false,
+      "scene_authoring_kernel_v1": {
+        "source": "scene_local_lighting_contract",
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_bedroom_window_fill",
+      "role": "window_fill",
+      "type": "spot",
+      "position": [
+        -1.9,
+        1.95,
+        -1.25
+      ],
+      "target": [
+        0.0,
+        0.65,
+        0.35
+      ],
+      "color": [
+        0.72,
+        0.82,
+        1.0
+      ],
+      "intensity": 1.6,
+      "range": 5.2,
+      "inner_cone_degrees": 24.0,
+      "outer_cone_degrees": 48.0,
+      "casts_shadows": false,
+      "scene_authoring_kernel_v1": {
+        "source": "scene_local_lighting_contract",
+        "variant": 0
+      }
+    }
+  ],
+  "objects": [
+    {
+      "id": "sak_bedroom_floor",
+      "role": "room_floor",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "floor_wood",
+      "support": "ground",
+      "assembly_id": "room_shell",
+      "transform": {
+        "position": [
+          0.0,
+          0.035,
+          0.0
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          4.5,
+          0.07,
+          3.8
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "floor",
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_bedroom_back_wall",
+      "role": "room_wall",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "room_wall_warm",
+      "support": "ground",
+      "assembly_id": "room_shell",
+      "transform": {
+        "position": [
+          0.0,
+          1.325,
+          1.9
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          4.5,
+          2.65,
+          0.08
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "wall",
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_bedroom_left_wall",
+      "role": "room_wall",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "room_wall_warm",
+      "support": "ground",
+      "assembly_id": "room_shell",
+      "transform": {
+        "position": [
+          -2.25,
+          1.325,
+          0.0
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.08,
+          2.65,
+          3.8
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "wall",
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_bedroom_right_wall",
+      "role": "room_wall",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "room_wall_warm",
+      "support": "ground",
+      "assembly_id": "room_shell",
+      "transform": {
+        "position": [
+          2.25,
+          1.325,
+          0.0
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.08,
+          2.65,
+          3.8
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "wall",
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_bedroom_ceiling",
+      "role": "room_ceiling",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "room_wall_warm",
+      "support": "ground",
+      "assembly_id": "room_shell",
+      "transform": {
+        "position": [
+          0.0,
+          2.69,
+          0.0
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          4.5,
+          0.08,
+          3.8
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "ceiling",
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_bedroom_base_trim_back",
+      "role": "architectural_baseboard",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "metal_dark",
+      "support": "sak_bedroom_floor",
+      "assembly_id": "room_shell",
+      "transform": {
+        "position": [
+          0.0,
+          0.13,
+          1.845
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          4.34,
+          0.045,
+          0.035
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "wall_detail",
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_bedroom_base_trim_left",
+      "role": "architectural_baseboard",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "metal_dark",
+      "support": "sak_bedroom_floor",
+      "assembly_id": "room_shell",
+      "transform": {
+        "position": [
+          -2.195,
+          0.13,
+          0.0
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.035,
+          0.045,
+          3.64
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "wall_detail",
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_bedroom_base_trim_right",
+      "role": "architectural_baseboard",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "metal_dark",
+      "support": "sak_bedroom_floor",
+      "assembly_id": "room_shell",
+      "transform": {
+        "position": [
+          2.195,
+          0.13,
+          0.0
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.035,
+          0.045,
+          3.64
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "wall_detail",
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_bedroom_crown_trim_back",
+      "role": "architectural_baseboard",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "metal_dark",
+      "support": "sak_bedroom_floor",
+      "assembly_id": "room_shell",
+      "transform": {
+        "position": [
+          0.0,
+          2.47,
+          1.845
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          4.34,
+          0.035,
+          0.035
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "wall_detail",
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_bedroom_crown_trim_left",
+      "role": "architectural_baseboard",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "metal_dark",
+      "support": "sak_bedroom_floor",
+      "assembly_id": "room_shell",
+      "transform": {
+        "position": [
+          -2.195,
+          2.47,
+          0.0
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.035,
+          0.035,
+          3.64
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "wall_detail",
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_bedroom_crown_trim_right",
+      "role": "architectural_baseboard",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "metal_dark",
+      "support": "sak_bedroom_floor",
+      "assembly_id": "room_shell",
+      "transform": {
+        "position": [
+          2.195,
+          2.47,
+          0.0
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.035,
+          0.035,
+          3.64
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "wall_detail",
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_bedroom_corner_post_0",
+      "role": "architectural_corner_post",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "metal_dark",
+      "support": "sak_bedroom_floor",
+      "assembly_id": "room_shell",
+      "transform": {
+        "position": [
+          -2.195,
+          1.325,
+          1.845
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.055,
+          2.47,
+          0.055
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "wall_detail",
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_bedroom_corner_post_1",
+      "role": "architectural_corner_post",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "metal_dark",
+      "support": "sak_bedroom_floor",
+      "assembly_id": "room_shell",
+      "transform": {
+        "position": [
+          2.195,
+          1.325,
+          1.845
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.055,
+          2.47,
+          0.055
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "wall_detail",
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_bedroom_back_wall_vertical_trim_0",
+      "role": "wall_panel_trim",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "metal_dark",
+      "support": "sak_bedroom_floor",
+      "assembly_id": "room_shell",
+      "transform": {
+        "position": [
+          -1.85,
+          1.378,
+          1.838
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.018,
+          1.431,
+          0.018
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "wall_detail",
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_bedroom_back_wall_vertical_trim_1",
+      "role": "wall_panel_trim",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "metal_dark",
+      "support": "sak_bedroom_floor",
+      "assembly_id": "room_shell",
+      "transform": {
+        "position": [
+          -0.925,
+          1.378,
+          1.838
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.018,
+          1.431,
+          0.018
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "wall_detail",
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_bedroom_back_wall_vertical_trim_2",
+      "role": "wall_panel_trim",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "metal_dark",
+      "support": "sak_bedroom_floor",
+      "assembly_id": "room_shell",
+      "transform": {
+        "position": [
+          0.0,
+          1.378,
+          1.838
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.018,
+          1.431,
+          0.018
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "wall_detail",
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_bedroom_back_wall_vertical_trim_3",
+      "role": "wall_panel_trim",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "metal_dark",
+      "support": "sak_bedroom_floor",
+      "assembly_id": "room_shell",
+      "transform": {
+        "position": [
+          0.925,
+          1.378,
+          1.838
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.018,
+          1.431,
+          0.018
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "wall_detail",
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_bedroom_back_wall_vertical_trim_4",
+      "role": "wall_panel_trim",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "metal_dark",
+      "support": "sak_bedroom_floor",
+      "assembly_id": "room_shell",
+      "transform": {
+        "position": [
+          1.85,
+          1.378,
+          1.838
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.018,
+          1.431,
+          0.018
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "wall_detail",
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_bedroom_back_wall_horizontal_trim_0",
+      "role": "wall_panel_trim",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "metal_dark",
+      "support": "sak_bedroom_floor",
+      "assembly_id": "room_shell",
+      "transform": {
+        "position": [
+          0.0,
+          0.901,
+          1.836
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          3.69,
+          0.018,
+          0.018
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "wall_detail",
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_bedroom_back_wall_horizontal_trim_1",
+      "role": "wall_panel_trim",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "metal_dark",
+      "support": "sak_bedroom_floor",
+      "assembly_id": "room_shell",
+      "transform": {
+        "position": [
+          0.0,
+          1.643,
+          1.836
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          3.69,
+          0.018,
+          0.018
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "wall_detail",
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_bedroom_back_wall_horizontal_trim_2",
+      "role": "wall_panel_trim",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "metal_dark",
+      "support": "sak_bedroom_floor",
+      "assembly_id": "room_shell",
+      "transform": {
+        "position": [
+          0.0,
+          2.173,
+          1.836
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          3.69,
+          0.018,
+          0.018
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "wall_detail",
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_bedroom_left_wall_vertical_trim_0",
+      "role": "wall_panel_trim",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "metal_dark",
+      "support": "sak_bedroom_floor",
+      "assembly_id": "room_shell",
+      "transform": {
+        "position": [
+          -2.188,
+          1.325,
+          -0.912
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.018,
+          1.219,
+          0.018
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "wall_detail",
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_bedroom_left_wall_vertical_trim_1",
+      "role": "wall_panel_trim",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "metal_dark",
+      "support": "sak_bedroom_floor",
+      "assembly_id": "room_shell",
+      "transform": {
+        "position": [
+          -2.188,
+          1.325,
+          0.304
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.018,
+          1.219,
+          0.018
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "wall_detail",
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_bedroom_left_wall_vertical_trim_2",
+      "role": "wall_panel_trim",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "metal_dark",
+      "support": "sak_bedroom_floor",
+      "assembly_id": "room_shell",
+      "transform": {
+        "position": [
+          -2.188,
+          1.325,
+          1.368
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.018,
+          1.219,
+          0.018
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "wall_detail",
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_bedroom_right_wall_vertical_trim_0",
+      "role": "wall_panel_trim",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "metal_dark",
+      "support": "sak_bedroom_floor",
+      "assembly_id": "room_shell",
+      "transform": {
+        "position": [
+          2.188,
+          1.325,
+          -0.912
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.018,
+          1.219,
+          0.018
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "wall_detail",
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_bedroom_right_wall_vertical_trim_1",
+      "role": "wall_panel_trim",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "metal_dark",
+      "support": "sak_bedroom_floor",
+      "assembly_id": "room_shell",
+      "transform": {
+        "position": [
+          2.188,
+          1.325,
+          0.304
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.018,
+          1.219,
+          0.018
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "wall_detail",
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_bedroom_right_wall_vertical_trim_2",
+      "role": "wall_panel_trim",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "metal_dark",
+      "support": "sak_bedroom_floor",
+      "assembly_id": "room_shell",
+      "transform": {
+        "position": [
+          2.188,
+          1.325,
+          1.368
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.018,
+          1.219,
+          0.018
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "wall_detail",
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_bedroom_bed",
+      "role": "bed_mesh",
+      "kind": "kenney_asset",
+      "runtime_asset": "assets/models/kenney_furniture_kit/bedDouble/bedDouble.gltf",
+      "material": "floor_dark",
+      "support": "sak_bedroom_floor",
+      "assembly_id": "sleep_zone",
+      "transform": {
+        "position": [
+          -0.82,
+          0.07,
+          0.92
+        ],
+        "rotation_degrees": [
+          0.0,
+          180.0,
+          0.0
+        ],
+        "scale": [
+          1.6,
+          1.6,
+          1.6
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "bed",
+        "asset_id": "bed_double",
+        "anchors": {
+          "floor_contact": [
+            0,
+            0,
+            0
+          ],
+          "front": [
+            0,
+            0,
+            -1
+          ]
+        },
+        "license": "Kenney CC0",
+        "scale_contract": {
+          "requested_scale": [
+            1.6,
+            1.6,
+            1.6
+          ],
+          "resolved_scale": [
+            1.6,
+            1.6,
+            1.6
+          ],
+          "semantic_floor": 1.45,
+          "physical_size": {
+            "requested_scale": [
+              1.6,
+              1.6,
+              1.6
+            ],
+            "semantic_floor_scale": 1.45,
+            "resolved_scale": [
+              1.6,
+              1.6,
+              1.6
+            ],
+            "native_extent": [
+              0.956,
+              0.375,
+              1.125
+            ],
+            "min_extent": [
+              1.35,
+              0.45,
+              1.7
+            ],
+            "max_extent": [
+              2.3,
+              1.1,
+              2.5
+            ],
+            "resolved_extent": [
+              1.5296,
+              0.6,
+              1.8
+            ],
+            "physical_contract": "PASS",
+            "adjustment_reasons": []
+          }
+        },
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_bedroom_nightstand_0",
+      "role": "side_table",
+      "kind": "kenney_asset",
+      "runtime_asset": "assets/models/kenney_furniture_kit/sideTable/sideTable.gltf",
+      "material": "floor_dark",
+      "support": "sak_bedroom_floor",
+      "assembly_id": "sleep_zone",
+      "transform": {
+        "position": [
+          -1.77,
+          0.07,
+          0.21954
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          1.59034,
+          1.61287,
+          2.95455
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "table",
+        "asset_id": "side_table",
+        "anchors": {
+          "floor_contact": [
+            0,
+            0,
+            0
+          ],
+          "top_surface": [
+            0,
+            0.45,
+            0
+          ]
+        },
+        "license": "Kenney CC0",
+        "scale_contract": {
+          "requested_scale": [
+            0.56,
+            0.56,
+            0.56
+          ],
+          "resolved_scale": [
+            1.59034,
+            1.61287,
+            2.95455
+          ],
+          "semantic_floor": 1.0,
+          "physical_size": {
+            "requested_scale": [
+              0.56,
+              0.56,
+              0.56
+            ],
+            "semantic_floor_scale": 1.0,
+            "resolved_scale": [
+              1.59034,
+              1.61287,
+              2.95455
+            ],
+            "native_extent": [
+              0.53448,
+              0.38441,
+              0.22
+            ],
+            "min_extent": [
+              0.85,
+              0.62,
+              0.65
+            ],
+            "max_extent": [
+              2.4,
+              1.05,
+              1.8
+            ],
+            "resolved_extent": [
+              0.85,
+              0.62,
+              0.65
+            ],
+            "physical_contract": "PASS",
+            "adjustment_reasons": [
+              "axis_0_raised_to_min_extent",
+              "axis_1_raised_to_min_extent",
+              "axis_2_raised_to_min_extent"
+            ]
+          }
+        },
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_bedroom_table_lamp_0",
+      "role": "warm_fixture",
+      "kind": "kenney_asset",
+      "runtime_asset": "assets/models/kenney_furniture_kit/lampRoundTable/lampRoundTable.gltf",
+      "material": "cabinet_warm",
+      "support": "sak_bedroom_nightstand_0",
+      "assembly_id": "lighting",
+      "transform": {
+        "position": [
+          -1.77,
+          0.6909995014587046,
+          0.21954
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.56,
+          0.56,
+          0.56
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "light",
+        "asset_id": "lamp_table",
+        "anchors": {
+          "support_contact": [
+            0,
+            0,
+            0
+          ]
+        },
+        "license": "Kenney CC0",
+        "scale_contract": {
+          "requested_scale": [
+            0.56,
+            0.56,
+            0.56
+          ],
+          "resolved_scale": [
+            0.56,
+            0.56,
+            0.56
+          ],
+          "semantic_floor": 0.0,
+          "physical_size": {
+            "requested_scale": [
+              0.56,
+              0.56,
+              0.56
+            ],
+            "semantic_floor_scale": 0.0,
+            "resolved_scale": [
+              0.56,
+              0.56,
+              0.56
+            ]
+          }
+        },
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_bedroom_nightstand_1",
+      "role": "side_table",
+      "kind": "kenney_asset",
+      "runtime_asset": "assets/models/kenney_furniture_kit/sideTable/sideTable.gltf",
+      "material": "floor_dark",
+      "support": "sak_bedroom_floor",
+      "assembly_id": "sleep_zone",
+      "transform": {
+        "position": [
+          0.13,
+          0.07,
+          0.58
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          1.59034,
+          1.61287,
+          2.95455
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "table",
+        "asset_id": "side_table",
+        "anchors": {
+          "floor_contact": [
+            0,
+            0,
+            0
+          ],
+          "top_surface": [
+            0,
+            0.45,
+            0
+          ]
+        },
+        "license": "Kenney CC0",
+        "scale_contract": {
+          "requested_scale": [
+            0.56,
+            0.56,
+            0.56
+          ],
+          "resolved_scale": [
+            1.59034,
+            1.61287,
+            2.95455
+          ],
+          "semantic_floor": 1.0,
+          "physical_size": {
+            "requested_scale": [
+              0.56,
+              0.56,
+              0.56
+            ],
+            "semantic_floor_scale": 1.0,
+            "resolved_scale": [
+              1.59034,
+              1.61287,
+              2.95455
+            ],
+            "native_extent": [
+              0.53448,
+              0.38441,
+              0.22
+            ],
+            "min_extent": [
+              0.85,
+              0.62,
+              0.65
+            ],
+            "max_extent": [
+              2.4,
+              1.05,
+              1.8
+            ],
+            "resolved_extent": [
+              0.85,
+              0.62,
+              0.65
+            ],
+            "physical_contract": "PASS",
+            "adjustment_reasons": [
+              "axis_0_raised_to_min_extent",
+              "axis_1_raised_to_min_extent",
+              "axis_2_raised_to_min_extent"
+            ]
+          }
+        },
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_bedroom_table_lamp_1",
+      "role": "warm_fixture",
+      "kind": "kenney_asset",
+      "runtime_asset": "assets/models/kenney_furniture_kit/lampRoundTable/lampRoundTable.gltf",
+      "material": "cabinet_warm",
+      "support": "sak_bedroom_nightstand_1",
+      "assembly_id": "lighting",
+      "transform": {
+        "position": [
+          0.13,
+          0.6909995014587046,
+          0.58
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.56,
+          0.56,
+          0.56
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "light",
+        "asset_id": "lamp_table",
+        "anchors": {
+          "support_contact": [
+            0,
+            0,
+            0
+          ]
+        },
+        "license": "Kenney CC0",
+        "scale_contract": {
+          "requested_scale": [
+            0.56,
+            0.56,
+            0.56
+          ],
+          "resolved_scale": [
+            0.56,
+            0.56,
+            0.56
+          ],
+          "semantic_floor": 0.0,
+          "physical_size": {
+            "requested_scale": [
+              0.56,
+              0.56,
+              0.56
+            ],
+            "semantic_floor_scale": 0.0,
+            "resolved_scale": [
+              0.56,
+              0.56,
+              0.56
+            ]
+          }
+        },
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_bedroom_rug",
+      "role": "floor_mat",
+      "kind": "kenney_asset",
+      "runtime_asset": "assets/models/kenney_furniture_kit/rugRectangle/rugRectangle.gltf",
+      "material": "accent_orange",
+      "support": "sak_bedroom_floor",
+      "assembly_id": "sleep_zone",
+      "transform": {
+        "position": [
+          0.1,
+          0.07,
+          -0.28
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          1.42,
+          1.42,
+          1.42
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "floor_detail",
+        "asset_id": "rug_rectangle",
+        "anchors": {
+          "floor_contact": [
+            0,
+            0,
+            0
+          ]
+        },
+        "license": "Kenney CC0",
+        "scale_contract": {
+          "requested_scale": [
+            1.42,
+            1.42,
+            1.42
+          ],
+          "resolved_scale": [
+            1.42,
+            1.42,
+            1.42
+          ],
+          "semantic_floor": 0.0,
+          "physical_size": {
+            "requested_scale": [
+              1.42,
+              1.42,
+              1.42
+            ],
+            "semantic_floor_scale": 0.0,
+            "resolved_scale": [
+              1.42,
+              1.42,
+              1.42
+            ]
+          }
+        },
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_bedroom_lounge_chair",
+      "role": "chair",
+      "kind": "kenney_asset",
+      "runtime_asset": "assets/models/kenney_furniture_kit/loungeChair/loungeChair.gltf",
+      "material": "plastic_blue",
+      "support": "sak_bedroom_floor",
+      "assembly_id": "reading_corner",
+      "transform": {
+        "position": [
+          1.38,
+          0.07,
+          -0.58
+        ],
+        "rotation_degrees": [
+          0.0,
+          -48.3853,
+          0.0
+        ],
+        "scale": [
+          1.45,
+          1.69565,
+          1.45
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "chair",
+        "asset_id": "lounge_chair",
+        "anchors": {
+          "floor_contact": [
+            0,
+            0,
+            0
+          ],
+          "front": [
+            0,
+            0,
+            -1
+          ]
+        },
+        "license": "Kenney CC0",
+        "scale_contract": {
+          "requested_scale": [
+            1.45,
+            1.45,
+            1.45
+          ],
+          "resolved_scale": [
+            1.45,
+            1.69565,
+            1.45
+          ],
+          "semantic_floor": 1.35,
+          "physical_size": {
+            "requested_scale": [
+              1.45,
+              1.45,
+              1.45
+            ],
+            "semantic_floor_scale": 1.35,
+            "resolved_scale": [
+              1.45,
+              1.69565,
+              1.45
+            ],
+            "native_extent": [
+              0.49,
+              0.46,
+              0.41
+            ],
+            "min_extent": [
+              0.5,
+              0.78,
+              0.48
+            ],
+            "max_extent": [
+              0.95,
+              1.3,
+              1.0
+            ],
+            "resolved_extent": [
+              0.7105,
+              0.78,
+              0.5945
+            ],
+            "physical_contract": "PASS",
+            "adjustment_reasons": [
+              "axis_1_raised_to_min_extent"
+            ]
+          }
+        },
+        "variant": 0
+      },
+      "facing_target": "sak_bedroom_nightstand_1",
+      "facing_relation": "seat_faces_table_or_work_anchor",
+      "facing_tolerance_degrees": 55.0,
+      "constructor_tags": [
+        "facing_relation_compiled"
+      ]
+    },
+    {
+      "id": "sak_bedroom_bookcase",
+      "role": "shelf_mesh",
+      "kind": "kenney_asset",
+      "runtime_asset": "assets/models/kenney_furniture_kit/bookcaseClosedWide/bookcaseClosedWide.gltf",
+      "material": "cabinet_warm",
+      "support": "sak_bedroom_floor",
+      "assembly_id": "storage_wall",
+      "transform": {
+        "position": [
+          1.55,
+          0.07,
+          1.38
+        ],
+        "rotation_degrees": [
+          0.0,
+          180.0,
+          0.0
+        ],
+        "scale": [
+          1.8,
+          1.8,
+          1.8
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "shelf",
+        "asset_id": "bookcase_wide",
+        "anchors": {
+          "floor_contact": [
+            0,
+            0,
+            0
+          ],
+          "front": [
+            0,
+            0,
+            -1
+          ]
+        },
+        "license": "Kenney CC0",
+        "scale_contract": {
+          "requested_scale": [
+            1.8,
+            1.8,
+            1.8
+          ],
+          "resolved_scale": [
+            1.8,
+            1.8,
+            1.8
+          ],
+          "semantic_floor": 1.35,
+          "physical_size": {
+            "requested_scale": [
+              1.8,
+              1.8,
+              1.8
+            ],
+            "semantic_floor_scale": 1.35,
+            "resolved_scale": [
+              1.8,
+              1.8,
+              1.8
+            ],
+            "native_extent": [
+              0.8,
+              0.79,
+              0.25
+            ],
+            "min_extent": [
+              0.75,
+              1.1,
+              0.28
+            ],
+            "max_extent": [
+              2.3,
+              2.3,
+              0.8
+            ],
+            "resolved_extent": [
+              1.44,
+              1.422,
+              0.45
+            ],
+            "physical_contract": "PASS",
+            "adjustment_reasons": []
+          }
+        },
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_bedroom_tv_cabinet",
+      "role": "cabinet",
+      "kind": "kenney_asset",
+      "runtime_asset": "assets/models/kenney_furniture_kit/cabinetTelevision/cabinetTelevision.gltf",
+      "material": "cabinet_warm",
+      "support": "sak_bedroom_floor",
+      "assembly_id": "media_wall",
+      "transform": {
+        "position": [
+          -1.58,
+          0.07,
+          -0.88
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          1.0,
+          1.77419,
+          1.12
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "cabinet",
+        "asset_id": "cabinet_tv",
+        "anchors": {
+          "floor_contact": [
+            0,
+            0,
+            0
+          ],
+          "front": [
+            0,
+            0,
+            -1
+          ]
+        },
+        "license": "Kenney CC0",
+        "scale_contract": {
+          "requested_scale": [
+            0.62,
+            0.62,
+            0.62
+          ],
+          "resolved_scale": [
+            1.0,
+            1.77419,
+            1.12
+          ],
+          "semantic_floor": 1.0,
+          "physical_size": {
+            "requested_scale": [
+              0.62,
+              0.62,
+              0.62
+            ],
+            "semantic_floor_scale": 1.0,
+            "resolved_scale": [
+              1.0,
+              1.77419,
+              1.12
+            ],
+            "native_extent": [
+              0.8,
+              0.31,
+              0.25
+            ],
+            "min_extent": [
+              0.55,
+              0.55,
+              0.28
+            ],
+            "max_extent": [
+              2.6,
+              2.2,
+              0.9
+            ],
+            "resolved_extent": [
+              0.8,
+              0.55,
+              0.28
+            ],
+            "physical_contract": "PASS",
+            "adjustment_reasons": [
+              "axis_1_raised_to_min_extent",
+              "axis_2_raised_to_min_extent"
+            ]
+          }
+        },
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_bedroom_tv",
+      "role": "screen",
+      "kind": "kenney_asset",
+      "runtime_asset": "assets/models/kenney_furniture_kit/televisionModern/televisionModern.gltf",
+      "material": "metal_dark",
+      "support": "sak_bedroom_tv_cabinet",
+      "assembly_id": "media_wall",
+      "transform": {
+        "position": [
+          -1.58,
+          0.6,
+          -0.88
+        ],
+        "rotation_degrees": [
+          0.0,
+          77.0857,
+          0.0
+        ],
+        "scale": [
+          0.9,
+          0.9,
+          0.9
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "screen",
+        "asset_id": "television_modern",
+        "anchors": {
+          "support_contact": [
+            0,
+            0,
+            0
+          ],
+          "front": [
+            0,
+            0,
+            -1
+          ]
+        },
+        "license": "Kenney CC0",
+        "scale_contract": {
+          "requested_scale": [
+            0.62,
+            0.62,
+            0.62
+          ],
+          "resolved_scale": [
+            0.9,
+            0.9,
+            0.9
+          ],
+          "semantic_floor": 0.9,
+          "physical_size": {
+            "requested_scale": [
+              0.62,
+              0.62,
+              0.62
+            ],
+            "semantic_floor_scale": 0.9,
+            "resolved_scale": [
+              0.9,
+              0.9,
+              0.9
+            ],
+            "native_extent": [
+              0.6848,
+              0.45475,
+              0.1284
+            ],
+            "min_extent": [
+              0.32,
+              0.2,
+              0.02
+            ],
+            "max_extent": [
+              1.8,
+              1.2,
+              0.25
+            ],
+            "resolved_extent": [
+              0.61632,
+              0.40928,
+              0.11556
+            ],
+            "physical_contract": "PASS",
+            "adjustment_reasons": []
+          }
+        },
+        "variant": 0
+      },
+      "facing_target": "sak_bedroom_lounge_chair",
+      "facing_relation": "screen_faces_viewer_anchor",
+      "facing_tolerance_degrees": 55.0,
+      "constructor_tags": [
+        "facing_relation_compiled"
+      ]
+    },
+    {
+      "id": "sak_bedroom_plant",
+      "role": "plant",
+      "kind": "kenney_asset",
+      "runtime_asset": "assets/models/kenney_furniture_kit/pottedPlant/pottedPlant.gltf",
+      "material": "accent_cyan",
+      "support": "sak_bedroom_floor",
+      "assembly_id": "decor",
+      "transform": {
+        "position": [
+          1.82,
+          0.07,
+          -1.2
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.72,
+          0.72,
+          0.72
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "decor_prop",
+        "asset_id": "potted_plant",
+        "anchors": {
+          "floor_contact": [
+            0,
+            0,
+            0
+          ]
+        },
+        "license": "Kenney CC0",
+        "scale_contract": {
+          "requested_scale": [
+            0.72,
+            0.72,
+            0.72
+          ],
+          "resolved_scale": [
+            0.72,
+            0.72,
+            0.72
+          ],
+          "semantic_floor": 0.0,
+          "physical_size": {
+            "requested_scale": [
+              0.72,
+              0.72,
+              0.72
+            ],
+            "semantic_floor_scale": 0.0,
+            "resolved_scale": [
+              0.72,
+              0.72,
+              0.72
+            ]
+          }
+        },
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_bedroom_wall_art_0",
+      "role": "wall_art",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "accent_cyan",
+      "support": "sak_bedroom_back_wall",
+      "assembly_id": "wall_dressing",
+      "transform": {
+        "position": [
+          -1.54,
+          1.52,
+          1.855
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.34,
+          0.24,
+          0.018
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "decor",
+        "variant": 0
+      },
+      "attached_to": "sak_bedroom_back_wall"
+    },
+    {
+      "id": "sak_bedroom_wall_art_1",
+      "role": "wall_art",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "accent_orange",
+      "support": "sak_bedroom_back_wall",
+      "assembly_id": "wall_dressing",
+      "transform": {
+        "position": [
+          -1.08,
+          1.56,
+          1.855
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.34,
+          0.24,
+          0.018
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "decor",
+        "variant": 0
+      },
+      "attached_to": "sak_bedroom_back_wall"
+    },
+    {
+      "id": "sak_bedroom_wall_art_2",
+      "role": "wall_art",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "accent_magenta",
+      "support": "sak_bedroom_back_wall",
+      "assembly_id": "wall_dressing",
+      "transform": {
+        "position": [
+          0.98,
+          1.48,
+          1.855
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.34,
+          0.24,
+          0.018
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "decor",
+        "variant": 0
+      },
+      "attached_to": "sak_bedroom_back_wall"
+    },
+    {
+      "id": "sak_bedroom_bed_pillow_0",
+      "role": "bed_pillow",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "cabinet_warm",
+      "support": "sak_bedroom_bed",
+      "assembly_id": "sleep_zone",
+      "transform": {
+        "position": [
+          -1.1,
+          0.72,
+          1.16
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.24,
+          0.1,
+          0.14
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "soft_prop",
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_bedroom_bed_pillow_1",
+      "role": "bed_pillow",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "plastic_blue",
+      "support": "sak_bedroom_bed",
+      "assembly_id": "sleep_zone",
+      "transform": {
+        "position": [
+          -0.92,
+          0.72,
+          1.16
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.24,
+          0.1,
+          0.14
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "soft_prop",
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_bedroom_bed_pillow_2",
+      "role": "bed_pillow",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "cabinet_warm",
+      "support": "sak_bedroom_bed",
+      "assembly_id": "sleep_zone",
+      "transform": {
+        "position": [
+          -0.72,
+          0.72,
+          1.16
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.24,
+          0.1,
+          0.14
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "soft_prop",
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_bedroom_bed_pillow_3",
+      "role": "bed_pillow",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "plastic_blue",
+      "support": "sak_bedroom_bed",
+      "assembly_id": "sleep_zone",
+      "transform": {
+        "position": [
+          -0.54,
+          0.72,
+          1.16
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.24,
+          0.1,
+          0.14
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "soft_prop",
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_bedroom_bedding_layer_0",
+      "role": "bedding_layer",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "accent_cyan",
+      "support": "sak_bedroom_bed",
+      "assembly_id": "sleep_zone",
+      "transform": {
+        "position": [
+          -0.82,
+          0.683,
+          0.72
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          1.12,
+          0.026,
+          0.18
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "soft_prop",
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_bedroom_bedding_layer_1",
+      "role": "bedding_layer",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "accent_orange",
+      "support": "sak_bedroom_bed",
+      "assembly_id": "sleep_zone",
+      "transform": {
+        "position": [
+          -0.82,
+          0.683,
+          0.94
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.86,
+          0.026,
+          0.18
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "soft_prop",
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_bedroom_bedding_layer_2",
+      "role": "bedding_layer",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "accent_magenta",
+      "support": "sak_bedroom_bed",
+      "assembly_id": "sleep_zone",
+      "transform": {
+        "position": [
+          -0.82,
+          0.683,
+          1.16
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          1.02,
+          0.026,
+          0.18
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "soft_prop",
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_bedroom_dark_bedspread",
+      "role": "bedding_layer",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "floor_dark",
+      "support": "sak_bedroom_bed",
+      "assembly_id": "sleep_zone",
+      "transform": {
+        "position": [
+          -0.82,
+          0.685,
+          0.78
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          1.3,
+          0.03,
+          0.96
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "soft_prop",
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_bedroom_bedspread_seam_0",
+      "role": "bedding_detail",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "metal_dark",
+      "support": "sak_bedroom_bed",
+      "assembly_id": "sleep_zone",
+      "transform": {
+        "position": [
+          -0.82,
+          0.676,
+          0.44
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          1.18,
+          0.012,
+          0.014
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "soft_prop",
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_bedroom_bedspread_seam_1",
+      "role": "bedding_detail",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "metal_dark",
+      "support": "sak_bedroom_bed",
+      "assembly_id": "sleep_zone",
+      "transform": {
+        "position": [
+          -0.82,
+          0.676,
+          0.68
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          1.18,
+          0.012,
+          0.014
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "soft_prop",
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_bedroom_bedspread_seam_2",
+      "role": "bedding_detail",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "metal_dark",
+      "support": "sak_bedroom_bed",
+      "assembly_id": "sleep_zone",
+      "transform": {
+        "position": [
+          -0.82,
+          0.676,
+          0.92
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          1.18,
+          0.012,
+          0.014
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "soft_prop",
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_bedroom_bedspread_seam_3",
+      "role": "bedding_detail",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "metal_dark",
+      "support": "sak_bedroom_bed",
+      "assembly_id": "sleep_zone",
+      "transform": {
+        "position": [
+          -0.82,
+          0.676,
+          1.16
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          1.18,
+          0.012,
+          0.014
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "soft_prop",
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_bedroom_lamp_shade_0",
+      "role": "lamp_shade",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "floor_dark",
+      "support": "sak_bedroom_table_lamp_0",
+      "assembly_id": "lighting",
+      "transform": {
+        "position": [
+          -1.77,
+          0.93198,
+          0.21954
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.18,
+          0.13,
+          0.18
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "light",
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_bedroom_lamp_shade_1",
+      "role": "lamp_shade",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "cabinet_warm",
+      "support": "sak_bedroom_table_lamp_1",
+      "assembly_id": "lighting",
+      "transform": {
+        "position": [
+          0.13,
+          0.93198,
+          0.58
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.18,
+          0.13,
+          0.18
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "light",
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_bedroom_palette_panel_0",
+      "role": "palette_accent_panel",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "accent_cyan",
+      "support": "sak_bedroom_back_wall",
+      "assembly_id": "wall_dressing",
+      "transform": {
+        "position": [
+          -1.78,
+          1.28,
+          1.858
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.28,
+          0.16,
+          0.016
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "decor",
+        "variant": 0
+      },
+      "attached_to": "sak_bedroom_back_wall"
+    },
+    {
+      "id": "sak_bedroom_palette_panel_1",
+      "role": "palette_accent_panel",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "paper",
+      "support": "sak_bedroom_back_wall",
+      "assembly_id": "wall_dressing",
+      "transform": {
+        "position": [
+          -1.78,
+          1.02,
+          1.858
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.28,
+          0.16,
+          0.016
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "decor",
+        "variant": 0
+      },
+      "attached_to": "sak_bedroom_back_wall"
+    },
+    {
+      "id": "sak_bedroom_palette_panel_2",
+      "role": "palette_accent_panel",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "accent_orange",
+      "support": "sak_bedroom_back_wall",
+      "assembly_id": "wall_dressing",
+      "transform": {
+        "position": [
+          1.92,
+          1.2,
+          1.858
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.28,
+          0.16,
+          0.016
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "decor",
+        "variant": 0
+      },
+      "attached_to": "sak_bedroom_back_wall"
+    },
+    {
+      "id": "sak_bedroom_window",
+      "role": "window",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "glass_soft",
+      "support": "sak_bedroom_back_wall",
+      "assembly_id": "wall_dressing",
+      "transform": {
+        "position": [
+          1.54,
+          1.52,
+          1.854
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.52,
+          0.42,
+          0.018
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "window",
+        "variant": 0
+      },
+      "attached_to": "sak_bedroom_back_wall"
+    },
+    {
+      "id": "sak_bedroom_curtain_0",
+      "role": "curtain",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "accent_magenta",
+      "support": "sak_bedroom_back_wall",
+      "assembly_id": "wall_dressing",
+      "transform": {
+        "position": [
+          1.2,
+          1.45,
+          1.842
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.1,
+          0.92,
+          0.014
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "curtain",
+        "variant": 0
+      },
+      "attached_to": "sak_bedroom_back_wall"
+    },
+    {
+      "id": "sak_bedroom_curtain_1",
+      "role": "curtain",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "accent_cyan",
+      "support": "sak_bedroom_back_wall",
+      "assembly_id": "wall_dressing",
+      "transform": {
+        "position": [
+          1.88,
+          1.45,
+          1.842
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.1,
+          0.92,
+          0.014
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "curtain",
+        "variant": 0
+      },
+      "attached_to": "sak_bedroom_back_wall"
+    },
+    {
+      "id": "sak_bedroom_book_stack_0",
+      "role": "book",
+      "kind": "kenney_asset",
+      "runtime_asset": "assets/models/kenney_furniture_kit/books/books.gltf",
+      "material": "accent_orange",
+      "support": "sak_bedroom_bookcase",
+      "assembly_id": "storage_wall",
+      "transform": {
+        "position": [
+          1.45,
+          1.4930000386238098,
+          1.388
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.52,
+          0.52,
+          0.52
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "book",
+        "asset_id": "books",
+        "anchors": {
+          "support_contact": [
+            0,
+            0,
+            0
+          ]
+        },
+        "license": "Kenney CC0",
+        "scale_contract": {
+          "requested_scale": [
+            0.52,
+            0.52,
+            0.52
+          ],
+          "resolved_scale": [
+            0.52,
+            0.52,
+            0.52
+          ],
+          "semantic_floor": 0.0,
+          "physical_size": {
+            "requested_scale": [
+              0.52,
+              0.52,
+              0.52
+            ],
+            "semantic_floor_scale": 0.0,
+            "resolved_scale": [
+              0.52,
+              0.52,
+              0.52
+            ]
+          }
+        },
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_bedroom_book_stack_1",
+      "role": "book",
+      "kind": "kenney_asset",
+      "runtime_asset": "assets/models/kenney_furniture_kit/books/books.gltf",
+      "material": "accent_cyan",
+      "support": "sak_bedroom_bookcase",
+      "assembly_id": "storage_wall",
+      "transform": {
+        "position": [
+          1.59,
+          1.4930000386238098,
+          1.4
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.52,
+          0.52,
+          0.52
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "book",
+        "asset_id": "books",
+        "anchors": {
+          "support_contact": [
+            0,
+            0,
+            0
+          ]
+        },
+        "license": "Kenney CC0",
+        "scale_contract": {
+          "requested_scale": [
+            0.52,
+            0.52,
+            0.52
+          ],
+          "resolved_scale": [
+            0.52,
+            0.52,
+            0.52
+          ],
+          "semantic_floor": 0.0,
+          "physical_size": {
+            "requested_scale": [
+              0.52,
+              0.52,
+              0.52
+            ],
+            "semantic_floor_scale": 0.0,
+            "resolved_scale": [
+              0.52,
+              0.52,
+              0.52
+            ]
+          }
+        },
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_bedroom_book_stack_2",
+      "role": "book",
+      "kind": "kenney_asset",
+      "runtime_asset": "assets/models/kenney_furniture_kit/books/books.gltf",
+      "material": "accent_orange",
+      "support": "sak_bedroom_bookcase",
+      "assembly_id": "storage_wall",
+      "transform": {
+        "position": [
+          1.542,
+          1.4930000386238098,
+          1.5
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.52,
+          0.52,
+          0.52
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "book",
+        "asset_id": "books",
+        "anchors": {
+          "support_contact": [
+            0,
+            0,
+            0
+          ]
+        },
+        "license": "Kenney CC0",
+        "scale_contract": {
+          "requested_scale": [
+            0.52,
+            0.52,
+            0.52
+          ],
+          "resolved_scale": [
+            0.52,
+            0.52,
+            0.52
+          ],
+          "semantic_floor": 0.0,
+          "physical_size": {
+            "requested_scale": [
+              0.52,
+              0.52,
+              0.52
+            ],
+            "semantic_floor_scale": 0.0,
+            "resolved_scale": [
+              0.52,
+              0.52,
+              0.52
+            ]
+          }
+        },
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_bedroom_floor_plank_0",
+      "role": "floor_detail_line",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "metal_dark",
+      "support": "sak_bedroom_floor",
+      "assembly_id": "floor_detail",
+      "transform": {
+        "position": [
+          0.0,
+          0.095,
+          -1.52
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          4.12,
+          0.01,
+          0.018
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "floor_detail",
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_bedroom_floor_plank_1",
+      "role": "floor_detail_line",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "metal_dark",
+      "support": "sak_bedroom_floor",
+      "assembly_id": "floor_detail",
+      "transform": {
+        "position": [
+          0.0,
+          0.095,
+          -1.12
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          4.12,
+          0.01,
+          0.018
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "floor_detail",
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_bedroom_floor_plank_2",
+      "role": "floor_detail_line",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "metal_dark",
+      "support": "sak_bedroom_floor",
+      "assembly_id": "floor_detail",
+      "transform": {
+        "position": [
+          0.0,
+          0.095,
+          -0.72
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          4.12,
+          0.01,
+          0.018
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "floor_detail",
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_bedroom_floor_plank_3",
+      "role": "floor_detail_line",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "metal_dark",
+      "support": "sak_bedroom_floor",
+      "assembly_id": "floor_detail",
+      "transform": {
+        "position": [
+          0.0,
+          0.095,
+          -0.32
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          4.12,
+          0.01,
+          0.018
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "floor_detail",
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_bedroom_floor_plank_4",
+      "role": "floor_detail_line",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "metal_dark",
+      "support": "sak_bedroom_floor",
+      "assembly_id": "floor_detail",
+      "transform": {
+        "position": [
+          0.0,
+          0.095,
+          0.08
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          4.12,
+          0.01,
+          0.018
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "floor_detail",
+        "variant": 0
+      }
+    }
+  ],
+  "semantic_scene_graph": {
+    "schema": "cortex.scene_authoring_kernel.semantic_graph.v1",
+    "prompt": "quiet evening bedroom with bed nightstands lamps reading chair and warm rug",
+    "family": "bedroom_evening",
+    "variant": 0,
+    "nodes": [
+      {
+        "id": "sak_bedroom_floor",
+        "category": "floor",
+        "role": "room_floor",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_bedroom_back_wall",
+        "category": "wall",
+        "role": "room_wall",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_bedroom_left_wall",
+        "category": "wall",
+        "role": "room_wall",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_bedroom_right_wall",
+        "category": "wall",
+        "role": "room_wall",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_bedroom_ceiling",
+        "category": "ceiling",
+        "role": "room_ceiling",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_bedroom_base_trim_back",
+        "category": "wall_detail",
+        "role": "architectural_baseboard",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_bedroom_base_trim_left",
+        "category": "wall_detail",
+        "role": "architectural_baseboard",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_bedroom_base_trim_right",
+        "category": "wall_detail",
+        "role": "architectural_baseboard",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_bedroom_crown_trim_back",
+        "category": "wall_detail",
+        "role": "architectural_baseboard",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_bedroom_crown_trim_left",
+        "category": "wall_detail",
+        "role": "architectural_baseboard",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_bedroom_crown_trim_right",
+        "category": "wall_detail",
+        "role": "architectural_baseboard",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_bedroom_corner_post_0",
+        "category": "wall_detail",
+        "role": "architectural_corner_post",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_bedroom_corner_post_1",
+        "category": "wall_detail",
+        "role": "architectural_corner_post",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_bedroom_back_wall_vertical_trim_0",
+        "category": "wall_detail",
+        "role": "wall_panel_trim",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_bedroom_back_wall_vertical_trim_1",
+        "category": "wall_detail",
+        "role": "wall_panel_trim",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_bedroom_back_wall_vertical_trim_2",
+        "category": "wall_detail",
+        "role": "wall_panel_trim",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_bedroom_back_wall_vertical_trim_3",
+        "category": "wall_detail",
+        "role": "wall_panel_trim",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_bedroom_back_wall_vertical_trim_4",
+        "category": "wall_detail",
+        "role": "wall_panel_trim",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_bedroom_back_wall_horizontal_trim_0",
+        "category": "wall_detail",
+        "role": "wall_panel_trim",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_bedroom_back_wall_horizontal_trim_1",
+        "category": "wall_detail",
+        "role": "wall_panel_trim",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_bedroom_back_wall_horizontal_trim_2",
+        "category": "wall_detail",
+        "role": "wall_panel_trim",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_bedroom_left_wall_vertical_trim_0",
+        "category": "wall_detail",
+        "role": "wall_panel_trim",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_bedroom_left_wall_vertical_trim_1",
+        "category": "wall_detail",
+        "role": "wall_panel_trim",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_bedroom_left_wall_vertical_trim_2",
+        "category": "wall_detail",
+        "role": "wall_panel_trim",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_bedroom_right_wall_vertical_trim_0",
+        "category": "wall_detail",
+        "role": "wall_panel_trim",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_bedroom_right_wall_vertical_trim_1",
+        "category": "wall_detail",
+        "role": "wall_panel_trim",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_bedroom_right_wall_vertical_trim_2",
+        "category": "wall_detail",
+        "role": "wall_panel_trim",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_bedroom_bed",
+        "category": "bed",
+        "role": "bed_mesh",
+        "asset_id": "bed_double",
+        "anchors": {
+          "floor_contact": [
+            0,
+            0,
+            0
+          ],
+          "front": [
+            0,
+            0,
+            -1
+          ]
+        },
+        "constraints": []
+      },
+      {
+        "id": "sak_bedroom_nightstand_0",
+        "category": "table",
+        "role": "side_table",
+        "asset_id": "side_table",
+        "anchors": {
+          "floor_contact": [
+            0,
+            0,
+            0
+          ],
+          "top_surface": [
+            0,
+            0.45,
+            0
+          ]
+        },
+        "constraints": []
+      },
+      {
+        "id": "sak_bedroom_table_lamp_0",
+        "category": "light",
+        "role": "warm_fixture",
+        "asset_id": "lamp_table",
+        "anchors": {
+          "support_contact": [
+            0,
+            0,
+            0
+          ]
+        },
+        "constraints": []
+      },
+      {
+        "id": "sak_bedroom_nightstand_1",
+        "category": "table",
+        "role": "side_table",
+        "asset_id": "side_table",
+        "anchors": {
+          "floor_contact": [
+            0,
+            0,
+            0
+          ],
+          "top_surface": [
+            0,
+            0.45,
+            0
+          ]
+        },
+        "constraints": []
+      },
+      {
+        "id": "sak_bedroom_table_lamp_1",
+        "category": "light",
+        "role": "warm_fixture",
+        "asset_id": "lamp_table",
+        "anchors": {
+          "support_contact": [
+            0,
+            0,
+            0
+          ]
+        },
+        "constraints": []
+      },
+      {
+        "id": "sak_bedroom_rug",
+        "category": "floor_detail",
+        "role": "floor_mat",
+        "asset_id": "rug_rectangle",
+        "anchors": {
+          "floor_contact": [
+            0,
+            0,
+            0
+          ]
+        },
+        "constraints": []
+      },
+      {
+        "id": "sak_bedroom_lounge_chair",
+        "category": "chair",
+        "role": "chair",
+        "asset_id": "lounge_chair",
+        "anchors": {
+          "floor_contact": [
+            0,
+            0,
+            0
+          ],
+          "front": [
+            0,
+            0,
+            -1
+          ]
+        },
+        "constraints": []
+      },
+      {
+        "id": "sak_bedroom_bookcase",
+        "category": "shelf",
+        "role": "shelf_mesh",
+        "asset_id": "bookcase_wide",
+        "anchors": {
+          "floor_contact": [
+            0,
+            0,
+            0
+          ],
+          "front": [
+            0,
+            0,
+            -1
+          ]
+        },
+        "constraints": []
+      },
+      {
+        "id": "sak_bedroom_tv_cabinet",
+        "category": "cabinet",
+        "role": "cabinet",
+        "asset_id": "cabinet_tv",
+        "anchors": {
+          "floor_contact": [
+            0,
+            0,
+            0
+          ],
+          "front": [
+            0,
+            0,
+            -1
+          ]
+        },
+        "constraints": []
+      },
+      {
+        "id": "sak_bedroom_tv",
+        "category": "screen",
+        "role": "screen",
+        "asset_id": "television_modern",
+        "anchors": {
+          "support_contact": [
+            0,
+            0,
+            0
+          ],
+          "front": [
+            0,
+            0,
+            -1
+          ]
+        },
+        "constraints": []
+      },
+      {
+        "id": "sak_bedroom_plant",
+        "category": "decor_prop",
+        "role": "plant",
+        "asset_id": "potted_plant",
+        "anchors": {
+          "floor_contact": [
+            0,
+            0,
+            0
+          ]
+        },
+        "constraints": []
+      },
+      {
+        "id": "sak_bedroom_wall_art_0",
+        "category": "decor",
+        "role": "wall_art",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_bedroom_wall_art_1",
+        "category": "decor",
+        "role": "wall_art",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_bedroom_wall_art_2",
+        "category": "decor",
+        "role": "wall_art",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_bedroom_bed_pillow_0",
+        "category": "soft_prop",
+        "role": "bed_pillow",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_bedroom_bed_pillow_1",
+        "category": "soft_prop",
+        "role": "bed_pillow",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_bedroom_bed_pillow_2",
+        "category": "soft_prop",
+        "role": "bed_pillow",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_bedroom_bed_pillow_3",
+        "category": "soft_prop",
+        "role": "bed_pillow",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_bedroom_bedding_layer_0",
+        "category": "soft_prop",
+        "role": "bedding_layer",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_bedroom_bedding_layer_1",
+        "category": "soft_prop",
+        "role": "bedding_layer",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_bedroom_bedding_layer_2",
+        "category": "soft_prop",
+        "role": "bedding_layer",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_bedroom_dark_bedspread",
+        "category": "soft_prop",
+        "role": "bedding_layer",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_bedroom_bedspread_seam_0",
+        "category": "soft_prop",
+        "role": "bedding_detail",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_bedroom_bedspread_seam_1",
+        "category": "soft_prop",
+        "role": "bedding_detail",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_bedroom_bedspread_seam_2",
+        "category": "soft_prop",
+        "role": "bedding_detail",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_bedroom_bedspread_seam_3",
+        "category": "soft_prop",
+        "role": "bedding_detail",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_bedroom_lamp_shade_0",
+        "category": "light",
+        "role": "lamp_shade",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_bedroom_lamp_shade_1",
+        "category": "light",
+        "role": "lamp_shade",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_bedroom_palette_panel_0",
+        "category": "decor",
+        "role": "palette_accent_panel",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_bedroom_palette_panel_1",
+        "category": "decor",
+        "role": "palette_accent_panel",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_bedroom_palette_panel_2",
+        "category": "decor",
+        "role": "palette_accent_panel",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_bedroom_window",
+        "category": "window",
+        "role": "window",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_bedroom_curtain_0",
+        "category": "curtain",
+        "role": "curtain",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_bedroom_curtain_1",
+        "category": "curtain",
+        "role": "curtain",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_bedroom_book_stack_0",
+        "category": "book",
+        "role": "book",
+        "asset_id": "books",
+        "anchors": {
+          "support_contact": [
+            0,
+            0,
+            0
+          ]
+        },
+        "constraints": []
+      },
+      {
+        "id": "sak_bedroom_book_stack_1",
+        "category": "book",
+        "role": "book",
+        "asset_id": "books",
+        "anchors": {
+          "support_contact": [
+            0,
+            0,
+            0
+          ]
+        },
+        "constraints": []
+      },
+      {
+        "id": "sak_bedroom_book_stack_2",
+        "category": "book",
+        "role": "book",
+        "asset_id": "books",
+        "anchors": {
+          "support_contact": [
+            0,
+            0,
+            0
+          ]
+        },
+        "constraints": []
+      },
+      {
+        "id": "sak_bedroom_floor_plank_0",
+        "category": "floor_detail",
+        "role": "floor_detail_line",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_bedroom_floor_plank_1",
+        "category": "floor_detail",
+        "role": "floor_detail_line",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_bedroom_floor_plank_2",
+        "category": "floor_detail",
+        "role": "floor_detail_line",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_bedroom_floor_plank_3",
+        "category": "floor_detail",
+        "role": "floor_detail_line",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_bedroom_floor_plank_4",
+        "category": "floor_detail",
+        "role": "floor_detail_line",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      }
+    ],
+    "relations": [
+      {
+        "type": "supports",
+        "source": "ground",
+        "target": "sak_bedroom_floor",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_bedroom_floor",
+        "target": "room_shell",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "ground",
+        "target": "sak_bedroom_back_wall",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_bedroom_back_wall",
+        "target": "room_shell",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "ground",
+        "target": "sak_bedroom_left_wall",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_bedroom_left_wall",
+        "target": "room_shell",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "ground",
+        "target": "sak_bedroom_right_wall",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_bedroom_right_wall",
+        "target": "room_shell",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "ground",
+        "target": "sak_bedroom_ceiling",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_bedroom_ceiling",
+        "target": "room_shell",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_bedroom_floor",
+        "target": "sak_bedroom_base_trim_back",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_bedroom_base_trim_back",
+        "target": "room_shell",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_bedroom_floor",
+        "target": "sak_bedroom_base_trim_left",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_bedroom_base_trim_left",
+        "target": "room_shell",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_bedroom_floor",
+        "target": "sak_bedroom_base_trim_right",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_bedroom_base_trim_right",
+        "target": "room_shell",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_bedroom_floor",
+        "target": "sak_bedroom_crown_trim_back",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_bedroom_crown_trim_back",
+        "target": "room_shell",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_bedroom_floor",
+        "target": "sak_bedroom_crown_trim_left",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_bedroom_crown_trim_left",
+        "target": "room_shell",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_bedroom_floor",
+        "target": "sak_bedroom_crown_trim_right",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_bedroom_crown_trim_right",
+        "target": "room_shell",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_bedroom_floor",
+        "target": "sak_bedroom_corner_post_0",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_bedroom_corner_post_0",
+        "target": "room_shell",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_bedroom_floor",
+        "target": "sak_bedroom_corner_post_1",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_bedroom_corner_post_1",
+        "target": "room_shell",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_bedroom_floor",
+        "target": "sak_bedroom_back_wall_vertical_trim_0",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_bedroom_back_wall_vertical_trim_0",
+        "target": "room_shell",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_bedroom_floor",
+        "target": "sak_bedroom_back_wall_vertical_trim_1",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_bedroom_back_wall_vertical_trim_1",
+        "target": "room_shell",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_bedroom_floor",
+        "target": "sak_bedroom_back_wall_vertical_trim_2",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_bedroom_back_wall_vertical_trim_2",
+        "target": "room_shell",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_bedroom_floor",
+        "target": "sak_bedroom_back_wall_vertical_trim_3",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_bedroom_back_wall_vertical_trim_3",
+        "target": "room_shell",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_bedroom_floor",
+        "target": "sak_bedroom_back_wall_vertical_trim_4",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_bedroom_back_wall_vertical_trim_4",
+        "target": "room_shell",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_bedroom_floor",
+        "target": "sak_bedroom_back_wall_horizontal_trim_0",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_bedroom_back_wall_horizontal_trim_0",
+        "target": "room_shell",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_bedroom_floor",
+        "target": "sak_bedroom_back_wall_horizontal_trim_1",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_bedroom_back_wall_horizontal_trim_1",
+        "target": "room_shell",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_bedroom_floor",
+        "target": "sak_bedroom_back_wall_horizontal_trim_2",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_bedroom_back_wall_horizontal_trim_2",
+        "target": "room_shell",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_bedroom_floor",
+        "target": "sak_bedroom_left_wall_vertical_trim_0",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_bedroom_left_wall_vertical_trim_0",
+        "target": "room_shell",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_bedroom_floor",
+        "target": "sak_bedroom_left_wall_vertical_trim_1",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_bedroom_left_wall_vertical_trim_1",
+        "target": "room_shell",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_bedroom_floor",
+        "target": "sak_bedroom_left_wall_vertical_trim_2",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_bedroom_left_wall_vertical_trim_2",
+        "target": "room_shell",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_bedroom_floor",
+        "target": "sak_bedroom_right_wall_vertical_trim_0",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_bedroom_right_wall_vertical_trim_0",
+        "target": "room_shell",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_bedroom_floor",
+        "target": "sak_bedroom_right_wall_vertical_trim_1",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_bedroom_right_wall_vertical_trim_1",
+        "target": "room_shell",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_bedroom_floor",
+        "target": "sak_bedroom_right_wall_vertical_trim_2",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_bedroom_right_wall_vertical_trim_2",
+        "target": "room_shell",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_bedroom_floor",
+        "target": "sak_bedroom_bed",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_bedroom_bed",
+        "target": "sleep_zone",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_bedroom_floor",
+        "target": "sak_bedroom_nightstand_0",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_bedroom_nightstand_0",
+        "target": "sleep_zone",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_bedroom_nightstand_0",
+        "target": "sak_bedroom_table_lamp_0",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_bedroom_table_lamp_0",
+        "target": "lighting",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_bedroom_floor",
+        "target": "sak_bedroom_nightstand_1",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_bedroom_nightstand_1",
+        "target": "sleep_zone",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_bedroom_nightstand_1",
+        "target": "sak_bedroom_table_lamp_1",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_bedroom_table_lamp_1",
+        "target": "lighting",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_bedroom_floor",
+        "target": "sak_bedroom_rug",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_bedroom_rug",
+        "target": "sleep_zone",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_bedroom_floor",
+        "target": "sak_bedroom_lounge_chair",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_bedroom_lounge_chair",
+        "target": "reading_corner",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "faces",
+        "source": "sak_bedroom_lounge_chair",
+        "target": "sak_bedroom_rug",
+        "reason": "reading_chair_faces_room_center"
+      },
+      {
+        "type": "supports",
+        "source": "sak_bedroom_floor",
+        "target": "sak_bedroom_bookcase",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_bedroom_bookcase",
+        "target": "storage_wall",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_bedroom_floor",
+        "target": "sak_bedroom_tv_cabinet",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_bedroom_tv_cabinet",
+        "target": "media_wall",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_bedroom_tv_cabinet",
+        "target": "sak_bedroom_tv",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_bedroom_tv",
+        "target": "media_wall",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_bedroom_floor",
+        "target": "sak_bedroom_plant",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_bedroom_plant",
+        "target": "decor",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_bedroom_back_wall",
+        "target": "sak_bedroom_wall_art_0",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "attached_to",
+        "source": "sak_bedroom_wall_art_0",
+        "target": "sak_bedroom_back_wall",
+        "reason": "constructor_attachment"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_bedroom_wall_art_0",
+        "target": "wall_dressing",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_bedroom_back_wall",
+        "target": "sak_bedroom_wall_art_1",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "attached_to",
+        "source": "sak_bedroom_wall_art_1",
+        "target": "sak_bedroom_back_wall",
+        "reason": "constructor_attachment"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_bedroom_wall_art_1",
+        "target": "wall_dressing",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_bedroom_back_wall",
+        "target": "sak_bedroom_wall_art_2",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "attached_to",
+        "source": "sak_bedroom_wall_art_2",
+        "target": "sak_bedroom_back_wall",
+        "reason": "constructor_attachment"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_bedroom_wall_art_2",
+        "target": "wall_dressing",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_bedroom_bed",
+        "target": "sak_bedroom_bed_pillow_0",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_bedroom_bed_pillow_0",
+        "target": "sleep_zone",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_bedroom_bed",
+        "target": "sak_bedroom_bed_pillow_1",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_bedroom_bed_pillow_1",
+        "target": "sleep_zone",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_bedroom_bed",
+        "target": "sak_bedroom_bed_pillow_2",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_bedroom_bed_pillow_2",
+        "target": "sleep_zone",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_bedroom_bed",
+        "target": "sak_bedroom_bed_pillow_3",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_bedroom_bed_pillow_3",
+        "target": "sleep_zone",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_bedroom_bed",
+        "target": "sak_bedroom_bedding_layer_0",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_bedroom_bedding_layer_0",
+        "target": "sleep_zone",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_bedroom_bed",
+        "target": "sak_bedroom_bedding_layer_1",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_bedroom_bedding_layer_1",
+        "target": "sleep_zone",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_bedroom_bed",
+        "target": "sak_bedroom_bedding_layer_2",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_bedroom_bedding_layer_2",
+        "target": "sleep_zone",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_bedroom_bed",
+        "target": "sak_bedroom_dark_bedspread",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_bedroom_dark_bedspread",
+        "target": "sleep_zone",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_bedroom_bed",
+        "target": "sak_bedroom_bedspread_seam_0",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_bedroom_bedspread_seam_0",
+        "target": "sleep_zone",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_bedroom_bed",
+        "target": "sak_bedroom_bedspread_seam_1",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_bedroom_bedspread_seam_1",
+        "target": "sleep_zone",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_bedroom_bed",
+        "target": "sak_bedroom_bedspread_seam_2",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_bedroom_bedspread_seam_2",
+        "target": "sleep_zone",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_bedroom_bed",
+        "target": "sak_bedroom_bedspread_seam_3",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_bedroom_bedspread_seam_3",
+        "target": "sleep_zone",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_bedroom_table_lamp_0",
+        "target": "sak_bedroom_lamp_shade_0",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_bedroom_lamp_shade_0",
+        "target": "lighting",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_bedroom_table_lamp_1",
+        "target": "sak_bedroom_lamp_shade_1",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_bedroom_lamp_shade_1",
+        "target": "lighting",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_bedroom_back_wall",
+        "target": "sak_bedroom_palette_panel_0",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "attached_to",
+        "source": "sak_bedroom_palette_panel_0",
+        "target": "sak_bedroom_back_wall",
+        "reason": "constructor_attachment"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_bedroom_palette_panel_0",
+        "target": "wall_dressing",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_bedroom_back_wall",
+        "target": "sak_bedroom_palette_panel_1",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "attached_to",
+        "source": "sak_bedroom_palette_panel_1",
+        "target": "sak_bedroom_back_wall",
+        "reason": "constructor_attachment"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_bedroom_palette_panel_1",
+        "target": "wall_dressing",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_bedroom_back_wall",
+        "target": "sak_bedroom_palette_panel_2",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "attached_to",
+        "source": "sak_bedroom_palette_panel_2",
+        "target": "sak_bedroom_back_wall",
+        "reason": "constructor_attachment"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_bedroom_palette_panel_2",
+        "target": "wall_dressing",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_bedroom_back_wall",
+        "target": "sak_bedroom_window",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "attached_to",
+        "source": "sak_bedroom_window",
+        "target": "sak_bedroom_back_wall",
+        "reason": "constructor_attachment"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_bedroom_window",
+        "target": "wall_dressing",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_bedroom_back_wall",
+        "target": "sak_bedroom_curtain_0",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "attached_to",
+        "source": "sak_bedroom_curtain_0",
+        "target": "sak_bedroom_back_wall",
+        "reason": "constructor_attachment"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_bedroom_curtain_0",
+        "target": "wall_dressing",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_bedroom_back_wall",
+        "target": "sak_bedroom_curtain_1",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "attached_to",
+        "source": "sak_bedroom_curtain_1",
+        "target": "sak_bedroom_back_wall",
+        "reason": "constructor_attachment"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_bedroom_curtain_1",
+        "target": "wall_dressing",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_bedroom_bookcase",
+        "target": "sak_bedroom_book_stack_0",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_bedroom_book_stack_0",
+        "target": "storage_wall",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_bedroom_bookcase",
+        "target": "sak_bedroom_book_stack_1",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_bedroom_book_stack_1",
+        "target": "storage_wall",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_bedroom_bookcase",
+        "target": "sak_bedroom_book_stack_2",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_bedroom_book_stack_2",
+        "target": "storage_wall",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_bedroom_floor",
+        "target": "sak_bedroom_floor_plank_0",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_bedroom_floor_plank_0",
+        "target": "floor_detail",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_bedroom_floor",
+        "target": "sak_bedroom_floor_plank_1",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_bedroom_floor_plank_1",
+        "target": "floor_detail",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_bedroom_floor",
+        "target": "sak_bedroom_floor_plank_2",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_bedroom_floor_plank_2",
+        "target": "floor_detail",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_bedroom_floor",
+        "target": "sak_bedroom_floor_plank_3",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_bedroom_floor_plank_3",
+        "target": "floor_detail",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_bedroom_floor",
+        "target": "sak_bedroom_floor_plank_4",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_bedroom_floor_plank_4",
+        "target": "floor_detail",
+        "reason": "constructor_assembly"
+      }
+    ],
+    "validation_view_overrides": {
+      "left_three_quarter": {
+        "position_nudge": [
+          -0.18,
+          0.02,
+          -0.04
+        ],
+        "target_nudge": [
+          0.22,
+          0.0,
+          0.02
+        ],
+        "fov_add": 1.5,
+        "reason": "avoid_centered_bed_lamp_mass_in_oblique_review_view"
+      }
+    },
+    "warnings": []
+  },
+  "scene_authoring_kernel_v1": {
+    "prompt": "quiet evening bedroom with bed nightstands lamps reading chair and warm rug",
+    "family": "bedroom_evening",
+    "variant": 0,
+    "graph_node_count": 69,
+    "graph_relation_count": 148,
+    "warnings": [],
+    "completion_claim_allowed": false,
+    "human_review_required": true
+  },
+  "scene_graph_kernel_v1": {
+    "status": "repaired"
+  },
+  "metadata": {
+    "facing_relation_compilation": {
+      "schema": 1,
+      "source": "tools/model_scene_facing_relation_compiler.py",
+      "change_count": 2,
+      "skipped_count": 0,
+      "completion_claim_allowed": false,
+      "human_review_required": true
+    }
+  }
+}

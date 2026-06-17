@@ -1,0 +1,369 @@
+{
+  "schema": 1,
+  "id": "pretrained_rain_tabletop_shap_e_v0",
+  "version": 1,
+  "status": "seeded_not_runtime",
+  "units": "meters",
+  "coordinate_system": "y_up_right_handed",
+  "generator": {
+    "provider": "openai_shap_e_text300m",
+    "batch_id": "shap_e_rain_glass_pavilion_prototype",
+    "source_scene_request_family": "rain_glass_pavilion",
+    "asset_count": 4,
+    "authorship": "pretrained_generated_assets_plus_cortex_constraint_synthesis"
+  },
+  "intent": {
+    "one_sentence": "A generated rainy tabletop still life built from pretrained mesh assets, warm light, glass, wet contact, and a shallow pavilion frame.",
+    "art_goal": "Use pretrained assets as the visual subject while Cortex supplies scale, contact, camera, material classes, and rejection gates.",
+    "foreground_midground_background": {
+      "foreground": "Generated wet-contact plane and low glass/frame asset.",
+      "midground": "Generated lantern and tabletop dressing assets on a simple support plane.",
+      "background": "Dark procedural rain-card plane kept minimal so generated assets remain the subject."
+    },
+    "forbidden_reads": [
+      "hand-authored prop solution",
+      "whole-scene AI blob",
+      "floating generated asset",
+      "uneditable mesh soup"
+    ]
+  },
+  "lighting": {
+    "script_id": "pretrained_rain_tabletop",
+    "rig": "rain_pavilion_night",
+    "key": "Cool soft overhead rain light.",
+    "fill": "Low dim fill from the glass side.",
+    "rim": "Warm tabletop practical from generated lantern role.",
+    "fog": "Thin rain haze.",
+    "exposure": 1.55,
+    "bloom_ceiling": 1.35,
+    "warm_cool_contrast": 0.72,
+    "world_shader_palette": "rain_pavilion_night"
+  },
+  "environment": {
+    "ibl": "studio",
+    "fallback": "procedural_sky"
+  },
+  "cameras": [
+    {
+      "id": "hero",
+      "role": "Generated tabletop asset cluster first read.",
+      "position": [
+        -1.15,
+        0.82,
+        0.16
+      ],
+      "target": [
+        -0.12,
+        0.58,
+        0.76
+      ],
+      "fov": 28.0,
+      "art_reason": "Close camera makes generated assets carry the scene instead of relying on weak blockout."
+    },
+    {
+      "id": "asset_diagnostic",
+      "role": "Inspect imported generated mesh contact and scale.",
+      "position": [
+        -0.82,
+        0.68,
+        -0.34
+      ],
+      "target": [
+        -0.05,
+        0.45,
+        0.55
+      ],
+      "fov": 34.0,
+      "art_reason": "Diagnostic camera catches floating, over-scale, or unreadable generated assets."
+    }
+  ],
+  "material_palette": [
+    {
+      "id": "pretrained_vertex_material",
+      "surface_class": "generated_asset",
+      "shader_mode": "runtime_pbr_fallback",
+      "description": "Generated mesh material using imported metadata and runtime fallback material."
+    },
+    {
+      "id": "wet_dark_support",
+      "surface_class": "wet_ground",
+      "shader_mode": "wet_ground",
+      "description": "Dark wet support surfaces to make generated assets read."
+    },
+    {
+      "id": "warm_table_light",
+      "surface_class": "emissive",
+      "shader_mode": "bounded_emissive",
+      "description": "Warm constrained accent light associated with the generated lantern role."
+    }
+  ],
+  "assets": [
+    {
+      "id": "generated_floor_plane",
+      "role": "support_floor",
+      "source": "procedural:thin_wet_floor",
+      "transform": {
+        "position": [
+          0.0,
+          0.0,
+          0.62
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          1.9,
+          0.02,
+          1.25
+        ]
+      },
+      "contact": "grounded",
+      "material_override": "wet_dark_support",
+      "art_reason": "Minimal generated-scene support surface, not the hero."
+    },
+    {
+      "id": "generated_table_plane",
+      "role": "support_tabletop",
+      "source": "procedural:thin_tabletop",
+      "transform": {
+        "position": [
+          0.0,
+          0.7,
+          0.8
+        ],
+        "rotation_degrees": [
+          0.0,
+          -12.0,
+          0.0
+        ],
+        "scale": [
+          1.05,
+          0.05,
+          0.55
+        ]
+      },
+      "contact": "mounted",
+      "anchor": "generated_floor_plane",
+      "material_override": "wet_dark_support",
+      "art_reason": "Simple support plane so the generated assets define the scene."
+    },
+    {
+      "id": "generated_warm_fixture_00",
+      "role": "warm_fixture",
+      "source": "pretrained:rain_glass_pavilion_rain_tabletop_lantern_cluster_openai_shap_e_text300m",
+      "runtime_asset": "assets/generated/pretrained_assets/openai_shap_e_text300m/rain_glass_pavilion/rain_tabletop_lantern_cluster/rain_glass_pavilion_rain_tabletop_lantern_cluster_openai_shap_e_text300m.gltf",
+      "preview_image": "assets/generated/pretrained_assets/openai_shap_e_text300m/rain_glass_pavilion/rain_tabletop_lantern_cluster/rain_glass_pavilion_rain_tabletop_lantern_cluster_openai_shap_e_text300m.preview.png",
+      "transform": {
+        "position": [
+          -0.18,
+          0.74,
+          0.82
+        ],
+        "rotation_degrees": [
+          0.0,
+          -12.0,
+          0.0
+        ],
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ]
+      },
+      "contact": "mounted",
+      "anchor": "generated_table_plane",
+      "bounds_meters": {
+        "min": [
+          -0.10570085793733597,
+          0.0,
+          -0.17499999701976776
+        ],
+        "max": [
+          0.10570085793733597,
+          0.20896688103675842,
+          0.17499999701976776
+        ]
+      },
+      "material_override": "pretrained_vertex_material",
+      "art_reason": "Placed by generated-scene synthesis from admitted pretrained mesh metadata, not manually modeled."
+    },
+    {
+      "id": "generated_glass_accent_01",
+      "role": "glass_accent",
+      "source": "pretrained:rain_glass_pavilion_rain_glass_table_dressing_openai_shap_e_text300m",
+      "runtime_asset": "assets/generated/pretrained_assets/openai_shap_e_text300m/rain_glass_pavilion/rain_glass_table_dressing/rain_glass_pavilion_rain_glass_table_dressing_openai_shap_e_text300m.gltf",
+      "preview_image": "assets/generated/pretrained_assets/openai_shap_e_text300m/rain_glass_pavilion/rain_glass_table_dressing/rain_glass_pavilion_rain_glass_table_dressing_openai_shap_e_text300m.preview.png",
+      "transform": {
+        "position": [
+          0.18,
+          0.74,
+          0.78
+        ],
+        "rotation_degrees": [
+          0.0,
+          -3.0,
+          0.0
+        ],
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ]
+      },
+      "contact": "mounted",
+      "anchor": "generated_table_plane",
+      "bounds_meters": {
+        "min": [
+          -0.09024836868047714,
+          0.0,
+          -0.05774647742509842
+        ],
+        "max": [
+          0.09024836868047714,
+          0.18000000715255737,
+          0.05774647742509842
+        ]
+      },
+      "material_override": "pretrained_vertex_material",
+      "art_reason": "Placed by generated-scene synthesis from admitted pretrained mesh metadata, not manually modeled."
+    },
+    {
+      "id": "generated_wet_contact_02",
+      "role": "wet_contact",
+      "source": "pretrained:rain_glass_pavilion_rain_puddle_floor_patch_openai_shap_e_text300m",
+      "runtime_asset": "assets/generated/pretrained_assets/openai_shap_e_text300m/rain_glass_pavilion/rain_puddle_floor_patch/rain_glass_pavilion_rain_puddle_floor_patch_openai_shap_e_text300m.gltf",
+      "preview_image": "assets/generated/pretrained_assets/openai_shap_e_text300m/rain_glass_pavilion/rain_puddle_floor_patch/rain_glass_pavilion_rain_puddle_floor_patch_openai_shap_e_text300m.preview.png",
+      "transform": {
+        "position": [
+          0.0,
+          0.012,
+          0.58
+        ],
+        "rotation_degrees": [
+          0.0,
+          6.0,
+          0.0
+        ],
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ]
+      },
+      "contact": "grounded",
+      "anchor": "generated_floor_plane",
+      "bounds_meters": {
+        "min": [
+          -0.010012687183916569,
+          0.0,
+          -0.00010192026093136519
+        ],
+        "max": [
+          0.010012687183916569,
+          0.019999999552965164,
+          0.00010192026093136519
+        ]
+      },
+      "material_override": "pretrained_vertex_material",
+      "art_reason": "Placed by generated-scene synthesis from admitted pretrained mesh metadata, not manually modeled."
+    },
+    {
+      "id": "generated_foreground_frame_03",
+      "role": "foreground_frame",
+      "source": "pretrained:rain_glass_pavilion_rain_streak_window_panel_openai_shap_e_text300m",
+      "runtime_asset": "assets/generated/pretrained_assets/openai_shap_e_text300m/rain_glass_pavilion/rain_streak_window_panel/rain_glass_pavilion_rain_streak_window_panel_openai_shap_e_text300m.gltf",
+      "preview_image": "assets/generated/pretrained_assets/openai_shap_e_text300m/rain_glass_pavilion/rain_streak_window_panel/rain_glass_pavilion_rain_streak_window_panel_openai_shap_e_text300m.preview.png",
+      "transform": {
+        "position": [
+          -0.82,
+          0.02,
+          0.34
+        ],
+        "rotation_degrees": [
+          0.0,
+          15.0,
+          0.0
+        ],
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ]
+      },
+      "contact": "grounded",
+      "anchor": "generated_floor_plane",
+      "bounds_meters": {
+        "min": [
+          -0.11313717812299728,
+          0.0,
+          -0.03999999910593033
+        ],
+        "max": [
+          0.11313717812299728,
+          0.2272692620754242,
+          0.03999999910593033
+        ]
+      },
+      "material_override": "pretrained_vertex_material",
+      "art_reason": "Placed by generated-scene synthesis from admitted pretrained mesh metadata, not manually modeled."
+    }
+  ],
+  "authored_groups": [
+    {
+      "id": "pretrained_asset_cluster",
+      "primary": true,
+      "art_reason": "The generated assets are the primary scene content.",
+      "parts": [
+        "generated_warm_fixture_00",
+        "generated_glass_accent_01",
+        "generated_wet_contact_02",
+        "generated_foreground_frame_03"
+      ],
+      "contact_rules": {
+        "requires_supports": true,
+        "max_gap_m": 0.05
+      }
+    },
+    {
+      "id": "support_surfaces",
+      "primary": true,
+      "art_reason": "Generated assets need simple contact surfaces for physical plausibility.",
+      "parts": [
+        "generated_floor_plane",
+        "generated_table_plane"
+      ],
+      "contact_rules": {
+        "requires_ground_contact": true,
+        "max_gap_m": 0.05
+      }
+    },
+    {
+      "id": "rain_material_read",
+      "primary": false,
+      "art_reason": "The scene should read as wet glass and warm-cool rain lighting.",
+      "parts": [
+        "generated_warm_fixture_00",
+        "generated_glass_accent_01",
+        "generated_wet_contact_02",
+        "generated_foreground_frame_03",
+        "generated_floor_plane"
+      ],
+      "contact_rules": {
+        "requires_anchor": "support_surfaces",
+        "max_gap_m": 0.1
+      }
+    }
+  ],
+  "validation": {
+    "contact_tolerance_m": 0.05,
+    "max_gap_m": 0.1,
+    "min_authored_groups": 3,
+    "max_round_prop_axis_ratio": 1.15,
+    "require_foreground_midground_background": true,
+    "palette_required": true,
+    "requires_pretrained_assets": true,
+    "minimum_pretrained_assets": 4
+  }
+}

@@ -1,0 +1,106 @@
+{
+  "asset": {
+    "version": "2.0",
+    "generator": "CortexEngine OBJ-to-glTF pretrained asset converter"
+  },
+  "scene": 0,
+  "scenes": [
+    {
+      "nodes": [
+        0
+      ]
+    }
+  ],
+  "nodes": [
+    {
+      "mesh": 0
+    }
+  ],
+  "meshes": [
+    {
+      "primitives": [
+        {
+          "attributes": {
+            "POSITION": 0,
+            "NORMAL": 1,
+            "TEXCOORD_0": 2
+          },
+          "indices": 3,
+          "mode": 4
+        }
+      ]
+    }
+  ],
+  "buffers": [
+    {
+      "uri": "rain_glass_pavilion_rain_tabletop_lantern_cluster_openai_shap_e_text300m.bin",
+      "byteLength": 2124880
+    }
+  ],
+  "bufferViews": [
+    {
+      "buffer": 0,
+      "byteOffset": 0,
+      "byteLength": 453840,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteOffset": 453840,
+      "byteLength": 453840,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteOffset": 907680,
+      "byteLength": 302560,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteOffset": 1210240,
+      "byteLength": 914640,
+      "target": 34963
+    }
+  ],
+  "accessors": [
+    {
+      "bufferView": 0,
+      "byteOffset": 0,
+      "componentType": 5126,
+      "count": 37820,
+      "type": "VEC3",
+      "min": [
+        -0.10570099949836731,
+        0.0,
+        -0.17499999701976776
+      ],
+      "max": [
+        0.10570099949836731,
+        0.20896700024604797,
+        0.17499999701976776
+      ]
+    },
+    {
+      "bufferView": 1,
+      "byteOffset": 0,
+      "componentType": 5126,
+      "count": 37820,
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 2,
+      "byteOffset": 0,
+      "componentType": 5126,
+      "count": 37820,
+      "type": "VEC2"
+    },
+    {
+      "bufferView": 3,
+      "byteOffset": 0,
+      "componentType": 5125,
+      "count": 228660,
+      "type": "SCALAR"
+    }
+  ]
+}

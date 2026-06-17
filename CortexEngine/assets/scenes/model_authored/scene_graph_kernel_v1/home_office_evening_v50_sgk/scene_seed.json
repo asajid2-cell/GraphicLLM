@@ -1,0 +1,6400 @@
+{
+  "schema": "cortex.model_authored_scene_seed.v1",
+  "id": "home_office_evening__semantic_plan_v1_balanced__view_local_midfrequency_bookcase_context_framed_panels__macro_director_macro_layered_palette",
+  "scene_family": "home_office_evening",
+  "status": "MODEL_AUTHORED_SCENE_GRAPH_KERNEL_V1_REPAIRED",
+  "generator": {
+    "name": "model_scene_semantic_plan_constructor",
+    "mode": "scene_authoring_intelligence_v1_semantic_plan_to_seed",
+    "brief": "home office with desk, bookcase, cork board, task chair, and enclosed evening practical lighting",
+    "semantic_plan_source": "artifacts/scene_authoring_intelligence_v1/01_home_office_evening/semantic_scene_plan.json",
+    "variant": "v1_balanced",
+    "construction_layers": [
+      "brief_compiled_semantic_plan",
+      "enclosed_room_shell",
+      "zone_aware_object_roles",
+      "support_contact_snapping",
+      "scene_local_environment",
+      "relation_assertion_export",
+      "macro_director_batch",
+      "scene_plausibility_qa_v1",
+      "scene_graph_kernel_v1"
+    ]
+  },
+  "camera": {
+    "position": [
+      -1.62,
+      1.26,
+      -1.16
+    ],
+    "target": [
+      0.25,
+      0.84,
+      0.58
+    ],
+    "fov": 58.0,
+    "class": "hero"
+  },
+  "environment": {
+    "preset": "neutral_procedural",
+    "art_lighting_preset": "semantic_plan_scene_local",
+    "graphics_preset": "hero_final_art",
+    "ibl_enabled": false,
+    "ibl_diffuse_intensity": 0.0,
+    "ibl_specular_intensity": 0.0,
+    "allow_hdri_background": false,
+    "allow_hdri_reflections": false,
+    "visible_background": "authored_geometry_only",
+    "ambient_source": "scene_authored_lights",
+    "reflection_policy": "scene_local_no_hdri",
+    "enclosure_contract": {
+      "requires_authored_floor": true,
+      "requires_authored_walls": true,
+      "requires_authored_ceiling": true,
+      "background_must_be_occluded_by_scene_geometry": true,
+      "runtime_environment_must_be_neutral": true
+    }
+  },
+  "validation": {
+    "must_not_expose_environment_background": true,
+    "must_not_use_hdri_reflections": true,
+    "must_have_seed_authored_lights": true
+  },
+  "catalog_intent": {
+    "story_beat": "home office with desk, bookcase, cork board, task chair, and enclosed evening practical lighting",
+    "focal_subject": "desk_monitor_cluster, task_chair, bookcase_wall",
+    "palette_intent": "dark desk, paper/card detail, matte wall, varied book spines, soft lamp glow",
+    "required_roles": [
+      "desk",
+      "office_chair",
+      "monitor",
+      "keyboard",
+      "lamp",
+      "bookcase",
+      "books",
+      "paper_stack",
+      "plant"
+    ],
+    "failure_modes": [
+      "raw IBL backdrop",
+      "missing enclosure",
+      "floating props",
+      "slot-colliding furniture",
+      "unranked full-scene candidate"
+    ]
+  },
+  "materials": {
+    "floor_neutral": {
+      "color": [
+        0.33,
+        0.35,
+        0.34,
+        1.0
+      ],
+      "metallic": 0.0,
+      "roughness": 0.78,
+      "preset": "matte_tile"
+    },
+    "wall_warm": {
+      "color": [
+        0.58,
+        0.54,
+        0.48,
+        1.0
+      ],
+      "metallic": 0.0,
+      "roughness": 0.82,
+      "preset": "paint"
+    },
+    "ceiling_soft": {
+      "color": [
+        0.7,
+        0.68,
+        0.62,
+        1.0
+      ],
+      "metallic": 0.0,
+      "roughness": 0.86,
+      "preset": "paint"
+    },
+    "dark_wall": {
+      "color": [
+        0.055,
+        0.052,
+        0.062,
+        1.0
+      ],
+      "metallic": 0.0,
+      "roughness": 0.72,
+      "preset": "paint"
+    },
+    "wood": {
+      "color": [
+        0.34,
+        0.2,
+        0.12,
+        1.0
+      ],
+      "metallic": 0.0,
+      "roughness": 0.56,
+      "preset": "wood"
+    },
+    "dark_wood": {
+      "color": [
+        0.12,
+        0.075,
+        0.045,
+        1.0
+      ],
+      "metallic": 0.0,
+      "roughness": 0.52,
+      "preset": "wood"
+    },
+    "metal": {
+      "color": [
+        0.5,
+        0.52,
+        0.5,
+        1.0
+      ],
+      "metallic": 0.65,
+      "roughness": 0.34,
+      "preset": "brushed_metal"
+    },
+    "black_metal": {
+      "color": [
+        0.025,
+        0.026,
+        0.028,
+        1.0
+      ],
+      "metallic": 0.72,
+      "roughness": 0.34,
+      "preset": "brushed_metal"
+    },
+    "glass": {
+      "color": [
+        0.78,
+        0.88,
+        0.95,
+        0.62
+      ],
+      "metallic": 0.0,
+      "roughness": 0.08,
+      "preset": "glass"
+    },
+    "paper": {
+      "color": [
+        0.88,
+        0.82,
+        0.62,
+        1.0
+      ],
+      "metallic": 0.0,
+      "roughness": 0.72,
+      "preset": "paper"
+    },
+    "red_fabric": {
+      "color": [
+        0.42,
+        0.04,
+        0.05,
+        1.0
+      ],
+      "metallic": 0.0,
+      "roughness": 0.72,
+      "preset": "fabric"
+    },
+    "blue_fabric": {
+      "color": [
+        0.06,
+        0.11,
+        0.2,
+        1.0
+      ],
+      "metallic": 0.0,
+      "roughness": 0.74,
+      "preset": "fabric"
+    },
+    "court_wood": {
+      "color": [
+        0.66,
+        0.43,
+        0.19,
+        1.0
+      ],
+      "metallic": 0.0,
+      "roughness": 0.46,
+      "preset": "wood"
+    },
+    "turf": {
+      "color": [
+        0.04,
+        0.31,
+        0.1,
+        1.0
+      ],
+      "metallic": 0.0,
+      "roughness": 0.78,
+      "preset": "organic"
+    },
+    "emissive_warm": {
+      "color": [
+        1.0,
+        0.62,
+        0.2,
+        1.0
+      ],
+      "metallic": 0.0,
+      "roughness": 0.3,
+      "preset": "emissive",
+      "emissive": [
+        1.0,
+        0.42,
+        0.1
+      ],
+      "emissive_strength": 1.9
+    },
+    "emissive_cyan": {
+      "color": [
+        0.0,
+        0.58,
+        1.0,
+        1.0
+      ],
+      "metallic": 0.0,
+      "roughness": 0.28,
+      "preset": "emissive",
+      "emissive": [
+        0.0,
+        0.38,
+        0.95
+      ],
+      "emissive_strength": 1.8
+    },
+    "emissive_magenta": {
+      "color": [
+        0.95,
+        0.05,
+        0.42,
+        1.0
+      ],
+      "metallic": 0.0,
+      "roughness": 0.28,
+      "preset": "emissive",
+      "emissive": [
+        0.95,
+        0.02,
+        0.28
+      ],
+      "emissive_strength": 1.7
+    },
+    "line_white": {
+      "color": [
+        0.92,
+        0.91,
+        0.86,
+        1.0
+      ],
+      "metallic": 0.0,
+      "roughness": 0.58,
+      "preset": "paint"
+    },
+    "seat_plastic": {
+      "color": [
+        0.08,
+        0.18,
+        0.46,
+        1.0
+      ],
+      "metallic": 0.0,
+      "roughness": 0.62,
+      "preset": "paint"
+    },
+    "paper_white": {
+      "color": [
+        0.92,
+        0.9,
+        0.82,
+        1.0
+      ],
+      "metallic": 0.0,
+      "roughness": 0.74,
+      "preset": "paper"
+    },
+    "chalk_white": {
+      "color": [
+        0.88,
+        0.88,
+        0.78,
+        1.0
+      ],
+      "metallic": 0.0,
+      "roughness": 0.86,
+      "preset": "chalk"
+    },
+    "classroom_book_red": {
+      "color": [
+        0.74,
+        0.08,
+        0.08,
+        1.0
+      ],
+      "metallic": 0.0,
+      "roughness": 0.66,
+      "preset": "paper"
+    },
+    "classroom_book_blue": {
+      "color": [
+        0.08,
+        0.18,
+        0.58,
+        1.0
+      ],
+      "metallic": 0.0,
+      "roughness": 0.66,
+      "preset": "paper"
+    },
+    "classroom_poster_warm": {
+      "color": [
+        0.95,
+        0.55,
+        0.12,
+        1.0
+      ],
+      "metallic": 0.0,
+      "roughness": 0.62,
+      "preset": "paper"
+    },
+    "classroom_poster_cool": {
+      "color": [
+        0.08,
+        0.58,
+        0.72,
+        1.0
+      ],
+      "metallic": 0.0,
+      "roughness": 0.62,
+      "preset": "paper"
+    },
+    "classroom_floor_line": {
+      "color": [
+        0.2,
+        0.16,
+        0.1,
+        1.0
+      ],
+      "metallic": 0.0,
+      "roughness": 0.7,
+      "preset": "wood"
+    },
+    "classroom_blue_strong": {
+      "color": [
+        0.0,
+        0.08,
+        1.0,
+        1.0
+      ],
+      "metallic": 0.0,
+      "roughness": 0.54,
+      "preset": "paint",
+      "emissive": [
+        0.0,
+        0.015,
+        0.12
+      ],
+      "emissive_strength": 0.12
+    },
+    "classroom_orange_strong": {
+      "color": [
+        1.0,
+        0.16,
+        0.0,
+        1.0
+      ],
+      "metallic": 0.0,
+      "roughness": 0.54,
+      "preset": "paint",
+      "emissive": [
+        0.12,
+        0.025,
+        0.0
+      ],
+      "emissive_strength": 0.12
+    },
+    "classroom_green_board": {
+      "color": [
+        0.02,
+        0.22,
+        0.1,
+        1.0
+      ],
+      "metallic": 0.0,
+      "roughness": 0.82,
+      "preset": "chalkboard"
+    },
+    "classroom_sun_patch": {
+      "color": [
+        1.0,
+        0.68,
+        0.18,
+        1.0
+      ],
+      "metallic": 0.0,
+      "roughness": 0.48,
+      "preset": "emissive",
+      "emissive": [
+        0.3,
+        0.12,
+        0.02
+      ],
+      "emissive_strength": 0.18
+    },
+    "concert_screen_muted": {
+      "color": [
+        0.28,
+        0.02,
+        0.26,
+        1.0
+      ],
+      "metallic": 0.0,
+      "roughness": 0.38,
+      "preset": "emissive",
+      "emissive": [
+        0.2,
+        0.015,
+        0.16
+      ],
+      "emissive_strength": 0.46
+    },
+    "concert_ui_cyan": {
+      "color": [
+        0.0,
+        0.72,
+        1.0,
+        1.0
+      ],
+      "metallic": 0.0,
+      "roughness": 0.34,
+      "preset": "emissive",
+      "emissive": [
+        0.0,
+        0.4,
+        0.8
+      ],
+      "emissive_strength": 0.42
+    },
+    "concert_ui_orange": {
+      "color": [
+        1.0,
+        0.28,
+        0.0,
+        1.0
+      ],
+      "metallic": 0.0,
+      "roughness": 0.34,
+      "preset": "emissive",
+      "emissive": [
+        0.55,
+        0.12,
+        0.0
+      ],
+      "emissive_strength": 0.4
+    },
+    "concert_screen_black": {
+      "color": [
+        0.01,
+        0.008,
+        0.018,
+        1.0
+      ],
+      "metallic": 0.0,
+      "roughness": 0.62,
+      "preset": "matte"
+    },
+    "concert_costume_lime": {
+      "color": [
+        0.34,
+        1.0,
+        0.05,
+        1.0
+      ],
+      "metallic": 0.0,
+      "roughness": 0.58,
+      "preset": "fabric",
+      "emissive": [
+        0.08,
+        0.28,
+        0.02
+      ],
+      "emissive_strength": 0.22
+    },
+    "stadium_turf_dark": {
+      "color": [
+        0.018,
+        0.16,
+        0.055,
+        1.0
+      ],
+      "metallic": 0.0,
+      "roughness": 0.82,
+      "preset": "organic"
+    },
+    "stadium_turf_light": {
+      "color": [
+        0.055,
+        0.36,
+        0.105,
+        1.0
+      ],
+      "metallic": 0.0,
+      "roughness": 0.78,
+      "preset": "organic"
+    },
+    "stadium_seat_blue": {
+      "color": [
+        0.0,
+        0.08,
+        0.7,
+        1.0
+      ],
+      "metallic": 0.0,
+      "roughness": 0.52,
+      "preset": "paint",
+      "emissive": [
+        0.0,
+        0.0,
+        0.035
+      ],
+      "emissive_strength": 0.06
+    },
+    "stadium_seat_red": {
+      "color": [
+        0.84,
+        0.02,
+        0.06,
+        1.0
+      ],
+      "metallic": 0.0,
+      "roughness": 0.54,
+      "preset": "paint",
+      "emissive": [
+        0.045,
+        0.0,
+        0.0
+      ],
+      "emissive_strength": 0.06
+    },
+    "stadium_banner_gold": {
+      "color": [
+        1.0,
+        0.46,
+        0.0,
+        1.0
+      ],
+      "metallic": 0.0,
+      "roughness": 0.42,
+      "preset": "emissive",
+      "emissive": [
+        0.34,
+        0.115,
+        0.0
+      ],
+      "emissive_strength": 0.32
+    },
+    "stadium_banner_cyan": {
+      "color": [
+        0.0,
+        0.72,
+        1.0,
+        1.0
+      ],
+      "metallic": 0.0,
+      "roughness": 0.4,
+      "preset": "emissive",
+      "emissive": [
+        0.0,
+        0.24,
+        0.46
+      ],
+      "emissive_strength": 0.34
+    },
+    "stadium_shadow": {
+      "color": [
+        0.006,
+        0.008,
+        0.01,
+        1.0
+      ],
+      "metallic": 0.0,
+      "roughness": 0.88,
+      "preset": "paint"
+    },
+    "sai_midfreq_warm_rule": {
+      "color": [
+        0.72,
+        0.24,
+        0.065,
+        1.0
+      ],
+      "roughness": 0.78,
+      "procedural_mask": 0.2,
+      "preset": "paint",
+      "texture_policy": "scene_local_procedural_no_showcase_hdri"
+    },
+    "sai_midfreq_cool_rule": {
+      "color": [
+        0.025,
+        0.23,
+        0.34,
+        1.0
+      ],
+      "roughness": 0.82,
+      "procedural_mask": 0.24,
+      "preset": "paint",
+      "texture_policy": "scene_local_procedural_no_showcase_hdri"
+    },
+    "sai_midfreq_shadow_rule": {
+      "color": [
+        0.015,
+        0.026,
+        0.03,
+        1.0
+      ],
+      "roughness": 0.88,
+      "procedural_mask": 0.18,
+      "preset": "paint",
+      "texture_policy": "scene_local_procedural_no_showcase_hdri"
+    },
+    "sai_midfreq_paper_patch": {
+      "color": [
+        0.8,
+        0.72,
+        0.52,
+        1.0
+      ],
+      "roughness": 0.86,
+      "procedural_mask": 0.28,
+      "preset": "paper",
+      "texture_policy": "scene_local_procedural_no_showcase_hdri"
+    },
+    "macro_warm_paper": {
+      "color": [
+        0.86,
+        0.75,
+        0.52,
+        1.0
+      ],
+      "metallic": 0.0,
+      "roughness": 0.74,
+      "preset": "paper"
+    },
+    "macro_deep_green": {
+      "color": [
+        0.08,
+        0.18,
+        0.13,
+        1.0
+      ],
+      "metallic": 0.0,
+      "roughness": 0.72,
+      "preset": "fabric"
+    },
+    "macro_blue_shadow": {
+      "color": [
+        0.05,
+        0.09,
+        0.16,
+        1.0
+      ],
+      "metallic": 0.0,
+      "roughness": 0.76,
+      "preset": "paint"
+    },
+    "macro_lamp_gold": {
+      "color": [
+        1.0,
+        0.58,
+        0.22,
+        1.0
+      ],
+      "emissive": [
+        1.0,
+        0.42,
+        0.12
+      ],
+      "emissive_intensity": 0.45,
+      "roughness": 0.42
+    }
+  },
+  "lights": [
+    {
+      "id": "home_office_evening_soft_key",
+      "type": "point",
+      "position": [
+        -1.5,
+        2.1,
+        -0.9
+      ],
+      "color": [
+        1.0,
+        0.78,
+        0.55
+      ],
+      "intensity": 2.5,
+      "radius": 3.2
+    },
+    {
+      "id": "home_office_evening_fill",
+      "type": "point",
+      "position": [
+        1.6,
+        1.7,
+        0.2
+      ],
+      "color": [
+        0.55,
+        0.68,
+        1.0
+      ],
+      "intensity": 0.65,
+      "radius": 4.0
+    },
+    {
+      "id": "macro_office_warm_shelf_accent",
+      "role": "macro_scene_local_accent_light",
+      "type": "spot",
+      "position": [
+        0.35,
+        1.55,
+        0.48
+      ],
+      "target": [
+        1.32,
+        0.9,
+        0.9
+      ],
+      "color": [
+        1.0,
+        0.72,
+        0.44
+      ],
+      "intensity": 0.95,
+      "range": 3.0,
+      "inner_cone_degrees": 22.0,
+      "outer_cone_degrees": 58.0,
+      "casts_shadows": false,
+      "provenance": "model_scene_macro_director_batch"
+    }
+  ],
+  "objects": [
+    {
+      "id": "home_office_evening_floor",
+      "role": "room_floor",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "blue_fabric",
+      "transform": {
+        "position": [
+          0.0,
+          0.035,
+          0.0
+        ],
+        "scale": [
+          4.2,
+          0.07,
+          3.4
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "support": "ground",
+      "editable": true,
+      "provenance": "scene_authoring_intelligence_v1_semantic_plan_constructor",
+      "semantic_tags": [
+        "room_floor",
+        "support_surface"
+      ],
+      "assembly_id": "room_shell",
+      "placement_intent": {
+        "source": "semantic_plan_constructor",
+        "brief_role": "room_floor",
+        "family": "home_office_evening"
+      }
+    },
+    {
+      "id": "home_office_evening_back_wall",
+      "role": "room_wall",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "wall_warm",
+      "transform": {
+        "position": [
+          0.0,
+          1.3,
+          1.7
+        ],
+        "scale": [
+          4.2,
+          2.6,
+          0.08
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "support": "ground",
+      "editable": true,
+      "provenance": "scene_authoring_intelligence_v1_semantic_plan_constructor",
+      "semantic_tags": [
+        "room_wall",
+        "back_wall"
+      ],
+      "assembly_id": "room_shell",
+      "placement_intent": {
+        "source": "semantic_plan_constructor",
+        "brief_role": "room_wall",
+        "family": "home_office_evening"
+      }
+    },
+    {
+      "id": "home_office_evening_left_wall",
+      "role": "room_wall",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "wall_warm",
+      "transform": {
+        "position": [
+          -2.1,
+          1.3,
+          0.0
+        ],
+        "scale": [
+          0.08,
+          2.6,
+          3.4
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "support": "ground",
+      "editable": true,
+      "provenance": "scene_authoring_intelligence_v1_semantic_plan_constructor",
+      "semantic_tags": [
+        "room_wall",
+        "side_wall"
+      ],
+      "assembly_id": "room_shell",
+      "placement_intent": {
+        "source": "semantic_plan_constructor",
+        "brief_role": "room_wall",
+        "family": "home_office_evening"
+      }
+    },
+    {
+      "id": "home_office_evening_right_wall",
+      "role": "room_wall",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "wall_warm",
+      "transform": {
+        "position": [
+          2.1,
+          1.3,
+          0.0
+        ],
+        "scale": [
+          0.08,
+          2.6,
+          3.4
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "support": "ground",
+      "editable": true,
+      "provenance": "scene_authoring_intelligence_v1_semantic_plan_constructor",
+      "semantic_tags": [
+        "room_wall",
+        "side_wall"
+      ],
+      "assembly_id": "room_shell",
+      "placement_intent": {
+        "source": "semantic_plan_constructor",
+        "brief_role": "room_wall",
+        "family": "home_office_evening"
+      }
+    },
+    {
+      "id": "home_office_evening_ceiling",
+      "role": "room_ceiling",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "ceiling_soft",
+      "transform": {
+        "position": [
+          0.0,
+          2.64,
+          0.0
+        ],
+        "scale": [
+          4.2,
+          0.08,
+          3.4
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "support": "ground",
+      "editable": true,
+      "provenance": "scene_authoring_intelligence_v1_semantic_plan_constructor",
+      "semantic_tags": [
+        "room_ceiling",
+        "overhead_boundary"
+      ],
+      "assembly_id": "room_shell",
+      "placement_intent": {
+        "source": "semantic_plan_constructor",
+        "brief_role": "room_ceiling",
+        "family": "home_office_evening"
+      }
+    },
+    {
+      "id": "office_desk",
+      "role": "desk",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "dark_wood",
+      "transform": {
+        "position": [
+          -0.45,
+          0.43,
+          0.88
+        ],
+        "scale": [
+          1.45,
+          0.72,
+          0.72
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "support": "home_office_evening_floor",
+      "editable": true,
+      "provenance": "scene_authoring_intelligence_v1_semantic_plan_constructor",
+      "semantic_tags": [
+        "desk",
+        "support_surface",
+        "validation_proxy"
+      ],
+      "validation_only": true,
+      "renderable": false,
+      "assembly_id": "office_workstation",
+      "placement_intent": {
+        "source": "semantic_plan_constructor",
+        "brief_role": "desk",
+        "family": "home_office_evening"
+      },
+      "constructor_contact_mode": "support_contact"
+    },
+    {
+      "id": "office_desk_mesh",
+      "role": "desk",
+      "kind": "kenney_asset",
+      "runtime_asset": "assets/models/kenney_furniture_kit/desk/desk.gltf",
+      "material": "dark_wood",
+      "transform": {
+        "position": [
+          -0.45,
+          0.07,
+          0.88
+        ],
+        "scale": [
+          0.92,
+          0.74,
+          0.86
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "support": "home_office_evening_floor",
+      "editable": true,
+      "provenance": "scene_authoring_intelligence_v1_semantic_plan_constructor",
+      "semantic_tags": [
+        "desk",
+        "admitted_mesh"
+      ],
+      "assembly_id": "office_workstation",
+      "placement_intent": {
+        "source": "semantic_plan_constructor",
+        "brief_role": "desk",
+        "family": "home_office_evening"
+      },
+      "constructor_contact_mode": "support_contact",
+      "layout_slot": "slot_office_desk_mesh"
+    },
+    {
+      "id": "office_desk_surface",
+      "role": "desk_support_surface",
+      "kind": "validation_support",
+      "primitive": "cube",
+      "material": "floor_neutral",
+      "transform": {
+        "position": [
+          -0.4,
+          0.802,
+          0.86
+        ],
+        "scale": [
+          1.45,
+          0.024,
+          0.66
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "support": "office_desk_mesh",
+      "editable": true,
+      "provenance": "scene_authoring_intelligence_v1_semantic_plan_constructor",
+      "semantic_tags": [
+        "hidden_support_surface",
+        "support_surface"
+      ],
+      "renderable": false,
+      "constructor_contact_mode": "support_contact",
+      "assembly_id": "office_workstation",
+      "placement_intent": {
+        "source": "semantic_plan_constructor",
+        "brief_role": "desk_support_surface",
+        "family": "home_office_evening"
+      }
+    },
+    {
+      "id": "office_monitor_stand",
+      "role": "monitor_stand",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "black_metal",
+      "transform": {
+        "position": [
+          -0.45,
+          0.885,
+          0.93
+        ],
+        "scale": [
+          0.5,
+          0.19,
+          0.2
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "support": "office_desk_surface",
+      "editable": true,
+      "provenance": "scene_authoring_intelligence_v1_semantic_plan_constructor",
+      "semantic_tags": [
+        "monitor_stand",
+        "desk_equipment"
+      ],
+      "assembly_id": "office_workstation",
+      "placement_intent": {
+        "source": "semantic_plan_constructor",
+        "brief_role": "monitor_stand",
+        "family": "home_office_evening"
+      },
+      "constructor_contact_mode": "support_contact",
+      "layout_slot": "slot_office_monitor_stand"
+    },
+    {
+      "id": "office_monitor",
+      "role": "monitor",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "black_metal",
+      "transform": {
+        "position": [
+          -0.45,
+          1.17,
+          0.98
+        ],
+        "scale": [
+          0.66,
+          0.38,
+          0.06
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "support": "office_monitor_stand",
+      "editable": true,
+      "provenance": "scene_authoring_intelligence_v1_semantic_plan_constructor",
+      "semantic_tags": [
+        "monitor",
+        "screen"
+      ],
+      "constructor_contact_mode": "subpart",
+      "assembly_id": "office_workstation",
+      "placement_intent": {
+        "source": "semantic_plan_constructor",
+        "brief_role": "monitor",
+        "family": "home_office_evening"
+      },
+      "layout_slot": "slot_office_monitor"
+    },
+    {
+      "id": "office_screen",
+      "role": "screen_ui_detail",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "emissive_cyan",
+      "transform": {
+        "position": [
+          -0.45,
+          1.17,
+          0.945
+        ],
+        "scale": [
+          0.56,
+          0.3,
+          0.018
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "support": "office_monitor",
+      "editable": true,
+      "provenance": "scene_authoring_intelligence_v1_semantic_plan_constructor",
+      "semantic_tags": [
+        "screen",
+        "emissive",
+        "screen_ui_detail"
+      ],
+      "constructor_contact_mode": "face_attachment",
+      "assembly_id": "room_shell",
+      "placement_intent": {
+        "source": "semantic_plan_constructor",
+        "brief_role": "screen_ui_detail",
+        "family": "home_office_evening"
+      },
+      "attached_to": "office_monitor"
+    },
+    {
+      "id": "office_keyboard",
+      "role": "keyboard",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "black_metal",
+      "transform": {
+        "position": [
+          -0.45,
+          0.825,
+          0.56
+        ],
+        "scale": [
+          0.55,
+          0.04,
+          0.18
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "support": "office_desk_surface",
+      "editable": true,
+      "provenance": "scene_authoring_intelligence_v1_semantic_plan_constructor",
+      "semantic_tags": [
+        "keyboard"
+      ],
+      "assembly_id": "office_workstation",
+      "placement_intent": {
+        "source": "semantic_plan_constructor",
+        "brief_role": "keyboard",
+        "family": "home_office_evening"
+      },
+      "constructor_contact_mode": "support_contact",
+      "attached_to": "office_desk_surface",
+      "layout_slot": "slot_office_keyboard"
+    },
+    {
+      "id": "office_keyboard_mesh",
+      "role": "keyboard",
+      "kind": "kenney_asset",
+      "runtime_asset": "assets/models/kenney_furniture_kit/computerKeyboard/computerKeyboard.gltf",
+      "material": "black_metal",
+      "transform": {
+        "position": [
+          -0.45,
+          0.814,
+          0.54
+        ],
+        "scale": [
+          0.58,
+          0.58,
+          0.58
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "support": "office_desk_surface",
+      "editable": true,
+      "provenance": "scene_authoring_intelligence_v1_semantic_plan_constructor",
+      "semantic_tags": [
+        "keyboard",
+        "admitted_mesh"
+      ],
+      "assembly_id": "office_workstation",
+      "placement_intent": {
+        "source": "semantic_plan_constructor",
+        "brief_role": "keyboard",
+        "family": "home_office_evening"
+      },
+      "constructor_contact_mode": "support_contact",
+      "attached_to": "office_desk_surface",
+      "layout_slot": "slot_office_keyboard_mesh"
+    },
+    {
+      "id": "office_keyboard_key_cluster",
+      "role": "keyboard_key_cluster",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "emissive_cyan",
+      "transform": {
+        "position": [
+          -0.45,
+          0.856,
+          0.54
+        ],
+        "scale": [
+          0.46,
+          0.018,
+          0.13
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "support": "office_keyboard",
+      "editable": true,
+      "provenance": "scene_authoring_intelligence_v1_semantic_plan_constructor",
+      "semantic_tags": [
+        "keyboard_key_cluster",
+        "desk_detail"
+      ],
+      "constructor_contact_mode": "subpart",
+      "assembly_id": "room_shell",
+      "placement_intent": {
+        "source": "semantic_plan_constructor",
+        "brief_role": "keyboard_key_cluster",
+        "family": "home_office_evening"
+      },
+      "attached_to": "office_keyboard"
+    },
+    {
+      "id": "office_mouse",
+      "role": "mouse",
+      "kind": "primitive",
+      "primitive": "sphere",
+      "material": "black_metal",
+      "transform": {
+        "position": [
+          0.12,
+          0.845,
+          0.55
+        ],
+        "scale": [
+          0.16,
+          0.06,
+          0.11
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "support": "office_desk_surface",
+      "editable": true,
+      "provenance": "scene_authoring_intelligence_v1_semantic_plan_constructor",
+      "semantic_tags": [
+        "mouse",
+        "desk_detail"
+      ],
+      "assembly_id": "room_shell",
+      "placement_intent": {
+        "source": "semantic_plan_constructor",
+        "brief_role": "mouse",
+        "family": "home_office_evening"
+      },
+      "constructor_contact_mode": "support_contact"
+    },
+    {
+      "id": "office_mouse_mesh",
+      "role": "desk_prop",
+      "kind": "kenney_asset",
+      "runtime_asset": "assets/models/kenney_furniture_kit/computerMouse/computerMouse.gltf",
+      "material": "black_metal",
+      "transform": {
+        "position": [
+          -0.02,
+          0.814,
+          0.58
+        ],
+        "scale": [
+          0.52,
+          0.52,
+          0.52
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "support": "office_desk_surface",
+      "editable": true,
+      "provenance": "scene_authoring_intelligence_v1_semantic_plan_constructor",
+      "semantic_tags": [
+        "mouse",
+        "desk_detail",
+        "admitted_mesh"
+      ],
+      "assembly_id": "room_shell",
+      "placement_intent": {
+        "source": "semantic_plan_constructor",
+        "brief_role": "desk_prop",
+        "family": "home_office_evening"
+      },
+      "constructor_contact_mode": "support_contact"
+    },
+    {
+      "id": "office_cable_run",
+      "role": "cable_run",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "black_metal",
+      "transform": {
+        "position": [
+          -0.18,
+          0.808,
+          0.7
+        ],
+        "scale": [
+          0.56,
+          0.018,
+          0.03
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "support": "office_desk_surface",
+      "editable": true,
+      "provenance": "scene_authoring_intelligence_v1_semantic_plan_constructor",
+      "semantic_tags": [
+        "cable_run",
+        "desk_detail"
+      ],
+      "assembly_id": "room_shell",
+      "placement_intent": {
+        "source": "semantic_plan_constructor",
+        "brief_role": "cable_run",
+        "family": "home_office_evening"
+      },
+      "constructor_contact_mode": "support_contact"
+    },
+    {
+      "id": "office_task_chair",
+      "role": "chair",
+      "kind": "kenney_asset",
+      "runtime_asset": "assets/models/kenney_furniture_kit/chairDesk/chairDesk.gltf",
+      "material": "black_metal",
+      "transform": {
+        "position": [
+          -0.45,
+          0.07,
+          -0.15
+        ],
+        "scale": [
+          0.84,
+          0.84,
+          0.84
+        ],
+        "rotation_degrees": [
+          0.0,
+          153.49862,
+          0.0
+        ]
+      },
+      "support": "home_office_evening_floor",
+      "editable": true,
+      "provenance": "scene_authoring_intelligence_v1_semantic_plan_constructor",
+      "semantic_tags": [
+        "office_chair",
+        "chair",
+        "floor_contact",
+        "admitted_mesh"
+      ],
+      "assembly_id": "room_shell",
+      "placement_intent": {
+        "source": "semantic_plan_constructor",
+        "brief_role": "chair",
+        "family": "home_office_evening"
+      },
+      "constructor_contact_mode": "support_contact",
+      "scene_graph_kernel_v1": {
+        "faces": "office_table_lamp_mesh",
+        "front_yaw_offset_degrees": 180.0
+      }
+    },
+    {
+      "id": "office_bookcase",
+      "role": "shelf",
+      "kind": "kenney_asset",
+      "runtime_asset": "assets/models/kenney_furniture_kit/bookcaseOpen/bookcaseOpen.gltf",
+      "material": "wood",
+      "transform": {
+        "position": [
+          1.35,
+          0.07,
+          1.05
+        ],
+        "scale": [
+          0.82,
+          0.92,
+          0.82
+        ],
+        "rotation_degrees": [
+          0.0,
+          -90.0,
+          0.0
+        ]
+      },
+      "support": "home_office_evening_floor",
+      "editable": true,
+      "provenance": "scene_authoring_intelligence_v1_semantic_plan_constructor",
+      "semantic_tags": [
+        "bookcase",
+        "storage",
+        "admitted_mesh"
+      ],
+      "assembly_id": "office_storage",
+      "placement_intent": {
+        "source": "semantic_plan_constructor",
+        "brief_role": "shelf",
+        "family": "home_office_evening"
+      },
+      "constructor_contact_mode": "support_contact",
+      "attached_to": "home_office_evening_floor",
+      "layout_slot": "slot_office_bookcase"
+    },
+    {
+      "id": "office_book_shelf_upper",
+      "role": "shelf_surface",
+      "kind": "validation_support",
+      "primitive": "cube",
+      "material": "floor_neutral",
+      "transform": {
+        "position": [
+          1.35,
+          1.02,
+          0.9
+        ],
+        "scale": [
+          0.58,
+          0.024,
+          0.22
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "support": "office_bookcase",
+      "editable": true,
+      "provenance": "scene_authoring_intelligence_v1_semantic_plan_constructor",
+      "semantic_tags": [
+        "hidden_support_surface",
+        "support_surface"
+      ],
+      "renderable": false,
+      "constructor_contact_mode": "support_contact",
+      "assembly_id": "office_storage",
+      "placement_intent": {
+        "source": "semantic_plan_constructor",
+        "brief_role": "shelf_surface",
+        "family": "home_office_evening"
+      },
+      "attached_to": "office_bookcase"
+    },
+    {
+      "id": "office_book_shelf_lower",
+      "role": "shelf_surface",
+      "kind": "validation_support",
+      "primitive": "cube",
+      "material": "floor_neutral",
+      "transform": {
+        "position": [
+          1.35,
+          0.68,
+          0.9
+        ],
+        "scale": [
+          0.58,
+          0.024,
+          0.22
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "support": "office_bookcase",
+      "editable": true,
+      "provenance": "scene_authoring_intelligence_v1_semantic_plan_constructor",
+      "semantic_tags": [
+        "hidden_support_surface",
+        "support_surface"
+      ],
+      "renderable": false,
+      "constructor_contact_mode": "support_contact",
+      "assembly_id": "office_storage",
+      "placement_intent": {
+        "source": "semantic_plan_constructor",
+        "brief_role": "shelf_surface",
+        "family": "home_office_evening"
+      },
+      "attached_to": "office_bookcase"
+    },
+    {
+      "id": "office_books_mesh",
+      "role": "book",
+      "kind": "kenney_asset",
+      "runtime_asset": "assets/models/kenney_furniture_kit/books/books.gltf",
+      "material": "paper",
+      "transform": {
+        "position": [
+          1.28,
+          1.045,
+          0.89
+        ],
+        "scale": [
+          0.82,
+          0.82,
+          0.82
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "support": "office_book_shelf_upper",
+      "editable": true,
+      "provenance": "scene_authoring_intelligence_v1_semantic_plan_constructor",
+      "semantic_tags": [
+        "book",
+        "detail",
+        "admitted_mesh"
+      ],
+      "assembly_id": "room_shell",
+      "placement_intent": {
+        "source": "semantic_plan_constructor",
+        "brief_role": "book",
+        "family": "home_office_evening"
+      },
+      "constructor_contact_mode": "support_contact"
+    },
+    {
+      "id": "office_table_lamp_mesh",
+      "role": "task_lamp",
+      "kind": "kenney_asset",
+      "runtime_asset": "assets/models/kenney_furniture_kit/lampSquareTable/lampSquareTable.gltf",
+      "material": "emissive_warm",
+      "transform": {
+        "position": [
+          -0.94,
+          0.814,
+          0.72
+        ],
+        "scale": [
+          0.62,
+          0.62,
+          0.62
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "support": "office_desk_surface",
+      "editable": true,
+      "provenance": "scene_authoring_intelligence_v1_semantic_plan_constructor",
+      "semantic_tags": [
+        "task_lamp",
+        "practical_light",
+        "admitted_mesh"
+      ],
+      "assembly_id": "dining_table_vignette",
+      "placement_intent": {
+        "source": "semantic_plan_constructor",
+        "brief_role": "task_lamp",
+        "family": "home_office_evening"
+      },
+      "constructor_contact_mode": "support_contact",
+      "layout_slot": "slot_office_table_lamp_mesh"
+    },
+    {
+      "id": "office_plant_mesh",
+      "role": "plant",
+      "kind": "kenney_asset",
+      "runtime_asset": "assets/models/kenney_furniture_kit/plantSmall2/plantSmall2.gltf",
+      "material": "turf",
+      "transform": {
+        "position": [
+          0.02,
+          0.814,
+          0.78
+        ],
+        "scale": [
+          0.68,
+          0.68,
+          0.68
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "support": "office_desk_surface",
+      "editable": true,
+      "provenance": "scene_authoring_intelligence_v1_semantic_plan_constructor",
+      "semantic_tags": [
+        "plant",
+        "decor",
+        "admitted_mesh"
+      ],
+      "assembly_id": "semantic_plan_generated",
+      "placement_intent": {
+        "source": "semantic_plan_constructor",
+        "brief_role": "plant",
+        "family": "home_office_evening"
+      },
+      "constructor_contact_mode": "support_contact",
+      "layout_slot": "slot_office_plant_mesh"
+    },
+    {
+      "id": "office_plant_pot",
+      "role": "plant_pot",
+      "kind": "primitive",
+      "primitive": "cylinder",
+      "material": "dark_wood",
+      "transform": {
+        "position": [
+          0.02,
+          0.87,
+          0.78
+        ],
+        "scale": [
+          0.16,
+          0.16,
+          0.16
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "support": "office_desk_surface",
+      "editable": true,
+      "provenance": "scene_authoring_intelligence_v1_semantic_plan_constructor",
+      "semantic_tags": [
+        "plant_pot",
+        "decor"
+      ],
+      "assembly_id": "semantic_plan_generated",
+      "placement_intent": {
+        "source": "semantic_plan_constructor",
+        "brief_role": "plant_pot",
+        "family": "home_office_evening"
+      },
+      "constructor_contact_mode": "support_contact",
+      "layout_slot": "slot_office_plant_pot"
+    },
+    {
+      "id": "office_floor_rug_mesh",
+      "role": "floor_mat",
+      "kind": "kenney_asset",
+      "runtime_asset": "assets/models/kenney_furniture_kit/rugRectangle/rugRectangle.gltf",
+      "material": "blue_fabric",
+      "transform": {
+        "position": [
+          -0.35,
+          0.075,
+          -0.34
+        ],
+        "scale": [
+          1.2,
+          1.0,
+          1.05
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "support": "home_office_evening_floor",
+      "editable": true,
+      "provenance": "scene_authoring_intelligence_v1_semantic_plan_constructor",
+      "semantic_tags": [
+        "rug",
+        "floor_detail",
+        "admitted_mesh"
+      ],
+      "assembly_id": "room_shell",
+      "placement_intent": {
+        "source": "semantic_plan_constructor",
+        "brief_role": "floor_mat",
+        "family": "home_office_evening"
+      },
+      "constructor_contact_mode": "support_contact"
+    },
+    {
+      "id": "office_cork_board",
+      "role": "room_wall_panel",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "paper",
+      "transform": {
+        "position": [
+          -1.35,
+          1.35,
+          1.66
+        ],
+        "scale": [
+          0.85,
+          0.58,
+          0.035
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "support": "home_office_evening_back_wall",
+      "editable": true,
+      "provenance": "scene_authoring_intelligence_v1_semantic_plan_constructor",
+      "semantic_tags": [
+        "cork_board",
+        "wall_detail"
+      ],
+      "constructor_contact_mode": "face_attachment",
+      "assembly_id": "room_shell",
+      "placement_intent": {
+        "source": "semantic_plan_constructor",
+        "brief_role": "room_wall_panel",
+        "family": "home_office_evening"
+      },
+      "attached_to": "home_office_evening_back_wall"
+    },
+    {
+      "id": "office_framed_display_mesh",
+      "role": "office_framed_display_mesh",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "paper",
+      "transform": {
+        "position": [
+          -1.36,
+          1.26,
+          1.645
+        ],
+        "scale": [
+          0.72,
+          0.44,
+          0.028
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "support": "home_office_evening_back_wall",
+      "editable": true,
+      "provenance": "scene_authoring_intelligence_v1_semantic_plan_constructor",
+      "semantic_tags": [
+        "office_framed_display_mesh",
+        "wall_display",
+        "admitted_mesh"
+      ],
+      "constructor_contact_mode": "face_attachment",
+      "assembly_id": "room_shell",
+      "placement_intent": {
+        "source": "semantic_plan_constructor",
+        "brief_role": "office_framed_display_mesh",
+        "family": "home_office_evening"
+      },
+      "attached_to": "home_office_evening_back_wall"
+    },
+    {
+      "id": "office_wall_fixture_mesh",
+      "role": "office_wall_fixture_mesh",
+      "kind": "kenney_asset",
+      "runtime_asset": "assets/models/kenney_furniture_kit/lampWall/lampWall.gltf",
+      "material": "emissive_warm",
+      "transform": {
+        "position": [
+          1.72,
+          1.42,
+          1.67
+        ],
+        "scale": [
+          0.64,
+          0.64,
+          0.64
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "support": "home_office_evening_back_wall",
+      "editable": true,
+      "provenance": "scene_authoring_intelligence_v1_semantic_plan_constructor",
+      "semantic_tags": [
+        "office_wall_fixture_mesh",
+        "wall_light",
+        "admitted_mesh"
+      ],
+      "constructor_contact_mode": "face_attachment",
+      "assembly_id": "room_shell",
+      "placement_intent": {
+        "source": "semantic_plan_constructor",
+        "brief_role": "office_wall_fixture_mesh",
+        "family": "home_office_evening"
+      },
+      "attached_to": "home_office_evening_back_wall"
+    },
+    {
+      "id": "office_window",
+      "role": "window",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "emissive_cyan",
+      "transform": {
+        "position": [
+          -2.06,
+          1.44,
+          0.28
+        ],
+        "scale": [
+          0.035,
+          0.72,
+          0.72
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "support": "home_office_evening_left_wall",
+      "editable": true,
+      "provenance": "scene_authoring_intelligence_v1_semantic_plan_constructor",
+      "semantic_tags": [
+        "window",
+        "light_context"
+      ],
+      "constructor_contact_mode": "face_attachment",
+      "assembly_id": "semantic_plan_generated",
+      "placement_intent": {
+        "source": "semantic_plan_constructor",
+        "brief_role": "window",
+        "family": "home_office_evening"
+      },
+      "attached_to": "home_office_evening_left_wall",
+      "layout_slot": "slot_office_window"
+    },
+    {
+      "id": "office_window_blind",
+      "role": "window_blind",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "paper",
+      "transform": {
+        "position": [
+          -2.02,
+          1.58,
+          0.28
+        ],
+        "scale": [
+          0.028,
+          0.04,
+          0.64
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "support": "office_window",
+      "editable": true,
+      "provenance": "scene_authoring_intelligence_v1_semantic_plan_constructor",
+      "semantic_tags": [
+        "window_blind",
+        "light_context"
+      ],
+      "constructor_contact_mode": "face_attachment",
+      "assembly_id": "semantic_plan_generated",
+      "placement_intent": {
+        "source": "semantic_plan_constructor",
+        "brief_role": "window_blind",
+        "family": "home_office_evening"
+      },
+      "layout_slot": "slot_office_window_blind"
+    },
+    {
+      "id": "office_baseboard_back",
+      "role": "baseboard",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "wood",
+      "transform": {
+        "position": [
+          0.0,
+          0.18,
+          1.665
+        ],
+        "scale": [
+          3.8,
+          0.1,
+          0.035
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "support": "home_office_evening_back_wall",
+      "editable": true,
+      "provenance": "scene_authoring_intelligence_v1_semantic_plan_constructor",
+      "semantic_tags": [
+        "baseboard",
+        "room_detail"
+      ],
+      "constructor_contact_mode": "face_attachment",
+      "assembly_id": "room_shell",
+      "placement_intent": {
+        "source": "semantic_plan_constructor",
+        "brief_role": "baseboard",
+        "family": "home_office_evening"
+      },
+      "attached_to": "home_office_evening_back_wall"
+    },
+    {
+      "id": "office_baseboard_left",
+      "role": "baseboard",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "wood",
+      "transform": {
+        "position": [
+          -2.065,
+          0.18,
+          0.0
+        ],
+        "scale": [
+          0.035,
+          0.1,
+          2.8
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "support": "home_office_evening_left_wall",
+      "editable": true,
+      "provenance": "scene_authoring_intelligence_v1_semantic_plan_constructor",
+      "semantic_tags": [
+        "baseboard",
+        "room_detail"
+      ],
+      "constructor_contact_mode": "face_attachment",
+      "assembly_id": "room_shell",
+      "placement_intent": {
+        "source": "semantic_plan_constructor",
+        "brief_role": "baseboard",
+        "family": "home_office_evening"
+      },
+      "attached_to": "home_office_evening_left_wall"
+    },
+    {
+      "id": "office_screen_ui_line_0",
+      "role": "screen_ui_detail",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "emissive_warm",
+      "transform": {
+        "position": [
+          -0.58,
+          1.21,
+          0.948
+        ],
+        "scale": [
+          0.18,
+          0.018,
+          0.012
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "support": "office_screen",
+      "editable": true,
+      "provenance": "scene_authoring_intelligence_v1_semantic_plan_constructor",
+      "semantic_tags": [
+        "screen_ui_detail",
+        "accent"
+      ],
+      "constructor_contact_mode": "subpart",
+      "assembly_id": "room_shell",
+      "placement_intent": {
+        "source": "semantic_plan_constructor",
+        "brief_role": "screen_ui_detail",
+        "family": "home_office_evening"
+      },
+      "attached_to": "office_screen"
+    },
+    {
+      "id": "office_screen_ui_line_1",
+      "role": "screen_ui_detail",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "emissive_cyan",
+      "transform": {
+        "position": [
+          -0.34,
+          1.11,
+          0.948
+        ],
+        "scale": [
+          0.26,
+          0.018,
+          0.012
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "support": "office_screen",
+      "editable": true,
+      "provenance": "scene_authoring_intelligence_v1_semantic_plan_constructor",
+      "semantic_tags": [
+        "screen_ui_detail",
+        "accent"
+      ],
+      "constructor_contact_mode": "subpart",
+      "assembly_id": "room_shell",
+      "placement_intent": {
+        "source": "semantic_plan_constructor",
+        "brief_role": "screen_ui_detail",
+        "family": "home_office_evening"
+      },
+      "attached_to": "office_screen"
+    },
+    {
+      "id": "office_floor_accent_panel",
+      "role": "palette_accent_panel",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "emissive_cyan",
+      "transform": {
+        "position": [
+          0.72,
+          0.09,
+          -0.56
+        ],
+        "scale": [
+          0.46,
+          0.032,
+          0.08
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "support": "home_office_evening_floor",
+      "editable": true,
+      "provenance": "scene_authoring_intelligence_v1_semantic_plan_constructor",
+      "semantic_tags": [
+        "palette_accent_panel",
+        "floor_light"
+      ],
+      "assembly_id": "room_shell",
+      "placement_intent": {
+        "source": "semantic_plan_constructor",
+        "brief_role": "palette_accent_panel",
+        "family": "home_office_evening"
+      },
+      "constructor_contact_mode": "support_contact"
+    },
+    {
+      "id": "office_second_framed_display_mesh",
+      "role": "office_framed_display_mesh",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "emissive_cyan",
+      "transform": {
+        "position": [
+          0.82,
+          1.36,
+          1.645
+        ],
+        "scale": [
+          0.62,
+          0.38,
+          0.028
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "support": "home_office_evening_back_wall",
+      "editable": true,
+      "provenance": "scene_authoring_intelligence_v1_semantic_plan_constructor",
+      "semantic_tags": [
+        "office_framed_display_mesh",
+        "wall_display",
+        "admitted_mesh"
+      ],
+      "constructor_contact_mode": "face_attachment",
+      "assembly_id": "room_shell",
+      "placement_intent": {
+        "source": "semantic_plan_constructor",
+        "brief_role": "office_framed_display_mesh",
+        "family": "home_office_evening"
+      },
+      "attached_to": "home_office_evening_back_wall"
+    },
+    {
+      "id": "office_wall_system_mesh",
+      "role": "office_wall_system_mesh",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "dark_wood",
+      "transform": {
+        "position": [
+          0.02,
+          1.08,
+          1.65
+        ],
+        "scale": [
+          0.82,
+          0.16,
+          0.03
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "support": "home_office_evening_back_wall",
+      "editable": true,
+      "provenance": "scene_authoring_intelligence_v1_semantic_plan_constructor",
+      "semantic_tags": [
+        "office_wall_system_mesh",
+        "shelf",
+        "admitted_mesh"
+      ],
+      "constructor_contact_mode": "face_attachment",
+      "assembly_id": "room_shell",
+      "placement_intent": {
+        "source": "semantic_plan_constructor",
+        "brief_role": "office_wall_system_mesh",
+        "family": "home_office_evening"
+      },
+      "attached_to": "home_office_evening_back_wall"
+    },
+    {
+      "id": "office_left_wall_fixture_mesh",
+      "role": "office_wall_fixture_mesh",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "emissive_warm",
+      "transform": {
+        "position": [
+          -1.82,
+          1.24,
+          1.645
+        ],
+        "scale": [
+          0.16,
+          0.42,
+          0.026
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "support": "home_office_evening_back_wall",
+      "editable": true,
+      "provenance": "scene_authoring_intelligence_v1_semantic_plan_constructor",
+      "semantic_tags": [
+        "office_wall_fixture_mesh",
+        "wall_light",
+        "admitted_mesh"
+      ],
+      "constructor_contact_mode": "face_attachment",
+      "assembly_id": "room_shell",
+      "placement_intent": {
+        "source": "semantic_plan_constructor",
+        "brief_role": "office_wall_fixture_mesh",
+        "family": "home_office_evening"
+      },
+      "attached_to": "home_office_evening_back_wall"
+    },
+    {
+      "id": "office_floor_accent_panel_warm",
+      "role": "palette_accent_panel",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "emissive_warm",
+      "transform": {
+        "position": [
+          -1.18,
+          0.09,
+          -0.58
+        ],
+        "scale": [
+          0.46,
+          0.032,
+          0.08
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "support": "home_office_evening_floor",
+      "editable": true,
+      "provenance": "scene_authoring_intelligence_v1_semantic_plan_constructor",
+      "semantic_tags": [
+        "palette_accent_panel",
+        "floor_light"
+      ],
+      "assembly_id": "room_shell",
+      "placement_intent": {
+        "source": "semantic_plan_constructor",
+        "brief_role": "palette_accent_panel",
+        "family": "home_office_evening"
+      },
+      "constructor_contact_mode": "support_contact"
+    },
+    {
+      "id": "office_book_0",
+      "role": "book",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "paper",
+      "transform": {
+        "position": [
+          1.1,
+          1.065,
+          0.89
+        ],
+        "scale": [
+          0.1,
+          0.08,
+          0.16
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "support": "office_book_shelf_upper",
+      "editable": true,
+      "provenance": "scene_authoring_intelligence_v1_semantic_plan_constructor",
+      "semantic_tags": [
+        "book",
+        "detail"
+      ],
+      "assembly_id": "room_shell",
+      "placement_intent": {
+        "source": "semantic_plan_constructor",
+        "brief_role": "book",
+        "family": "home_office_evening"
+      },
+      "constructor_contact_mode": "support_contact"
+    },
+    {
+      "id": "office_book_1",
+      "role": "book",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "paper",
+      "transform": {
+        "position": [
+          1.28,
+          1.065,
+          0.89
+        ],
+        "scale": [
+          0.1,
+          0.08,
+          0.16
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "support": "office_book_shelf_upper",
+      "editable": true,
+      "provenance": "scene_authoring_intelligence_v1_semantic_plan_constructor",
+      "semantic_tags": [
+        "book",
+        "detail"
+      ],
+      "assembly_id": "room_shell",
+      "placement_intent": {
+        "source": "semantic_plan_constructor",
+        "brief_role": "book",
+        "family": "home_office_evening"
+      },
+      "constructor_contact_mode": "support_contact"
+    },
+    {
+      "id": "office_book_2",
+      "role": "book",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "paper",
+      "transform": {
+        "position": [
+          1.46,
+          1.065,
+          0.89
+        ],
+        "scale": [
+          0.1,
+          0.08,
+          0.16
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "support": "office_book_shelf_upper",
+      "editable": true,
+      "provenance": "scene_authoring_intelligence_v1_semantic_plan_constructor",
+      "semantic_tags": [
+        "book",
+        "detail"
+      ],
+      "assembly_id": "room_shell",
+      "placement_intent": {
+        "source": "semantic_plan_constructor",
+        "brief_role": "book",
+        "family": "home_office_evening"
+      },
+      "constructor_contact_mode": "support_contact"
+    },
+    {
+      "id": "office_screen_ui_trace_0",
+      "role": "screen_ui_detail",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "emissive_warm",
+      "transform": {
+        "position": [
+          -0.45,
+          1.01,
+          0.948
+        ],
+        "scale": [
+          0.42,
+          0.012,
+          0.01
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "support": "office_screen",
+      "editable": true,
+      "provenance": "scene_authoring_intelligence_v1_semantic_plan_constructor",
+      "semantic_tags": [
+        "screen_ui_detail",
+        "edge_density"
+      ],
+      "constructor_contact_mode": "subpart",
+      "assembly_id": "room_shell",
+      "placement_intent": {
+        "source": "semantic_plan_constructor",
+        "brief_role": "screen_ui_detail",
+        "family": "home_office_evening"
+      },
+      "attached_to": "office_screen"
+    },
+    {
+      "id": "office_screen_ui_trace_1",
+      "role": "screen_ui_detail",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "emissive_cyan",
+      "transform": {
+        "position": [
+          -0.45,
+          1.09,
+          0.948
+        ],
+        "scale": [
+          0.38,
+          0.012,
+          0.01
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "support": "office_screen",
+      "editable": true,
+      "provenance": "scene_authoring_intelligence_v1_semantic_plan_constructor",
+      "semantic_tags": [
+        "screen_ui_detail",
+        "edge_density"
+      ],
+      "constructor_contact_mode": "subpart",
+      "assembly_id": "room_shell",
+      "placement_intent": {
+        "source": "semantic_plan_constructor",
+        "brief_role": "screen_ui_detail",
+        "family": "home_office_evening"
+      },
+      "attached_to": "office_screen"
+    },
+    {
+      "id": "office_screen_ui_trace_2",
+      "role": "screen_ui_detail",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "emissive_warm",
+      "transform": {
+        "position": [
+          -0.45,
+          1.17,
+          0.948
+        ],
+        "scale": [
+          0.34,
+          0.012,
+          0.01
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "support": "office_screen",
+      "editable": true,
+      "provenance": "scene_authoring_intelligence_v1_semantic_plan_constructor",
+      "semantic_tags": [
+        "screen_ui_detail",
+        "edge_density"
+      ],
+      "constructor_contact_mode": "subpart",
+      "assembly_id": "room_shell",
+      "placement_intent": {
+        "source": "semantic_plan_constructor",
+        "brief_role": "screen_ui_detail",
+        "family": "home_office_evening"
+      },
+      "attached_to": "office_screen"
+    },
+    {
+      "id": "office_screen_ui_trace_3",
+      "role": "screen_ui_detail",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "emissive_cyan",
+      "transform": {
+        "position": [
+          -0.45,
+          1.25,
+          0.948
+        ],
+        "scale": [
+          0.3,
+          0.012,
+          0.01
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "support": "office_screen",
+      "editable": true,
+      "provenance": "scene_authoring_intelligence_v1_semantic_plan_constructor",
+      "semantic_tags": [
+        "screen_ui_detail",
+        "edge_density"
+      ],
+      "constructor_contact_mode": "subpart",
+      "assembly_id": "room_shell",
+      "placement_intent": {
+        "source": "semantic_plan_constructor",
+        "brief_role": "screen_ui_detail",
+        "family": "home_office_evening"
+      },
+      "attached_to": "office_screen"
+    },
+    {
+      "id": "office_back_wall_slat_0",
+      "role": "wall_topology_line",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "black_metal",
+      "transform": {
+        "position": [
+          -1.78,
+          1.3,
+          1.645
+        ],
+        "scale": [
+          0.018,
+          1.2,
+          0.018
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "support": "home_office_evening_back_wall",
+      "editable": true,
+      "provenance": "scene_authoring_intelligence_v1_semantic_plan_constructor",
+      "semantic_tags": [
+        "wall_detail",
+        "edge_density"
+      ],
+      "constructor_contact_mode": "face_attachment",
+      "assembly_id": "room_shell",
+      "placement_intent": {
+        "source": "semantic_plan_constructor",
+        "brief_role": "wall_topology_line",
+        "family": "home_office_evening"
+      },
+      "attached_to": "home_office_evening_back_wall"
+    },
+    {
+      "id": "office_back_wall_slat_1",
+      "role": "wall_topology_line",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "emissive_cyan",
+      "transform": {
+        "position": [
+          -1.42,
+          1.3,
+          1.645
+        ],
+        "scale": [
+          0.018,
+          1.2,
+          0.018
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "support": "home_office_evening_back_wall",
+      "editable": true,
+      "provenance": "scene_authoring_intelligence_v1_semantic_plan_constructor",
+      "semantic_tags": [
+        "wall_detail",
+        "edge_density"
+      ],
+      "constructor_contact_mode": "face_attachment",
+      "assembly_id": "room_shell",
+      "placement_intent": {
+        "source": "semantic_plan_constructor",
+        "brief_role": "wall_topology_line",
+        "family": "home_office_evening"
+      },
+      "attached_to": "home_office_evening_back_wall"
+    },
+    {
+      "id": "office_back_wall_slat_2",
+      "role": "wall_topology_line",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "black_metal",
+      "transform": {
+        "position": [
+          -1.06,
+          1.3,
+          1.645
+        ],
+        "scale": [
+          0.018,
+          1.2,
+          0.018
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "support": "home_office_evening_back_wall",
+      "editable": true,
+      "provenance": "scene_authoring_intelligence_v1_semantic_plan_constructor",
+      "semantic_tags": [
+        "wall_detail",
+        "edge_density"
+      ],
+      "constructor_contact_mode": "face_attachment",
+      "assembly_id": "room_shell",
+      "placement_intent": {
+        "source": "semantic_plan_constructor",
+        "brief_role": "wall_topology_line",
+        "family": "home_office_evening"
+      },
+      "attached_to": "home_office_evening_back_wall"
+    },
+    {
+      "id": "office_back_wall_slat_3",
+      "role": "wall_topology_line",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "emissive_cyan",
+      "transform": {
+        "position": [
+          -0.7,
+          1.3,
+          1.645
+        ],
+        "scale": [
+          0.018,
+          1.2,
+          0.018
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "support": "home_office_evening_back_wall",
+      "editable": true,
+      "provenance": "scene_authoring_intelligence_v1_semantic_plan_constructor",
+      "semantic_tags": [
+        "wall_detail",
+        "edge_density"
+      ],
+      "constructor_contact_mode": "face_attachment",
+      "assembly_id": "room_shell",
+      "placement_intent": {
+        "source": "semantic_plan_constructor",
+        "brief_role": "wall_topology_line",
+        "family": "home_office_evening"
+      },
+      "attached_to": "home_office_evening_back_wall"
+    },
+    {
+      "id": "office_back_wall_slat_4",
+      "role": "wall_topology_line",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "black_metal",
+      "transform": {
+        "position": [
+          -0.34,
+          1.3,
+          1.645
+        ],
+        "scale": [
+          0.018,
+          1.2,
+          0.018
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "support": "home_office_evening_back_wall",
+      "editable": true,
+      "provenance": "scene_authoring_intelligence_v1_semantic_plan_constructor",
+      "semantic_tags": [
+        "wall_detail",
+        "edge_density"
+      ],
+      "constructor_contact_mode": "face_attachment",
+      "assembly_id": "room_shell",
+      "placement_intent": {
+        "source": "semantic_plan_constructor",
+        "brief_role": "wall_topology_line",
+        "family": "home_office_evening"
+      },
+      "attached_to": "home_office_evening_back_wall"
+    },
+    {
+      "id": "office_back_wall_slat_5",
+      "role": "wall_topology_line",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "emissive_cyan",
+      "transform": {
+        "position": [
+          0.02,
+          1.3,
+          1.645
+        ],
+        "scale": [
+          0.018,
+          1.2,
+          0.018
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "support": "home_office_evening_back_wall",
+      "editable": true,
+      "provenance": "scene_authoring_intelligence_v1_semantic_plan_constructor",
+      "semantic_tags": [
+        "wall_detail",
+        "edge_density"
+      ],
+      "constructor_contact_mode": "face_attachment",
+      "assembly_id": "room_shell",
+      "placement_intent": {
+        "source": "semantic_plan_constructor",
+        "brief_role": "wall_topology_line",
+        "family": "home_office_evening"
+      },
+      "attached_to": "home_office_evening_back_wall"
+    },
+    {
+      "id": "office_back_wall_slat_6",
+      "role": "wall_topology_line",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "black_metal",
+      "transform": {
+        "position": [
+          0.38,
+          1.3,
+          1.645
+        ],
+        "scale": [
+          0.018,
+          1.2,
+          0.018
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "support": "home_office_evening_back_wall",
+      "editable": true,
+      "provenance": "scene_authoring_intelligence_v1_semantic_plan_constructor",
+      "semantic_tags": [
+        "wall_detail",
+        "edge_density"
+      ],
+      "constructor_contact_mode": "face_attachment",
+      "assembly_id": "room_shell",
+      "placement_intent": {
+        "source": "semantic_plan_constructor",
+        "brief_role": "wall_topology_line",
+        "family": "home_office_evening"
+      },
+      "attached_to": "home_office_evening_back_wall"
+    },
+    {
+      "id": "office_back_wall_slat_7",
+      "role": "wall_topology_line",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "emissive_cyan",
+      "transform": {
+        "position": [
+          0.74,
+          1.3,
+          1.645
+        ],
+        "scale": [
+          0.018,
+          1.2,
+          0.018
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "support": "home_office_evening_back_wall",
+      "editable": true,
+      "provenance": "scene_authoring_intelligence_v1_semantic_plan_constructor",
+      "semantic_tags": [
+        "wall_detail",
+        "edge_density"
+      ],
+      "constructor_contact_mode": "face_attachment",
+      "assembly_id": "room_shell",
+      "placement_intent": {
+        "source": "semantic_plan_constructor",
+        "brief_role": "wall_topology_line",
+        "family": "home_office_evening"
+      },
+      "attached_to": "home_office_evening_back_wall"
+    },
+    {
+      "id": "office_back_wall_slat_8",
+      "role": "wall_topology_line",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "black_metal",
+      "transform": {
+        "position": [
+          1.1,
+          1.3,
+          1.645
+        ],
+        "scale": [
+          0.018,
+          1.2,
+          0.018
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "support": "home_office_evening_back_wall",
+      "editable": true,
+      "provenance": "scene_authoring_intelligence_v1_semantic_plan_constructor",
+      "semantic_tags": [
+        "wall_detail",
+        "edge_density"
+      ],
+      "constructor_contact_mode": "face_attachment",
+      "assembly_id": "room_shell",
+      "placement_intent": {
+        "source": "semantic_plan_constructor",
+        "brief_role": "wall_topology_line",
+        "family": "home_office_evening"
+      },
+      "attached_to": "home_office_evening_back_wall"
+    },
+    {
+      "id": "office_back_wall_slat_9",
+      "role": "wall_topology_line",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "emissive_cyan",
+      "transform": {
+        "position": [
+          1.46,
+          1.3,
+          1.645
+        ],
+        "scale": [
+          0.018,
+          1.2,
+          0.018
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "support": "home_office_evening_back_wall",
+      "editable": true,
+      "provenance": "scene_authoring_intelligence_v1_semantic_plan_constructor",
+      "semantic_tags": [
+        "wall_detail",
+        "edge_density"
+      ],
+      "constructor_contact_mode": "face_attachment",
+      "assembly_id": "room_shell",
+      "placement_intent": {
+        "source": "semantic_plan_constructor",
+        "brief_role": "wall_topology_line",
+        "family": "home_office_evening"
+      },
+      "attached_to": "home_office_evening_back_wall"
+    },
+    {
+      "id": "office_back_wall_slat_10",
+      "role": "wall_topology_line",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "black_metal",
+      "transform": {
+        "position": [
+          1.82,
+          1.3,
+          1.645
+        ],
+        "scale": [
+          0.018,
+          1.2,
+          0.018
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "support": "home_office_evening_back_wall",
+      "editable": true,
+      "provenance": "scene_authoring_intelligence_v1_semantic_plan_constructor",
+      "semantic_tags": [
+        "wall_detail",
+        "edge_density"
+      ],
+      "constructor_contact_mode": "face_attachment",
+      "assembly_id": "room_shell",
+      "placement_intent": {
+        "source": "semantic_plan_constructor",
+        "brief_role": "wall_topology_line",
+        "family": "home_office_evening"
+      },
+      "attached_to": "home_office_evening_back_wall"
+    },
+    {
+      "id": "office_floor_thread_0",
+      "role": "floor_topology_line",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "black_metal",
+      "transform": {
+        "position": [
+          -0.3,
+          0.112,
+          -1.18
+        ],
+        "scale": [
+          2.85,
+          0.026,
+          0.018
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "support": "home_office_evening_floor",
+      "editable": true,
+      "provenance": "scene_authoring_intelligence_v1_semantic_plan_constructor",
+      "semantic_tags": [
+        "floor_detail",
+        "edge_density"
+      ],
+      "assembly_id": "room_shell",
+      "placement_intent": {
+        "source": "semantic_plan_constructor",
+        "brief_role": "floor_topology_line",
+        "family": "home_office_evening"
+      },
+      "constructor_contact_mode": "support_contact",
+      "renderable": false,
+      "quarantined": true,
+      "plausibility_qa": {
+        "quarantine_reason": "low_value_unparented_detail"
+      }
+    },
+    {
+      "id": "office_floor_thread_1",
+      "role": "floor_topology_line",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "emissive_warm",
+      "transform": {
+        "position": [
+          -0.3,
+          0.112,
+          -0.94
+        ],
+        "scale": [
+          2.85,
+          0.026,
+          0.018
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "support": "home_office_evening_floor",
+      "editable": true,
+      "provenance": "scene_authoring_intelligence_v1_semantic_plan_constructor",
+      "semantic_tags": [
+        "floor_detail",
+        "edge_density"
+      ],
+      "assembly_id": "room_shell",
+      "placement_intent": {
+        "source": "semantic_plan_constructor",
+        "brief_role": "floor_topology_line",
+        "family": "home_office_evening"
+      },
+      "constructor_contact_mode": "support_contact",
+      "renderable": false,
+      "quarantined": true,
+      "plausibility_qa": {
+        "quarantine_reason": "low_value_unparented_detail"
+      }
+    },
+    {
+      "id": "office_floor_thread_2",
+      "role": "floor_topology_line",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "black_metal",
+      "transform": {
+        "position": [
+          -0.3,
+          0.112,
+          -0.7
+        ],
+        "scale": [
+          2.85,
+          0.026,
+          0.018
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "support": "home_office_evening_floor",
+      "editable": true,
+      "provenance": "scene_authoring_intelligence_v1_semantic_plan_constructor",
+      "semantic_tags": [
+        "floor_detail",
+        "edge_density"
+      ],
+      "assembly_id": "room_shell",
+      "placement_intent": {
+        "source": "semantic_plan_constructor",
+        "brief_role": "floor_topology_line",
+        "family": "home_office_evening"
+      },
+      "constructor_contact_mode": "support_contact",
+      "renderable": false,
+      "quarantined": true,
+      "plausibility_qa": {
+        "quarantine_reason": "low_value_unparented_detail"
+      }
+    },
+    {
+      "id": "office_floor_thread_3",
+      "role": "floor_topology_line",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "emissive_warm",
+      "transform": {
+        "position": [
+          -0.3,
+          0.112,
+          -0.46
+        ],
+        "scale": [
+          2.85,
+          0.026,
+          0.018
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "support": "home_office_evening_floor",
+      "editable": true,
+      "provenance": "scene_authoring_intelligence_v1_semantic_plan_constructor",
+      "semantic_tags": [
+        "floor_detail",
+        "edge_density"
+      ],
+      "assembly_id": "room_shell",
+      "placement_intent": {
+        "source": "semantic_plan_constructor",
+        "brief_role": "floor_topology_line",
+        "family": "home_office_evening"
+      },
+      "constructor_contact_mode": "support_contact",
+      "renderable": false,
+      "quarantined": true,
+      "plausibility_qa": {
+        "quarantine_reason": "low_value_unparented_detail"
+      }
+    },
+    {
+      "id": "office_floor_thread_4",
+      "role": "floor_topology_line",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "black_metal",
+      "transform": {
+        "position": [
+          -0.3,
+          0.112,
+          -0.22
+        ],
+        "scale": [
+          2.85,
+          0.026,
+          0.018
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "support": "home_office_evening_floor",
+      "editable": true,
+      "provenance": "scene_authoring_intelligence_v1_semantic_plan_constructor",
+      "semantic_tags": [
+        "floor_detail",
+        "edge_density"
+      ],
+      "assembly_id": "room_shell",
+      "placement_intent": {
+        "source": "semantic_plan_constructor",
+        "brief_role": "floor_topology_line",
+        "family": "home_office_evening"
+      },
+      "constructor_contact_mode": "support_contact",
+      "renderable": false,
+      "quarantined": true,
+      "plausibility_qa": {
+        "quarantine_reason": "low_value_unparented_detail"
+      }
+    },
+    {
+      "id": "office_floor_thread_5",
+      "role": "floor_topology_line",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "emissive_warm",
+      "transform": {
+        "position": [
+          -0.3,
+          0.112,
+          0.02
+        ],
+        "scale": [
+          2.85,
+          0.026,
+          0.018
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "support": "home_office_evening_floor",
+      "editable": true,
+      "provenance": "scene_authoring_intelligence_v1_semantic_plan_constructor",
+      "semantic_tags": [
+        "floor_detail",
+        "edge_density"
+      ],
+      "assembly_id": "room_shell",
+      "placement_intent": {
+        "source": "semantic_plan_constructor",
+        "brief_role": "floor_topology_line",
+        "family": "home_office_evening"
+      },
+      "constructor_contact_mode": "support_contact",
+      "renderable": false,
+      "quarantined": true,
+      "plausibility_qa": {
+        "quarantine_reason": "low_value_unparented_detail"
+      }
+    },
+    {
+      "id": "office_floor_thread_6",
+      "role": "floor_topology_line",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "black_metal",
+      "transform": {
+        "position": [
+          -0.3,
+          0.112,
+          0.26
+        ],
+        "scale": [
+          2.85,
+          0.026,
+          0.018
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "support": "home_office_evening_floor",
+      "editable": true,
+      "provenance": "scene_authoring_intelligence_v1_semantic_plan_constructor",
+      "semantic_tags": [
+        "floor_detail",
+        "edge_density"
+      ],
+      "assembly_id": "room_shell",
+      "placement_intent": {
+        "source": "semantic_plan_constructor",
+        "brief_role": "floor_topology_line",
+        "family": "home_office_evening"
+      },
+      "constructor_contact_mode": "support_contact",
+      "renderable": false,
+      "quarantined": true,
+      "plausibility_qa": {
+        "quarantine_reason": "low_value_unparented_detail"
+      }
+    },
+    {
+      "id": "office_floor_thread_7",
+      "role": "floor_topology_line",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "emissive_warm",
+      "transform": {
+        "position": [
+          -0.3,
+          0.112,
+          0.5
+        ],
+        "scale": [
+          2.85,
+          0.026,
+          0.018
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "support": "home_office_evening_floor",
+      "editable": true,
+      "provenance": "scene_authoring_intelligence_v1_semantic_plan_constructor",
+      "semantic_tags": [
+        "floor_detail",
+        "edge_density"
+      ],
+      "assembly_id": "room_shell",
+      "placement_intent": {
+        "source": "semantic_plan_constructor",
+        "brief_role": "floor_topology_line",
+        "family": "home_office_evening"
+      },
+      "constructor_contact_mode": "support_contact",
+      "renderable": false,
+      "quarantined": true,
+      "plausibility_qa": {
+        "quarantine_reason": "low_value_unparented_detail"
+      }
+    },
+    {
+      "id": "office_floor_cross_thread_0",
+      "role": "floor_topology_line",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "black_metal",
+      "transform": {
+        "position": [
+          -1.22,
+          0.115,
+          -0.34
+        ],
+        "scale": [
+          0.018,
+          0.026,
+          1.52
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "support": "home_office_evening_floor",
+      "editable": true,
+      "provenance": "scene_authoring_intelligence_v1_semantic_plan_constructor",
+      "semantic_tags": [
+        "floor_detail",
+        "edge_density"
+      ],
+      "assembly_id": "room_shell",
+      "placement_intent": {
+        "source": "semantic_plan_constructor",
+        "brief_role": "floor_topology_line",
+        "family": "home_office_evening"
+      },
+      "constructor_contact_mode": "support_contact",
+      "renderable": false,
+      "quarantined": true,
+      "plausibility_qa": {
+        "quarantine_reason": "low_value_unparented_detail"
+      }
+    },
+    {
+      "id": "office_floor_cross_thread_1",
+      "role": "floor_topology_line",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "emissive_cyan",
+      "transform": {
+        "position": [
+          -0.86,
+          0.115,
+          -0.34
+        ],
+        "scale": [
+          0.018,
+          0.026,
+          1.52
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "support": "home_office_evening_floor",
+      "editable": true,
+      "provenance": "scene_authoring_intelligence_v1_semantic_plan_constructor",
+      "semantic_tags": [
+        "floor_detail",
+        "edge_density"
+      ],
+      "assembly_id": "room_shell",
+      "placement_intent": {
+        "source": "semantic_plan_constructor",
+        "brief_role": "floor_topology_line",
+        "family": "home_office_evening"
+      },
+      "constructor_contact_mode": "support_contact",
+      "renderable": false,
+      "quarantined": true,
+      "plausibility_qa": {
+        "quarantine_reason": "low_value_unparented_detail"
+      }
+    },
+    {
+      "id": "office_floor_cross_thread_2",
+      "role": "floor_topology_line",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "black_metal",
+      "transform": {
+        "position": [
+          -0.5,
+          0.115,
+          -0.34
+        ],
+        "scale": [
+          0.018,
+          0.026,
+          1.52
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "support": "home_office_evening_floor",
+      "editable": true,
+      "provenance": "scene_authoring_intelligence_v1_semantic_plan_constructor",
+      "semantic_tags": [
+        "floor_detail",
+        "edge_density"
+      ],
+      "assembly_id": "room_shell",
+      "placement_intent": {
+        "source": "semantic_plan_constructor",
+        "brief_role": "floor_topology_line",
+        "family": "home_office_evening"
+      },
+      "constructor_contact_mode": "support_contact",
+      "renderable": false,
+      "quarantined": true,
+      "plausibility_qa": {
+        "quarantine_reason": "low_value_unparented_detail"
+      }
+    },
+    {
+      "id": "office_floor_cross_thread_3",
+      "role": "floor_topology_line",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "emissive_cyan",
+      "transform": {
+        "position": [
+          -0.14,
+          0.115,
+          -0.34
+        ],
+        "scale": [
+          0.018,
+          0.026,
+          1.52
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "support": "home_office_evening_floor",
+      "editable": true,
+      "provenance": "scene_authoring_intelligence_v1_semantic_plan_constructor",
+      "semantic_tags": [
+        "floor_detail",
+        "edge_density"
+      ],
+      "assembly_id": "room_shell",
+      "placement_intent": {
+        "source": "semantic_plan_constructor",
+        "brief_role": "floor_topology_line",
+        "family": "home_office_evening"
+      },
+      "constructor_contact_mode": "support_contact",
+      "renderable": false,
+      "quarantined": true,
+      "plausibility_qa": {
+        "quarantine_reason": "low_value_unparented_detail"
+      }
+    },
+    {
+      "id": "office_floor_cross_thread_4",
+      "role": "floor_topology_line",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "black_metal",
+      "transform": {
+        "position": [
+          0.22,
+          0.115,
+          -0.34
+        ],
+        "scale": [
+          0.018,
+          0.026,
+          1.52
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "support": "home_office_evening_floor",
+      "editable": true,
+      "provenance": "scene_authoring_intelligence_v1_semantic_plan_constructor",
+      "semantic_tags": [
+        "floor_detail",
+        "edge_density"
+      ],
+      "assembly_id": "room_shell",
+      "placement_intent": {
+        "source": "semantic_plan_constructor",
+        "brief_role": "floor_topology_line",
+        "family": "home_office_evening"
+      },
+      "constructor_contact_mode": "support_contact",
+      "renderable": false,
+      "quarantined": true,
+      "plausibility_qa": {
+        "quarantine_reason": "low_value_unparented_detail"
+      }
+    },
+    {
+      "id": "office_floor_cross_thread_5",
+      "role": "floor_topology_line",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "emissive_cyan",
+      "transform": {
+        "position": [
+          0.58,
+          0.115,
+          -0.34
+        ],
+        "scale": [
+          0.018,
+          0.026,
+          1.52
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "support": "home_office_evening_floor",
+      "editable": true,
+      "provenance": "scene_authoring_intelligence_v1_semantic_plan_constructor",
+      "semantic_tags": [
+        "floor_detail",
+        "edge_density"
+      ],
+      "assembly_id": "room_shell",
+      "placement_intent": {
+        "source": "semantic_plan_constructor",
+        "brief_role": "floor_topology_line",
+        "family": "home_office_evening"
+      },
+      "constructor_contact_mode": "support_contact",
+      "renderable": false,
+      "quarantined": true,
+      "plausibility_qa": {
+        "quarantine_reason": "low_value_unparented_detail"
+      }
+    },
+    {
+      "id": "office_floor_cross_thread_6",
+      "role": "floor_topology_line",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "black_metal",
+      "transform": {
+        "position": [
+          0.94,
+          0.115,
+          -0.34
+        ],
+        "scale": [
+          0.018,
+          0.026,
+          1.52
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "support": "home_office_evening_floor",
+      "editable": true,
+      "provenance": "scene_authoring_intelligence_v1_semantic_plan_constructor",
+      "semantic_tags": [
+        "floor_detail",
+        "edge_density"
+      ],
+      "assembly_id": "room_shell",
+      "placement_intent": {
+        "source": "semantic_plan_constructor",
+        "brief_role": "floor_topology_line",
+        "family": "home_office_evening"
+      },
+      "constructor_contact_mode": "support_contact",
+      "renderable": false,
+      "quarantined": true,
+      "plausibility_qa": {
+        "quarantine_reason": "low_value_unparented_detail"
+      }
+    },
+    {
+      "id": "sai_mf_bookcase_context_framed_panels_0_0",
+      "role": "book_spine",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "sai_midfreq_paper_patch",
+      "transform": {
+        "position": [
+          1.1412,
+          0.7485,
+          0.8648
+        ],
+        "scale": [
+          0.038,
+          0.105,
+          0.0484
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "support": "office_book_shelf_lower",
+      "editable": true,
+      "provenance": "model_scene_view_local_midfrequency_detail_variants",
+      "semantic_tags": [
+        "mid_frequency_detail",
+        "support_bound",
+        "view_local",
+        "book",
+        "shelf_detail"
+      ],
+      "view_local_midfrequency_detail_variant": {
+        "schema": 1,
+        "source": "tools/model_scene_view_local_midfrequency_detail_variants.py",
+        "source_target": "office_book_shelf_lower",
+        "policy": "framed_panels",
+        "completion_claim_allowed": false
+      }
+    },
+    {
+      "id": "sai_mf_bookcase_context_framed_panels_0_1",
+      "role": "book_spine",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "sai_midfreq_warm_rule",
+      "transform": {
+        "position": [
+          1.2108,
+          0.7485,
+          0.8648
+        ],
+        "scale": [
+          0.038,
+          0.105,
+          0.0484
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "support": "office_book_shelf_lower",
+      "editable": true,
+      "provenance": "model_scene_view_local_midfrequency_detail_variants",
+      "semantic_tags": [
+        "mid_frequency_detail",
+        "support_bound",
+        "view_local",
+        "book",
+        "shelf_detail"
+      ],
+      "view_local_midfrequency_detail_variant": {
+        "schema": 1,
+        "source": "tools/model_scene_view_local_midfrequency_detail_variants.py",
+        "source_target": "office_book_shelf_lower",
+        "policy": "framed_panels",
+        "completion_claim_allowed": false
+      }
+    },
+    {
+      "id": "sai_mf_bookcase_context_framed_panels_0_2",
+      "role": "book_spine",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "sai_midfreq_cool_rule",
+      "transform": {
+        "position": [
+          1.2804,
+          0.7485,
+          0.8912
+        ],
+        "scale": [
+          0.038,
+          0.105,
+          0.0484
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "support": "office_book_shelf_lower",
+      "editable": true,
+      "provenance": "model_scene_view_local_midfrequency_detail_variants",
+      "semantic_tags": [
+        "mid_frequency_detail",
+        "support_bound",
+        "view_local",
+        "book",
+        "shelf_detail"
+      ],
+      "view_local_midfrequency_detail_variant": {
+        "schema": 1,
+        "source": "tools/model_scene_view_local_midfrequency_detail_variants.py",
+        "source_target": "office_book_shelf_lower",
+        "policy": "framed_panels",
+        "completion_claim_allowed": false
+      }
+    },
+    {
+      "id": "sai_mf_bookcase_context_framed_panels_0_3",
+      "role": "book_spine",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "sai_midfreq_shadow_rule",
+      "transform": {
+        "position": [
+          1.35,
+          0.7485,
+          0.8912
+        ],
+        "scale": [
+          0.038,
+          0.105,
+          0.0484
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "support": "office_book_shelf_lower",
+      "editable": true,
+      "provenance": "model_scene_view_local_midfrequency_detail_variants",
+      "semantic_tags": [
+        "mid_frequency_detail",
+        "support_bound",
+        "view_local",
+        "book",
+        "shelf_detail"
+      ],
+      "view_local_midfrequency_detail_variant": {
+        "schema": 1,
+        "source": "tools/model_scene_view_local_midfrequency_detail_variants.py",
+        "source_target": "office_book_shelf_lower",
+        "policy": "framed_panels",
+        "completion_claim_allowed": false
+      }
+    },
+    {
+      "id": "sai_mf_bookcase_context_framed_panels_0_4",
+      "role": "book_spine",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "sai_midfreq_paper_patch",
+      "transform": {
+        "position": [
+          1.4196,
+          0.7485,
+          0.9176
+        ],
+        "scale": [
+          0.038,
+          0.105,
+          0.0484
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "support": "office_book_shelf_lower",
+      "editable": true,
+      "provenance": "model_scene_view_local_midfrequency_detail_variants",
+      "semantic_tags": [
+        "mid_frequency_detail",
+        "support_bound",
+        "view_local",
+        "book",
+        "shelf_detail"
+      ],
+      "view_local_midfrequency_detail_variant": {
+        "schema": 1,
+        "source": "tools/model_scene_view_local_midfrequency_detail_variants.py",
+        "source_target": "office_book_shelf_lower",
+        "policy": "framed_panels",
+        "completion_claim_allowed": false
+      }
+    },
+    {
+      "id": "sai_mf_bookcase_context_framed_panels_1_0",
+      "role": "book_spine",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "sai_midfreq_cool_rule",
+      "transform": {
+        "position": [
+          1.5588,
+          1.0885,
+          0.8648
+        ],
+        "scale": [
+          0.038,
+          0.105,
+          0.0484
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "support": "office_book_shelf_upper",
+      "editable": true,
+      "provenance": "model_scene_view_local_midfrequency_detail_variants",
+      "semantic_tags": [
+        "mid_frequency_detail",
+        "support_bound",
+        "view_local",
+        "book",
+        "shelf_detail"
+      ],
+      "view_local_midfrequency_detail_variant": {
+        "schema": 1,
+        "source": "tools/model_scene_view_local_midfrequency_detail_variants.py",
+        "source_target": "office_book_shelf_upper",
+        "policy": "framed_panels",
+        "completion_claim_allowed": false
+      }
+    },
+    {
+      "id": "macro_office_floor_plant_naturalistic",
+      "role": "office_plant_mesh",
+      "kind": "naturalistic_asset",
+      "runtime_asset": "assets/models/kenney_furniture_kit/pottedPlant/pottedPlant.gltf",
+      "material": "macro_deep_green",
+      "transform": {
+        "position": [
+          -1.62,
+          0.07,
+          -1.12
+        ],
+        "scale": [
+          0.72,
+          0.72,
+          0.72
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "support": "home_office_evening_floor",
+      "editable": true,
+      "semantic_tags": [
+        "macro_director_batch",
+        "asset_fidelity_upgrade"
+      ],
+      "provenance": "model_scene_macro_director_batch"
+    },
+    {
+      "id": "macro_office_storage_box_naturalistic",
+      "role": "office_storage_mesh",
+      "kind": "naturalistic_asset",
+      "runtime_asset": "assets/models/kenney_furniture_kit/cardboardBoxOpen/cardboardBoxOpen.gltf",
+      "material": "macro_warm_paper",
+      "transform": {
+        "position": [
+          1.55,
+          0.07,
+          -1.02
+        ],
+        "scale": [
+          0.58,
+          0.58,
+          0.58
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "support": "home_office_evening_floor",
+      "editable": true,
+      "semantic_tags": [
+        "macro_director_batch",
+        "asset_fidelity_upgrade"
+      ],
+      "provenance": "model_scene_macro_director_batch"
+    },
+    {
+      "id": "macro_office_laptop_naturalistic",
+      "role": "desk_prop",
+      "kind": "naturalistic_asset",
+      "runtime_asset": "assets/models/kenney_furniture_kit/laptop/laptop.gltf",
+      "material": "black_metal",
+      "transform": {
+        "position": [
+          -0.32,
+          0.814,
+          0.72
+        ],
+        "scale": [
+          0.56,
+          0.56,
+          0.56
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "support": "office_desk_surface",
+      "editable": true,
+      "semantic_tags": [
+        "macro_director_batch",
+        "asset_fidelity_upgrade"
+      ],
+      "provenance": "model_scene_macro_director_batch"
+    },
+    {
+      "id": "macro_office_lower_books_naturalistic",
+      "role": "book_mesh",
+      "kind": "naturalistic_asset",
+      "runtime_asset": "assets/models/kenney_furniture_kit/books/books.gltf",
+      "material": "macro_warm_paper",
+      "transform": {
+        "position": [
+          1.28,
+          0.692,
+          0.88
+        ],
+        "scale": [
+          0.54,
+          0.54,
+          0.54
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "support": "office_book_shelf_lower",
+      "editable": true,
+      "semantic_tags": [
+        "macro_director_batch",
+        "asset_fidelity_upgrade"
+      ],
+      "provenance": "model_scene_macro_director_batch"
+    },
+    {
+      "id": "macro_office_large_cork_calendar",
+      "role": "wall_art",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "macro_warm_paper",
+      "transform": {
+        "position": [
+          -1.28,
+          1.37,
+          1.642
+        ],
+        "scale": [
+          0.52,
+          0.38,
+          0.024
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "support": "home_office_evening_back_wall",
+      "editable": true,
+      "semantic_tags": [
+        "macro_director_batch",
+        "macro_wall_information_layer"
+      ],
+      "provenance": "model_scene_macro_director_batch"
+    },
+    {
+      "id": "macro_office_blue_shadow_panel",
+      "role": "palette_accent_panel",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "macro_blue_shadow",
+      "transform": {
+        "position": [
+          0.78,
+          1.18,
+          1.64
+        ],
+        "scale": [
+          0.58,
+          0.34,
+          0.022
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "support": "home_office_evening_back_wall",
+      "editable": true,
+      "semantic_tags": [
+        "macro_director_batch",
+        "macro_color_script"
+      ],
+      "provenance": "model_scene_macro_director_batch"
+    },
+    {
+      "id": "macro_office_foreground_side_silhouette",
+      "role": "foreground_frame",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "dark_wood",
+      "transform": {
+        "position": [
+          -1.92,
+          0.72,
+          -1.22
+        ],
+        "scale": [
+          0.08,
+          1.25,
+          0.08
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "support": "home_office_evening_floor",
+      "editable": true,
+      "semantic_tags": [
+        "macro_director_batch",
+        "foreground_layer"
+      ],
+      "provenance": "model_scene_macro_director_batch"
+    },
+    {
+      "id": "macro_office_lamp_glow_patch",
+      "role": "palette_accent_panel",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "macro_lamp_gold",
+      "transform": {
+        "position": [
+          -0.92,
+          1.0,
+          1.638
+        ],
+        "scale": [
+          0.34,
+          0.22,
+          0.018
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "support": "home_office_evening_back_wall",
+      "editable": true,
+      "semantic_tags": [
+        "macro_director_batch",
+        "local_light_color_script"
+      ],
+      "provenance": "model_scene_macro_director_batch"
+    }
+  ],
+  "semantic_scene_graph": {
+    "schema_version": 1,
+    "family": "home_office_evening",
+    "nodes": [
+      {
+        "id": "home_office_evening_room_shell",
+        "kind": "enclosure",
+        "semantic_tags": [
+          "room_shell",
+          "enclosed_space"
+        ],
+        "provenance": "scene_authoring_intelligence_v1",
+        "style_intent": "enclosed small office with back wall, side wall, floor, ceiling, shelves, and no external office IBL panorama"
+      },
+      {
+        "id": "home_office_evening_floor",
+        "kind": "support",
+        "semantic_tags": [
+          "room_floor",
+          "world_floor"
+        ],
+        "provenance": "scene_authoring_intelligence_v1"
+      },
+      {
+        "id": "home_office_evening_walls",
+        "kind": "boundary_group",
+        "semantic_tags": [
+          "room_wall",
+          "side_walls",
+          "back_wall"
+        ],
+        "provenance": "scene_authoring_intelligence_v1"
+      },
+      {
+        "id": "home_office_evening_ceiling",
+        "kind": "boundary",
+        "semantic_tags": [
+          "room_ceiling"
+        ],
+        "provenance": "scene_authoring_intelligence_v1"
+      },
+      {
+        "id": "home_office_evening_desk_work_zone",
+        "kind": "zone",
+        "semantic_tags": [
+          "construction_slot",
+          "desk_work_zone"
+        ],
+        "support": "home_office_evening_floor",
+        "provenance": "scene_authoring_intelligence_v1"
+      },
+      {
+        "id": "home_office_evening_bookcase_wall",
+        "kind": "zone",
+        "semantic_tags": [
+          "construction_slot",
+          "bookcase_wall"
+        ],
+        "support": "home_office_evening_floor",
+        "provenance": "scene_authoring_intelligence_v1"
+      },
+      {
+        "id": "home_office_evening_cork_board_wall",
+        "kind": "zone",
+        "semantic_tags": [
+          "construction_slot",
+          "cork_board_wall"
+        ],
+        "support": "home_office_evening_floor",
+        "provenance": "scene_authoring_intelligence_v1"
+      },
+      {
+        "id": "home_office_evening_floor_storage",
+        "kind": "zone",
+        "semantic_tags": [
+          "construction_slot",
+          "floor_storage"
+        ],
+        "support": "home_office_evening_floor",
+        "provenance": "scene_authoring_intelligence_v1"
+      },
+      {
+        "id": "home_office_evening_chair_clearance",
+        "kind": "zone",
+        "semantic_tags": [
+          "construction_slot",
+          "chair_clearance"
+        ],
+        "support": "home_office_evening_floor",
+        "provenance": "scene_authoring_intelligence_v1"
+      },
+      {
+        "id": "office_desk",
+        "kind": "macro_slot",
+        "semantic_tags": [
+          "construction_slot",
+          "desk",
+          "desk_mesh"
+        ],
+        "required": true,
+        "min_occupants": 1,
+        "assembly_id": "office_workstation",
+        "camera_relevant_views": [
+          "hero",
+          "desk_focus"
+        ],
+        "provenance": "family_grammar"
+      },
+      {
+        "id": "office_task_chair",
+        "kind": "macro_slot",
+        "semantic_tags": [
+          "construction_slot",
+          "chair",
+          "chair_mesh"
+        ],
+        "required": true,
+        "min_occupants": 1,
+        "assembly_id": "office_workstation",
+        "camera_relevant_views": [
+          "hero",
+          "desk_focus"
+        ],
+        "provenance": "family_grammar"
+      },
+      {
+        "id": "office_bookcase",
+        "kind": "macro_slot",
+        "semantic_tags": [
+          "construction_slot",
+          "shelf",
+          "bookcase"
+        ],
+        "required": true,
+        "min_occupants": 1,
+        "assembly_id": "office_storage",
+        "camera_relevant_views": [
+          "bookcase_context",
+          "high_layout_check"
+        ],
+        "provenance": "family_grammar"
+      },
+      {
+        "id": "home_office_evening_desk",
+        "kind": "object_role",
+        "role": "desk",
+        "primitive_hint": "desk",
+        "support_role": "support_surface",
+        "semantic_tags": [
+          "desk",
+          "desk"
+        ],
+        "scale_bounds": {
+          "source": "primitive_catalog_or_family_default"
+        },
+        "provenance": "scene_authoring_intelligence_v1"
+      },
+      {
+        "id": "home_office_evening_office_chair",
+        "kind": "object_role",
+        "role": "office_chair",
+        "primitive_hint": "office_chair",
+        "support_role": "seating",
+        "semantic_tags": [
+          "office_chair",
+          "office_chair"
+        ],
+        "scale_bounds": {
+          "source": "primitive_catalog_or_family_default"
+        },
+        "provenance": "scene_authoring_intelligence_v1"
+      },
+      {
+        "id": "home_office_evening_monitor",
+        "kind": "object_role",
+        "role": "monitor",
+        "primitive_hint": "monitor",
+        "support_role": "small_appliance",
+        "semantic_tags": [
+          "monitor",
+          "monitor"
+        ],
+        "scale_bounds": {
+          "source": "primitive_catalog_or_family_default"
+        },
+        "provenance": "scene_authoring_intelligence_v1"
+      },
+      {
+        "id": "home_office_evening_keyboard",
+        "kind": "object_role",
+        "role": "keyboard",
+        "primitive_hint": "keyboard_key_cluster",
+        "support_role": "surface_detail",
+        "semantic_tags": [
+          "keyboard",
+          "keyboard_key_cluster"
+        ],
+        "scale_bounds": {
+          "source": "primitive_catalog_or_family_default"
+        },
+        "provenance": "scene_authoring_intelligence_v1"
+      },
+      {
+        "id": "home_office_evening_lamp",
+        "kind": "object_role",
+        "role": "lamp",
+        "primitive_hint": "lamp",
+        "support_role": "unknown",
+        "semantic_tags": [
+          "lamp",
+          "lamp"
+        ],
+        "scale_bounds": {
+          "source": "primitive_catalog_or_family_default"
+        },
+        "provenance": "scene_authoring_intelligence_v1"
+      },
+      {
+        "id": "home_office_evening_bookcase",
+        "kind": "object_role",
+        "role": "bookcase",
+        "primitive_hint": "bookcase",
+        "support_role": "unknown",
+        "semantic_tags": [
+          "bookcase",
+          "bookcase"
+        ],
+        "scale_bounds": {
+          "source": "primitive_catalog_or_family_default"
+        },
+        "provenance": "scene_authoring_intelligence_v1"
+      },
+      {
+        "id": "home_office_evening_books",
+        "kind": "object_role",
+        "role": "books",
+        "primitive_hint": "bookshelf",
+        "support_role": "standing_storage",
+        "semantic_tags": [
+          "books",
+          "bookshelf"
+        ],
+        "scale_bounds": {
+          "source": "primitive_catalog_or_family_default"
+        },
+        "provenance": "scene_authoring_intelligence_v1"
+      },
+      {
+        "id": "home_office_evening_paper_stack",
+        "kind": "object_role",
+        "role": "paper_stack",
+        "primitive_hint": "paper_stack",
+        "support_role": "unknown",
+        "semantic_tags": [
+          "paper_stack",
+          "paper_stack"
+        ],
+        "scale_bounds": {
+          "source": "primitive_catalog_or_family_default"
+        },
+        "provenance": "scene_authoring_intelligence_v1"
+      },
+      {
+        "id": "home_office_evening_plant",
+        "kind": "object_role",
+        "role": "plant",
+        "primitive_hint": "plant_pot",
+        "support_role": "small_prop",
+        "semantic_tags": [
+          "plant",
+          "plant_pot"
+        ],
+        "scale_bounds": {
+          "source": "primitive_catalog_or_family_default"
+        },
+        "provenance": "scene_authoring_intelligence_v1"
+      }
+    ],
+    "edges": [
+      {
+        "type": "enclosure_membership",
+        "parent": "home_office_evening_room_shell",
+        "child": "home_office_evening_floor",
+        "required": true
+      },
+      {
+        "type": "enclosure_membership",
+        "parent": "home_office_evening_room_shell",
+        "child": "home_office_evening_walls",
+        "required": true
+      },
+      {
+        "type": "enclosure_membership",
+        "parent": "home_office_evening_room_shell",
+        "child": "home_office_evening_ceiling",
+        "required": true
+      },
+      {
+        "type": "construction_slot",
+        "parent": "home_office_evening_room_shell",
+        "child": "home_office_evening_desk_work_zone",
+        "required": true
+      },
+      {
+        "type": "construction_slot",
+        "parent": "home_office_evening_room_shell",
+        "child": "home_office_evening_bookcase_wall",
+        "required": true
+      },
+      {
+        "type": "construction_slot",
+        "parent": "home_office_evening_room_shell",
+        "child": "home_office_evening_cork_board_wall",
+        "required": true
+      },
+      {
+        "type": "construction_slot",
+        "parent": "home_office_evening_room_shell",
+        "child": "home_office_evening_floor_storage",
+        "required": true
+      },
+      {
+        "type": "construction_slot",
+        "parent": "home_office_evening_room_shell",
+        "child": "home_office_evening_chair_clearance",
+        "required": true
+      },
+      {
+        "type": "construction_slot",
+        "parent": "home_office_evening_room_shell",
+        "child": "office_desk",
+        "required": true
+      },
+      {
+        "type": "construction_slot",
+        "parent": "home_office_evening_room_shell",
+        "child": "office_task_chair",
+        "required": true
+      },
+      {
+        "type": "construction_slot",
+        "parent": "home_office_evening_room_shell",
+        "child": "office_bookcase",
+        "required": true
+      },
+      {
+        "type": "enclosure_membership",
+        "parent": "home_office_evening_room_shell",
+        "child": "home_office_evening_desk",
+        "required": true
+      },
+      {
+        "type": "support_contact",
+        "parent": "home_office_evening_floor",
+        "child": "home_office_evening_desk",
+        "required": true
+      },
+      {
+        "type": "enclosure_membership",
+        "parent": "home_office_evening_room_shell",
+        "child": "home_office_evening_office_chair",
+        "required": true
+      },
+      {
+        "type": "support_contact",
+        "parent": "home_office_evening_floor",
+        "child": "home_office_evening_office_chair",
+        "required": true
+      },
+      {
+        "type": "enclosure_membership",
+        "parent": "home_office_evening_room_shell",
+        "child": "home_office_evening_monitor",
+        "required": true
+      },
+      {
+        "type": "enclosure_membership",
+        "parent": "home_office_evening_room_shell",
+        "child": "home_office_evening_keyboard",
+        "required": true
+      },
+      {
+        "type": "enclosure_membership",
+        "parent": "home_office_evening_room_shell",
+        "child": "home_office_evening_lamp",
+        "required": true
+      },
+      {
+        "type": "enclosure_membership",
+        "parent": "home_office_evening_room_shell",
+        "child": "home_office_evening_bookcase",
+        "required": true
+      },
+      {
+        "type": "enclosure_membership",
+        "parent": "home_office_evening_room_shell",
+        "child": "home_office_evening_books",
+        "required": true
+      },
+      {
+        "type": "support_contact",
+        "parent": "home_office_evening_floor",
+        "child": "home_office_evening_books",
+        "required": true
+      },
+      {
+        "type": "enclosure_membership",
+        "parent": "home_office_evening_room_shell",
+        "child": "home_office_evening_paper_stack",
+        "required": true
+      },
+      {
+        "type": "enclosure_membership",
+        "parent": "home_office_evening_room_shell",
+        "child": "home_office_evening_plant",
+        "required": false
+      }
+    ],
+    "required_relation_checks": [
+      "enclosure_membership",
+      "construction_slot",
+      "support_contact",
+      "exclusive_layout_slot",
+      "functional_pair",
+      "part_to_whole_assembly",
+      "clearance_and_affordance",
+      "scale_prior",
+      "visibility_budget",
+      "material_intent_cluster"
+    ],
+    "forbidden": [
+      "direct_live_scene_mutation_by_model",
+      "single_fused_uneditable_scene_mesh",
+      "visible_unrelated_ibl_background_for_enclosed_scene",
+      "promotion_without_engine_validation"
+    ]
+  },
+  "completion_claim_allowed": false,
+  "human_review_required": true,
+  "scene_construction_plan": {
+    "schema": "cortex.scene_family_constructor_plan.v1",
+    "planner": "tools/model_scene_semantic_plan_constructor.py",
+    "scene_family": "home_office_evening",
+    "purpose": "Constrain V1 brief-generated scenes through slots and assemblies before render polish.",
+    "recipe_families": [
+      "scene_authoring_intelligence_v1",
+      "enclosed_room",
+      "home_office_evening"
+    ],
+    "required_roles": [
+      "baseboard",
+      "book",
+      "cable_run",
+      "chair",
+      "desk",
+      "desk_prop",
+      "desk_support_surface",
+      "floor_mat",
+      "floor_topology_line",
+      "keyboard",
+      "keyboard_key_cluster",
+      "monitor",
+      "monitor_stand",
+      "mouse",
+      "office_framed_display_mesh",
+      "office_wall_fixture_mesh",
+      "office_wall_system_mesh",
+      "palette_accent_panel",
+      "plant",
+      "plant_pot",
+      "room_ceiling",
+      "room_floor",
+      "room_wall",
+      "room_wall_panel",
+      "screen_ui_detail",
+      "shelf",
+      "shelf_surface",
+      "task_lamp",
+      "wall_topology_line",
+      "window",
+      "window_blind"
+    ],
+    "required_assemblies": [
+      {
+        "id": "office_workstation",
+        "required_roles": [],
+        "required_terms": [],
+        "reason": "Imported from Scene Authoring Intelligence V1 family grammar."
+      },
+      {
+        "id": "office_workstation",
+        "required_roles": [],
+        "required_terms": [],
+        "reason": "Imported from Scene Authoring Intelligence V1 family grammar."
+      },
+      {
+        "id": "office_storage",
+        "required_roles": [],
+        "required_terms": [],
+        "reason": "Imported from Scene Authoring Intelligence V1 family grammar."
+      }
+    ],
+    "support_surfaces": [
+      {
+        "id": "home_office_evening_floor",
+        "role": "room_floor",
+        "bounds": {
+          "min": [
+            -2.1,
+            0.0,
+            -1.7
+          ],
+          "max": [
+            2.1,
+            0.07,
+            1.7
+          ],
+          "center": [
+            0.0,
+            0.035,
+            0.0
+          ],
+          "extent": [
+            4.2,
+            0.07,
+            3.4
+          ]
+        },
+        "supports_slots": true
+      },
+      {
+        "id": "office_bookcase",
+        "role": "shelf",
+        "bounds": {
+          "min": [
+            0.94,
+            -0.39,
+            0.64
+          ],
+          "max": [
+            1.76,
+            0.53,
+            1.46
+          ],
+          "center": [
+            1.35,
+            0.07,
+            1.05
+          ],
+          "extent": [
+            0.82,
+            0.92,
+            0.82
+          ]
+        },
+        "supports_slots": true
+      },
+      {
+        "id": "office_book_shelf_upper",
+        "role": "shelf_surface",
+        "bounds": {
+          "min": [
+            1.06,
+            1.008,
+            0.79
+          ],
+          "max": [
+            1.64,
+            1.032,
+            1.01
+          ],
+          "center": [
+            1.35,
+            1.02,
+            0.9
+          ],
+          "extent": [
+            0.58,
+            0.024,
+            0.22
+          ]
+        },
+        "supports_slots": true
+      },
+      {
+        "id": "office_book_shelf_lower",
+        "role": "shelf_surface",
+        "bounds": {
+          "min": [
+            1.06,
+            0.668,
+            0.79
+          ],
+          "max": [
+            1.64,
+            0.692,
+            1.01
+          ],
+          "center": [
+            1.35,
+            0.68,
+            0.9
+          ],
+          "extent": [
+            0.58,
+            0.024,
+            0.22
+          ]
+        },
+        "supports_slots": true
+      },
+      {
+        "id": "office_floor_rug_mesh",
+        "role": "floor_mat",
+        "bounds": {
+          "min": [
+            -0.95,
+            -0.425,
+            -0.865
+          ],
+          "max": [
+            0.25,
+            0.575,
+            0.185
+          ],
+          "center": [
+            -0.35,
+            0.075,
+            -0.34
+          ],
+          "extent": [
+            1.2,
+            1.0,
+            1.05
+          ]
+        },
+        "supports_slots": true
+      },
+      {
+        "id": "office_floor_thread_0",
+        "role": "floor_topology_line",
+        "bounds": {
+          "min": [
+            -1.725,
+            0.099,
+            -1.189
+          ],
+          "max": [
+            1.125,
+            0.125,
+            -1.171
+          ],
+          "center": [
+            -0.3,
+            0.112,
+            -1.18
+          ],
+          "extent": [
+            2.85,
+            0.026,
+            0.018
+          ]
+        },
+        "supports_slots": true
+      },
+      {
+        "id": "office_floor_thread_1",
+        "role": "floor_topology_line",
+        "bounds": {
+          "min": [
+            -1.725,
+            0.099,
+            -0.949
+          ],
+          "max": [
+            1.125,
+            0.125,
+            -0.931
+          ],
+          "center": [
+            -0.3,
+            0.112,
+            -0.94
+          ],
+          "extent": [
+            2.85,
+            0.026,
+            0.018
+          ]
+        },
+        "supports_slots": true
+      },
+      {
+        "id": "office_floor_thread_2",
+        "role": "floor_topology_line",
+        "bounds": {
+          "min": [
+            -1.725,
+            0.099,
+            -0.709
+          ],
+          "max": [
+            1.125,
+            0.125,
+            -0.691
+          ],
+          "center": [
+            -0.3,
+            0.112,
+            -0.7
+          ],
+          "extent": [
+            2.85,
+            0.026,
+            0.018
+          ]
+        },
+        "supports_slots": true
+      },
+      {
+        "id": "office_floor_thread_3",
+        "role": "floor_topology_line",
+        "bounds": {
+          "min": [
+            -1.725,
+            0.099,
+            -0.469
+          ],
+          "max": [
+            1.125,
+            0.125,
+            -0.451
+          ],
+          "center": [
+            -0.3,
+            0.112,
+            -0.46
+          ],
+          "extent": [
+            2.85,
+            0.026,
+            0.018
+          ]
+        },
+        "supports_slots": true
+      },
+      {
+        "id": "office_floor_thread_4",
+        "role": "floor_topology_line",
+        "bounds": {
+          "min": [
+            -1.725,
+            0.099,
+            -0.229
+          ],
+          "max": [
+            1.125,
+            0.125,
+            -0.211
+          ],
+          "center": [
+            -0.3,
+            0.112,
+            -0.22
+          ],
+          "extent": [
+            2.85,
+            0.026,
+            0.018
+          ]
+        },
+        "supports_slots": true
+      },
+      {
+        "id": "office_floor_thread_5",
+        "role": "floor_topology_line",
+        "bounds": {
+          "min": [
+            -1.725,
+            0.099,
+            0.011
+          ],
+          "max": [
+            1.125,
+            0.125,
+            0.029
+          ],
+          "center": [
+            -0.3,
+            0.112,
+            0.02
+          ],
+          "extent": [
+            2.85,
+            0.026,
+            0.018
+          ]
+        },
+        "supports_slots": true
+      },
+      {
+        "id": "office_floor_thread_6",
+        "role": "floor_topology_line",
+        "bounds": {
+          "min": [
+            -1.725,
+            0.099,
+            0.251
+          ],
+          "max": [
+            1.125,
+            0.125,
+            0.269
+          ],
+          "center": [
+            -0.3,
+            0.112,
+            0.26
+          ],
+          "extent": [
+            2.85,
+            0.026,
+            0.018
+          ]
+        },
+        "supports_slots": true
+      },
+      {
+        "id": "office_floor_thread_7",
+        "role": "floor_topology_line",
+        "bounds": {
+          "min": [
+            -1.725,
+            0.099,
+            0.491
+          ],
+          "max": [
+            1.125,
+            0.125,
+            0.509
+          ],
+          "center": [
+            -0.3,
+            0.112,
+            0.5
+          ],
+          "extent": [
+            2.85,
+            0.026,
+            0.018
+          ]
+        },
+        "supports_slots": true
+      },
+      {
+        "id": "office_floor_cross_thread_0",
+        "role": "floor_topology_line",
+        "bounds": {
+          "min": [
+            -1.229,
+            0.102,
+            -1.1
+          ],
+          "max": [
+            -1.211,
+            0.128,
+            0.42
+          ],
+          "center": [
+            -1.22,
+            0.115,
+            -0.34
+          ],
+          "extent": [
+            0.018,
+            0.026,
+            1.52
+          ]
+        },
+        "supports_slots": true
+      },
+      {
+        "id": "office_floor_cross_thread_1",
+        "role": "floor_topology_line",
+        "bounds": {
+          "min": [
+            -0.869,
+            0.102,
+            -1.1
+          ],
+          "max": [
+            -0.851,
+            0.128,
+            0.42
+          ],
+          "center": [
+            -0.86,
+            0.115,
+            -0.34
+          ],
+          "extent": [
+            0.018,
+            0.026,
+            1.52
+          ]
+        },
+        "supports_slots": true
+      },
+      {
+        "id": "office_floor_cross_thread_2",
+        "role": "floor_topology_line",
+        "bounds": {
+          "min": [
+            -0.509,
+            0.102,
+            -1.1
+          ],
+          "max": [
+            -0.491,
+            0.128,
+            0.42
+          ],
+          "center": [
+            -0.5,
+            0.115,
+            -0.34
+          ],
+          "extent": [
+            0.018,
+            0.026,
+            1.52
+          ]
+        },
+        "supports_slots": true
+      },
+      {
+        "id": "office_floor_cross_thread_3",
+        "role": "floor_topology_line",
+        "bounds": {
+          "min": [
+            -0.149,
+            0.102,
+            -1.1
+          ],
+          "max": [
+            -0.131,
+            0.128,
+            0.42
+          ],
+          "center": [
+            -0.14,
+            0.115,
+            -0.34
+          ],
+          "extent": [
+            0.018,
+            0.026,
+            1.52
+          ]
+        },
+        "supports_slots": true
+      },
+      {
+        "id": "office_floor_cross_thread_4",
+        "role": "floor_topology_line",
+        "bounds": {
+          "min": [
+            0.211,
+            0.102,
+            -1.1
+          ],
+          "max": [
+            0.229,
+            0.128,
+            0.42
+          ],
+          "center": [
+            0.22,
+            0.115,
+            -0.34
+          ],
+          "extent": [
+            0.018,
+            0.026,
+            1.52
+          ]
+        },
+        "supports_slots": true
+      },
+      {
+        "id": "office_floor_cross_thread_5",
+        "role": "floor_topology_line",
+        "bounds": {
+          "min": [
+            0.571,
+            0.102,
+            -1.1
+          ],
+          "max": [
+            0.589,
+            0.128,
+            0.42
+          ],
+          "center": [
+            0.58,
+            0.115,
+            -0.34
+          ],
+          "extent": [
+            0.018,
+            0.026,
+            1.52
+          ]
+        },
+        "supports_slots": true
+      },
+      {
+        "id": "office_floor_cross_thread_6",
+        "role": "floor_topology_line",
+        "bounds": {
+          "min": [
+            0.931,
+            0.102,
+            -1.1
+          ],
+          "max": [
+            0.949,
+            0.128,
+            0.42
+          ],
+          "center": [
+            0.94,
+            0.115,
+            -0.34
+          ],
+          "extent": [
+            0.018,
+            0.026,
+            1.52
+          ]
+        },
+        "supports_slots": true
+      }
+    ],
+    "placement_slots": [
+      {
+        "id": "slot_office_desk_mesh",
+        "support": "home_office_evening_floor",
+        "support_role": "",
+        "center_xz": [
+          -0.45,
+          0.88
+        ],
+        "half_extent_xz": [
+          0.5336,
+          0.4988
+        ],
+        "allowed_roles": [
+          "desk"
+        ],
+        "max_occupants": 1,
+        "exclusive_group": "semantic_plan_object_slots",
+        "assigned_objects": [
+          "office_desk_mesh"
+        ]
+      },
+      {
+        "id": "slot_office_monitor_stand",
+        "support": "office_desk_surface",
+        "support_role": "",
+        "center_xz": [
+          -0.45,
+          0.93
+        ],
+        "half_extent_xz": [
+          0.29,
+          0.116
+        ],
+        "allowed_roles": [
+          "monitor_stand"
+        ],
+        "max_occupants": 1,
+        "exclusive_group": "semantic_plan_object_slots",
+        "assigned_objects": [
+          "office_monitor_stand"
+        ]
+      },
+      {
+        "id": "slot_office_monitor",
+        "support": "office_monitor_stand",
+        "support_role": "",
+        "center_xz": [
+          -0.45,
+          0.98
+        ],
+        "half_extent_xz": [
+          0.3828,
+          0.08
+        ],
+        "allowed_roles": [
+          "monitor"
+        ],
+        "max_occupants": 1,
+        "exclusive_group": "semantic_plan_object_slots",
+        "assigned_objects": [
+          "office_monitor"
+        ]
+      },
+      {
+        "id": "slot_office_keyboard",
+        "support": "office_desk_surface",
+        "support_role": "",
+        "center_xz": [
+          -0.45,
+          0.56
+        ],
+        "half_extent_xz": [
+          0.319,
+          0.1044
+        ],
+        "allowed_roles": [
+          "keyboard"
+        ],
+        "max_occupants": 1,
+        "exclusive_group": "semantic_plan_object_slots",
+        "assigned_objects": [
+          "office_keyboard"
+        ]
+      },
+      {
+        "id": "slot_office_keyboard_mesh",
+        "support": "office_desk_surface",
+        "support_role": "",
+        "center_xz": [
+          -0.45,
+          0.54
+        ],
+        "half_extent_xz": [
+          0.3364,
+          0.3364
+        ],
+        "allowed_roles": [
+          "keyboard"
+        ],
+        "max_occupants": 1,
+        "exclusive_group": "semantic_plan_object_slots",
+        "assigned_objects": [
+          "office_keyboard_mesh"
+        ]
+      },
+      {
+        "id": "slot_office_bookcase",
+        "support": "home_office_evening_floor",
+        "support_role": "",
+        "center_xz": [
+          1.35,
+          1.05
+        ],
+        "half_extent_xz": [
+          0.4756,
+          0.4756
+        ],
+        "allowed_roles": [
+          "shelf"
+        ],
+        "max_occupants": 1,
+        "exclusive_group": "semantic_plan_object_slots",
+        "assigned_objects": [
+          "office_bookcase"
+        ]
+      },
+      {
+        "id": "slot_office_table_lamp_mesh",
+        "support": "office_desk_surface",
+        "support_role": "",
+        "center_xz": [
+          -0.94,
+          0.72
+        ],
+        "half_extent_xz": [
+          0.3596,
+          0.3596
+        ],
+        "allowed_roles": [
+          "task_lamp"
+        ],
+        "max_occupants": 1,
+        "exclusive_group": "semantic_plan_object_slots",
+        "assigned_objects": [
+          "office_table_lamp_mesh"
+        ]
+      },
+      {
+        "id": "slot_office_plant_mesh",
+        "support": "office_desk_surface",
+        "support_role": "",
+        "center_xz": [
+          0.02,
+          0.78
+        ],
+        "half_extent_xz": [
+          0.3944,
+          0.3944
+        ],
+        "allowed_roles": [
+          "plant"
+        ],
+        "max_occupants": 1,
+        "exclusive_group": "semantic_plan_object_slots",
+        "assigned_objects": [
+          "office_plant_mesh"
+        ]
+      },
+      {
+        "id": "slot_office_plant_pot",
+        "support": "office_desk_surface",
+        "support_role": "",
+        "center_xz": [
+          0.02,
+          0.78
+        ],
+        "half_extent_xz": [
+          0.0928,
+          0.0928
+        ],
+        "allowed_roles": [
+          "plant_pot"
+        ],
+        "max_occupants": 1,
+        "exclusive_group": "semantic_plan_object_slots",
+        "assigned_objects": [
+          "office_plant_pot"
+        ]
+      },
+      {
+        "id": "slot_office_window",
+        "support": "home_office_evening_left_wall",
+        "support_role": "",
+        "center_xz": [
+          -2.06,
+          0.28
+        ],
+        "half_extent_xz": [
+          0.08,
+          0.4176
+        ],
+        "allowed_roles": [
+          "window"
+        ],
+        "max_occupants": 1,
+        "exclusive_group": "semantic_plan_object_slots",
+        "assigned_objects": [
+          "office_window"
+        ]
+      },
+      {
+        "id": "slot_office_window_blind",
+        "support": "office_window",
+        "support_role": "",
+        "center_xz": [
+          -2.02,
+          0.28
+        ],
+        "half_extent_xz": [
+          0.08,
+          0.3712
+        ],
+        "allowed_roles": [
+          "window_blind"
+        ],
+        "max_occupants": 1,
+        "exclusive_group": "semantic_plan_object_slots",
+        "assigned_objects": [
+          "office_window_blind"
+        ]
+      }
+    ],
+    "exclusive_groups": [
+      {
+        "id": "semantic_plan_object_slots",
+        "match_terms": [
+          "appliance",
+          "cabinet",
+          "chair",
+          "desk",
+          "fridge",
+          "oven",
+          "seat",
+          "sofa",
+          "speaker",
+          "table"
+        ],
+        "scope": "same_support",
+        "max_overlap_ratio": 0.2,
+        "max_y_overlap": 0.025
+      }
+    ]
+  },
+  "relation_assertions": [
+    {
+      "type": "enclosure_membership",
+      "object": "home_office_evening_floor",
+      "room": "home_office_evening_room_shell",
+      "required": true
+    },
+    {
+      "type": "enclosure_membership",
+      "object": "home_office_evening_back_wall",
+      "room": "home_office_evening_room_shell",
+      "required": true
+    },
+    {
+      "type": "enclosure_membership",
+      "object": "home_office_evening_left_wall",
+      "room": "home_office_evening_room_shell",
+      "required": true
+    },
+    {
+      "type": "enclosure_membership",
+      "object": "home_office_evening_right_wall",
+      "room": "home_office_evening_room_shell",
+      "required": true
+    },
+    {
+      "type": "enclosure_membership",
+      "object": "home_office_evening_ceiling",
+      "room": "home_office_evening_room_shell",
+      "required": true
+    },
+    {
+      "type": "enclosure_membership",
+      "object": "office_desk",
+      "room": "home_office_evening_room_shell",
+      "required": true
+    },
+    {
+      "type": "support_contact",
+      "object": "office_desk",
+      "support": "home_office_evening_floor",
+      "required": true
+    },
+    {
+      "type": "enclosure_membership",
+      "object": "office_desk_mesh",
+      "room": "home_office_evening_room_shell",
+      "required": true
+    },
+    {
+      "type": "support_contact",
+      "object": "office_desk_mesh",
+      "support": "home_office_evening_floor",
+      "required": true
+    },
+    {
+      "type": "enclosure_membership",
+      "object": "office_desk_surface",
+      "room": "home_office_evening_room_shell",
+      "required": true
+    },
+    {
+      "type": "support_contact",
+      "object": "office_desk_surface",
+      "support": "office_desk_mesh",
+      "required": true
+    },
+    {
+      "type": "enclosure_membership",
+      "object": "office_monitor_stand",
+      "room": "home_office_evening_room_shell",
+      "required": true
+    },
+    {
+      "type": "support_contact",
+      "object": "office_monitor_stand",
+      "support": "office_desk_surface",
+      "required": true
+    },
+    {
+      "type": "enclosure_membership",
+      "object": "office_monitor",
+      "room": "home_office_evening_room_shell",
+      "required": true
+    },
+    {
+      "type": "face_attachment",
+      "object": "office_monitor",
+      "support": "office_monitor_stand",
+      "required": true
+    },
+    {
+      "type": "enclosure_membership",
+      "object": "office_screen",
+      "room": "home_office_evening_room_shell",
+      "required": true
+    },
+    {
+      "type": "face_attachment",
+      "object": "office_screen",
+      "support": "office_monitor",
+      "required": true
+    },
+    {
+      "type": "enclosure_membership",
+      "object": "office_keyboard",
+      "room": "home_office_evening_room_shell",
+      "required": true
+    },
+    {
+      "type": "support_contact",
+      "object": "office_keyboard",
+      "support": "office_desk_surface",
+      "required": true
+    },
+    {
+      "type": "enclosure_membership",
+      "object": "office_keyboard_mesh",
+      "room": "home_office_evening_room_shell",
+      "required": true
+    },
+    {
+      "type": "support_contact",
+      "object": "office_keyboard_mesh",
+      "support": "office_desk_surface",
+      "required": true
+    },
+    {
+      "type": "enclosure_membership",
+      "object": "office_keyboard_key_cluster",
+      "room": "home_office_evening_room_shell",
+      "required": true
+    },
+    {
+      "type": "enclosure_membership",
+      "object": "office_mouse",
+      "room": "home_office_evening_room_shell",
+      "required": true
+    },
+    {
+      "type": "support_contact",
+      "object": "office_mouse",
+      "support": "office_desk_surface",
+      "required": true
+    },
+    {
+      "type": "enclosure_membership",
+      "object": "office_mouse_mesh",
+      "room": "home_office_evening_room_shell",
+      "required": true
+    },
+    {
+      "type": "support_contact",
+      "object": "office_mouse_mesh",
+      "support": "office_desk_surface",
+      "required": true
+    },
+    {
+      "type": "enclosure_membership",
+      "object": "office_cable_run",
+      "room": "home_office_evening_room_shell",
+      "required": true
+    },
+    {
+      "type": "support_contact",
+      "object": "office_cable_run",
+      "support": "office_desk_surface",
+      "required": true
+    },
+    {
+      "type": "enclosure_membership",
+      "object": "office_task_chair",
+      "room": "home_office_evening_room_shell",
+      "required": true
+    },
+    {
+      "type": "support_contact",
+      "object": "office_task_chair",
+      "support": "home_office_evening_floor",
+      "required": true
+    },
+    {
+      "type": "enclosure_membership",
+      "object": "office_bookcase",
+      "room": "home_office_evening_room_shell",
+      "required": true
+    },
+    {
+      "type": "support_contact",
+      "object": "office_bookcase",
+      "support": "home_office_evening_floor",
+      "required": true
+    },
+    {
+      "type": "enclosure_membership",
+      "object": "office_book_shelf_upper",
+      "room": "home_office_evening_room_shell",
+      "required": true
+    },
+    {
+      "type": "support_contact",
+      "object": "office_book_shelf_upper",
+      "support": "office_bookcase",
+      "required": true
+    },
+    {
+      "type": "enclosure_membership",
+      "object": "office_book_shelf_lower",
+      "room": "home_office_evening_room_shell",
+      "required": true
+    },
+    {
+      "type": "support_contact",
+      "object": "office_book_shelf_lower",
+      "support": "office_bookcase",
+      "required": true
+    },
+    {
+      "type": "enclosure_membership",
+      "object": "office_books_mesh",
+      "room": "home_office_evening_room_shell",
+      "required": true
+    },
+    {
+      "type": "support_contact",
+      "object": "office_books_mesh",
+      "support": "office_book_shelf_upper",
+      "required": true
+    },
+    {
+      "type": "enclosure_membership",
+      "object": "office_table_lamp_mesh",
+      "room": "home_office_evening_room_shell",
+      "required": true
+    },
+    {
+      "type": "support_contact",
+      "object": "office_table_lamp_mesh",
+      "support": "office_desk_surface",
+      "required": true
+    },
+    {
+      "type": "enclosure_membership",
+      "object": "office_plant_mesh",
+      "room": "home_office_evening_room_shell",
+      "required": true
+    },
+    {
+      "type": "support_contact",
+      "object": "office_plant_mesh",
+      "support": "office_desk_surface",
+      "required": true
+    },
+    {
+      "type": "enclosure_membership",
+      "object": "office_plant_pot",
+      "room": "home_office_evening_room_shell",
+      "required": true
+    },
+    {
+      "type": "support_contact",
+      "object": "office_plant_pot",
+      "support": "office_desk_surface",
+      "required": true
+    },
+    {
+      "type": "enclosure_membership",
+      "object": "office_floor_rug_mesh",
+      "room": "home_office_evening_room_shell",
+      "required": true
+    },
+    {
+      "type": "support_contact",
+      "object": "office_floor_rug_mesh",
+      "support": "home_office_evening_floor",
+      "required": true
+    },
+    {
+      "type": "enclosure_membership",
+      "object": "office_cork_board",
+      "room": "home_office_evening_room_shell",
+      "required": true
+    },
+    {
+      "type": "face_attachment",
+      "object": "office_cork_board",
+      "support": "home_office_evening_back_wall",
+      "required": true
+    },
+    {
+      "type": "enclosure_membership",
+      "object": "office_framed_display_mesh",
+      "room": "home_office_evening_room_shell",
+      "required": true
+    },
+    {
+      "type": "face_attachment",
+      "object": "office_framed_display_mesh",
+      "support": "home_office_evening_back_wall",
+      "required": true
+    },
+    {
+      "type": "enclosure_membership",
+      "object": "office_wall_fixture_mesh",
+      "room": "home_office_evening_room_shell",
+      "required": true
+    },
+    {
+      "type": "face_attachment",
+      "object": "office_wall_fixture_mesh",
+      "support": "home_office_evening_back_wall",
+      "required": true
+    },
+    {
+      "type": "enclosure_membership",
+      "object": "office_window",
+      "room": "home_office_evening_room_shell",
+      "required": true
+    },
+    {
+      "type": "face_attachment",
+      "object": "office_window",
+      "support": "home_office_evening_left_wall",
+      "required": true
+    },
+    {
+      "type": "enclosure_membership",
+      "object": "office_window_blind",
+      "room": "home_office_evening_room_shell",
+      "required": true
+    },
+    {
+      "type": "face_attachment",
+      "object": "office_window_blind",
+      "support": "office_window",
+      "required": true
+    },
+    {
+      "type": "enclosure_membership",
+      "object": "office_baseboard_back",
+      "room": "home_office_evening_room_shell",
+      "required": true
+    },
+    {
+      "type": "face_attachment",
+      "object": "office_baseboard_back",
+      "support": "home_office_evening_back_wall",
+      "required": true
+    },
+    {
+      "type": "enclosure_membership",
+      "object": "office_baseboard_left",
+      "room": "home_office_evening_room_shell",
+      "required": true
+    },
+    {
+      "type": "face_attachment",
+      "object": "office_baseboard_left",
+      "support": "home_office_evening_left_wall",
+      "required": true
+    },
+    {
+      "type": "enclosure_membership",
+      "object": "office_screen_ui_line_0",
+      "room": "home_office_evening_room_shell",
+      "required": true
+    },
+    {
+      "type": "enclosure_membership",
+      "object": "office_screen_ui_line_1",
+      "room": "home_office_evening_room_shell",
+      "required": true
+    },
+    {
+      "type": "enclosure_membership",
+      "object": "office_floor_accent_panel",
+      "room": "home_office_evening_room_shell",
+      "required": true
+    },
+    {
+      "type": "support_contact",
+      "object": "office_floor_accent_panel",
+      "support": "home_office_evening_floor",
+      "required": true
+    },
+    {
+      "type": "enclosure_membership",
+      "object": "office_second_framed_display_mesh",
+      "room": "home_office_evening_room_shell",
+      "required": true
+    },
+    {
+      "type": "face_attachment",
+      "object": "office_second_framed_display_mesh",
+      "support": "home_office_evening_back_wall",
+      "required": true
+    },
+    {
+      "type": "enclosure_membership",
+      "object": "office_wall_system_mesh",
+      "room": "home_office_evening_room_shell",
+      "required": true
+    },
+    {
+      "type": "face_attachment",
+      "object": "office_wall_system_mesh",
+      "support": "home_office_evening_back_wall",
+      "required": true
+    },
+    {
+      "type": "enclosure_membership",
+      "object": "office_left_wall_fixture_mesh",
+      "room": "home_office_evening_room_shell",
+      "required": true
+    },
+    {
+      "type": "face_attachment",
+      "object": "office_left_wall_fixture_mesh",
+      "support": "home_office_evening_back_wall",
+      "required": true
+    },
+    {
+      "type": "enclosure_membership",
+      "object": "office_floor_accent_panel_warm",
+      "room": "home_office_evening_room_shell",
+      "required": true
+    },
+    {
+      "type": "support_contact",
+      "object": "office_floor_accent_panel_warm",
+      "support": "home_office_evening_floor",
+      "required": true
+    },
+    {
+      "type": "enclosure_membership",
+      "object": "office_book_0",
+      "room": "home_office_evening_room_shell",
+      "required": true
+    },
+    {
+      "type": "support_contact",
+      "object": "office_book_0",
+      "support": "office_book_shelf_upper",
+      "required": true
+    },
+    {
+      "type": "enclosure_membership",
+      "object": "office_book_1",
+      "room": "home_office_evening_room_shell",
+      "required": true
+    },
+    {
+      "type": "support_contact",
+      "object": "office_book_1",
+      "support": "office_book_shelf_upper",
+      "required": true
+    },
+    {
+      "type": "enclosure_membership",
+      "object": "office_book_2",
+      "room": "home_office_evening_room_shell",
+      "required": true
+    },
+    {
+      "type": "support_contact",
+      "object": "office_book_2",
+      "support": "office_book_shelf_upper",
+      "required": true
+    },
+    {
+      "type": "enclosure_membership",
+      "object": "office_screen_ui_trace_0",
+      "room": "home_office_evening_room_shell",
+      "required": true
+    },
+    {
+      "type": "enclosure_membership",
+      "object": "office_screen_ui_trace_1",
+      "room": "home_office_evening_room_shell",
+      "required": true
+    },
+    {
+      "type": "enclosure_membership",
+      "object": "office_screen_ui_trace_2",
+      "room": "home_office_evening_room_shell",
+      "required": true
+    },
+    {
+      "type": "enclosure_membership",
+      "object": "office_screen_ui_trace_3",
+      "room": "home_office_evening_room_shell",
+      "required": true
+    },
+    {
+      "type": "enclosure_membership",
+      "object": "office_back_wall_slat_0",
+      "room": "home_office_evening_room_shell",
+      "required": true
+    },
+    {
+      "type": "face_attachment",
+      "object": "office_back_wall_slat_0",
+      "support": "home_office_evening_back_wall",
+      "required": true
+    },
+    {
+      "type": "enclosure_membership",
+      "object": "office_back_wall_slat_1",
+      "room": "home_office_evening_room_shell",
+      "required": true
+    },
+    {
+      "type": "face_attachment",
+      "object": "office_back_wall_slat_1",
+      "support": "home_office_evening_back_wall",
+      "required": true
+    },
+    {
+      "type": "enclosure_membership",
+      "object": "office_back_wall_slat_2",
+      "room": "home_office_evening_room_shell",
+      "required": true
+    },
+    {
+      "type": "face_attachment",
+      "object": "office_back_wall_slat_2",
+      "support": "home_office_evening_back_wall",
+      "required": true
+    },
+    {
+      "type": "enclosure_membership",
+      "object": "office_back_wall_slat_3",
+      "room": "home_office_evening_room_shell",
+      "required": true
+    },
+    {
+      "type": "face_attachment",
+      "object": "office_back_wall_slat_3",
+      "support": "home_office_evening_back_wall",
+      "required": true
+    },
+    {
+      "type": "enclosure_membership",
+      "object": "office_back_wall_slat_4",
+      "room": "home_office_evening_room_shell",
+      "required": true
+    },
+    {
+      "type": "face_attachment",
+      "object": "office_back_wall_slat_4",
+      "support": "home_office_evening_back_wall",
+      "required": true
+    },
+    {
+      "type": "enclosure_membership",
+      "object": "office_back_wall_slat_5",
+      "room": "home_office_evening_room_shell",
+      "required": true
+    },
+    {
+      "type": "face_attachment",
+      "object": "office_back_wall_slat_5",
+      "support": "home_office_evening_back_wall",
+      "required": true
+    },
+    {
+      "type": "enclosure_membership",
+      "object": "office_back_wall_slat_6",
+      "room": "home_office_evening_room_shell",
+      "required": true
+    },
+    {
+      "type": "face_attachment",
+      "object": "office_back_wall_slat_6",
+      "support": "home_office_evening_back_wall",
+      "required": true
+    },
+    {
+      "type": "enclosure_membership",
+      "object": "office_back_wall_slat_7",
+      "room": "home_office_evening_room_shell",
+      "required": true
+    },
+    {
+      "type": "face_attachment",
+      "object": "office_back_wall_slat_7",
+      "support": "home_office_evening_back_wall",
+      "required": true
+    },
+    {
+      "type": "enclosure_membership",
+      "object": "office_back_wall_slat_8",
+      "room": "home_office_evening_room_shell",
+      "required": true
+    },
+    {
+      "type": "face_attachment",
+      "object": "office_back_wall_slat_8",
+      "support": "home_office_evening_back_wall",
+      "required": true
+    },
+    {
+      "type": "enclosure_membership",
+      "object": "office_back_wall_slat_9",
+      "room": "home_office_evening_room_shell",
+      "required": true
+    },
+    {
+      "type": "face_attachment",
+      "object": "office_back_wall_slat_9",
+      "support": "home_office_evening_back_wall",
+      "required": true
+    },
+    {
+      "type": "enclosure_membership",
+      "object": "office_back_wall_slat_10",
+      "room": "home_office_evening_room_shell",
+      "required": true
+    },
+    {
+      "type": "face_attachment",
+      "object": "office_back_wall_slat_10",
+      "support": "home_office_evening_back_wall",
+      "required": true
+    },
+    {
+      "type": "enclosure_membership",
+      "object": "office_floor_thread_0",
+      "room": "home_office_evening_room_shell",
+      "required": true
+    },
+    {
+      "type": "support_contact",
+      "object": "office_floor_thread_0",
+      "support": "home_office_evening_floor",
+      "required": true
+    },
+    {
+      "type": "enclosure_membership",
+      "object": "office_floor_thread_1",
+      "room": "home_office_evening_room_shell",
+      "required": true
+    },
+    {
+      "type": "support_contact",
+      "object": "office_floor_thread_1",
+      "support": "home_office_evening_floor",
+      "required": true
+    },
+    {
+      "type": "enclosure_membership",
+      "object": "office_floor_thread_2",
+      "room": "home_office_evening_room_shell",
+      "required": true
+    },
+    {
+      "type": "support_contact",
+      "object": "office_floor_thread_2",
+      "support": "home_office_evening_floor",
+      "required": true
+    },
+    {
+      "type": "enclosure_membership",
+      "object": "office_floor_thread_3",
+      "room": "home_office_evening_room_shell",
+      "required": true
+    },
+    {
+      "type": "support_contact",
+      "object": "office_floor_thread_3",
+      "support": "home_office_evening_floor",
+      "required": true
+    },
+    {
+      "type": "enclosure_membership",
+      "object": "office_floor_thread_4",
+      "room": "home_office_evening_room_shell",
+      "required": true
+    },
+    {
+      "type": "support_contact",
+      "object": "office_floor_thread_4",
+      "support": "home_office_evening_floor",
+      "required": true
+    },
+    {
+      "type": "enclosure_membership",
+      "object": "office_floor_thread_5",
+      "room": "home_office_evening_room_shell",
+      "required": true
+    },
+    {
+      "type": "support_contact",
+      "object": "office_floor_thread_5",
+      "support": "home_office_evening_floor",
+      "required": true
+    },
+    {
+      "type": "enclosure_membership",
+      "object": "office_floor_thread_6",
+      "room": "home_office_evening_room_shell",
+      "required": true
+    },
+    {
+      "type": "support_contact",
+      "object": "office_floor_thread_6",
+      "support": "home_office_evening_floor",
+      "required": true
+    },
+    {
+      "type": "enclosure_membership",
+      "object": "office_floor_thread_7",
+      "room": "home_office_evening_room_shell",
+      "required": true
+    },
+    {
+      "type": "support_contact",
+      "object": "office_floor_thread_7",
+      "support": "home_office_evening_floor",
+      "required": true
+    },
+    {
+      "type": "enclosure_membership",
+      "object": "office_floor_cross_thread_0",
+      "room": "home_office_evening_room_shell",
+      "required": true
+    },
+    {
+      "type": "support_contact",
+      "object": "office_floor_cross_thread_0",
+      "support": "home_office_evening_floor",
+      "required": true
+    },
+    {
+      "type": "enclosure_membership",
+      "object": "office_floor_cross_thread_1",
+      "room": "home_office_evening_room_shell",
+      "required": true
+    },
+    {
+      "type": "support_contact",
+      "object": "office_floor_cross_thread_1",
+      "support": "home_office_evening_floor",
+      "required": true
+    },
+    {
+      "type": "enclosure_membership",
+      "object": "office_floor_cross_thread_2",
+      "room": "home_office_evening_room_shell",
+      "required": true
+    },
+    {
+      "type": "support_contact",
+      "object": "office_floor_cross_thread_2",
+      "support": "home_office_evening_floor",
+      "required": true
+    },
+    {
+      "type": "enclosure_membership",
+      "object": "office_floor_cross_thread_3",
+      "room": "home_office_evening_room_shell",
+      "required": true
+    },
+    {
+      "type": "support_contact",
+      "object": "office_floor_cross_thread_3",
+      "support": "home_office_evening_floor",
+      "required": true
+    },
+    {
+      "type": "enclosure_membership",
+      "object": "office_floor_cross_thread_4",
+      "room": "home_office_evening_room_shell",
+      "required": true
+    },
+    {
+      "type": "support_contact",
+      "object": "office_floor_cross_thread_4",
+      "support": "home_office_evening_floor",
+      "required": true
+    },
+    {
+      "type": "enclosure_membership",
+      "object": "office_floor_cross_thread_5",
+      "room": "home_office_evening_room_shell",
+      "required": true
+    },
+    {
+      "type": "support_contact",
+      "object": "office_floor_cross_thread_5",
+      "support": "home_office_evening_floor",
+      "required": true
+    },
+    {
+      "type": "enclosure_membership",
+      "object": "office_floor_cross_thread_6",
+      "room": "home_office_evening_room_shell",
+      "required": true
+    },
+    {
+      "type": "support_contact",
+      "object": "office_floor_cross_thread_6",
+      "support": "home_office_evening_floor",
+      "required": true
+    },
+    {
+      "type": "construction_slot",
+      "slot": "office_desk",
+      "assembly_id": "office_workstation",
+      "required": true,
+      "min_occupants": 1
+    },
+    {
+      "type": "construction_slot",
+      "slot": "office_task_chair",
+      "assembly_id": "office_workstation",
+      "required": true,
+      "min_occupants": 1
+    },
+    {
+      "type": "construction_slot",
+      "slot": "office_bookcase",
+      "assembly_id": "office_storage",
+      "required": true,
+      "min_occupants": 1
+    }
+  ],
+  "view_local_midfrequency_detail_variant": {
+    "schema": 1,
+    "source": "tools/model_scene_view_local_midfrequency_detail_variants.py",
+    "source_seed": "build/bin/logs/runs/home_office_evening_render_v2_dressed/source_scene_seed.json",
+    "view_root": "assets/scenes/model_authored/scene_authoring_intelligence_v1/home_office_evening_render_v2_dressed",
+    "target_view": "bookcase_context",
+    "protected_views": [
+      "chair_contact_side",
+      "desk_equipment_close",
+      "hero",
+      "high_room_layout",
+      "lamp_window_balance"
+    ],
+    "policy": "framed_panels",
+    "role_terms": [
+      "bookcase",
+      "shelf"
+    ],
+    "min_target_area": 0.0003,
+    "selected_supports": [
+      {
+        "id": "office_book_shelf_lower",
+        "role": "shelf_surface",
+        "material": "floor_neutral",
+        "orientation": "horizontal",
+        "target_area": 0.002423,
+        "protected_area": 0.016609,
+        "locality": 0.127325,
+        "projection": {
+          "center_x": 0.17491,
+          "center_y": 0.03916,
+          "depth": 3.35944
+        }
+      },
+      {
+        "id": "office_book_shelf_upper",
+        "role": "shelf_surface",
+        "material": "floor_neutral",
+        "orientation": "horizontal",
+        "target_area": 0.001762,
+        "protected_area": 0.019126,
+        "locality": 0.084373,
+        "projection": {
+          "center_x": 0.18017,
+          "center_y": 0.19501,
+          "depth": 3.26005
+        }
+      }
+    ],
+    "added_materials": [
+      "sai_midfreq_warm_rule",
+      "sai_midfreq_cool_rule",
+      "sai_midfreq_shadow_rule",
+      "sai_midfreq_paper_patch"
+    ],
+    "added_object_count": 6,
+    "structural_signature_changed": true,
+    "camera_changed": false,
+    "lights_changed": false,
+    "rendered_admission_required": true,
+    "completion_claim_allowed": false
+  },
+  "macro_director": {
+    "policy": "macro_layered_palette",
+    "source_seed": "build/bin/logs/runs/home_office_evening_render_v49_shelf_framed_panels/source_scene_seed.json",
+    "directives_consumed": [
+      "local_operator_saturated",
+      "macro_scene_construction_pass",
+      "asset_fidelity_upgrade",
+      "silhouette_and_layering_upgrade"
+    ],
+    "does_not_move_existing_objects": true,
+    "adds_macro_semantic_structure_before_local_detail": true,
+    "completion_claim_allowed": false
+  },
+  "scene_graph_kernel_v1": {
+    "status": "repaired"
+  }
+}

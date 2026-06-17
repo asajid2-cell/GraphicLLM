@@ -1,0 +1,11 @@
+{
+  "id": "novel_basketball_gym",
+  "status": "PROMOTED_FOR_HUMAN_REVIEW",
+  "selection_status": "SELECTED_BY_RENDERED_FALLBACK",
+  "selected_policy": "fallback:view_metric_restage:left_recenter",
+  "selected_report": "docs/media/final_art/generated/model_authored/model_authored_multiview_novel_basketball_gym_closed_loop_rendered_fallback_01_view_metric_restage_left_recenter.json",
+  "source_seed": "artifacts/scene_authoring_kernel_v1/closed_loop_admission_batch_v2_full10_plateau/novel_basketball_gym/02_rendered_fallback/router/view_metric_restage/left_recenter/scene_seed.json",
+  "promoted_seed": "assets/scenes/model_authored/scene_authoring_closed_loop_v1/novel_basketball_gym/scene_seed.json",
+  "completion_claim_allowed": false,
+  "human_review_required": true
+}

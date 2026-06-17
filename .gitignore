@@ -52,3 +52,6 @@ CortexEngine/vendor/
 CortexEngine/*_stdout.txt
 CortexEngine/System.Collections.Hashtable
 CortexEngine/debug_menu_state.json
+
+# Source archives (extracted content is tracked separately)
+CortexEngine/assets/source_assets/**/*.zip

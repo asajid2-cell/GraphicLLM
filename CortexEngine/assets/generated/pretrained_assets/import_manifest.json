@@ -1,0 +1,297 @@
+{
+  "schema": 1,
+  "generator_batch_id": "shap_e_basketball_gym_prototype",
+  "generated_at": "2026-05-23T23:45:18",
+  "assets": [
+    {
+      "id": "rain_glass_pavilion_rain_tabletop_lantern_cluster_openai_shap_e_text300m",
+      "scene": "rain_glass_pavilion",
+      "request_id": "rain_tabletop_lantern_cluster",
+      "provider": "openai_shap_e_text300m",
+      "source_model": "text300M + transmitter",
+      "license_policy": "project_approved_generated_asset",
+      "runtime_asset": {
+        "format": "gltf",
+        "path": "openai_shap_e_text300m/rain_glass_pavilion/rain_tabletop_lantern_cluster/rain_glass_pavilion_rain_tabletop_lantern_cluster_openai_shap_e_text300m.gltf",
+        "triangle_count": 76220,
+        "texture_megabytes": 0.0,
+        "metadata": "openai_shap_e_text300m/rain_glass_pavilion/rain_tabletop_lantern_cluster/rain_glass_pavilion_rain_tabletop_lantern_cluster_openai_shap_e_text300m.metadata.json"
+      },
+      "preview_image": "openai_shap_e_text300m/rain_glass_pavilion/rain_tabletop_lantern_cluster/rain_glass_pavilion_rain_tabletop_lantern_cluster_openai_shap_e_text300m.preview.png",
+      "orientation": {
+        "up_axis": "Y",
+        "forward_axis": "Z",
+        "handedness": "right"
+      },
+      "scale_to_meters": 1.0,
+      "pivot_policy": "floor_aligned_runtime",
+      "bounds_meters": {
+        "min": [
+          -0.10570085793733597,
+          0.0,
+          -0.17499999701976776
+        ],
+        "max": [
+          0.10570085793733597,
+          0.20896688103675842,
+          0.17499999701976776
+        ]
+      },
+      "material_textures": {
+        "base_color": "vertex_color_generated",
+        "normal": "runtime_generated_flat_normal",
+        "roughness": "runtime_default_roughness",
+        "metallic": "runtime_default_metallic"
+      },
+      "semantic_tags": [
+        "warm_fixture",
+        "hero_closeup",
+        "brass",
+        "warm_emissive",
+        "wet_glass"
+      ],
+      "admission": {
+        "editable_mesh": true,
+        "separated_object": true,
+        "not_whole_scene_blob": true,
+        "scale_valid": true,
+        "contact_ready": true,
+        "material_maps_present": true,
+        "budget_class": "prototype_pretrained_generated",
+        "visual_preview_score": 0.7
+      }
+    },
+    {
+      "id": "rain_glass_pavilion_rain_glass_table_dressing_openai_shap_e_text300m",
+      "scene": "rain_glass_pavilion",
+      "request_id": "rain_glass_table_dressing",
+      "provider": "openai_shap_e_text300m",
+      "source_model": "text300M + transmitter",
+      "license_policy": "project_approved_generated_asset",
+      "runtime_asset": {
+        "format": "gltf",
+        "path": "openai_shap_e_text300m/rain_glass_pavilion/rain_glass_table_dressing/rain_glass_pavilion_rain_glass_table_dressing_openai_shap_e_text300m.gltf",
+        "triangle_count": 78000,
+        "texture_megabytes": 0.0,
+        "metadata": "openai_shap_e_text300m/rain_glass_pavilion/rain_glass_table_dressing/rain_glass_pavilion_rain_glass_table_dressing_openai_shap_e_text300m.metadata.json"
+      },
+      "preview_image": "openai_shap_e_text300m/rain_glass_pavilion/rain_glass_table_dressing/rain_glass_pavilion_rain_glass_table_dressing_openai_shap_e_text300m.preview.png",
+      "orientation": {
+        "up_axis": "Y",
+        "forward_axis": "Z",
+        "handedness": "right"
+      },
+      "scale_to_meters": 1.0,
+      "pivot_policy": "floor_aligned_runtime",
+      "bounds_meters": {
+        "min": [
+          -0.09024836868047714,
+          0.0,
+          -0.05774647742509842
+        ],
+        "max": [
+          0.09024836868047714,
+          0.18000000715255737,
+          0.05774647742509842
+        ]
+      },
+      "material_textures": {
+        "base_color": "vertex_color_generated",
+        "normal": "runtime_generated_flat_normal",
+        "roughness": "runtime_default_roughness",
+        "metallic": "runtime_default_metallic"
+      },
+      "semantic_tags": [
+        "glass_accent",
+        "material_closeup",
+        "clear_glass",
+        "chrome",
+        "wet_fabric"
+      ],
+      "admission": {
+        "editable_mesh": true,
+        "separated_object": true,
+        "not_whole_scene_blob": true,
+        "scale_valid": true,
+        "contact_ready": true,
+        "material_maps_present": true,
+        "budget_class": "prototype_pretrained_generated",
+        "visual_preview_score": 0.7
+      }
+    },
+    {
+      "id": "rain_glass_pavilion_rain_puddle_floor_patch_openai_shap_e_text300m",
+      "scene": "rain_glass_pavilion",
+      "request_id": "rain_puddle_floor_patch",
+      "provider": "openai_shap_e_text300m",
+      "source_model": "text300M + transmitter",
+      "license_policy": "project_approved_generated_asset",
+      "runtime_asset": {
+        "format": "gltf",
+        "path": "openai_shap_e_text300m/rain_glass_pavilion/rain_puddle_floor_patch/rain_glass_pavilion_rain_puddle_floor_patch_openai_shap_e_text300m.gltf",
+        "triangle_count": 50760,
+        "texture_megabytes": 0.0,
+        "metadata": "openai_shap_e_text300m/rain_glass_pavilion/rain_puddle_floor_patch/rain_glass_pavilion_rain_puddle_floor_patch_openai_shap_e_text300m.metadata.json"
+      },
+      "preview_image": "openai_shap_e_text300m/rain_glass_pavilion/rain_puddle_floor_patch/rain_glass_pavilion_rain_puddle_floor_patch_openai_shap_e_text300m.preview.png",
+      "orientation": {
+        "up_axis": "Y",
+        "forward_axis": "Z",
+        "handedness": "right"
+      },
+      "scale_to_meters": 1.0,
+      "pivot_policy": "floor_aligned_runtime",
+      "bounds_meters": {
+        "min": [
+          -0.010012687183916569,
+          0.0,
+          -0.00010192026093136519
+        ],
+        "max": [
+          0.010012687183916569,
+          0.019999999552965164,
+          0.00010192026093136519
+        ]
+      },
+      "material_textures": {
+        "base_color": "vertex_color_generated",
+        "normal": "runtime_generated_flat_normal",
+        "roughness": "runtime_default_roughness",
+        "metallic": "runtime_default_metallic"
+      },
+      "semantic_tags": [
+        "wet_contact",
+        "reflection_receiver",
+        "water",
+        "wet_tile",
+        "reflection"
+      ],
+      "admission": {
+        "editable_mesh": true,
+        "separated_object": true,
+        "not_whole_scene_blob": true,
+        "scale_valid": true,
+        "contact_ready": true,
+        "material_maps_present": true,
+        "budget_class": "prototype_pretrained_generated",
+        "visual_preview_score": 0.7
+      }
+    },
+    {
+      "id": "rain_glass_pavilion_rain_streak_window_panel_openai_shap_e_text300m",
+      "scene": "rain_glass_pavilion",
+      "request_id": "rain_streak_window_panel",
+      "provider": "openai_shap_e_text300m",
+      "source_model": "text300M + transmitter",
+      "license_policy": "project_approved_generated_asset",
+      "runtime_asset": {
+        "format": "gltf",
+        "path": "openai_shap_e_text300m/rain_glass_pavilion/rain_streak_window_panel/rain_glass_pavilion_rain_streak_window_panel_openai_shap_e_text300m.gltf",
+        "triangle_count": 66144,
+        "texture_megabytes": 0.0,
+        "metadata": "openai_shap_e_text300m/rain_glass_pavilion/rain_streak_window_panel/rain_glass_pavilion_rain_streak_window_panel_openai_shap_e_text300m.metadata.json"
+      },
+      "preview_image": "openai_shap_e_text300m/rain_glass_pavilion/rain_streak_window_panel/rain_glass_pavilion_rain_streak_window_panel_openai_shap_e_text300m.preview.png",
+      "orientation": {
+        "up_axis": "Y",
+        "forward_axis": "Z",
+        "handedness": "right"
+      },
+      "scale_to_meters": 1.0,
+      "pivot_policy": "floor_aligned_runtime",
+      "bounds_meters": {
+        "min": [
+          -0.11313717812299728,
+          0.0,
+          -0.03999999910593033
+        ],
+        "max": [
+          0.11313717812299728,
+          0.2272692620754242,
+          0.03999999910593033
+        ]
+      },
+      "material_textures": {
+        "base_color": "vertex_color_generated",
+        "normal": "runtime_generated_flat_normal",
+        "roughness": "runtime_default_roughness",
+        "metallic": "runtime_default_metallic"
+      },
+      "semantic_tags": [
+        "foreground_frame",
+        "foreground_frame",
+        "transparent_glass",
+        "wet_streaks",
+        "dark_metal"
+      ],
+      "admission": {
+        "editable_mesh": true,
+        "separated_object": true,
+        "not_whole_scene_blob": true,
+        "scale_valid": true,
+        "contact_ready": true,
+        "material_maps_present": true,
+        "budget_class": "prototype_pretrained_generated",
+        "visual_preview_score": 0.7
+      }
+    },
+    {
+      "id": "basketball_gym_indoor_rim_net_bracket_openai_shap_e_text300m",
+      "scene": "basketball_gym",
+      "request_id": "indoor_rim_net_bracket",
+      "provider": "openai_shap_e_text300m",
+      "source_model": "text300M + transmitter",
+      "license_policy": "project_approved_generated_asset",
+      "runtime_asset": {
+        "format": "gltf",
+        "path": "openai_shap_e_text300m/basketball_gym/indoor_rim_net_bracket/basketball_gym_indoor_rim_net_bracket_openai_shap_e_text300m.gltf",
+        "triangle_count": 15432,
+        "texture_megabytes": 0.0,
+        "metadata": "openai_shap_e_text300m/basketball_gym/indoor_rim_net_bracket/basketball_gym_indoor_rim_net_bracket_openai_shap_e_text300m.metadata.json"
+      },
+      "preview_image": "openai_shap_e_text300m/basketball_gym/indoor_rim_net_bracket/basketball_gym_indoor_rim_net_bracket_openai_shap_e_text300m.preview.png",
+      "orientation": {
+        "up_axis": "Y",
+        "forward_axis": "Z",
+        "handedness": "right"
+      },
+      "scale_to_meters": 1.0,
+      "pivot_policy": "floor_aligned_runtime",
+      "bounds_meters": {
+        "min": [
+          -0.1451738029718399,
+          0.0,
+          -0.2750000059604645
+        ],
+        "max": [
+          0.1451738029718399,
+          0.166258305311203,
+          0.2750000059604645
+        ]
+      },
+      "material_textures": {
+        "base_color": "vertex_color_generated",
+        "normal": "runtime_generated_flat_normal",
+        "roughness": "runtime_default_roughness",
+        "metallic": "runtime_default_metallic"
+      },
+      "semantic_tags": [
+        "hoop",
+        "basketball_rim",
+        "basketball_net",
+        "rim_brace",
+        "fixture_detail"
+      ],
+      "admission": {
+        "editable_mesh": true,
+        "separated_object": true,
+        "not_whole_scene_blob": true,
+        "scale_valid": true,
+        "contact_ready": true,
+        "material_maps_present": true,
+        "budget_class": "prototype_pretrained_generated",
+        "visual_preview_score": 0.7
+      }
+    }
+  ]
+}

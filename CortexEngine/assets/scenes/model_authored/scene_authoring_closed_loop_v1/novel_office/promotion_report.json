@@ -1,0 +1,11 @@
+{
+  "id": "novel_office",
+  "status": "PROMOTED_FOR_HUMAN_REVIEW",
+  "selection_status": "SELECTED_BY_PHYSICAL_RENDERED_ADMISSION",
+  "selected_policy": "physical_minutia_repaired",
+  "selected_report": "docs/media/final_art/generated/model_authored/model_authored_multiview_novel_office_physical_minutia_repaired.json",
+  "source_seed": "artifacts/scene_authoring_kernel_v1/physical_minutia_repair_batch_v8/novel_office/physical_minutia_repaired_scene_seed.json",
+  "promoted_seed": "assets/scenes/model_authored/scene_authoring_closed_loop_v1/novel_office/scene_seed.json",
+  "completion_claim_allowed": false,
+  "human_review_required": true
+}

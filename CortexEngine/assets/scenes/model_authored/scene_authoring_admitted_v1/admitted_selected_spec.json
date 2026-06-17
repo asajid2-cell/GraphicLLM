@@ -1,0 +1,79 @@
+{
+  "schema": "cortex.scene_authoring.admitted_selected_spec.v1",
+  "ledger_item": "L001",
+  "status": "ADMITTED_SELECTED_SPEC_READY",
+  "results": [
+    {
+      "id": "admitted_kitchen",
+      "selected_policy": "facing_relation_compiled",
+      "selected_report": "docs/media/final_art/generated/model_authored/model_authored_multiview_admitted_kitchen_facing_relation_compiled.json",
+      "source_seed": "artifacts/scene_authoring_kernel_v1/admitted_facing_relation_batch_v4/admitted_kitchen/facing_relation_scene_seed.json",
+      "notes": "Kitchen admitted candidate with dining chairs facing the table after reusable facing-relation compilation and rendered multiview revalidation."
+    },
+    {
+      "id": "admitted_office",
+      "selected_policy": "scale_readability_repaired",
+      "selected_report": "docs/media/final_art/generated/model_authored/model_authored_multiview_admitted_office_scale_readability_repaired.json",
+      "source_seed": "artifacts/scene_authoring_kernel_v1/admitted_after_scale_repair_facing_batch_v1/admitted_office/facing_relation_scene_seed.json",
+      "notes": "Office admitted candidate with the undersized desk replacement quarantined, the validated desk source restored, facing relations recompiled, and rendered multiview revalidated."
+    },
+    {
+      "id": "admitted_red_room",
+      "selected_policy": "facing_relation_compiled",
+      "selected_report": "docs/media/final_art/generated/model_authored/model_authored_multiview_admitted_red_room_facing_relation_compiled.json",
+      "source_seed": "artifacts/scene_authoring_kernel_v1/admitted_facing_relation_batch_v4/admitted_red_room/facing_relation_scene_seed.json",
+      "notes": "Red room admitted candidate with lounge seating facing the central table after facing-relation compilation and rendered multiview revalidation."
+    },
+    {
+      "id": "admitted_stadium",
+      "selected_policy": "facing_relation_compiled",
+      "selected_report": "docs/media/final_art/generated/model_authored/model_authored_multiview_admitted_stadium_facing_relation_compiled.json",
+      "source_seed": "artifacts/scene_authoring_kernel_v1/admitted_facing_relation_batch_v4/admitted_stadium/facing_relation_scene_seed.json",
+      "notes": "Stadium admitted candidate with upper stand seats facing the field after facing-relation compilation and rendered multiview revalidation."
+    },
+    {
+      "id": "admitted_basketball_gym",
+      "selected_policy": "spatial_relation_repaired",
+      "selected_report": "docs/media/final_art/generated/model_authored/model_authored_multiview_admitted_basketball_gym_spatial_relation_repaired.json",
+      "source_seed": "artifacts/scene_authoring_kernel_v1/admitted_spatial_relation_repair_batch_v1/admitted_basketball_gym/spatial_relation_repaired_scene_seed.json",
+      "notes": "Basketball gym admitted candidate with courtside and bleacher seating facing the rim, plus superseded above-rim net strings deactivated after SGK replacement net validation and rendered multiview revalidation."
+    },
+    {
+      "id": "admitted_classroom",
+      "selected_policy": "facing_relation_compiled",
+      "selected_report": "docs/media/final_art/generated/model_authored/model_authored_multiview_admitted_classroom_facing_relation_compiled.json",
+      "source_seed": "artifacts/scene_authoring_kernel_v1/admitted_facing_relation_batch_v4/admitted_classroom/facing_relation_scene_seed.json",
+      "notes": "Classroom admitted candidate with student chairs facing their numbered desks after facing-relation compilation and rendered multiview revalidation."
+    },
+    {
+      "id": "admitted_concert",
+      "selected_policy": "facing_relation_compiled",
+      "selected_report": "docs/media/final_art/generated/model_authored/model_authored_multiview_admitted_concert_facing_relation_compiled.json",
+      "source_seed": "artifacts/scene_authoring_kernel_v1/admitted_facing_relation_batch_v4/admitted_concert/facing_relation_scene_seed.json",
+      "notes": "Concert admitted candidate with audience seating facing the stage, speakers facing audience, and rendered multiview revalidation."
+    },
+    {
+      "id": "admitted_bedroom",
+      "selected_policy": "facing_relation_compiled",
+      "selected_report": "docs/media/final_art/generated/model_authored/model_authored_multiview_admitted_bedroom_facing_relation_compiled.json",
+      "source_seed": "artifacts/scene_authoring_kernel_v1/admitted_facing_relation_batch_v4/admitted_bedroom/facing_relation_scene_seed.json",
+      "notes": "Bedroom admitted candidate with TV/chair facing relations compiled and rendered multiview revalidated."
+    },
+    {
+      "id": "admitted_bathroom",
+      "selected_policy": "physical_minutia_repaired",
+      "selected_report": "docs/media/final_art/generated/model_authored/model_authored_multiview_novel_bathroom_physical_minutia_repaired.json",
+      "source_seed": "assets/scenes/model_authored/scene_authoring_closed_loop_v1/novel_bathroom/scene_seed.json",
+      "notes": "Novel bathroom physical-minutia repaired candidate with clean rendered multiview evidence."
+    },
+    {
+      "id": "admitted_store",
+      "selected_policy": "facing_relation_compiled",
+      "selected_report": "docs/media/final_art/generated/model_authored/model_authored_multiview_admitted_store_facing_relation_compiled.json",
+      "source_seed": "artifacts/scene_authoring_kernel_v1/admitted_facing_relation_batch_v4/admitted_store/facing_relation_scene_seed.json",
+      "notes": "Store admitted candidate with checkout screen/stool facing relations compiled and rendered multiview revalidated."
+    }
+  ],
+  "completion_claim_allowed": false,
+  "human_review_required": true
+}

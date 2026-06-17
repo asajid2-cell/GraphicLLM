@@ -1,0 +1,5091 @@
+{
+  "schema": "cortex.model_authored_scene_seed.v1",
+  "id": "sak_home_bathroom_day_clean_bathroom_with_vanity_sink_mirror_bathtub_toilet_shower_tile_and_so_v0",
+  "scene_family": "home_bathroom_day",
+  "status": "MODEL_AUTHORED_SCENE_GRAPH_KERNEL_V1_REPAIRED",
+  "generator": {
+    "name": "scene_authoring_kernel_v1",
+    "mode": "brief_to_semantic_graph_to_seed",
+    "prompt": "clean bathroom with vanity sink mirror bathtub toilet shower tile and soft light",
+    "construction_layers": [
+      "brief_compiler_v1",
+      "semantic_graph_native_constructor_v1",
+      "asset_affordance_catalog_v1",
+      "assembly_template_solver_v1",
+      "scene_graph_kernel_v1"
+    ]
+  },
+  "environment": {
+    "preset": "neutral_procedural",
+    "art_lighting_preset": "scene_local_authoring_kernel",
+    "graphics_preset": "hero_final_art",
+    "ibl_enabled": false,
+    "ibl_diffuse_intensity": 0.0,
+    "ibl_specular_intensity": 0.0,
+    "allow_hdri_background": false,
+    "allow_hdri_reflections": false,
+    "visible_background": "authored_geometry_only",
+    "ambient_source": "scene_authored_lights",
+    "reflection_policy": "scene_local_no_hdri"
+  },
+  "camera": {
+    "position": [
+      -1.75,
+      1.35,
+      -1.38
+    ],
+    "target": [
+      -0.18,
+      0.98,
+      0.72
+    ],
+    "fov": 60.0,
+    "class": "hero"
+  },
+  "validation_view_overrides": {},
+  "materials": {
+    "room_wall_warm": {
+      "color": [
+        0.62,
+        0.58,
+        0.5,
+        1.0
+      ],
+      "metallic": 0.0,
+      "roughness": 0.82,
+      "preset": "paint"
+    },
+    "room_wall_cool": {
+      "color": [
+        0.48,
+        0.56,
+        0.62,
+        1.0
+      ],
+      "metallic": 0.0,
+      "roughness": 0.84,
+      "preset": "paint"
+    },
+    "dark_wall": {
+      "color": [
+        0.05,
+        0.045,
+        0.055,
+        1.0
+      ],
+      "metallic": 0.0,
+      "roughness": 0.78,
+      "preset": "paint"
+    },
+    "floor_tile": {
+      "color": [
+        0.42,
+        0.43,
+        0.41,
+        1.0
+      ],
+      "metallic": 0.0,
+      "roughness": 0.74,
+      "preset": "matte_tile"
+    },
+    "floor_wood": {
+      "color": [
+        0.62,
+        0.43,
+        0.22,
+        1.0
+      ],
+      "metallic": 0.0,
+      "roughness": 0.56,
+      "preset": "wood"
+    },
+    "floor_dark": {
+      "color": [
+        0.08,
+        0.075,
+        0.085,
+        1.0
+      ],
+      "metallic": 0.0,
+      "roughness": 0.7,
+      "preset": "paint"
+    },
+    "wall_deep_red": {
+      "color": [
+        0.32,
+        0.025,
+        0.035,
+        1.0
+      ],
+      "metallic": 0.0,
+      "roughness": 0.78,
+      "preset": "paint"
+    },
+    "velvet_red": {
+      "color": [
+        0.55,
+        0.03,
+        0.055,
+        1.0
+      ],
+      "metallic": 0.0,
+      "roughness": 0.62,
+      "preset": "fabric"
+    },
+    "field_green": {
+      "color": [
+        0.05,
+        0.34,
+        0.12,
+        1.0
+      ],
+      "metallic": 0.0,
+      "roughness": 0.72,
+      "preset": "turf"
+    },
+    "counter_dark": {
+      "color": [
+        0.08,
+        0.075,
+        0.07,
+        1.0
+      ],
+      "metallic": 0.0,
+      "roughness": 0.38,
+      "preset": "stone"
+    },
+    "cabinet_warm": {
+      "color": [
+        0.36,
+        0.21,
+        0.11,
+        1.0
+      ],
+      "metallic": 0.0,
+      "roughness": 0.55,
+      "preset": "wood"
+    },
+    "metal_dark": {
+      "color": [
+        0.025,
+        0.026,
+        0.028,
+        1.0
+      ],
+      "metallic": 0.65,
+      "roughness": 0.34,
+      "preset": "brushed_metal"
+    },
+    "plastic_blue": {
+      "color": [
+        0.05,
+        0.28,
+        0.7,
+        1.0
+      ],
+      "metallic": 0.0,
+      "roughness": 0.52,
+      "preset": "paint"
+    },
+    "accent_orange": {
+      "color": [
+        1.0,
+        0.43,
+        0.05,
+        1.0
+      ],
+      "metallic": 0.0,
+      "roughness": 0.42,
+      "preset": "paint"
+    },
+    "accent_cyan": {
+      "color": [
+        0.0,
+        0.75,
+        1.0,
+        1.0
+      ],
+      "metallic": 0.0,
+      "roughness": 0.4,
+      "emissive": [
+        0.0,
+        0.28,
+        0.55
+      ],
+      "emissive_strength": 0.15,
+      "preset": "paint"
+    },
+    "accent_magenta": {
+      "color": [
+        0.95,
+        0.05,
+        0.62,
+        1.0
+      ],
+      "metallic": 0.0,
+      "roughness": 0.44,
+      "emissive": [
+        0.18,
+        0.01,
+        0.12
+      ],
+      "emissive_strength": 0.12,
+      "preset": "paint"
+    },
+    "glass_soft": {
+      "color": [
+        0.72,
+        0.88,
+        0.96,
+        0.42
+      ],
+      "roughness": 0.055,
+      "transmission": 0.45,
+      "ior": 1.46,
+      "alpha": "blend",
+      "preset": "glass"
+    },
+    "warm_light": {
+      "color": [
+        1.0,
+        0.62,
+        0.28,
+        1.0
+      ],
+      "emissive": [
+        1.0,
+        0.48,
+        0.18
+      ],
+      "emissive_strength": 0.45,
+      "roughness": 0.25,
+      "preset": "emissive"
+    },
+    "paper": {
+      "color": [
+        0.84,
+        0.79,
+        0.68,
+        1.0
+      ],
+      "metallic": 0.0,
+      "roughness": 0.86,
+      "preset": "paper"
+    }
+  },
+  "lights": [
+    {
+      "id": "sak_bathroom_soft_overhead",
+      "role": "overhead_fill",
+      "type": "point",
+      "position": [
+        -0.12,
+        2.18,
+        -0.2
+      ],
+      "color": [
+        0.82,
+        0.9,
+        1.0
+      ],
+      "intensity": 2.0,
+      "range": 4.2,
+      "casts_shadows": false,
+      "scene_authoring_kernel_v1": {
+        "source": "scene_local_lighting_contract",
+        "variant": 0
+      }
+    }
+  ],
+  "objects": [
+    {
+      "id": "sak_bathroom_floor",
+      "role": "room_floor",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "floor_tile",
+      "support": "ground",
+      "assembly_id": "room_shell",
+      "transform": {
+        "position": [
+          0.0,
+          0.035,
+          0.0
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          3.9,
+          0.07,
+          3.2
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "floor",
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_bathroom_back_wall",
+      "role": "room_wall",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "room_wall_cool",
+      "support": "ground",
+      "assembly_id": "room_shell",
+      "transform": {
+        "position": [
+          0.0,
+          1.275,
+          1.6
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          3.9,
+          2.55,
+          0.08
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "wall",
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_bathroom_left_wall",
+      "role": "room_wall",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "room_wall_cool",
+      "support": "ground",
+      "assembly_id": "room_shell",
+      "transform": {
+        "position": [
+          -1.95,
+          1.275,
+          0.0
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.08,
+          2.55,
+          3.2
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "wall",
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_bathroom_right_wall",
+      "role": "room_wall",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "room_wall_cool",
+      "support": "ground",
+      "assembly_id": "room_shell",
+      "transform": {
+        "position": [
+          1.95,
+          1.275,
+          0.0
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.08,
+          2.55,
+          3.2
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "wall",
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_bathroom_ceiling",
+      "role": "room_ceiling",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "room_wall_cool",
+      "support": "ground",
+      "assembly_id": "room_shell",
+      "transform": {
+        "position": [
+          0.0,
+          2.59,
+          0.0
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          3.9,
+          0.08,
+          3.2
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "ceiling",
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_bathroom_base_trim_back",
+      "role": "architectural_baseboard",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "metal_dark",
+      "support": "sak_bathroom_floor",
+      "assembly_id": "room_shell",
+      "transform": {
+        "position": [
+          0.0,
+          0.13,
+          1.545
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          3.74,
+          0.045,
+          0.035
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "wall_detail",
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_bathroom_base_trim_left",
+      "role": "architectural_baseboard",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "metal_dark",
+      "support": "sak_bathroom_floor",
+      "assembly_id": "room_shell",
+      "transform": {
+        "position": [
+          -1.895,
+          0.13,
+          0.0
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.035,
+          0.045,
+          3.04
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "wall_detail",
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_bathroom_base_trim_right",
+      "role": "architectural_baseboard",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "metal_dark",
+      "support": "sak_bathroom_floor",
+      "assembly_id": "room_shell",
+      "transform": {
+        "position": [
+          1.895,
+          0.13,
+          0.0
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.035,
+          0.045,
+          3.04
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "wall_detail",
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_bathroom_crown_trim_back",
+      "role": "architectural_baseboard",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "metal_dark",
+      "support": "sak_bathroom_floor",
+      "assembly_id": "room_shell",
+      "transform": {
+        "position": [
+          0.0,
+          2.37,
+          1.545
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          3.74,
+          0.035,
+          0.035
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "wall_detail",
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_bathroom_crown_trim_left",
+      "role": "architectural_baseboard",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "metal_dark",
+      "support": "sak_bathroom_floor",
+      "assembly_id": "room_shell",
+      "transform": {
+        "position": [
+          -1.895,
+          2.37,
+          0.0
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.035,
+          0.035,
+          3.04
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "wall_detail",
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_bathroom_crown_trim_right",
+      "role": "architectural_baseboard",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "metal_dark",
+      "support": "sak_bathroom_floor",
+      "assembly_id": "room_shell",
+      "transform": {
+        "position": [
+          1.895,
+          2.37,
+          0.0
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.035,
+          0.035,
+          3.04
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "wall_detail",
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_bathroom_corner_post_0",
+      "role": "architectural_corner_post",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "metal_dark",
+      "support": "sak_bathroom_floor",
+      "assembly_id": "room_shell",
+      "transform": {
+        "position": [
+          -1.895,
+          1.275,
+          1.545
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.055,
+          2.37,
+          0.055
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "wall_detail",
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_bathroom_corner_post_1",
+      "role": "architectural_corner_post",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "metal_dark",
+      "support": "sak_bathroom_floor",
+      "assembly_id": "room_shell",
+      "transform": {
+        "position": [
+          1.895,
+          1.275,
+          1.545
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.055,
+          2.37,
+          0.055
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "wall_detail",
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_bathroom_back_wall_vertical_trim_0",
+      "role": "wall_panel_trim",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "metal_dark",
+      "support": "sak_bathroom_floor",
+      "assembly_id": "room_shell",
+      "transform": {
+        "position": [
+          -1.55,
+          1.326,
+          1.538
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.018,
+          1.377,
+          0.018
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "wall_detail",
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_bathroom_back_wall_vertical_trim_1",
+      "role": "wall_panel_trim",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "metal_dark",
+      "support": "sak_bathroom_floor",
+      "assembly_id": "room_shell",
+      "transform": {
+        "position": [
+          -0.775,
+          1.326,
+          1.538
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.018,
+          1.377,
+          0.018
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "wall_detail",
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_bathroom_back_wall_vertical_trim_2",
+      "role": "wall_panel_trim",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "metal_dark",
+      "support": "sak_bathroom_floor",
+      "assembly_id": "room_shell",
+      "transform": {
+        "position": [
+          0.0,
+          1.326,
+          1.538
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.018,
+          1.377,
+          0.018
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "wall_detail",
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_bathroom_back_wall_vertical_trim_3",
+      "role": "wall_panel_trim",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "metal_dark",
+      "support": "sak_bathroom_floor",
+      "assembly_id": "room_shell",
+      "transform": {
+        "position": [
+          0.775,
+          1.326,
+          1.538
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.018,
+          1.377,
+          0.018
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "wall_detail",
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_bathroom_back_wall_vertical_trim_4",
+      "role": "wall_panel_trim",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "metal_dark",
+      "support": "sak_bathroom_floor",
+      "assembly_id": "room_shell",
+      "transform": {
+        "position": [
+          1.55,
+          1.326,
+          1.538
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.018,
+          1.377,
+          0.018
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "wall_detail",
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_bathroom_back_wall_horizontal_trim_0",
+      "role": "wall_panel_trim",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "metal_dark",
+      "support": "sak_bathroom_floor",
+      "assembly_id": "room_shell",
+      "transform": {
+        "position": [
+          0.0,
+          0.867,
+          1.536
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          3.198,
+          0.018,
+          0.018
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "wall_detail",
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_bathroom_back_wall_horizontal_trim_1",
+      "role": "wall_panel_trim",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "metal_dark",
+      "support": "sak_bathroom_floor",
+      "assembly_id": "room_shell",
+      "transform": {
+        "position": [
+          0.0,
+          1.581,
+          1.536
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          3.198,
+          0.018,
+          0.018
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "wall_detail",
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_bathroom_back_wall_horizontal_trim_2",
+      "role": "wall_panel_trim",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "metal_dark",
+      "support": "sak_bathroom_floor",
+      "assembly_id": "room_shell",
+      "transform": {
+        "position": [
+          0.0,
+          2.091,
+          1.536
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          3.198,
+          0.018,
+          0.018
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "wall_detail",
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_bathroom_left_wall_vertical_trim_0",
+      "role": "wall_panel_trim",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "metal_dark",
+      "support": "sak_bathroom_floor",
+      "assembly_id": "room_shell",
+      "transform": {
+        "position": [
+          -1.888,
+          1.275,
+          -0.768
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.018,
+          1.173,
+          0.018
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "wall_detail",
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_bathroom_left_wall_vertical_trim_1",
+      "role": "wall_panel_trim",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "metal_dark",
+      "support": "sak_bathroom_floor",
+      "assembly_id": "room_shell",
+      "transform": {
+        "position": [
+          -1.888,
+          1.275,
+          0.256
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.018,
+          1.173,
+          0.018
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "wall_detail",
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_bathroom_left_wall_vertical_trim_2",
+      "role": "wall_panel_trim",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "metal_dark",
+      "support": "sak_bathroom_floor",
+      "assembly_id": "room_shell",
+      "transform": {
+        "position": [
+          -1.888,
+          1.275,
+          1.152
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.018,
+          1.173,
+          0.018
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "wall_detail",
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_bathroom_right_wall_vertical_trim_0",
+      "role": "wall_panel_trim",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "metal_dark",
+      "support": "sak_bathroom_floor",
+      "assembly_id": "room_shell",
+      "transform": {
+        "position": [
+          1.888,
+          1.275,
+          -0.768
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.018,
+          1.173,
+          0.018
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "wall_detail",
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_bathroom_right_wall_vertical_trim_1",
+      "role": "wall_panel_trim",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "metal_dark",
+      "support": "sak_bathroom_floor",
+      "assembly_id": "room_shell",
+      "transform": {
+        "position": [
+          1.888,
+          1.275,
+          0.256
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.018,
+          1.173,
+          0.018
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "wall_detail",
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_bathroom_right_wall_vertical_trim_2",
+      "role": "wall_panel_trim",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "metal_dark",
+      "support": "sak_bathroom_floor",
+      "assembly_id": "room_shell",
+      "transform": {
+        "position": [
+          1.888,
+          1.275,
+          1.152
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.018,
+          1.173,
+          0.018
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "wall_detail",
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_bathroom_vanity_sink",
+      "role": "sink",
+      "kind": "kenney_asset",
+      "runtime_asset": "assets/models/kenney_furniture_kit/bathroomSink/bathroomSink.gltf",
+      "material": "paper",
+      "support": "sak_bathroom_floor",
+      "assembly_id": "vanity_wall",
+      "transform": {
+        "position": [
+          -1.15,
+          0.63,
+          1.08
+        ],
+        "rotation_degrees": [
+          0.0,
+          180.0,
+          0.0
+        ],
+        "scale": [
+          1.4,
+          1.4,
+          1.4
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "sink",
+        "asset_id": "bathroom_sink",
+        "anchors": {
+          "floor_contact": [
+            0,
+            0,
+            0
+          ],
+          "back": [
+            0,
+            0,
+            1
+          ],
+          "front": [
+            0,
+            0,
+            -1
+          ]
+        },
+        "license": "Kenney CC0",
+        "scale_contract": {
+          "requested_scale": [
+            1.4,
+            1.4,
+            1.4
+          ],
+          "resolved_scale": [
+            1.4,
+            1.4,
+            1.4
+          ],
+          "semantic_floor": 0.9,
+          "physical_size": {
+            "requested_scale": [
+              1.4,
+              1.4,
+              1.4
+            ],
+            "semantic_floor_scale": 0.9,
+            "resolved_scale": [
+              1.4,
+              1.4,
+              1.4
+            ],
+            "native_extent": [
+              0.34,
+              0.56,
+              0.29
+            ],
+            "min_extent": [
+              0.45,
+              0.7,
+              0.35
+            ],
+            "max_extent": [
+              1.4,
+              1.25,
+              0.9
+            ],
+            "resolved_extent": [
+              0.476,
+              0.784,
+              0.406
+            ],
+            "physical_contract": "PASS",
+            "adjustment_reasons": []
+          }
+        },
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_bathroom_mirror",
+      "role": "mirror",
+      "kind": "kenney_asset",
+      "runtime_asset": "assets/models/kenney_furniture_kit/bathroomMirror/bathroomMirror.gltf",
+      "material": "glass_soft",
+      "support": "sak_bathroom_back_wall",
+      "assembly_id": "vanity_wall",
+      "transform": {
+        "position": [
+          -1.15,
+          1.32,
+          1.51
+        ],
+        "rotation_degrees": [
+          0.0,
+          180.0,
+          0.0
+        ],
+        "scale": [
+          1.05,
+          1.05,
+          1.05
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "mirror",
+        "asset_id": "bathroom_mirror",
+        "anchors": {
+          "wall_contact": [
+            0,
+            0,
+            0
+          ],
+          "front": [
+            0,
+            0,
+            -1
+          ]
+        },
+        "license": "Kenney CC0",
+        "scale_contract": {
+          "requested_scale": [
+            1.05,
+            1.05,
+            1.05
+          ],
+          "resolved_scale": [
+            1.05,
+            1.05,
+            1.05
+          ],
+          "semantic_floor": 0.0,
+          "physical_size": {
+            "requested_scale": [
+              1.05,
+              1.05,
+              1.05
+            ],
+            "semantic_floor_scale": 0.0,
+            "resolved_scale": [
+              1.05,
+              1.05,
+              1.05
+            ]
+          }
+        },
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_bathroom_toilet",
+      "role": "toilet",
+      "kind": "kenney_asset",
+      "runtime_asset": "assets/models/kenney_furniture_kit/toilet/toilet.gltf",
+      "material": "paper",
+      "support": "sak_bathroom_floor",
+      "assembly_id": "plumbing_wall",
+      "transform": {
+        "position": [
+          0.7,
+          0.07,
+          1.05
+        ],
+        "rotation_degrees": [
+          0.0,
+          180.0,
+          0.0
+        ],
+        "scale": [
+          1.4,
+          1.4,
+          1.4
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "toilet",
+        "asset_id": "toilet",
+        "anchors": {
+          "floor_contact": [
+            0,
+            0,
+            0
+          ],
+          "back": [
+            0,
+            0,
+            1
+          ],
+          "front": [
+            0,
+            0,
+            -1
+          ]
+        },
+        "license": "Kenney CC0",
+        "scale_contract": {
+          "requested_scale": [
+            1.4,
+            1.4,
+            1.4
+          ],
+          "resolved_scale": [
+            1.4,
+            1.4,
+            1.4
+          ],
+          "semantic_floor": 1.2,
+          "physical_size": {
+            "requested_scale": [
+              1.4,
+              1.4,
+              1.4
+            ],
+            "semantic_floor_scale": 1.2,
+            "resolved_scale": [
+              1.4,
+              1.4,
+              1.4
+            ],
+            "native_extent": [
+              0.31255,
+              0.45096,
+              0.47718
+            ],
+            "min_extent": [
+              0.35,
+              0.58,
+              0.55
+            ],
+            "max_extent": [
+              0.9,
+              1.1,
+              1.0
+            ],
+            "resolved_extent": [
+              0.43757,
+              0.63135,
+              0.66805
+            ],
+            "physical_contract": "PASS",
+            "adjustment_reasons": []
+          }
+        },
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_bathroom_tub",
+      "role": "bathtub",
+      "kind": "kenney_asset",
+      "runtime_asset": "assets/models/kenney_furniture_kit/bathtub/bathtub.gltf",
+      "material": "paper",
+      "support": "sak_bathroom_floor",
+      "assembly_id": "wet_zone",
+      "transform": {
+        "position": [
+          0.985,
+          0.07,
+          -0.72
+        ],
+        "rotation_degrees": [
+          0.0,
+          -90.0,
+          0.0
+        ],
+        "scale": [
+          1.25,
+          1.25,
+          1.25
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "bathtub",
+        "asset_id": "bathtub",
+        "anchors": {
+          "floor_contact": [
+            0,
+            0,
+            0
+          ],
+          "front": [
+            0,
+            0,
+            -1
+          ]
+        },
+        "license": "Kenney CC0",
+        "scale_contract": {
+          "requested_scale": [
+            0.82,
+            0.82,
+            0.82
+          ],
+          "resolved_scale": [
+            1.25,
+            1.25,
+            1.25
+          ],
+          "semantic_floor": 1.25,
+          "physical_size": {
+            "requested_scale": [
+              0.82,
+              0.82,
+              0.82
+            ],
+            "semantic_floor_scale": 1.25,
+            "resolved_scale": [
+              1.25,
+              1.25,
+              1.25
+            ],
+            "native_extent": [
+              1.19,
+              0.42,
+              0.56
+            ],
+            "min_extent": [
+              1.45,
+              0.45,
+              0.65
+            ],
+            "max_extent": [
+              2.3,
+              1.0,
+              1.2
+            ],
+            "resolved_extent": [
+              1.4875,
+              0.525,
+              0.7
+            ],
+            "physical_contract": "PASS",
+            "adjustment_reasons": []
+          }
+        },
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_bathroom_shower",
+      "role": "shower_mesh",
+      "kind": "kenney_asset",
+      "runtime_asset": "assets/models/kenney_furniture_kit/showerRound/showerRound.gltf",
+      "material": "glass_soft",
+      "support": "sak_bathroom_floor",
+      "assembly_id": "wet_zone",
+      "transform": {
+        "position": [
+          1.51033,
+          0.07,
+          0.26
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          1.3,
+          1.41678,
+          1.3
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "shower",
+        "asset_id": "shower_round",
+        "anchors": {
+          "floor_contact": [
+            0,
+            0,
+            0
+          ]
+        },
+        "license": "Kenney CC0",
+        "scale_contract": {
+          "requested_scale": [
+            0.62,
+            0.62,
+            0.62
+          ],
+          "resolved_scale": [
+            1.3,
+            1.41678,
+            1.3
+          ],
+          "semantic_floor": 1.3,
+          "physical_size": {
+            "requested_scale": [
+              0.62,
+              0.62,
+              0.62
+            ],
+            "semantic_floor_scale": 1.3,
+            "resolved_scale": [
+              1.3,
+              1.41678,
+              1.3
+            ],
+            "native_extent": [
+              0.56179,
+              1.09403,
+              0.56179
+            ],
+            "min_extent": [
+              0.7,
+              1.55,
+              0.7
+            ],
+            "max_extent": [
+              1.5,
+              2.5,
+              1.5
+            ],
+            "resolved_extent": [
+              0.73033,
+              1.55,
+              0.73033
+            ],
+            "physical_contract": "PASS",
+            "adjustment_reasons": [
+              "axis_1_raised_to_min_extent"
+            ]
+          }
+        },
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_bathroom_trashcan",
+      "role": "utility_prop",
+      "kind": "kenney_asset",
+      "runtime_asset": "assets/models/kenney_furniture_kit/trashcan/trashcan.gltf",
+      "material": "metal_dark",
+      "support": "sak_bathroom_floor",
+      "assembly_id": "utility",
+      "transform": {
+        "position": [
+          -1.7,
+          0.07,
+          -0.52
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.58,
+          0.58,
+          0.58
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "utility_prop",
+        "asset_id": "trashcan",
+        "anchors": {
+          "floor_contact": [
+            0,
+            0,
+            0
+          ]
+        },
+        "license": "Kenney CC0",
+        "scale_contract": {
+          "requested_scale": [
+            0.58,
+            0.58,
+            0.58
+          ],
+          "resolved_scale": [
+            0.58,
+            0.58,
+            0.58
+          ],
+          "semantic_floor": 0.0,
+          "physical_size": {
+            "requested_scale": [
+              0.58,
+              0.58,
+              0.58
+            ],
+            "semantic_floor_scale": 0.0,
+            "resolved_scale": [
+              0.58,
+              0.58,
+              0.58
+            ]
+          }
+        },
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_bathroom_mirror_frame_top",
+      "role": "mirror_frame",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "metal_dark",
+      "support": "sak_bathroom_back_wall",
+      "assembly_id": "vanity_wall",
+      "transform": {
+        "position": [
+          -1.15,
+          1.58,
+          1.505
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.54,
+          0.035,
+          0.018
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "decor",
+        "variant": 0
+      },
+      "attached_to": "sak_bathroom_back_wall"
+    },
+    {
+      "id": "sak_bathroom_mirror_frame_bottom",
+      "role": "mirror_frame",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "metal_dark",
+      "support": "sak_bathroom_back_wall",
+      "assembly_id": "vanity_wall",
+      "transform": {
+        "position": [
+          -1.15,
+          1.06,
+          1.505
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.54,
+          0.035,
+          0.018
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "decor",
+        "variant": 0
+      },
+      "attached_to": "sak_bathroom_back_wall"
+    },
+    {
+      "id": "sak_bathroom_counter_bottle_0",
+      "role": "countertop_prop",
+      "kind": "primitive",
+      "primitive": "cylinder",
+      "material": "accent_orange",
+      "support": "sak_bathroom_vanity_sink",
+      "assembly_id": "vanity_wall",
+      "transform": {
+        "position": [
+          -1.4,
+          0.9349999949932097,
+          1.1155
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.055,
+          0.16,
+          0.055
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "countertop_prop",
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_bathroom_counter_bottle_1",
+      "role": "countertop_prop",
+      "kind": "primitive",
+      "primitive": "cylinder",
+      "material": "accent_cyan",
+      "support": "sak_bathroom_vanity_sink",
+      "assembly_id": "vanity_wall",
+      "transform": {
+        "position": [
+          -1.2955,
+          0.9349999949932097,
+          1.1155
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.055,
+          0.16,
+          0.055
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "countertop_prop",
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_bathroom_counter_bottle_2",
+      "role": "countertop_prop",
+      "kind": "primitive",
+      "primitive": "cylinder",
+      "material": "accent_orange",
+      "support": "sak_bathroom_vanity_sink",
+      "assembly_id": "vanity_wall",
+      "transform": {
+        "position": [
+          -1.1855,
+          0.9349999949932097,
+          1.1155
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.055,
+          0.16,
+          0.055
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "countertop_prop",
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_bathroom_bath_mat",
+      "role": "bath_mat",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "accent_orange",
+      "support": "sak_bathroom_floor",
+      "assembly_id": "wet_zone",
+      "transform": {
+        "position": [
+          0.38,
+          0.095,
+          -0.6
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.72,
+          0.014,
+          0.42
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "floor_detail",
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_bathroom_tub_color_band",
+      "role": "accent_tile",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "accent_cyan",
+      "support": "sak_bathroom_tub",
+      "assembly_id": "wet_zone",
+      "transform": {
+        "position": [
+          0.86,
+          0.695,
+          -1.31
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.86,
+          0.2,
+          0.018
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "wall_detail",
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_bathroom_cool_floor_runner",
+      "role": "bath_mat",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "accent_cyan",
+      "support": "sak_bathroom_floor",
+      "assembly_id": "wet_zone",
+      "transform": {
+        "position": [
+          -0.58,
+          0.097,
+          -0.72
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.82,
+          0.014,
+          0.38
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "floor_detail",
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_bathroom_magenta_floor_runner",
+      "role": "bath_mat",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "accent_magenta",
+      "support": "sak_bathroom_floor",
+      "assembly_id": "wet_zone",
+      "transform": {
+        "position": [
+          0.88,
+          0.098,
+          0.26
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.62,
+          0.014,
+          0.34
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "floor_detail",
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_bathroom_towel_rail",
+      "role": "wall_storage",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "metal_dark",
+      "support": "sak_bathroom_left_wall",
+      "assembly_id": "vanity_wall",
+      "transform": {
+        "position": [
+          -1.78,
+          1.28,
+          0.08
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.035,
+          0.035,
+          0.74
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "wall_storage",
+        "variant": 0
+      },
+      "attached_to": "sak_bathroom_left_wall"
+    },
+    {
+      "id": "sak_bathroom_towel_0",
+      "role": "soft_prop",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "accent_cyan",
+      "support": "sak_bathroom_towel_rail",
+      "assembly_id": "vanity_wall",
+      "transform": {
+        "position": [
+          -1.8,
+          1.4175,
+          0.08
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.028,
+          0.24,
+          0.34
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "soft_prop",
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_bathroom_towel_1",
+      "role": "soft_prop",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "paper",
+      "support": "sak_bathroom_towel_rail",
+      "assembly_id": "vanity_wall",
+      "transform": {
+        "position": [
+          -1.8,
+          1.4175,
+          0.08
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.028,
+          0.24,
+          0.34
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "soft_prop",
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_bathroom_floor_grout_x_0",
+      "role": "tile_grout",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "paper",
+      "support": "sak_bathroom_floor",
+      "assembly_id": "floor_detail",
+      "transform": {
+        "position": [
+          -1.62,
+          0.082,
+          -0.03
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.014,
+          0.008,
+          2.82
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "floor_detail",
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_bathroom_floor_grout_x_1",
+      "role": "tile_grout",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "paper",
+      "support": "sak_bathroom_floor",
+      "assembly_id": "floor_detail",
+      "transform": {
+        "position": [
+          -1.24,
+          0.082,
+          -0.03
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.014,
+          0.008,
+          2.82
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "floor_detail",
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_bathroom_floor_grout_x_2",
+      "role": "tile_grout",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "paper",
+      "support": "sak_bathroom_floor",
+      "assembly_id": "floor_detail",
+      "transform": {
+        "position": [
+          -0.86,
+          0.082,
+          -0.03
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.014,
+          0.008,
+          2.82
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "floor_detail",
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_bathroom_floor_grout_x_3",
+      "role": "tile_grout",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "paper",
+      "support": "sak_bathroom_floor",
+      "assembly_id": "floor_detail",
+      "transform": {
+        "position": [
+          -0.48,
+          0.082,
+          -0.03
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.014,
+          0.008,
+          2.82
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "floor_detail",
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_bathroom_floor_grout_x_4",
+      "role": "tile_grout",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "paper",
+      "support": "sak_bathroom_floor",
+      "assembly_id": "floor_detail",
+      "transform": {
+        "position": [
+          -0.1,
+          0.082,
+          -0.03
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.014,
+          0.008,
+          2.82
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "floor_detail",
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_bathroom_floor_grout_x_5",
+      "role": "tile_grout",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "paper",
+      "support": "sak_bathroom_floor",
+      "assembly_id": "floor_detail",
+      "transform": {
+        "position": [
+          0.28,
+          0.082,
+          -0.03
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.014,
+          0.008,
+          2.82
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "floor_detail",
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_bathroom_floor_grout_x_6",
+      "role": "tile_grout",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "paper",
+      "support": "sak_bathroom_floor",
+      "assembly_id": "floor_detail",
+      "transform": {
+        "position": [
+          0.66,
+          0.082,
+          -0.03
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.014,
+          0.008,
+          2.82
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "floor_detail",
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_bathroom_floor_grout_x_7",
+      "role": "tile_grout",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "paper",
+      "support": "sak_bathroom_floor",
+      "assembly_id": "floor_detail",
+      "transform": {
+        "position": [
+          1.04,
+          0.082,
+          -0.03
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.014,
+          0.008,
+          2.82
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "floor_detail",
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_bathroom_floor_grout_x_8",
+      "role": "tile_grout",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "paper",
+      "support": "sak_bathroom_floor",
+      "assembly_id": "floor_detail",
+      "transform": {
+        "position": [
+          1.42,
+          0.082,
+          -0.03
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.014,
+          0.008,
+          2.82
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "floor_detail",
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_bathroom_floor_grout_z_0",
+      "role": "tile_grout",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "paper",
+      "support": "sak_bathroom_floor",
+      "assembly_id": "floor_detail",
+      "transform": {
+        "position": [
+          -0.04,
+          0.083,
+          -1.18
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          3.52,
+          0.008,
+          0.014
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "floor_detail",
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_bathroom_floor_grout_z_1",
+      "role": "tile_grout",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "paper",
+      "support": "sak_bathroom_floor",
+      "assembly_id": "floor_detail",
+      "transform": {
+        "position": [
+          -0.04,
+          0.083,
+          -0.8
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          3.52,
+          0.008,
+          0.014
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "floor_detail",
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_bathroom_floor_grout_z_2",
+      "role": "tile_grout",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "paper",
+      "support": "sak_bathroom_floor",
+      "assembly_id": "floor_detail",
+      "transform": {
+        "position": [
+          -0.04,
+          0.083,
+          -0.42
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          3.52,
+          0.008,
+          0.014
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "floor_detail",
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_bathroom_floor_grout_z_3",
+      "role": "tile_grout",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "paper",
+      "support": "sak_bathroom_floor",
+      "assembly_id": "floor_detail",
+      "transform": {
+        "position": [
+          -0.04,
+          0.083,
+          -0.04
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          3.52,
+          0.008,
+          0.014
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "floor_detail",
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_bathroom_floor_grout_z_4",
+      "role": "tile_grout",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "paper",
+      "support": "sak_bathroom_floor",
+      "assembly_id": "floor_detail",
+      "transform": {
+        "position": [
+          -0.04,
+          0.083,
+          0.34
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          3.52,
+          0.008,
+          0.014
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "floor_detail",
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_bathroom_floor_grout_z_5",
+      "role": "tile_grout",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "paper",
+      "support": "sak_bathroom_floor",
+      "assembly_id": "floor_detail",
+      "transform": {
+        "position": [
+          -0.04,
+          0.083,
+          0.72
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          3.52,
+          0.008,
+          0.014
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "floor_detail",
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_bathroom_floor_grout_z_6",
+      "role": "tile_grout",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "paper",
+      "support": "sak_bathroom_floor",
+      "assembly_id": "floor_detail",
+      "transform": {
+        "position": [
+          -0.04,
+          0.083,
+          1.1
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          3.52,
+          0.008,
+          0.014
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "floor_detail",
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_bathroom_vanity_light_0",
+      "role": "wall_light",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "warm_light",
+      "support": "sak_bathroom_back_wall",
+      "assembly_id": "lighting",
+      "transform": {
+        "position": [
+          -1.32,
+          1.78,
+          1.515
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.16,
+          0.08,
+          0.016
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "light",
+        "variant": 0
+      },
+      "attached_to": "sak_bathroom_back_wall"
+    },
+    {
+      "id": "sak_bathroom_vanity_light_1",
+      "role": "wall_light",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "warm_light",
+      "support": "sak_bathroom_back_wall",
+      "assembly_id": "lighting",
+      "transform": {
+        "position": [
+          -0.78,
+          1.78,
+          1.515
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.16,
+          0.08,
+          0.016
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "light",
+        "variant": 0
+      },
+      "attached_to": "sak_bathroom_back_wall"
+    },
+    {
+      "id": "sak_bathroom_vanity_light_2",
+      "role": "wall_light",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "warm_light",
+      "support": "sak_bathroom_back_wall",
+      "assembly_id": "lighting",
+      "transform": {
+        "position": [
+          -0.24,
+          1.78,
+          1.515
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.16,
+          0.08,
+          0.016
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "light",
+        "variant": 0
+      },
+      "attached_to": "sak_bathroom_back_wall"
+    },
+    {
+      "id": "sak_bathroom_accent_tile_0",
+      "role": "accent_tile",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "accent_cyan",
+      "support": "sak_bathroom_back_wall",
+      "assembly_id": "wall_dressing",
+      "transform": {
+        "position": [
+          -1.62,
+          1.7,
+          1.515
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.22,
+          0.18,
+          0.014
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "wall_detail",
+        "variant": 0
+      },
+      "attached_to": "sak_bathroom_back_wall"
+    },
+    {
+      "id": "sak_bathroom_accent_tile_1",
+      "role": "accent_tile",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "accent_orange",
+      "support": "sak_bathroom_back_wall",
+      "assembly_id": "wall_dressing",
+      "transform": {
+        "position": [
+          -0.28,
+          1.48,
+          1.515
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.22,
+          0.18,
+          0.014
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "wall_detail",
+        "variant": 0
+      },
+      "attached_to": "sak_bathroom_back_wall"
+    },
+    {
+      "id": "sak_bathroom_accent_tile_2",
+      "role": "accent_tile",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "accent_magenta",
+      "support": "sak_bathroom_back_wall",
+      "assembly_id": "wall_dressing",
+      "transform": {
+        "position": [
+          0.86,
+          1.64,
+          1.515
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.22,
+          0.18,
+          0.014
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "wall_detail",
+        "variant": 0
+      },
+      "attached_to": "sak_bathroom_back_wall"
+    },
+    {
+      "id": "sak_bathroom_accent_tile_3",
+      "role": "accent_tile",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "accent_cyan",
+      "support": "sak_bathroom_back_wall",
+      "assembly_id": "wall_dressing",
+      "transform": {
+        "position": [
+          1.48,
+          1.18,
+          1.515
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.22,
+          0.18,
+          0.014
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "wall_detail",
+        "variant": 0
+      },
+      "attached_to": "sak_bathroom_back_wall"
+    },
+    {
+      "id": "sak_bathroom_left_color_column_0",
+      "role": "accent_tile",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "accent_cyan",
+      "support": "sak_bathroom_left_wall",
+      "assembly_id": "wall_dressing",
+      "transform": {
+        "position": [
+          -1.912,
+          1.28,
+          -0.78
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.014,
+          0.72,
+          0.42
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "wall_detail",
+        "variant": 0
+      },
+      "attached_to": "sak_bathroom_left_wall"
+    },
+    {
+      "id": "sak_bathroom_left_color_column_1",
+      "role": "accent_tile",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "accent_magenta",
+      "support": "sak_bathroom_left_wall",
+      "assembly_id": "wall_dressing",
+      "transform": {
+        "position": [
+          -1.912,
+          1.28,
+          -0.3
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.014,
+          0.72,
+          0.42
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "wall_detail",
+        "variant": 0
+      },
+      "attached_to": "sak_bathroom_left_wall"
+    },
+    {
+      "id": "sak_bathroom_left_color_column_2",
+      "role": "accent_tile",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "accent_orange",
+      "support": "sak_bathroom_left_wall",
+      "assembly_id": "wall_dressing",
+      "transform": {
+        "position": [
+          -1.912,
+          1.28,
+          0.18
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.014,
+          0.72,
+          0.42
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "wall_detail",
+        "variant": 0
+      },
+      "attached_to": "sak_bathroom_left_wall"
+    },
+    {
+      "id": "sak_bathroom_left_large_color_field",
+      "role": "accent_tile",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "accent_magenta",
+      "support": "sak_bathroom_left_wall",
+      "assembly_id": "wall_dressing",
+      "transform": {
+        "position": [
+          -1.914,
+          1.62,
+          -0.88
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.016,
+          0.92,
+          0.76
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "wall_detail",
+        "variant": 0
+      },
+      "attached_to": "sak_bathroom_left_wall"
+    },
+    {
+      "id": "sak_bathroom_left_large_cool_field",
+      "role": "accent_tile",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "accent_cyan",
+      "support": "sak_bathroom_left_wall",
+      "assembly_id": "wall_dressing",
+      "transform": {
+        "position": [
+          -1.916,
+          1.18,
+          -0.18
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.016,
+          0.74,
+          0.64
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "wall_detail",
+        "variant": 0
+      },
+      "attached_to": "sak_bathroom_left_wall"
+    },
+    {
+      "id": "sak_bathroom_back_large_cool_field",
+      "role": "accent_tile",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "accent_cyan",
+      "support": "sak_bathroom_back_wall",
+      "assembly_id": "wall_dressing",
+      "transform": {
+        "position": [
+          0.38,
+          1.36,
+          1.512
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.42,
+          0.34,
+          0.016
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "wall_detail",
+        "variant": 0
+      },
+      "attached_to": "sak_bathroom_back_wall"
+    },
+    {
+      "id": "sak_bathroom_floor_color_block",
+      "role": "bath_mat",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "accent_magenta",
+      "support": "sak_bathroom_floor",
+      "assembly_id": "wet_zone",
+      "transform": {
+        "position": [
+          -0.92,
+          0.099,
+          0.56
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.68,
+          0.014,
+          0.52
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "floor_detail",
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_bathroom_shower_curtain_color",
+      "role": "soft_prop",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "accent_magenta",
+      "support": "sak_bathroom_shower",
+      "assembly_id": "wet_zone",
+      "transform": {
+        "position": [
+          1.32533,
+          2.11,
+          -0.22
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.56,
+          0.98,
+          0.022
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "soft_prop",
+        "variant": 0
+      }
+    },
+    {
+      "id": "sak_bathroom_side_warm_panel",
+      "role": "palette_accent_panel",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "accent_orange",
+      "support": "sak_bathroom_right_wall",
+      "assembly_id": "wall_dressing",
+      "transform": {
+        "position": [
+          1.912,
+          1.36,
+          -0.64
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.014,
+          0.82,
+          0.52
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "wall_detail",
+        "variant": 0
+      },
+      "attached_to": "sak_bathroom_right_wall"
+    },
+    {
+      "id": "sak_bathroom_side_cool_panel",
+      "role": "palette_accent_panel",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "accent_cyan",
+      "support": "sak_bathroom_right_wall",
+      "assembly_id": "wall_dressing",
+      "transform": {
+        "position": [
+          1.912,
+          1.74,
+          0.34
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.014,
+          0.52,
+          0.44
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "wall_detail",
+        "variant": 0
+      },
+      "attached_to": "sak_bathroom_right_wall"
+    },
+    {
+      "id": "sak_bathroom_window",
+      "role": "window",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "glass_soft",
+      "support": "sak_bathroom_back_wall",
+      "assembly_id": "wall_dressing",
+      "transform": {
+        "position": [
+          1.58,
+          1.72,
+          1.508
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.38,
+          0.3,
+          0.014
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "window",
+        "variant": 0
+      },
+      "attached_to": "sak_bathroom_back_wall"
+    },
+    {
+      "id": "sak_bathroom_window_glow",
+      "role": "palette_accent_panel",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "paper",
+      "support": "sak_bathroom_back_wall",
+      "assembly_id": "lighting",
+      "transform": {
+        "position": [
+          1.58,
+          1.72,
+          1.494
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.22,
+          0.16,
+          0.01
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "light",
+        "variant": 0
+      },
+      "attached_to": "sak_bathroom_back_wall"
+    }
+  ],
+  "semantic_scene_graph": {
+    "schema": "cortex.scene_authoring_kernel.semantic_graph.v1",
+    "prompt": "clean bathroom with vanity sink mirror bathtub toilet shower tile and soft light",
+    "family": "home_bathroom_day",
+    "variant": 0,
+    "nodes": [
+      {
+        "id": "sak_bathroom_floor",
+        "category": "floor",
+        "role": "room_floor",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_bathroom_back_wall",
+        "category": "wall",
+        "role": "room_wall",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_bathroom_left_wall",
+        "category": "wall",
+        "role": "room_wall",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_bathroom_right_wall",
+        "category": "wall",
+        "role": "room_wall",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_bathroom_ceiling",
+        "category": "ceiling",
+        "role": "room_ceiling",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_bathroom_base_trim_back",
+        "category": "wall_detail",
+        "role": "architectural_baseboard",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_bathroom_base_trim_left",
+        "category": "wall_detail",
+        "role": "architectural_baseboard",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_bathroom_base_trim_right",
+        "category": "wall_detail",
+        "role": "architectural_baseboard",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_bathroom_crown_trim_back",
+        "category": "wall_detail",
+        "role": "architectural_baseboard",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_bathroom_crown_trim_left",
+        "category": "wall_detail",
+        "role": "architectural_baseboard",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_bathroom_crown_trim_right",
+        "category": "wall_detail",
+        "role": "architectural_baseboard",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_bathroom_corner_post_0",
+        "category": "wall_detail",
+        "role": "architectural_corner_post",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_bathroom_corner_post_1",
+        "category": "wall_detail",
+        "role": "architectural_corner_post",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_bathroom_back_wall_vertical_trim_0",
+        "category": "wall_detail",
+        "role": "wall_panel_trim",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_bathroom_back_wall_vertical_trim_1",
+        "category": "wall_detail",
+        "role": "wall_panel_trim",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_bathroom_back_wall_vertical_trim_2",
+        "category": "wall_detail",
+        "role": "wall_panel_trim",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_bathroom_back_wall_vertical_trim_3",
+        "category": "wall_detail",
+        "role": "wall_panel_trim",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_bathroom_back_wall_vertical_trim_4",
+        "category": "wall_detail",
+        "role": "wall_panel_trim",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_bathroom_back_wall_horizontal_trim_0",
+        "category": "wall_detail",
+        "role": "wall_panel_trim",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_bathroom_back_wall_horizontal_trim_1",
+        "category": "wall_detail",
+        "role": "wall_panel_trim",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_bathroom_back_wall_horizontal_trim_2",
+        "category": "wall_detail",
+        "role": "wall_panel_trim",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_bathroom_left_wall_vertical_trim_0",
+        "category": "wall_detail",
+        "role": "wall_panel_trim",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_bathroom_left_wall_vertical_trim_1",
+        "category": "wall_detail",
+        "role": "wall_panel_trim",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_bathroom_left_wall_vertical_trim_2",
+        "category": "wall_detail",
+        "role": "wall_panel_trim",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_bathroom_right_wall_vertical_trim_0",
+        "category": "wall_detail",
+        "role": "wall_panel_trim",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_bathroom_right_wall_vertical_trim_1",
+        "category": "wall_detail",
+        "role": "wall_panel_trim",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_bathroom_right_wall_vertical_trim_2",
+        "category": "wall_detail",
+        "role": "wall_panel_trim",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_bathroom_vanity_sink",
+        "category": "sink",
+        "role": "sink",
+        "asset_id": "bathroom_sink",
+        "anchors": {
+          "floor_contact": [
+            0,
+            0,
+            0
+          ],
+          "back": [
+            0,
+            0,
+            1
+          ],
+          "front": [
+            0,
+            0,
+            -1
+          ]
+        },
+        "constraints": []
+      },
+      {
+        "id": "sak_bathroom_mirror",
+        "category": "mirror",
+        "role": "mirror",
+        "asset_id": "bathroom_mirror",
+        "anchors": {
+          "wall_contact": [
+            0,
+            0,
+            0
+          ],
+          "front": [
+            0,
+            0,
+            -1
+          ]
+        },
+        "constraints": []
+      },
+      {
+        "id": "sak_bathroom_toilet",
+        "category": "toilet",
+        "role": "toilet",
+        "asset_id": "toilet",
+        "anchors": {
+          "floor_contact": [
+            0,
+            0,
+            0
+          ],
+          "back": [
+            0,
+            0,
+            1
+          ],
+          "front": [
+            0,
+            0,
+            -1
+          ]
+        },
+        "constraints": []
+      },
+      {
+        "id": "sak_bathroom_tub",
+        "category": "bathtub",
+        "role": "bathtub",
+        "asset_id": "bathtub",
+        "anchors": {
+          "floor_contact": [
+            0,
+            0,
+            0
+          ],
+          "front": [
+            0,
+            0,
+            -1
+          ]
+        },
+        "constraints": []
+      },
+      {
+        "id": "sak_bathroom_shower",
+        "category": "shower",
+        "role": "shower_mesh",
+        "asset_id": "shower_round",
+        "anchors": {
+          "floor_contact": [
+            0,
+            0,
+            0
+          ]
+        },
+        "constraints": []
+      },
+      {
+        "id": "sak_bathroom_trashcan",
+        "category": "utility_prop",
+        "role": "utility_prop",
+        "asset_id": "trashcan",
+        "anchors": {
+          "floor_contact": [
+            0,
+            0,
+            0
+          ]
+        },
+        "constraints": []
+      },
+      {
+        "id": "sak_bathroom_mirror_frame_top",
+        "category": "decor",
+        "role": "mirror_frame",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_bathroom_mirror_frame_bottom",
+        "category": "decor",
+        "role": "mirror_frame",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_bathroom_counter_bottle_0",
+        "category": "countertop_prop",
+        "role": "countertop_prop",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_bathroom_counter_bottle_1",
+        "category": "countertop_prop",
+        "role": "countertop_prop",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_bathroom_counter_bottle_2",
+        "category": "countertop_prop",
+        "role": "countertop_prop",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_bathroom_bath_mat",
+        "category": "floor_detail",
+        "role": "bath_mat",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_bathroom_tub_color_band",
+        "category": "wall_detail",
+        "role": "accent_tile",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_bathroom_cool_floor_runner",
+        "category": "floor_detail",
+        "role": "bath_mat",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_bathroom_magenta_floor_runner",
+        "category": "floor_detail",
+        "role": "bath_mat",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_bathroom_towel_rail",
+        "category": "wall_storage",
+        "role": "wall_storage",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_bathroom_towel_0",
+        "category": "soft_prop",
+        "role": "soft_prop",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_bathroom_towel_1",
+        "category": "soft_prop",
+        "role": "soft_prop",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_bathroom_floor_grout_x_0",
+        "category": "floor_detail",
+        "role": "tile_grout",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_bathroom_floor_grout_x_1",
+        "category": "floor_detail",
+        "role": "tile_grout",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_bathroom_floor_grout_x_2",
+        "category": "floor_detail",
+        "role": "tile_grout",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_bathroom_floor_grout_x_3",
+        "category": "floor_detail",
+        "role": "tile_grout",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_bathroom_floor_grout_x_4",
+        "category": "floor_detail",
+        "role": "tile_grout",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_bathroom_floor_grout_x_5",
+        "category": "floor_detail",
+        "role": "tile_grout",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_bathroom_floor_grout_x_6",
+        "category": "floor_detail",
+        "role": "tile_grout",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_bathroom_floor_grout_x_7",
+        "category": "floor_detail",
+        "role": "tile_grout",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_bathroom_floor_grout_x_8",
+        "category": "floor_detail",
+        "role": "tile_grout",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_bathroom_floor_grout_z_0",
+        "category": "floor_detail",
+        "role": "tile_grout",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_bathroom_floor_grout_z_1",
+        "category": "floor_detail",
+        "role": "tile_grout",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_bathroom_floor_grout_z_2",
+        "category": "floor_detail",
+        "role": "tile_grout",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_bathroom_floor_grout_z_3",
+        "category": "floor_detail",
+        "role": "tile_grout",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_bathroom_floor_grout_z_4",
+        "category": "floor_detail",
+        "role": "tile_grout",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_bathroom_floor_grout_z_5",
+        "category": "floor_detail",
+        "role": "tile_grout",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_bathroom_floor_grout_z_6",
+        "category": "floor_detail",
+        "role": "tile_grout",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_bathroom_vanity_light_0",
+        "category": "light",
+        "role": "wall_light",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_bathroom_vanity_light_1",
+        "category": "light",
+        "role": "wall_light",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_bathroom_vanity_light_2",
+        "category": "light",
+        "role": "wall_light",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_bathroom_accent_tile_0",
+        "category": "wall_detail",
+        "role": "accent_tile",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_bathroom_accent_tile_1",
+        "category": "wall_detail",
+        "role": "accent_tile",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_bathroom_accent_tile_2",
+        "category": "wall_detail",
+        "role": "accent_tile",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_bathroom_accent_tile_3",
+        "category": "wall_detail",
+        "role": "accent_tile",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_bathroom_left_color_column_0",
+        "category": "wall_detail",
+        "role": "accent_tile",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_bathroom_left_color_column_1",
+        "category": "wall_detail",
+        "role": "accent_tile",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_bathroom_left_color_column_2",
+        "category": "wall_detail",
+        "role": "accent_tile",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_bathroom_left_large_color_field",
+        "category": "wall_detail",
+        "role": "accent_tile",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_bathroom_left_large_cool_field",
+        "category": "wall_detail",
+        "role": "accent_tile",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_bathroom_back_large_cool_field",
+        "category": "wall_detail",
+        "role": "accent_tile",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_bathroom_floor_color_block",
+        "category": "floor_detail",
+        "role": "bath_mat",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_bathroom_shower_curtain_color",
+        "category": "soft_prop",
+        "role": "soft_prop",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_bathroom_side_warm_panel",
+        "category": "wall_detail",
+        "role": "palette_accent_panel",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_bathroom_side_cool_panel",
+        "category": "wall_detail",
+        "role": "palette_accent_panel",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_bathroom_window",
+        "category": "window",
+        "role": "window",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_bathroom_window_glow",
+        "category": "light",
+        "role": "palette_accent_panel",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      }
+    ],
+    "relations": [
+      {
+        "type": "supports",
+        "source": "ground",
+        "target": "sak_bathroom_floor",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_bathroom_floor",
+        "target": "room_shell",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "ground",
+        "target": "sak_bathroom_back_wall",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_bathroom_back_wall",
+        "target": "room_shell",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "ground",
+        "target": "sak_bathroom_left_wall",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_bathroom_left_wall",
+        "target": "room_shell",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "ground",
+        "target": "sak_bathroom_right_wall",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_bathroom_right_wall",
+        "target": "room_shell",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "ground",
+        "target": "sak_bathroom_ceiling",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_bathroom_ceiling",
+        "target": "room_shell",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_bathroom_floor",
+        "target": "sak_bathroom_base_trim_back",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_bathroom_base_trim_back",
+        "target": "room_shell",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_bathroom_floor",
+        "target": "sak_bathroom_base_trim_left",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_bathroom_base_trim_left",
+        "target": "room_shell",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_bathroom_floor",
+        "target": "sak_bathroom_base_trim_right",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_bathroom_base_trim_right",
+        "target": "room_shell",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_bathroom_floor",
+        "target": "sak_bathroom_crown_trim_back",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_bathroom_crown_trim_back",
+        "target": "room_shell",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_bathroom_floor",
+        "target": "sak_bathroom_crown_trim_left",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_bathroom_crown_trim_left",
+        "target": "room_shell",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_bathroom_floor",
+        "target": "sak_bathroom_crown_trim_right",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_bathroom_crown_trim_right",
+        "target": "room_shell",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_bathroom_floor",
+        "target": "sak_bathroom_corner_post_0",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_bathroom_corner_post_0",
+        "target": "room_shell",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_bathroom_floor",
+        "target": "sak_bathroom_corner_post_1",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_bathroom_corner_post_1",
+        "target": "room_shell",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_bathroom_floor",
+        "target": "sak_bathroom_back_wall_vertical_trim_0",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_bathroom_back_wall_vertical_trim_0",
+        "target": "room_shell",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_bathroom_floor",
+        "target": "sak_bathroom_back_wall_vertical_trim_1",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_bathroom_back_wall_vertical_trim_1",
+        "target": "room_shell",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_bathroom_floor",
+        "target": "sak_bathroom_back_wall_vertical_trim_2",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_bathroom_back_wall_vertical_trim_2",
+        "target": "room_shell",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_bathroom_floor",
+        "target": "sak_bathroom_back_wall_vertical_trim_3",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_bathroom_back_wall_vertical_trim_3",
+        "target": "room_shell",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_bathroom_floor",
+        "target": "sak_bathroom_back_wall_vertical_trim_4",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_bathroom_back_wall_vertical_trim_4",
+        "target": "room_shell",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_bathroom_floor",
+        "target": "sak_bathroom_back_wall_horizontal_trim_0",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_bathroom_back_wall_horizontal_trim_0",
+        "target": "room_shell",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_bathroom_floor",
+        "target": "sak_bathroom_back_wall_horizontal_trim_1",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_bathroom_back_wall_horizontal_trim_1",
+        "target": "room_shell",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_bathroom_floor",
+        "target": "sak_bathroom_back_wall_horizontal_trim_2",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_bathroom_back_wall_horizontal_trim_2",
+        "target": "room_shell",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_bathroom_floor",
+        "target": "sak_bathroom_left_wall_vertical_trim_0",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_bathroom_left_wall_vertical_trim_0",
+        "target": "room_shell",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_bathroom_floor",
+        "target": "sak_bathroom_left_wall_vertical_trim_1",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_bathroom_left_wall_vertical_trim_1",
+        "target": "room_shell",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_bathroom_floor",
+        "target": "sak_bathroom_left_wall_vertical_trim_2",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_bathroom_left_wall_vertical_trim_2",
+        "target": "room_shell",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_bathroom_floor",
+        "target": "sak_bathroom_right_wall_vertical_trim_0",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_bathroom_right_wall_vertical_trim_0",
+        "target": "room_shell",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_bathroom_floor",
+        "target": "sak_bathroom_right_wall_vertical_trim_1",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_bathroom_right_wall_vertical_trim_1",
+        "target": "room_shell",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_bathroom_floor",
+        "target": "sak_bathroom_right_wall_vertical_trim_2",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_bathroom_right_wall_vertical_trim_2",
+        "target": "room_shell",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_bathroom_floor",
+        "target": "sak_bathroom_vanity_sink",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_bathroom_vanity_sink",
+        "target": "vanity_wall",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_bathroom_back_wall",
+        "target": "sak_bathroom_mirror",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_bathroom_mirror",
+        "target": "vanity_wall",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_bathroom_floor",
+        "target": "sak_bathroom_toilet",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_bathroom_toilet",
+        "target": "plumbing_wall",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_bathroom_floor",
+        "target": "sak_bathroom_tub",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_bathroom_tub",
+        "target": "wet_zone",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_bathroom_floor",
+        "target": "sak_bathroom_shower",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_bathroom_shower",
+        "target": "wet_zone",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_bathroom_floor",
+        "target": "sak_bathroom_trashcan",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_bathroom_trashcan",
+        "target": "utility",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_bathroom_back_wall",
+        "target": "sak_bathroom_mirror_frame_top",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "attached_to",
+        "source": "sak_bathroom_mirror_frame_top",
+        "target": "sak_bathroom_back_wall",
+        "reason": "constructor_attachment"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_bathroom_mirror_frame_top",
+        "target": "vanity_wall",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_bathroom_back_wall",
+        "target": "sak_bathroom_mirror_frame_bottom",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "attached_to",
+        "source": "sak_bathroom_mirror_frame_bottom",
+        "target": "sak_bathroom_back_wall",
+        "reason": "constructor_attachment"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_bathroom_mirror_frame_bottom",
+        "target": "vanity_wall",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_bathroom_vanity_sink",
+        "target": "sak_bathroom_counter_bottle_0",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_bathroom_counter_bottle_0",
+        "target": "vanity_wall",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_bathroom_vanity_sink",
+        "target": "sak_bathroom_counter_bottle_1",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_bathroom_counter_bottle_1",
+        "target": "vanity_wall",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_bathroom_vanity_sink",
+        "target": "sak_bathroom_counter_bottle_2",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_bathroom_counter_bottle_2",
+        "target": "vanity_wall",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_bathroom_floor",
+        "target": "sak_bathroom_bath_mat",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_bathroom_bath_mat",
+        "target": "wet_zone",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_bathroom_tub",
+        "target": "sak_bathroom_tub_color_band",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_bathroom_tub_color_band",
+        "target": "wet_zone",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_bathroom_floor",
+        "target": "sak_bathroom_cool_floor_runner",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_bathroom_cool_floor_runner",
+        "target": "wet_zone",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_bathroom_floor",
+        "target": "sak_bathroom_magenta_floor_runner",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_bathroom_magenta_floor_runner",
+        "target": "wet_zone",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_bathroom_left_wall",
+        "target": "sak_bathroom_towel_rail",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "attached_to",
+        "source": "sak_bathroom_towel_rail",
+        "target": "sak_bathroom_left_wall",
+        "reason": "constructor_attachment"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_bathroom_towel_rail",
+        "target": "vanity_wall",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_bathroom_towel_rail",
+        "target": "sak_bathroom_towel_0",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_bathroom_towel_0",
+        "target": "vanity_wall",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_bathroom_towel_rail",
+        "target": "sak_bathroom_towel_1",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_bathroom_towel_1",
+        "target": "vanity_wall",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_bathroom_floor",
+        "target": "sak_bathroom_floor_grout_x_0",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_bathroom_floor_grout_x_0",
+        "target": "floor_detail",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_bathroom_floor",
+        "target": "sak_bathroom_floor_grout_x_1",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_bathroom_floor_grout_x_1",
+        "target": "floor_detail",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_bathroom_floor",
+        "target": "sak_bathroom_floor_grout_x_2",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_bathroom_floor_grout_x_2",
+        "target": "floor_detail",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_bathroom_floor",
+        "target": "sak_bathroom_floor_grout_x_3",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_bathroom_floor_grout_x_3",
+        "target": "floor_detail",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_bathroom_floor",
+        "target": "sak_bathroom_floor_grout_x_4",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_bathroom_floor_grout_x_4",
+        "target": "floor_detail",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_bathroom_floor",
+        "target": "sak_bathroom_floor_grout_x_5",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_bathroom_floor_grout_x_5",
+        "target": "floor_detail",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_bathroom_floor",
+        "target": "sak_bathroom_floor_grout_x_6",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_bathroom_floor_grout_x_6",
+        "target": "floor_detail",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_bathroom_floor",
+        "target": "sak_bathroom_floor_grout_x_7",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_bathroom_floor_grout_x_7",
+        "target": "floor_detail",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_bathroom_floor",
+        "target": "sak_bathroom_floor_grout_x_8",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_bathroom_floor_grout_x_8",
+        "target": "floor_detail",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_bathroom_floor",
+        "target": "sak_bathroom_floor_grout_z_0",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_bathroom_floor_grout_z_0",
+        "target": "floor_detail",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_bathroom_floor",
+        "target": "sak_bathroom_floor_grout_z_1",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_bathroom_floor_grout_z_1",
+        "target": "floor_detail",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_bathroom_floor",
+        "target": "sak_bathroom_floor_grout_z_2",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_bathroom_floor_grout_z_2",
+        "target": "floor_detail",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_bathroom_floor",
+        "target": "sak_bathroom_floor_grout_z_3",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_bathroom_floor_grout_z_3",
+        "target": "floor_detail",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_bathroom_floor",
+        "target": "sak_bathroom_floor_grout_z_4",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_bathroom_floor_grout_z_4",
+        "target": "floor_detail",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_bathroom_floor",
+        "target": "sak_bathroom_floor_grout_z_5",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_bathroom_floor_grout_z_5",
+        "target": "floor_detail",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_bathroom_floor",
+        "target": "sak_bathroom_floor_grout_z_6",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_bathroom_floor_grout_z_6",
+        "target": "floor_detail",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_bathroom_back_wall",
+        "target": "sak_bathroom_vanity_light_0",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "attached_to",
+        "source": "sak_bathroom_vanity_light_0",
+        "target": "sak_bathroom_back_wall",
+        "reason": "constructor_attachment"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_bathroom_vanity_light_0",
+        "target": "lighting",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_bathroom_back_wall",
+        "target": "sak_bathroom_vanity_light_1",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "attached_to",
+        "source": "sak_bathroom_vanity_light_1",
+        "target": "sak_bathroom_back_wall",
+        "reason": "constructor_attachment"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_bathroom_vanity_light_1",
+        "target": "lighting",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_bathroom_back_wall",
+        "target": "sak_bathroom_vanity_light_2",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "attached_to",
+        "source": "sak_bathroom_vanity_light_2",
+        "target": "sak_bathroom_back_wall",
+        "reason": "constructor_attachment"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_bathroom_vanity_light_2",
+        "target": "lighting",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_bathroom_back_wall",
+        "target": "sak_bathroom_accent_tile_0",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "attached_to",
+        "source": "sak_bathroom_accent_tile_0",
+        "target": "sak_bathroom_back_wall",
+        "reason": "constructor_attachment"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_bathroom_accent_tile_0",
+        "target": "wall_dressing",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_bathroom_back_wall",
+        "target": "sak_bathroom_accent_tile_1",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "attached_to",
+        "source": "sak_bathroom_accent_tile_1",
+        "target": "sak_bathroom_back_wall",
+        "reason": "constructor_attachment"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_bathroom_accent_tile_1",
+        "target": "wall_dressing",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_bathroom_back_wall",
+        "target": "sak_bathroom_accent_tile_2",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "attached_to",
+        "source": "sak_bathroom_accent_tile_2",
+        "target": "sak_bathroom_back_wall",
+        "reason": "constructor_attachment"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_bathroom_accent_tile_2",
+        "target": "wall_dressing",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_bathroom_back_wall",
+        "target": "sak_bathroom_accent_tile_3",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "attached_to",
+        "source": "sak_bathroom_accent_tile_3",
+        "target": "sak_bathroom_back_wall",
+        "reason": "constructor_attachment"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_bathroom_accent_tile_3",
+        "target": "wall_dressing",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_bathroom_left_wall",
+        "target": "sak_bathroom_left_color_column_0",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "attached_to",
+        "source": "sak_bathroom_left_color_column_0",
+        "target": "sak_bathroom_left_wall",
+        "reason": "constructor_attachment"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_bathroom_left_color_column_0",
+        "target": "wall_dressing",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_bathroom_left_wall",
+        "target": "sak_bathroom_left_color_column_1",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "attached_to",
+        "source": "sak_bathroom_left_color_column_1",
+        "target": "sak_bathroom_left_wall",
+        "reason": "constructor_attachment"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_bathroom_left_color_column_1",
+        "target": "wall_dressing",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_bathroom_left_wall",
+        "target": "sak_bathroom_left_color_column_2",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "attached_to",
+        "source": "sak_bathroom_left_color_column_2",
+        "target": "sak_bathroom_left_wall",
+        "reason": "constructor_attachment"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_bathroom_left_color_column_2",
+        "target": "wall_dressing",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_bathroom_left_wall",
+        "target": "sak_bathroom_left_large_color_field",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "attached_to",
+        "source": "sak_bathroom_left_large_color_field",
+        "target": "sak_bathroom_left_wall",
+        "reason": "constructor_attachment"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_bathroom_left_large_color_field",
+        "target": "wall_dressing",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_bathroom_left_wall",
+        "target": "sak_bathroom_left_large_cool_field",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "attached_to",
+        "source": "sak_bathroom_left_large_cool_field",
+        "target": "sak_bathroom_left_wall",
+        "reason": "constructor_attachment"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_bathroom_left_large_cool_field",
+        "target": "wall_dressing",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_bathroom_back_wall",
+        "target": "sak_bathroom_back_large_cool_field",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "attached_to",
+        "source": "sak_bathroom_back_large_cool_field",
+        "target": "sak_bathroom_back_wall",
+        "reason": "constructor_attachment"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_bathroom_back_large_cool_field",
+        "target": "wall_dressing",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_bathroom_floor",
+        "target": "sak_bathroom_floor_color_block",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_bathroom_floor_color_block",
+        "target": "wet_zone",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_bathroom_shower",
+        "target": "sak_bathroom_shower_curtain_color",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_bathroom_shower_curtain_color",
+        "target": "wet_zone",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_bathroom_right_wall",
+        "target": "sak_bathroom_side_warm_panel",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "attached_to",
+        "source": "sak_bathroom_side_warm_panel",
+        "target": "sak_bathroom_right_wall",
+        "reason": "constructor_attachment"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_bathroom_side_warm_panel",
+        "target": "wall_dressing",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_bathroom_right_wall",
+        "target": "sak_bathroom_side_cool_panel",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "attached_to",
+        "source": "sak_bathroom_side_cool_panel",
+        "target": "sak_bathroom_right_wall",
+        "reason": "constructor_attachment"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_bathroom_side_cool_panel",
+        "target": "wall_dressing",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_bathroom_back_wall",
+        "target": "sak_bathroom_window",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "attached_to",
+        "source": "sak_bathroom_window",
+        "target": "sak_bathroom_back_wall",
+        "reason": "constructor_attachment"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_bathroom_window",
+        "target": "wall_dressing",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_bathroom_back_wall",
+        "target": "sak_bathroom_window_glow",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "attached_to",
+        "source": "sak_bathroom_window_glow",
+        "target": "sak_bathroom_back_wall",
+        "reason": "constructor_attachment"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_bathroom_window_glow",
+        "target": "lighting",
+        "reason": "constructor_assembly"
+      }
+    ],
+    "validation_view_overrides": {},
+    "warnings": []
+  },
+  "scene_authoring_kernel_v1": {
+    "prompt": "clean bathroom with vanity sink mirror bathtub toilet shower tile and soft light",
+    "family": "home_bathroom_day",
+    "variant": 0,
+    "graph_node_count": 80,
+    "graph_relation_count": 180,
+    "warnings": [],
+    "completion_claim_allowed": false,
+    "human_review_required": true
+  },
+  "scene_graph_kernel_v1": {
+    "status": "repaired"
+  }
+}

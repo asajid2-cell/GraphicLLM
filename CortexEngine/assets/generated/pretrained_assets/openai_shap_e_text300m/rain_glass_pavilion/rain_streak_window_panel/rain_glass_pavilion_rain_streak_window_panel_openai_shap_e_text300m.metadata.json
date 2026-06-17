@@ -1,0 +1,22 @@
+{
+  "schema": 1,
+  "job_id": "openai_shap_e_text300m/rain_glass_pavilion/rain_streak_window_panel",
+  "prompt": "single rain streaked glass pavilion panel with thin metal frame, transparent material, droplets and condensation texture, modular architectural asset",
+  "seed": 930237,
+  "steps": 16,
+  "guidance_scale": 10.0,
+  "triangle_count": 66144,
+  "bounds_meters": {
+    "min": [
+      -0.11313717812299728,
+      0.0,
+      -0.03999999910593033
+    ],
+    "max": [
+      0.11313717812299728,
+      0.2272692620754242,
+      0.03999999910593033
+    ]
+  },
+  "raw_generator": "openai_shap_e_text300m"
+}

@@ -1,0 +1,5889 @@
+{
+  "schema": "cortex.model_authored_scene_seed.v1",
+  "id": "sak_small_store_day_small_retail_store_with_checkout_counter_product_shelves_boxes_signs_and_v2",
+  "scene_family": "small_store_day",
+  "status": "MODEL_AUTHORED_SCENE_GRAPH_KERNEL_V1_REPAIRED",
+  "generator": {
+    "name": "scene_authoring_kernel_v1",
+    "mode": "brief_to_semantic_graph_to_seed",
+    "prompt": "small retail store with checkout counter product shelves boxes signs and aisle lighting",
+    "construction_layers": [
+      "brief_compiler_v1",
+      "semantic_graph_native_constructor_v1",
+      "asset_affordance_catalog_v1",
+      "assembly_template_solver_v1",
+      "scene_graph_kernel_v1"
+    ]
+  },
+  "environment": {
+    "preset": "neutral_procedural",
+    "art_lighting_preset": "scene_local_authoring_kernel",
+    "graphics_preset": "hero_final_art",
+    "ibl_enabled": false,
+    "ibl_diffuse_intensity": 0.0,
+    "ibl_specular_intensity": 0.0,
+    "allow_hdri_background": false,
+    "allow_hdri_reflections": false,
+    "visible_background": "authored_geometry_only",
+    "ambient_source": "scene_authored_lights",
+    "reflection_policy": "scene_local_no_hdri"
+  },
+  "camera": {
+    "position": [
+      -2.2,
+      1.42,
+      -1.7
+    ],
+    "target": [
+      0.35,
+      0.94,
+      0.52
+    ],
+    "fov": 59.0,
+    "class": "hero"
+  },
+  "validation_view_overrides": {},
+  "materials": {
+    "room_wall_warm": {
+      "color": [
+        0.62,
+        0.58,
+        0.5,
+        1.0
+      ],
+      "metallic": 0.0,
+      "roughness": 0.82,
+      "preset": "paint"
+    },
+    "room_wall_cool": {
+      "color": [
+        0.48,
+        0.56,
+        0.62,
+        1.0
+      ],
+      "metallic": 0.0,
+      "roughness": 0.84,
+      "preset": "paint"
+    },
+    "dark_wall": {
+      "color": [
+        0.05,
+        0.045,
+        0.055,
+        1.0
+      ],
+      "metallic": 0.0,
+      "roughness": 0.78,
+      "preset": "paint"
+    },
+    "floor_tile": {
+      "color": [
+        0.42,
+        0.43,
+        0.41,
+        1.0
+      ],
+      "metallic": 0.0,
+      "roughness": 0.74,
+      "preset": "matte_tile"
+    },
+    "floor_wood": {
+      "color": [
+        0.62,
+        0.43,
+        0.22,
+        1.0
+      ],
+      "metallic": 0.0,
+      "roughness": 0.56,
+      "preset": "wood"
+    },
+    "floor_dark": {
+      "color": [
+        0.08,
+        0.075,
+        0.085,
+        1.0
+      ],
+      "metallic": 0.0,
+      "roughness": 0.7,
+      "preset": "paint"
+    },
+    "wall_deep_red": {
+      "color": [
+        0.32,
+        0.025,
+        0.035,
+        1.0
+      ],
+      "metallic": 0.0,
+      "roughness": 0.78,
+      "preset": "paint"
+    },
+    "velvet_red": {
+      "color": [
+        0.55,
+        0.03,
+        0.055,
+        1.0
+      ],
+      "metallic": 0.0,
+      "roughness": 0.62,
+      "preset": "fabric"
+    },
+    "field_green": {
+      "color": [
+        0.05,
+        0.34,
+        0.12,
+        1.0
+      ],
+      "metallic": 0.0,
+      "roughness": 0.72,
+      "preset": "turf"
+    },
+    "counter_dark": {
+      "color": [
+        0.08,
+        0.075,
+        0.07,
+        1.0
+      ],
+      "metallic": 0.0,
+      "roughness": 0.38,
+      "preset": "stone"
+    },
+    "cabinet_warm": {
+      "color": [
+        0.36,
+        0.21,
+        0.11,
+        1.0
+      ],
+      "metallic": 0.0,
+      "roughness": 0.55,
+      "preset": "wood"
+    },
+    "metal_dark": {
+      "color": [
+        0.025,
+        0.026,
+        0.028,
+        1.0
+      ],
+      "metallic": 0.65,
+      "roughness": 0.34,
+      "preset": "brushed_metal"
+    },
+    "plastic_blue": {
+      "color": [
+        0.05,
+        0.28,
+        0.7,
+        1.0
+      ],
+      "metallic": 0.0,
+      "roughness": 0.52,
+      "preset": "paint"
+    },
+    "accent_orange": {
+      "color": [
+        1.0,
+        0.43,
+        0.05,
+        1.0
+      ],
+      "metallic": 0.0,
+      "roughness": 0.42,
+      "preset": "paint"
+    },
+    "accent_cyan": {
+      "color": [
+        0.0,
+        0.75,
+        1.0,
+        1.0
+      ],
+      "metallic": 0.0,
+      "roughness": 0.4,
+      "emissive": [
+        0.0,
+        0.28,
+        0.55
+      ],
+      "emissive_strength": 0.15,
+      "preset": "paint"
+    },
+    "accent_magenta": {
+      "color": [
+        0.95,
+        0.05,
+        0.62,
+        1.0
+      ],
+      "metallic": 0.0,
+      "roughness": 0.44,
+      "emissive": [
+        0.18,
+        0.01,
+        0.12
+      ],
+      "emissive_strength": 0.12,
+      "preset": "paint"
+    },
+    "glass_soft": {
+      "color": [
+        0.72,
+        0.88,
+        0.96,
+        0.42
+      ],
+      "roughness": 0.055,
+      "transmission": 0.45,
+      "ior": 1.46,
+      "alpha": "blend",
+      "preset": "glass"
+    },
+    "warm_light": {
+      "color": [
+        1.0,
+        0.62,
+        0.28,
+        1.0
+      ],
+      "emissive": [
+        1.0,
+        0.48,
+        0.18
+      ],
+      "emissive_strength": 0.45,
+      "roughness": 0.25,
+      "preset": "emissive"
+    },
+    "paper": {
+      "color": [
+        0.84,
+        0.79,
+        0.68,
+        1.0
+      ],
+      "metallic": 0.0,
+      "roughness": 0.86,
+      "preset": "paper"
+    }
+  },
+  "lights": [
+    {
+      "id": "sak_store_checkout_key",
+      "role": "checkout_key",
+      "type": "point",
+      "position": [
+        -1.18,
+        1.95,
+        -0.72
+      ],
+      "color": [
+        1.0,
+        0.76,
+        0.48
+      ],
+      "intensity": 2.8,
+      "range": 4.0,
+      "casts_shadows": false,
+      "scene_authoring_kernel_v1": {
+        "source": "scene_local_lighting_contract",
+        "variant": 2
+      }
+    },
+    {
+      "id": "sak_store_shelf_wash",
+      "role": "shelf_wash",
+      "type": "spot",
+      "position": [
+        1.65,
+        2.2,
+        -1.25
+      ],
+      "target": [
+        0.7,
+        0.72,
+        0.75
+      ],
+      "color": [
+        0.65,
+        0.88,
+        1.0
+      ],
+      "intensity": 2.4,
+      "range": 5.0,
+      "inner_cone_degrees": 24.0,
+      "outer_cone_degrees": 48.0,
+      "casts_shadows": false,
+      "scene_authoring_kernel_v1": {
+        "source": "scene_local_lighting_contract",
+        "variant": 2
+      }
+    }
+  ],
+  "objects": [
+    {
+      "id": "sak_store_floor",
+      "role": "room_floor",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "floor_dark",
+      "support": "ground",
+      "assembly_id": "room_shell",
+      "transform": {
+        "position": [
+          0.0,
+          0.035,
+          0.0
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          4.9,
+          0.07,
+          4.0
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "floor",
+        "variant": 2
+      }
+    },
+    {
+      "id": "sak_store_back_wall",
+      "role": "room_wall",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "room_wall_cool",
+      "support": "ground",
+      "assembly_id": "room_shell",
+      "transform": {
+        "position": [
+          0.0,
+          1.375,
+          2.0
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          4.9,
+          2.75,
+          0.08
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "wall",
+        "variant": 2
+      }
+    },
+    {
+      "id": "sak_store_left_wall",
+      "role": "room_wall",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "room_wall_cool",
+      "support": "ground",
+      "assembly_id": "room_shell",
+      "transform": {
+        "position": [
+          -2.45,
+          1.375,
+          0.0
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.08,
+          2.75,
+          4.0
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "wall",
+        "variant": 2
+      }
+    },
+    {
+      "id": "sak_store_right_wall",
+      "role": "room_wall",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "room_wall_cool",
+      "support": "ground",
+      "assembly_id": "room_shell",
+      "transform": {
+        "position": [
+          2.45,
+          1.375,
+          0.0
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.08,
+          2.75,
+          4.0
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "wall",
+        "variant": 2
+      }
+    },
+    {
+      "id": "sak_store_ceiling",
+      "role": "room_ceiling",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "room_wall_cool",
+      "support": "ground",
+      "assembly_id": "room_shell",
+      "transform": {
+        "position": [
+          0.0,
+          2.79,
+          0.0
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          4.9,
+          0.08,
+          4.0
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "ceiling",
+        "variant": 2
+      }
+    },
+    {
+      "id": "sak_store_base_trim_back",
+      "role": "architectural_baseboard",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "metal_dark",
+      "support": "sak_store_floor",
+      "assembly_id": "room_shell",
+      "transform": {
+        "position": [
+          0.0,
+          0.13,
+          1.945
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          4.74,
+          0.045,
+          0.035
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "wall_detail",
+        "variant": 2
+      }
+    },
+    {
+      "id": "sak_store_base_trim_left",
+      "role": "architectural_baseboard",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "metal_dark",
+      "support": "sak_store_floor",
+      "assembly_id": "room_shell",
+      "transform": {
+        "position": [
+          -2.395,
+          0.13,
+          0.0
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.035,
+          0.045,
+          3.84
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "wall_detail",
+        "variant": 2
+      }
+    },
+    {
+      "id": "sak_store_base_trim_right",
+      "role": "architectural_baseboard",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "metal_dark",
+      "support": "sak_store_floor",
+      "assembly_id": "room_shell",
+      "transform": {
+        "position": [
+          2.395,
+          0.13,
+          0.0
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.035,
+          0.045,
+          3.84
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "wall_detail",
+        "variant": 2
+      }
+    },
+    {
+      "id": "sak_store_crown_trim_back",
+      "role": "architectural_baseboard",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "metal_dark",
+      "support": "sak_store_floor",
+      "assembly_id": "room_shell",
+      "transform": {
+        "position": [
+          0.0,
+          2.57,
+          1.945
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          4.74,
+          0.035,
+          0.035
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "wall_detail",
+        "variant": 2
+      }
+    },
+    {
+      "id": "sak_store_crown_trim_left",
+      "role": "architectural_baseboard",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "metal_dark",
+      "support": "sak_store_floor",
+      "assembly_id": "room_shell",
+      "transform": {
+        "position": [
+          -2.395,
+          2.57,
+          0.0
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.035,
+          0.035,
+          3.84
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "wall_detail",
+        "variant": 2
+      }
+    },
+    {
+      "id": "sak_store_crown_trim_right",
+      "role": "architectural_baseboard",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "metal_dark",
+      "support": "sak_store_floor",
+      "assembly_id": "room_shell",
+      "transform": {
+        "position": [
+          2.395,
+          2.57,
+          0.0
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.035,
+          0.035,
+          3.84
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "wall_detail",
+        "variant": 2
+      }
+    },
+    {
+      "id": "sak_store_corner_post_0",
+      "role": "architectural_corner_post",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "metal_dark",
+      "support": "sak_store_floor",
+      "assembly_id": "room_shell",
+      "transform": {
+        "position": [
+          -2.395,
+          1.375,
+          1.945
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.055,
+          2.57,
+          0.055
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "wall_detail",
+        "variant": 2
+      }
+    },
+    {
+      "id": "sak_store_corner_post_1",
+      "role": "architectural_corner_post",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "metal_dark",
+      "support": "sak_store_floor",
+      "assembly_id": "room_shell",
+      "transform": {
+        "position": [
+          2.395,
+          1.375,
+          1.945
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.055,
+          2.57,
+          0.055
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "wall_detail",
+        "variant": 2
+      }
+    },
+    {
+      "id": "sak_store_back_wall_vertical_trim_0",
+      "role": "wall_panel_trim",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "metal_dark",
+      "support": "sak_store_floor",
+      "assembly_id": "room_shell",
+      "transform": {
+        "position": [
+          -2.05,
+          1.43,
+          1.938
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.018,
+          1.485,
+          0.018
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "wall_detail",
+        "variant": 2
+      }
+    },
+    {
+      "id": "sak_store_back_wall_vertical_trim_1",
+      "role": "wall_panel_trim",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "metal_dark",
+      "support": "sak_store_floor",
+      "assembly_id": "room_shell",
+      "transform": {
+        "position": [
+          -1.025,
+          1.43,
+          1.938
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.018,
+          1.485,
+          0.018
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "wall_detail",
+        "variant": 2
+      }
+    },
+    {
+      "id": "sak_store_back_wall_vertical_trim_2",
+      "role": "wall_panel_trim",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "metal_dark",
+      "support": "sak_store_floor",
+      "assembly_id": "room_shell",
+      "transform": {
+        "position": [
+          0.0,
+          1.43,
+          1.938
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.018,
+          1.485,
+          0.018
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "wall_detail",
+        "variant": 2
+      }
+    },
+    {
+      "id": "sak_store_back_wall_vertical_trim_3",
+      "role": "wall_panel_trim",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "metal_dark",
+      "support": "sak_store_floor",
+      "assembly_id": "room_shell",
+      "transform": {
+        "position": [
+          1.025,
+          1.43,
+          1.938
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.018,
+          1.485,
+          0.018
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "wall_detail",
+        "variant": 2
+      }
+    },
+    {
+      "id": "sak_store_back_wall_vertical_trim_4",
+      "role": "wall_panel_trim",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "metal_dark",
+      "support": "sak_store_floor",
+      "assembly_id": "room_shell",
+      "transform": {
+        "position": [
+          2.05,
+          1.43,
+          1.938
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.018,
+          1.485,
+          0.018
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "wall_detail",
+        "variant": 2
+      }
+    },
+    {
+      "id": "sak_store_back_wall_horizontal_trim_0",
+      "role": "wall_panel_trim",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "metal_dark",
+      "support": "sak_store_floor",
+      "assembly_id": "room_shell",
+      "transform": {
+        "position": [
+          0.0,
+          0.935,
+          1.936
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          4.018,
+          0.018,
+          0.018
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "wall_detail",
+        "variant": 2
+      }
+    },
+    {
+      "id": "sak_store_back_wall_horizontal_trim_1",
+      "role": "wall_panel_trim",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "metal_dark",
+      "support": "sak_store_floor",
+      "assembly_id": "room_shell",
+      "transform": {
+        "position": [
+          0.0,
+          1.705,
+          1.936
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          4.018,
+          0.018,
+          0.018
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "wall_detail",
+        "variant": 2
+      }
+    },
+    {
+      "id": "sak_store_back_wall_horizontal_trim_2",
+      "role": "wall_panel_trim",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "metal_dark",
+      "support": "sak_store_floor",
+      "assembly_id": "room_shell",
+      "transform": {
+        "position": [
+          0.0,
+          2.255,
+          1.936
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          4.018,
+          0.018,
+          0.018
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "wall_detail",
+        "variant": 2
+      }
+    },
+    {
+      "id": "sak_store_left_wall_vertical_trim_0",
+      "role": "wall_panel_trim",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "metal_dark",
+      "support": "sak_store_floor",
+      "assembly_id": "room_shell",
+      "transform": {
+        "position": [
+          -2.388,
+          1.375,
+          -0.96
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.018,
+          1.265,
+          0.018
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "wall_detail",
+        "variant": 2
+      }
+    },
+    {
+      "id": "sak_store_left_wall_vertical_trim_1",
+      "role": "wall_panel_trim",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "metal_dark",
+      "support": "sak_store_floor",
+      "assembly_id": "room_shell",
+      "transform": {
+        "position": [
+          -2.388,
+          1.375,
+          0.32
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.018,
+          1.265,
+          0.018
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "wall_detail",
+        "variant": 2
+      }
+    },
+    {
+      "id": "sak_store_left_wall_vertical_trim_2",
+      "role": "wall_panel_trim",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "metal_dark",
+      "support": "sak_store_floor",
+      "assembly_id": "room_shell",
+      "transform": {
+        "position": [
+          -2.388,
+          1.375,
+          1.44
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.018,
+          1.265,
+          0.018
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "wall_detail",
+        "variant": 2
+      }
+    },
+    {
+      "id": "sak_store_right_wall_vertical_trim_0",
+      "role": "wall_panel_trim",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "metal_dark",
+      "support": "sak_store_floor",
+      "assembly_id": "room_shell",
+      "transform": {
+        "position": [
+          2.388,
+          1.375,
+          -0.96
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.018,
+          1.265,
+          0.018
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "wall_detail",
+        "variant": 2
+      }
+    },
+    {
+      "id": "sak_store_right_wall_vertical_trim_1",
+      "role": "wall_panel_trim",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "metal_dark",
+      "support": "sak_store_floor",
+      "assembly_id": "room_shell",
+      "transform": {
+        "position": [
+          2.388,
+          1.375,
+          0.32
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.018,
+          1.265,
+          0.018
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "wall_detail",
+        "variant": 2
+      }
+    },
+    {
+      "id": "sak_store_right_wall_vertical_trim_2",
+      "role": "wall_panel_trim",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "metal_dark",
+      "support": "sak_store_floor",
+      "assembly_id": "room_shell",
+      "transform": {
+        "position": [
+          2.388,
+          1.375,
+          1.44
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.018,
+          1.265,
+          0.018
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "wall_detail",
+        "variant": 2
+      }
+    },
+    {
+      "id": "sak_store_checkout_counter",
+      "role": "countertop",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "counter_dark",
+      "support": "sak_store_floor",
+      "assembly_id": "checkout_zone",
+      "transform": {
+        "position": [
+          -1.14,
+          0.48,
+          -0.9
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          1.3,
+          0.82,
+          0.5
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "counter",
+        "variant": 2
+      }
+    },
+    {
+      "id": "sak_store_checkout_screen",
+      "role": "checkout_screen",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "accent_cyan",
+      "support": "sak_store_checkout_counter",
+      "assembly_id": "checkout_zone",
+      "transform": {
+        "position": [
+          -1.02,
+          1.02,
+          -1.1
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.34,
+          0.24,
+          0.026
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "screen",
+        "variant": 2
+      }
+    },
+    {
+      "id": "sak_store_counter_warm_strip",
+      "role": "warm_fixture",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "warm_light",
+      "support": "sak_store_checkout_counter",
+      "assembly_id": "checkout_zone",
+      "transform": {
+        "position": [
+          -1.14,
+          0.9084999999999999,
+          -0.98
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.72,
+          0.035,
+          0.026
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "light",
+        "variant": 2
+      }
+    },
+    {
+      "id": "sak_store_stool",
+      "role": "chair",
+      "kind": "kenney_asset",
+      "runtime_asset": "assets/models/kenney_furniture_kit/stoolBar/stoolBar.gltf",
+      "material": "plastic_blue",
+      "support": "sak_store_floor",
+      "assembly_id": "checkout_zone",
+      "transform": {
+        "position": [
+          -0.89,
+          0.07,
+          -1.86
+        ],
+        "rotation_degrees": [
+          0.0,
+          -180.00005,
+          0.0
+        ],
+        "scale": [
+          1.88366,
+          1.7931,
+          2.08807
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "chair",
+        "asset_id": "stool_bar",
+        "anchors": {
+          "floor_contact": [
+            0,
+            0,
+            0
+          ],
+          "front": [
+            0,
+            0,
+            1
+          ]
+        },
+        "license": "Kenney CC0",
+        "scale_contract": {
+          "requested_scale": [
+            1.55,
+            1.55,
+            1.55
+          ],
+          "resolved_scale": [
+            1.88366,
+            1.7931,
+            2.08807
+          ],
+          "semantic_floor": 1.35,
+          "physical_size": {
+            "requested_scale": [
+              1.55,
+              1.55,
+              1.55
+            ],
+            "semantic_floor_scale": 1.35,
+            "resolved_scale": [
+              1.88366,
+              1.7931,
+              2.08807
+            ],
+            "native_extent": [
+              0.26544,
+              0.435,
+              0.22988
+            ],
+            "min_extent": [
+              0.5,
+              0.78,
+              0.48
+            ],
+            "max_extent": [
+              0.95,
+              1.3,
+              1.0
+            ],
+            "resolved_extent": [
+              0.5,
+              0.78,
+              0.48
+            ],
+            "physical_contract": "PASS",
+            "adjustment_reasons": [
+              "axis_0_raised_to_min_extent",
+              "axis_1_raised_to_min_extent",
+              "axis_2_raised_to_min_extent"
+            ]
+          }
+        },
+        "variant": 2
+      },
+      "scene_graph_kernel_v1": {
+        "faces": "sak_store_checkout_counter",
+        "slot_target": "sak_store_checkout_counter",
+        "slot_index": 0
+      }
+    },
+    {
+      "id": "sak_store_shelf_0",
+      "role": "shelf_mesh",
+      "kind": "kenney_asset",
+      "runtime_asset": "assets/models/kenney_furniture_kit/bookcaseClosedWide/bookcaseClosedWide.gltf",
+      "material": "cabinet_warm",
+      "support": "sak_store_floor",
+      "assembly_id": "retail_shelves",
+      "transform": {
+        "position": [
+          0.65,
+          0.07,
+          -0.08
+        ],
+        "rotation_degrees": [
+          0.0,
+          -90.0,
+          0.0
+        ],
+        "scale": [
+          1.35,
+          1.39241,
+          1.35
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "shelf",
+        "asset_id": "bookcase_wide",
+        "anchors": {
+          "floor_contact": [
+            0,
+            0,
+            0
+          ],
+          "front": [
+            0,
+            0,
+            -1
+          ]
+        },
+        "license": "Kenney CC0",
+        "scale_contract": {
+          "requested_scale": [
+            0.72,
+            0.72,
+            0.72
+          ],
+          "resolved_scale": [
+            1.35,
+            1.39241,
+            1.35
+          ],
+          "semantic_floor": 1.35,
+          "physical_size": {
+            "requested_scale": [
+              0.72,
+              0.72,
+              0.72
+            ],
+            "semantic_floor_scale": 1.35,
+            "resolved_scale": [
+              1.35,
+              1.39241,
+              1.35
+            ],
+            "native_extent": [
+              0.8,
+              0.79,
+              0.25
+            ],
+            "min_extent": [
+              0.75,
+              1.1,
+              0.28
+            ],
+            "max_extent": [
+              2.3,
+              2.3,
+              0.8
+            ],
+            "resolved_extent": [
+              1.08,
+              1.1,
+              0.3375
+            ],
+            "physical_contract": "PASS",
+            "adjustment_reasons": [
+              "axis_1_raised_to_min_extent"
+            ]
+          }
+        },
+        "variant": 2
+      }
+    },
+    {
+      "id": "sak_store_product_box_0_0",
+      "role": "store_prop",
+      "kind": "kenney_asset",
+      "runtime_asset": "assets/models/kenney_furniture_kit/cardboardBoxClosed/cardboardBoxClosed.gltf",
+      "material": "accent_cyan",
+      "support": "sak_store_shelf_0",
+      "assembly_id": "retail_shelves",
+      "transform": {
+        "position": [
+          0.5,
+          1.17,
+          -0.14
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.32,
+          0.32,
+          0.32
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "store_prop",
+        "asset_id": "box_closed",
+        "anchors": {
+          "support_contact": [
+            0,
+            0,
+            0
+          ]
+        },
+        "license": "Kenney CC0",
+        "scale_contract": {
+          "requested_scale": [
+            0.32,
+            0.32,
+            0.32
+          ],
+          "resolved_scale": [
+            0.32,
+            0.32,
+            0.32
+          ],
+          "semantic_floor": 0.0,
+          "physical_size": {
+            "requested_scale": [
+              0.32,
+              0.32,
+              0.32
+            ],
+            "semantic_floor_scale": 0.0,
+            "resolved_scale": [
+              0.32,
+              0.32,
+              0.32
+            ]
+          }
+        },
+        "variant": 2
+      }
+    },
+    {
+      "id": "sak_store_product_label_0_0",
+      "role": "product_label",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "paper",
+      "support": "sak_store_shelf_0",
+      "assembly_id": "retail_shelves",
+      "transform": {
+        "position": [
+          0.5,
+          1.1975,
+          -0.38
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.16,
+          0.055,
+          0.012
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "store_prop",
+        "variant": 2
+      }
+    },
+    {
+      "id": "sak_store_price_tag_0_0",
+      "role": "price_tag",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "accent_orange",
+      "support": "sak_store_shelf_0",
+      "assembly_id": "retail_shelves",
+      "transform": {
+        "position": [
+          0.5,
+          1.1925,
+          -0.39
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.08,
+          0.045,
+          0.012
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "store_prop",
+        "variant": 2
+      }
+    },
+    {
+      "id": "sak_store_product_box_0_1",
+      "role": "store_prop",
+      "kind": "kenney_asset",
+      "runtime_asset": "assets/models/kenney_furniture_kit/cardboardBoxOpen/cardboardBoxOpen.gltf",
+      "material": "accent_orange",
+      "support": "sak_store_shelf_0",
+      "assembly_id": "retail_shelves",
+      "transform": {
+        "position": [
+          0.72,
+          1.17,
+          -0.14
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.32,
+          0.32,
+          0.32
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "store_prop",
+        "asset_id": "box_open",
+        "anchors": {
+          "support_contact": [
+            0,
+            0,
+            0
+          ]
+        },
+        "license": "Kenney CC0",
+        "scale_contract": {
+          "requested_scale": [
+            0.32,
+            0.32,
+            0.32
+          ],
+          "resolved_scale": [
+            0.32,
+            0.32,
+            0.32
+          ],
+          "semantic_floor": 0.0,
+          "physical_size": {
+            "requested_scale": [
+              0.32,
+              0.32,
+              0.32
+            ],
+            "semantic_floor_scale": 0.0,
+            "resolved_scale": [
+              0.32,
+              0.32,
+              0.32
+            ]
+          }
+        },
+        "variant": 2
+      }
+    },
+    {
+      "id": "sak_store_product_label_0_1",
+      "role": "product_label",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "paper",
+      "support": "sak_store_shelf_0",
+      "assembly_id": "retail_shelves",
+      "transform": {
+        "position": [
+          0.72,
+          1.1975,
+          -0.38
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.16,
+          0.055,
+          0.012
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "store_prop",
+        "variant": 2
+      }
+    },
+    {
+      "id": "sak_store_price_tag_0_1",
+      "role": "price_tag",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "accent_magenta",
+      "support": "sak_store_shelf_0",
+      "assembly_id": "retail_shelves",
+      "transform": {
+        "position": [
+          0.72,
+          1.1925,
+          -0.39
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.08,
+          0.045,
+          0.012
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "store_prop",
+        "variant": 2
+      }
+    },
+    {
+      "id": "sak_store_product_box_0_2",
+      "role": "store_prop",
+      "kind": "kenney_asset",
+      "runtime_asset": "assets/models/kenney_furniture_kit/cardboardBoxClosed/cardboardBoxClosed.gltf",
+      "material": "accent_cyan",
+      "support": "sak_store_shelf_0",
+      "assembly_id": "retail_shelves",
+      "transform": {
+        "position": [
+          0.94,
+          1.17,
+          -0.14
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.32,
+          0.32,
+          0.32
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "store_prop",
+        "asset_id": "box_closed",
+        "anchors": {
+          "support_contact": [
+            0,
+            0,
+            0
+          ]
+        },
+        "license": "Kenney CC0",
+        "scale_contract": {
+          "requested_scale": [
+            0.32,
+            0.32,
+            0.32
+          ],
+          "resolved_scale": [
+            0.32,
+            0.32,
+            0.32
+          ],
+          "semantic_floor": 0.0,
+          "physical_size": {
+            "requested_scale": [
+              0.32,
+              0.32,
+              0.32
+            ],
+            "semantic_floor_scale": 0.0,
+            "resolved_scale": [
+              0.32,
+              0.32,
+              0.32
+            ]
+          }
+        },
+        "variant": 2
+      }
+    },
+    {
+      "id": "sak_store_product_label_0_2",
+      "role": "product_label",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "paper",
+      "support": "sak_store_shelf_0",
+      "assembly_id": "retail_shelves",
+      "transform": {
+        "position": [
+          0.94,
+          1.1975,
+          -0.38
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.16,
+          0.055,
+          0.012
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "store_prop",
+        "variant": 2
+      }
+    },
+    {
+      "id": "sak_store_price_tag_0_2",
+      "role": "price_tag",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "accent_orange",
+      "support": "sak_store_shelf_0",
+      "assembly_id": "retail_shelves",
+      "transform": {
+        "position": [
+          0.94,
+          1.1925,
+          -0.39
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.08,
+          0.045,
+          0.012
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "store_prop",
+        "variant": 2
+      }
+    },
+    {
+      "id": "sak_store_shelf_1",
+      "role": "shelf_mesh",
+      "kind": "kenney_asset",
+      "runtime_asset": "assets/models/kenney_furniture_kit/bookcaseClosedWide/bookcaseClosedWide.gltf",
+      "material": "cabinet_warm",
+      "support": "sak_store_floor",
+      "assembly_id": "retail_shelves",
+      "transform": {
+        "position": [
+          0.65,
+          0.07,
+          0.62
+        ],
+        "rotation_degrees": [
+          0.0,
+          -90.0,
+          0.0
+        ],
+        "scale": [
+          1.35,
+          1.39241,
+          1.35
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "shelf",
+        "asset_id": "bookcase_wide",
+        "anchors": {
+          "floor_contact": [
+            0,
+            0,
+            0
+          ],
+          "front": [
+            0,
+            0,
+            -1
+          ]
+        },
+        "license": "Kenney CC0",
+        "scale_contract": {
+          "requested_scale": [
+            0.72,
+            0.72,
+            0.72
+          ],
+          "resolved_scale": [
+            1.35,
+            1.39241,
+            1.35
+          ],
+          "semantic_floor": 1.35,
+          "physical_size": {
+            "requested_scale": [
+              0.72,
+              0.72,
+              0.72
+            ],
+            "semantic_floor_scale": 1.35,
+            "resolved_scale": [
+              1.35,
+              1.39241,
+              1.35
+            ],
+            "native_extent": [
+              0.8,
+              0.79,
+              0.25
+            ],
+            "min_extent": [
+              0.75,
+              1.1,
+              0.28
+            ],
+            "max_extent": [
+              2.3,
+              2.3,
+              0.8
+            ],
+            "resolved_extent": [
+              1.08,
+              1.1,
+              0.3375
+            ],
+            "physical_contract": "PASS",
+            "adjustment_reasons": [
+              "axis_1_raised_to_min_extent"
+            ]
+          }
+        },
+        "variant": 2
+      }
+    },
+    {
+      "id": "sak_store_product_box_1_0",
+      "role": "store_prop",
+      "kind": "kenney_asset",
+      "runtime_asset": "assets/models/kenney_furniture_kit/cardboardBoxOpen/cardboardBoxOpen.gltf",
+      "material": "accent_cyan",
+      "support": "sak_store_shelf_1",
+      "assembly_id": "retail_shelves",
+      "transform": {
+        "position": [
+          0.5,
+          1.17,
+          0.56
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.32,
+          0.32,
+          0.32
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "store_prop",
+        "asset_id": "box_open",
+        "anchors": {
+          "support_contact": [
+            0,
+            0,
+            0
+          ]
+        },
+        "license": "Kenney CC0",
+        "scale_contract": {
+          "requested_scale": [
+            0.32,
+            0.32,
+            0.32
+          ],
+          "resolved_scale": [
+            0.32,
+            0.32,
+            0.32
+          ],
+          "semantic_floor": 0.0,
+          "physical_size": {
+            "requested_scale": [
+              0.32,
+              0.32,
+              0.32
+            ],
+            "semantic_floor_scale": 0.0,
+            "resolved_scale": [
+              0.32,
+              0.32,
+              0.32
+            ]
+          }
+        },
+        "variant": 2
+      }
+    },
+    {
+      "id": "sak_store_product_label_1_0",
+      "role": "product_label",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "paper",
+      "support": "sak_store_shelf_1",
+      "assembly_id": "retail_shelves",
+      "transform": {
+        "position": [
+          0.5,
+          1.1975,
+          0.32
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.16,
+          0.055,
+          0.012
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "store_prop",
+        "variant": 2
+      }
+    },
+    {
+      "id": "sak_store_price_tag_1_0",
+      "role": "price_tag",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "accent_orange",
+      "support": "sak_store_shelf_1",
+      "assembly_id": "retail_shelves",
+      "transform": {
+        "position": [
+          0.5,
+          1.1925,
+          0.31
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.08,
+          0.045,
+          0.012
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "store_prop",
+        "variant": 2
+      }
+    },
+    {
+      "id": "sak_store_product_box_1_1",
+      "role": "store_prop",
+      "kind": "kenney_asset",
+      "runtime_asset": "assets/models/kenney_furniture_kit/cardboardBoxClosed/cardboardBoxClosed.gltf",
+      "material": "accent_orange",
+      "support": "sak_store_shelf_1",
+      "assembly_id": "retail_shelves",
+      "transform": {
+        "position": [
+          0.72,
+          1.17,
+          0.56
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.32,
+          0.32,
+          0.32
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "store_prop",
+        "asset_id": "box_closed",
+        "anchors": {
+          "support_contact": [
+            0,
+            0,
+            0
+          ]
+        },
+        "license": "Kenney CC0",
+        "scale_contract": {
+          "requested_scale": [
+            0.32,
+            0.32,
+            0.32
+          ],
+          "resolved_scale": [
+            0.32,
+            0.32,
+            0.32
+          ],
+          "semantic_floor": 0.0,
+          "physical_size": {
+            "requested_scale": [
+              0.32,
+              0.32,
+              0.32
+            ],
+            "semantic_floor_scale": 0.0,
+            "resolved_scale": [
+              0.32,
+              0.32,
+              0.32
+            ]
+          }
+        },
+        "variant": 2
+      }
+    },
+    {
+      "id": "sak_store_product_label_1_1",
+      "role": "product_label",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "paper",
+      "support": "sak_store_shelf_1",
+      "assembly_id": "retail_shelves",
+      "transform": {
+        "position": [
+          0.72,
+          1.1975,
+          0.32
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.16,
+          0.055,
+          0.012
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "store_prop",
+        "variant": 2
+      }
+    },
+    {
+      "id": "sak_store_price_tag_1_1",
+      "role": "price_tag",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "accent_magenta",
+      "support": "sak_store_shelf_1",
+      "assembly_id": "retail_shelves",
+      "transform": {
+        "position": [
+          0.72,
+          1.1925,
+          0.31
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.08,
+          0.045,
+          0.012
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "store_prop",
+        "variant": 2
+      }
+    },
+    {
+      "id": "sak_store_product_box_1_2",
+      "role": "store_prop",
+      "kind": "kenney_asset",
+      "runtime_asset": "assets/models/kenney_furniture_kit/cardboardBoxOpen/cardboardBoxOpen.gltf",
+      "material": "accent_cyan",
+      "support": "sak_store_shelf_1",
+      "assembly_id": "retail_shelves",
+      "transform": {
+        "position": [
+          0.94,
+          1.17,
+          0.56
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.32,
+          0.32,
+          0.32
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "store_prop",
+        "asset_id": "box_open",
+        "anchors": {
+          "support_contact": [
+            0,
+            0,
+            0
+          ]
+        },
+        "license": "Kenney CC0",
+        "scale_contract": {
+          "requested_scale": [
+            0.32,
+            0.32,
+            0.32
+          ],
+          "resolved_scale": [
+            0.32,
+            0.32,
+            0.32
+          ],
+          "semantic_floor": 0.0,
+          "physical_size": {
+            "requested_scale": [
+              0.32,
+              0.32,
+              0.32
+            ],
+            "semantic_floor_scale": 0.0,
+            "resolved_scale": [
+              0.32,
+              0.32,
+              0.32
+            ]
+          }
+        },
+        "variant": 2
+      }
+    },
+    {
+      "id": "sak_store_product_label_1_2",
+      "role": "product_label",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "paper",
+      "support": "sak_store_shelf_1",
+      "assembly_id": "retail_shelves",
+      "transform": {
+        "position": [
+          0.94,
+          1.1975,
+          0.32
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.16,
+          0.055,
+          0.012
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "store_prop",
+        "variant": 2
+      }
+    },
+    {
+      "id": "sak_store_price_tag_1_2",
+      "role": "price_tag",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "accent_orange",
+      "support": "sak_store_shelf_1",
+      "assembly_id": "retail_shelves",
+      "transform": {
+        "position": [
+          0.94,
+          1.1925,
+          0.31
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.08,
+          0.045,
+          0.012
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "store_prop",
+        "variant": 2
+      }
+    },
+    {
+      "id": "sak_store_shelf_2",
+      "role": "shelf_mesh",
+      "kind": "kenney_asset",
+      "runtime_asset": "assets/models/kenney_furniture_kit/bookcaseClosedWide/bookcaseClosedWide.gltf",
+      "material": "cabinet_warm",
+      "support": "sak_store_floor",
+      "assembly_id": "retail_shelves",
+      "transform": {
+        "position": [
+          0.65,
+          0.07,
+          1.28
+        ],
+        "rotation_degrees": [
+          0.0,
+          -90.0,
+          0.0
+        ],
+        "scale": [
+          1.35,
+          1.39241,
+          1.35
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "shelf",
+        "asset_id": "bookcase_wide",
+        "anchors": {
+          "floor_contact": [
+            0,
+            0,
+            0
+          ],
+          "front": [
+            0,
+            0,
+            -1
+          ]
+        },
+        "license": "Kenney CC0",
+        "scale_contract": {
+          "requested_scale": [
+            0.72,
+            0.72,
+            0.72
+          ],
+          "resolved_scale": [
+            1.35,
+            1.39241,
+            1.35
+          ],
+          "semantic_floor": 1.35,
+          "physical_size": {
+            "requested_scale": [
+              0.72,
+              0.72,
+              0.72
+            ],
+            "semantic_floor_scale": 1.35,
+            "resolved_scale": [
+              1.35,
+              1.39241,
+              1.35
+            ],
+            "native_extent": [
+              0.8,
+              0.79,
+              0.25
+            ],
+            "min_extent": [
+              0.75,
+              1.1,
+              0.28
+            ],
+            "max_extent": [
+              2.3,
+              2.3,
+              0.8
+            ],
+            "resolved_extent": [
+              1.08,
+              1.1,
+              0.3375
+            ],
+            "physical_contract": "PASS",
+            "adjustment_reasons": [
+              "axis_1_raised_to_min_extent"
+            ]
+          }
+        },
+        "variant": 2
+      }
+    },
+    {
+      "id": "sak_store_product_box_2_0",
+      "role": "store_prop",
+      "kind": "kenney_asset",
+      "runtime_asset": "assets/models/kenney_furniture_kit/cardboardBoxClosed/cardboardBoxClosed.gltf",
+      "material": "accent_cyan",
+      "support": "sak_store_shelf_2",
+      "assembly_id": "retail_shelves",
+      "transform": {
+        "position": [
+          0.5,
+          1.17,
+          1.22
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.32,
+          0.32,
+          0.32
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "store_prop",
+        "asset_id": "box_closed",
+        "anchors": {
+          "support_contact": [
+            0,
+            0,
+            0
+          ]
+        },
+        "license": "Kenney CC0",
+        "scale_contract": {
+          "requested_scale": [
+            0.32,
+            0.32,
+            0.32
+          ],
+          "resolved_scale": [
+            0.32,
+            0.32,
+            0.32
+          ],
+          "semantic_floor": 0.0,
+          "physical_size": {
+            "requested_scale": [
+              0.32,
+              0.32,
+              0.32
+            ],
+            "semantic_floor_scale": 0.0,
+            "resolved_scale": [
+              0.32,
+              0.32,
+              0.32
+            ]
+          }
+        },
+        "variant": 2
+      }
+    },
+    {
+      "id": "sak_store_product_label_2_0",
+      "role": "product_label",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "paper",
+      "support": "sak_store_shelf_2",
+      "assembly_id": "retail_shelves",
+      "transform": {
+        "position": [
+          0.5,
+          1.1975,
+          0.98
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.16,
+          0.055,
+          0.012
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "store_prop",
+        "variant": 2
+      }
+    },
+    {
+      "id": "sak_store_price_tag_2_0",
+      "role": "price_tag",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "accent_orange",
+      "support": "sak_store_shelf_2",
+      "assembly_id": "retail_shelves",
+      "transform": {
+        "position": [
+          0.5,
+          1.1925,
+          0.97
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.08,
+          0.045,
+          0.012
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "store_prop",
+        "variant": 2
+      }
+    },
+    {
+      "id": "sak_store_product_box_2_1",
+      "role": "store_prop",
+      "kind": "kenney_asset",
+      "runtime_asset": "assets/models/kenney_furniture_kit/cardboardBoxOpen/cardboardBoxOpen.gltf",
+      "material": "accent_orange",
+      "support": "sak_store_shelf_2",
+      "assembly_id": "retail_shelves",
+      "transform": {
+        "position": [
+          0.72,
+          1.17,
+          1.22
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.32,
+          0.32,
+          0.32
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "store_prop",
+        "asset_id": "box_open",
+        "anchors": {
+          "support_contact": [
+            0,
+            0,
+            0
+          ]
+        },
+        "license": "Kenney CC0",
+        "scale_contract": {
+          "requested_scale": [
+            0.32,
+            0.32,
+            0.32
+          ],
+          "resolved_scale": [
+            0.32,
+            0.32,
+            0.32
+          ],
+          "semantic_floor": 0.0,
+          "physical_size": {
+            "requested_scale": [
+              0.32,
+              0.32,
+              0.32
+            ],
+            "semantic_floor_scale": 0.0,
+            "resolved_scale": [
+              0.32,
+              0.32,
+              0.32
+            ]
+          }
+        },
+        "variant": 2
+      }
+    },
+    {
+      "id": "sak_store_product_label_2_1",
+      "role": "product_label",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "paper",
+      "support": "sak_store_shelf_2",
+      "assembly_id": "retail_shelves",
+      "transform": {
+        "position": [
+          0.72,
+          1.1975,
+          0.98
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.16,
+          0.055,
+          0.012
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "store_prop",
+        "variant": 2
+      }
+    },
+    {
+      "id": "sak_store_price_tag_2_1",
+      "role": "price_tag",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "accent_magenta",
+      "support": "sak_store_shelf_2",
+      "assembly_id": "retail_shelves",
+      "transform": {
+        "position": [
+          0.72,
+          1.1925,
+          0.97
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.08,
+          0.045,
+          0.012
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "store_prop",
+        "variant": 2
+      }
+    },
+    {
+      "id": "sak_store_product_box_2_2",
+      "role": "store_prop",
+      "kind": "kenney_asset",
+      "runtime_asset": "assets/models/kenney_furniture_kit/cardboardBoxClosed/cardboardBoxClosed.gltf",
+      "material": "accent_cyan",
+      "support": "sak_store_shelf_2",
+      "assembly_id": "retail_shelves",
+      "transform": {
+        "position": [
+          0.94,
+          1.17,
+          1.22
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.32,
+          0.32,
+          0.32
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "store_prop",
+        "asset_id": "box_closed",
+        "anchors": {
+          "support_contact": [
+            0,
+            0,
+            0
+          ]
+        },
+        "license": "Kenney CC0",
+        "scale_contract": {
+          "requested_scale": [
+            0.32,
+            0.32,
+            0.32
+          ],
+          "resolved_scale": [
+            0.32,
+            0.32,
+            0.32
+          ],
+          "semantic_floor": 0.0,
+          "physical_size": {
+            "requested_scale": [
+              0.32,
+              0.32,
+              0.32
+            ],
+            "semantic_floor_scale": 0.0,
+            "resolved_scale": [
+              0.32,
+              0.32,
+              0.32
+            ]
+          }
+        },
+        "variant": 2
+      }
+    },
+    {
+      "id": "sak_store_product_label_2_2",
+      "role": "product_label",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "paper",
+      "support": "sak_store_shelf_2",
+      "assembly_id": "retail_shelves",
+      "transform": {
+        "position": [
+          0.94,
+          1.1975,
+          0.98
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.16,
+          0.055,
+          0.012
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "store_prop",
+        "variant": 2
+      }
+    },
+    {
+      "id": "sak_store_price_tag_2_2",
+      "role": "price_tag",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "accent_orange",
+      "support": "sak_store_shelf_2",
+      "assembly_id": "retail_shelves",
+      "transform": {
+        "position": [
+          0.94,
+          1.1925,
+          0.97
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.08,
+          0.045,
+          0.012
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "store_prop",
+        "variant": 2
+      }
+    },
+    {
+      "id": "sak_store_backwall_sign_panel_0",
+      "role": "wall_art",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "accent_orange",
+      "support": "sak_store_back_wall",
+      "assembly_id": "storefront_dressing",
+      "transform": {
+        "position": [
+          -1.64,
+          1.82,
+          1.975
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.48,
+          0.22,
+          0.018
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "decor",
+        "variant": 2
+      },
+      "attached_to": "sak_store_back_wall"
+    },
+    {
+      "id": "sak_store_backwall_sign_panel_1",
+      "role": "wall_art",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "accent_magenta",
+      "support": "sak_store_back_wall",
+      "assembly_id": "storefront_dressing",
+      "transform": {
+        "position": [
+          -0.92,
+          1.82,
+          1.975
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.48,
+          0.22,
+          0.018
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "decor",
+        "variant": 2
+      },
+      "attached_to": "sak_store_back_wall"
+    },
+    {
+      "id": "sak_store_backwall_sign_panel_2",
+      "role": "wall_art",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "accent_orange",
+      "support": "sak_store_back_wall",
+      "assembly_id": "storefront_dressing",
+      "transform": {
+        "position": [
+          -0.2,
+          1.82,
+          1.975
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.48,
+          0.22,
+          0.018
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "decor",
+        "variant": 2
+      },
+      "attached_to": "sak_store_back_wall"
+    },
+    {
+      "id": "sak_store_backwall_sign_panel_3",
+      "role": "wall_art",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "accent_magenta",
+      "support": "sak_store_back_wall",
+      "assembly_id": "storefront_dressing",
+      "transform": {
+        "position": [
+          0.52,
+          1.82,
+          1.975
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.48,
+          0.22,
+          0.018
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "decor",
+        "variant": 2
+      },
+      "attached_to": "sak_store_back_wall"
+    },
+    {
+      "id": "sak_store_backwall_sign_panel_4",
+      "role": "wall_art",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "accent_orange",
+      "support": "sak_store_back_wall",
+      "assembly_id": "storefront_dressing",
+      "transform": {
+        "position": [
+          1.24,
+          1.82,
+          1.975
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.48,
+          0.22,
+          0.018
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "decor",
+        "variant": 2
+      },
+      "attached_to": "sak_store_back_wall"
+    },
+    {
+      "id": "sak_store_backwall_sign_panel_5",
+      "role": "wall_art",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "accent_magenta",
+      "support": "sak_store_back_wall",
+      "assembly_id": "storefront_dressing",
+      "transform": {
+        "position": [
+          1.96,
+          1.82,
+          1.975
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.48,
+          0.22,
+          0.018
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "decor",
+        "variant": 2
+      },
+      "attached_to": "sak_store_back_wall"
+    },
+    {
+      "id": "sak_store_hanging_sign",
+      "role": "hanging_sign",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "warm_light",
+      "support": "",
+      "assembly_id": "storefront_dressing",
+      "transform": {
+        "position": [
+          0.08,
+          2.22,
+          1.64
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.96,
+          0.2,
+          0.03
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "decor",
+        "variant": 2
+      }
+    },
+    {
+      "id": "sak_store_aisle_marker_0",
+      "role": "aisle_marker",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "paper",
+      "support": "sak_store_floor",
+      "assembly_id": "floor_detail",
+      "transform": {
+        "position": [
+          -1.8,
+          0.115,
+          -0.02
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.34,
+          0.012,
+          0.035
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "floor_detail",
+        "variant": 2
+      }
+    },
+    {
+      "id": "sak_store_aisle_marker_1",
+      "role": "aisle_marker",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "accent_cyan",
+      "support": "sak_store_floor",
+      "assembly_id": "floor_detail",
+      "transform": {
+        "position": [
+          -0.9,
+          0.115,
+          -0.02
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.34,
+          0.012,
+          0.035
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "floor_detail",
+        "variant": 2
+      }
+    },
+    {
+      "id": "sak_store_aisle_marker_2",
+      "role": "aisle_marker",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "paper",
+      "support": "sak_store_floor",
+      "assembly_id": "floor_detail",
+      "transform": {
+        "position": [
+          0.0,
+          0.115,
+          -0.02
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.34,
+          0.012,
+          0.035
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "floor_detail",
+        "variant": 2
+      }
+    },
+    {
+      "id": "sak_store_aisle_marker_3",
+      "role": "aisle_marker",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "accent_cyan",
+      "support": "sak_store_floor",
+      "assembly_id": "floor_detail",
+      "transform": {
+        "position": [
+          0.9,
+          0.115,
+          -0.02
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.34,
+          0.012,
+          0.035
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "floor_detail",
+        "variant": 2
+      }
+    },
+    {
+      "id": "sak_store_aisle_marker_4",
+      "role": "aisle_marker",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "paper",
+      "support": "sak_store_floor",
+      "assembly_id": "floor_detail",
+      "transform": {
+        "position": [
+          1.8,
+          0.115,
+          -0.02
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.34,
+          0.012,
+          0.035
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "floor_detail",
+        "variant": 2
+      }
+    },
+    {
+      "id": "sak_store_palette_panel_0",
+      "role": "palette_accent_panel",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "accent_cyan",
+      "support": "sak_store_back_wall",
+      "assembly_id": "storefront_dressing",
+      "transform": {
+        "position": [
+          -1.98,
+          1.42,
+          1.975
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.32,
+          0.18,
+          0.016
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "decor",
+        "variant": 2
+      },
+      "attached_to": "sak_store_back_wall"
+    },
+    {
+      "id": "sak_store_palette_panel_1",
+      "role": "palette_accent_panel",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "accent_orange",
+      "support": "sak_store_back_wall",
+      "assembly_id": "storefront_dressing",
+      "transform": {
+        "position": [
+          -1.98,
+          1.08,
+          1.975
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.32,
+          0.18,
+          0.016
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "decor",
+        "variant": 2
+      },
+      "attached_to": "sak_store_back_wall"
+    },
+    {
+      "id": "sak_store_palette_panel_2",
+      "role": "palette_accent_panel",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "accent_magenta",
+      "support": "sak_store_back_wall",
+      "assembly_id": "storefront_dressing",
+      "transform": {
+        "position": [
+          2.18,
+          1.34,
+          1.975
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.32,
+          0.18,
+          0.016
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "decor",
+        "variant": 2
+      },
+      "attached_to": "sak_store_back_wall"
+    },
+    {
+      "id": "sak_store_floor_stack_0",
+      "role": "store_prop",
+      "kind": "kenney_asset",
+      "runtime_asset": "assets/models/kenney_furniture_kit/cardboardBoxClosed/cardboardBoxClosed.gltf",
+      "material": "paper",
+      "support": "sak_store_floor",
+      "assembly_id": "retail_shelves",
+      "transform": {
+        "position": [
+          -1.55,
+          0.07,
+          0.44
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.52,
+          0.52,
+          0.52
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "store_prop",
+        "asset_id": "box_closed",
+        "anchors": {
+          "support_contact": [
+            0,
+            0,
+            0
+          ]
+        },
+        "license": "Kenney CC0",
+        "scale_contract": {
+          "requested_scale": [
+            0.52,
+            0.52,
+            0.52
+          ],
+          "resolved_scale": [
+            0.52,
+            0.52,
+            0.52
+          ],
+          "semantic_floor": 0.0,
+          "physical_size": {
+            "requested_scale": [
+              0.52,
+              0.52,
+              0.52
+            ],
+            "semantic_floor_scale": 0.0,
+            "resolved_scale": [
+              0.52,
+              0.52,
+              0.52
+            ]
+          }
+        },
+        "variant": 2
+      }
+    },
+    {
+      "id": "sak_store_floor_stack_1",
+      "role": "store_prop",
+      "kind": "kenney_asset",
+      "runtime_asset": "assets/models/kenney_furniture_kit/cardboardBoxClosed/cardboardBoxClosed.gltf",
+      "material": "paper",
+      "support": "sak_store_floor",
+      "assembly_id": "retail_shelves",
+      "transform": {
+        "position": [
+          -0.75,
+          0.07,
+          0.62
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.52,
+          0.52,
+          0.52
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "store_prop",
+        "asset_id": "box_closed",
+        "anchors": {
+          "support_contact": [
+            0,
+            0,
+            0
+          ]
+        },
+        "license": "Kenney CC0",
+        "scale_contract": {
+          "requested_scale": [
+            0.52,
+            0.52,
+            0.52
+          ],
+          "resolved_scale": [
+            0.52,
+            0.52,
+            0.52
+          ],
+          "semantic_floor": 0.0,
+          "physical_size": {
+            "requested_scale": [
+              0.52,
+              0.52,
+              0.52
+            ],
+            "semantic_floor_scale": 0.0,
+            "resolved_scale": [
+              0.52,
+              0.52,
+              0.52
+            ]
+          }
+        },
+        "variant": 2
+      }
+    },
+    {
+      "id": "sak_store_floor_stack_2",
+      "role": "store_prop",
+      "kind": "kenney_asset",
+      "runtime_asset": "assets/models/kenney_furniture_kit/cardboardBoxClosed/cardboardBoxClosed.gltf",
+      "material": "paper",
+      "support": "sak_store_floor",
+      "assembly_id": "retail_shelves",
+      "transform": {
+        "position": [
+          0.05,
+          0.07,
+          0.8
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.52,
+          0.52,
+          0.52
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "store_prop",
+        "asset_id": "box_closed",
+        "anchors": {
+          "support_contact": [
+            0,
+            0,
+            0
+          ]
+        },
+        "license": "Kenney CC0",
+        "scale_contract": {
+          "requested_scale": [
+            0.52,
+            0.52,
+            0.52
+          ],
+          "resolved_scale": [
+            0.52,
+            0.52,
+            0.52
+          ],
+          "semantic_floor": 0.0,
+          "physical_size": {
+            "requested_scale": [
+              0.52,
+              0.52,
+              0.52
+            ],
+            "semantic_floor_scale": 0.0,
+            "resolved_scale": [
+              0.52,
+              0.52,
+              0.52
+            ]
+          }
+        },
+        "variant": 2
+      }
+    },
+    {
+      "id": "sak_store_plant",
+      "role": "plant",
+      "kind": "kenney_asset",
+      "runtime_asset": "assets/models/kenney_furniture_kit/pottedPlant/pottedPlant.gltf",
+      "material": "accent_cyan",
+      "support": "sak_store_floor",
+      "assembly_id": "storefront_dressing",
+      "transform": {
+        "position": [
+          1.92,
+          0.07,
+          -1.24
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          1.3,
+          1.3,
+          1.3
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "decor_prop",
+        "asset_id": "potted_plant",
+        "anchors": {
+          "floor_contact": [
+            0,
+            0,
+            0
+          ]
+        },
+        "license": "Kenney CC0",
+        "scale_contract": {
+          "requested_scale": [
+            1.3,
+            1.3,
+            1.3
+          ],
+          "resolved_scale": [
+            1.3,
+            1.3,
+            1.3
+          ],
+          "semantic_floor": 0.0,
+          "physical_size": {
+            "requested_scale": [
+              1.3,
+              1.3,
+              1.3
+            ],
+            "semantic_floor_scale": 0.0,
+            "resolved_scale": [
+              1.3,
+              1.3,
+              1.3
+            ]
+          }
+        },
+        "variant": 2
+      }
+    },
+    {
+      "id": "sak_store_floor_lane_0",
+      "role": "floor_detail_line",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "metal_dark",
+      "support": "sak_store_floor",
+      "assembly_id": "floor_detail",
+      "transform": {
+        "position": [
+          0.0,
+          0.092,
+          -1.42
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          4.35,
+          0.01,
+          0.014
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "floor_detail",
+        "variant": 2
+      }
+    },
+    {
+      "id": "sak_store_floor_lane_1",
+      "role": "floor_detail_line",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "paper",
+      "support": "sak_store_floor",
+      "assembly_id": "floor_detail",
+      "transform": {
+        "position": [
+          0.0,
+          0.092,
+          -1.02
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          4.35,
+          0.01,
+          0.014
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "floor_detail",
+        "variant": 2
+      }
+    },
+    {
+      "id": "sak_store_floor_lane_2",
+      "role": "floor_detail_line",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "metal_dark",
+      "support": "sak_store_floor",
+      "assembly_id": "floor_detail",
+      "transform": {
+        "position": [
+          0.0,
+          0.092,
+          -0.62
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          4.35,
+          0.01,
+          0.014
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "floor_detail",
+        "variant": 2
+      }
+    },
+    {
+      "id": "sak_store_floor_lane_3",
+      "role": "floor_detail_line",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "paper",
+      "support": "sak_store_floor",
+      "assembly_id": "floor_detail",
+      "transform": {
+        "position": [
+          0.0,
+          0.092,
+          -0.22
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          4.35,
+          0.01,
+          0.014
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "floor_detail",
+        "variant": 2
+      }
+    },
+    {
+      "id": "sak_store_floor_lane_4",
+      "role": "floor_detail_line",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "metal_dark",
+      "support": "sak_store_floor",
+      "assembly_id": "floor_detail",
+      "transform": {
+        "position": [
+          0.0,
+          0.092,
+          0.18
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          4.35,
+          0.01,
+          0.014
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "floor_detail",
+        "variant": 2
+      }
+    },
+    {
+      "id": "sak_store_floor_lane_5",
+      "role": "floor_detail_line",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "paper",
+      "support": "sak_store_floor",
+      "assembly_id": "floor_detail",
+      "transform": {
+        "position": [
+          0.0,
+          0.092,
+          0.58
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          4.35,
+          0.01,
+          0.014
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "floor_detail",
+        "variant": 2
+      }
+    },
+    {
+      "id": "sak_store_floor_lane_6",
+      "role": "floor_detail_line",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "metal_dark",
+      "support": "sak_store_floor",
+      "assembly_id": "floor_detail",
+      "transform": {
+        "position": [
+          0.0,
+          0.092,
+          0.98
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          4.35,
+          0.01,
+          0.014
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "floor_detail",
+        "variant": 2
+      }
+    },
+    {
+      "id": "sak_store_floor_lane_7",
+      "role": "floor_detail_line",
+      "kind": "primitive",
+      "primitive": "cube",
+      "material": "paper",
+      "support": "sak_store_floor",
+      "assembly_id": "floor_detail",
+      "transform": {
+        "position": [
+          0.0,
+          0.092,
+          1.38
+        ],
+        "rotation_degrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          4.35,
+          0.01,
+          0.014
+        ]
+      },
+      "scene_authoring_kernel_v1": {
+        "source": "graph_native_constructor",
+        "category": "floor_detail",
+        "variant": 2
+      }
+    }
+  ],
+  "semantic_scene_graph": {
+    "schema": "cortex.scene_authoring_kernel.semantic_graph.v1",
+    "prompt": "small retail store with checkout counter product shelves boxes signs and aisle lighting",
+    "family": "small_store_day",
+    "variant": 2,
+    "nodes": [
+      {
+        "id": "sak_store_floor",
+        "category": "floor",
+        "role": "room_floor",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_store_back_wall",
+        "category": "wall",
+        "role": "room_wall",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_store_left_wall",
+        "category": "wall",
+        "role": "room_wall",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_store_right_wall",
+        "category": "wall",
+        "role": "room_wall",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_store_ceiling",
+        "category": "ceiling",
+        "role": "room_ceiling",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_store_base_trim_back",
+        "category": "wall_detail",
+        "role": "architectural_baseboard",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_store_base_trim_left",
+        "category": "wall_detail",
+        "role": "architectural_baseboard",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_store_base_trim_right",
+        "category": "wall_detail",
+        "role": "architectural_baseboard",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_store_crown_trim_back",
+        "category": "wall_detail",
+        "role": "architectural_baseboard",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_store_crown_trim_left",
+        "category": "wall_detail",
+        "role": "architectural_baseboard",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_store_crown_trim_right",
+        "category": "wall_detail",
+        "role": "architectural_baseboard",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_store_corner_post_0",
+        "category": "wall_detail",
+        "role": "architectural_corner_post",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_store_corner_post_1",
+        "category": "wall_detail",
+        "role": "architectural_corner_post",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_store_back_wall_vertical_trim_0",
+        "category": "wall_detail",
+        "role": "wall_panel_trim",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_store_back_wall_vertical_trim_1",
+        "category": "wall_detail",
+        "role": "wall_panel_trim",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_store_back_wall_vertical_trim_2",
+        "category": "wall_detail",
+        "role": "wall_panel_trim",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_store_back_wall_vertical_trim_3",
+        "category": "wall_detail",
+        "role": "wall_panel_trim",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_store_back_wall_vertical_trim_4",
+        "category": "wall_detail",
+        "role": "wall_panel_trim",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_store_back_wall_horizontal_trim_0",
+        "category": "wall_detail",
+        "role": "wall_panel_trim",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_store_back_wall_horizontal_trim_1",
+        "category": "wall_detail",
+        "role": "wall_panel_trim",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_store_back_wall_horizontal_trim_2",
+        "category": "wall_detail",
+        "role": "wall_panel_trim",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_store_left_wall_vertical_trim_0",
+        "category": "wall_detail",
+        "role": "wall_panel_trim",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_store_left_wall_vertical_trim_1",
+        "category": "wall_detail",
+        "role": "wall_panel_trim",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_store_left_wall_vertical_trim_2",
+        "category": "wall_detail",
+        "role": "wall_panel_trim",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_store_right_wall_vertical_trim_0",
+        "category": "wall_detail",
+        "role": "wall_panel_trim",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_store_right_wall_vertical_trim_1",
+        "category": "wall_detail",
+        "role": "wall_panel_trim",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_store_right_wall_vertical_trim_2",
+        "category": "wall_detail",
+        "role": "wall_panel_trim",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_store_checkout_counter",
+        "category": "counter",
+        "role": "countertop",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_store_checkout_screen",
+        "category": "screen",
+        "role": "checkout_screen",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_store_counter_warm_strip",
+        "category": "light",
+        "role": "warm_fixture",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_store_stool",
+        "category": "chair",
+        "role": "chair",
+        "asset_id": "stool_bar",
+        "anchors": {
+          "floor_contact": [
+            0,
+            0,
+            0
+          ],
+          "front": [
+            0,
+            0,
+            1
+          ]
+        },
+        "constraints": []
+      },
+      {
+        "id": "sak_store_shelf_0",
+        "category": "shelf",
+        "role": "shelf_mesh",
+        "asset_id": "bookcase_wide",
+        "anchors": {
+          "floor_contact": [
+            0,
+            0,
+            0
+          ],
+          "front": [
+            0,
+            0,
+            -1
+          ]
+        },
+        "constraints": []
+      },
+      {
+        "id": "sak_store_product_box_0_0",
+        "category": "store_prop",
+        "role": "store_prop",
+        "asset_id": "box_closed",
+        "anchors": {
+          "support_contact": [
+            0,
+            0,
+            0
+          ]
+        },
+        "constraints": []
+      },
+      {
+        "id": "sak_store_product_label_0_0",
+        "category": "store_prop",
+        "role": "product_label",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_store_price_tag_0_0",
+        "category": "store_prop",
+        "role": "price_tag",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_store_product_box_0_1",
+        "category": "store_prop",
+        "role": "store_prop",
+        "asset_id": "box_open",
+        "anchors": {
+          "support_contact": [
+            0,
+            0,
+            0
+          ]
+        },
+        "constraints": []
+      },
+      {
+        "id": "sak_store_product_label_0_1",
+        "category": "store_prop",
+        "role": "product_label",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_store_price_tag_0_1",
+        "category": "store_prop",
+        "role": "price_tag",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_store_product_box_0_2",
+        "category": "store_prop",
+        "role": "store_prop",
+        "asset_id": "box_closed",
+        "anchors": {
+          "support_contact": [
+            0,
+            0,
+            0
+          ]
+        },
+        "constraints": []
+      },
+      {
+        "id": "sak_store_product_label_0_2",
+        "category": "store_prop",
+        "role": "product_label",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_store_price_tag_0_2",
+        "category": "store_prop",
+        "role": "price_tag",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_store_shelf_1",
+        "category": "shelf",
+        "role": "shelf_mesh",
+        "asset_id": "bookcase_wide",
+        "anchors": {
+          "floor_contact": [
+            0,
+            0,
+            0
+          ],
+          "front": [
+            0,
+            0,
+            -1
+          ]
+        },
+        "constraints": []
+      },
+      {
+        "id": "sak_store_product_box_1_0",
+        "category": "store_prop",
+        "role": "store_prop",
+        "asset_id": "box_open",
+        "anchors": {
+          "support_contact": [
+            0,
+            0,
+            0
+          ]
+        },
+        "constraints": []
+      },
+      {
+        "id": "sak_store_product_label_1_0",
+        "category": "store_prop",
+        "role": "product_label",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_store_price_tag_1_0",
+        "category": "store_prop",
+        "role": "price_tag",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_store_product_box_1_1",
+        "category": "store_prop",
+        "role": "store_prop",
+        "asset_id": "box_closed",
+        "anchors": {
+          "support_contact": [
+            0,
+            0,
+            0
+          ]
+        },
+        "constraints": []
+      },
+      {
+        "id": "sak_store_product_label_1_1",
+        "category": "store_prop",
+        "role": "product_label",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_store_price_tag_1_1",
+        "category": "store_prop",
+        "role": "price_tag",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_store_product_box_1_2",
+        "category": "store_prop",
+        "role": "store_prop",
+        "asset_id": "box_open",
+        "anchors": {
+          "support_contact": [
+            0,
+            0,
+            0
+          ]
+        },
+        "constraints": []
+      },
+      {
+        "id": "sak_store_product_label_1_2",
+        "category": "store_prop",
+        "role": "product_label",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_store_price_tag_1_2",
+        "category": "store_prop",
+        "role": "price_tag",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_store_shelf_2",
+        "category": "shelf",
+        "role": "shelf_mesh",
+        "asset_id": "bookcase_wide",
+        "anchors": {
+          "floor_contact": [
+            0,
+            0,
+            0
+          ],
+          "front": [
+            0,
+            0,
+            -1
+          ]
+        },
+        "constraints": []
+      },
+      {
+        "id": "sak_store_product_box_2_0",
+        "category": "store_prop",
+        "role": "store_prop",
+        "asset_id": "box_closed",
+        "anchors": {
+          "support_contact": [
+            0,
+            0,
+            0
+          ]
+        },
+        "constraints": []
+      },
+      {
+        "id": "sak_store_product_label_2_0",
+        "category": "store_prop",
+        "role": "product_label",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_store_price_tag_2_0",
+        "category": "store_prop",
+        "role": "price_tag",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_store_product_box_2_1",
+        "category": "store_prop",
+        "role": "store_prop",
+        "asset_id": "box_open",
+        "anchors": {
+          "support_contact": [
+            0,
+            0,
+            0
+          ]
+        },
+        "constraints": []
+      },
+      {
+        "id": "sak_store_product_label_2_1",
+        "category": "store_prop",
+        "role": "product_label",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_store_price_tag_2_1",
+        "category": "store_prop",
+        "role": "price_tag",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_store_product_box_2_2",
+        "category": "store_prop",
+        "role": "store_prop",
+        "asset_id": "box_closed",
+        "anchors": {
+          "support_contact": [
+            0,
+            0,
+            0
+          ]
+        },
+        "constraints": []
+      },
+      {
+        "id": "sak_store_product_label_2_2",
+        "category": "store_prop",
+        "role": "product_label",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_store_price_tag_2_2",
+        "category": "store_prop",
+        "role": "price_tag",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_store_backwall_sign_panel_0",
+        "category": "decor",
+        "role": "wall_art",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_store_backwall_sign_panel_1",
+        "category": "decor",
+        "role": "wall_art",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_store_backwall_sign_panel_2",
+        "category": "decor",
+        "role": "wall_art",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_store_backwall_sign_panel_3",
+        "category": "decor",
+        "role": "wall_art",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_store_backwall_sign_panel_4",
+        "category": "decor",
+        "role": "wall_art",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_store_backwall_sign_panel_5",
+        "category": "decor",
+        "role": "wall_art",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_store_hanging_sign",
+        "category": "decor",
+        "role": "hanging_sign",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_store_aisle_marker_0",
+        "category": "floor_detail",
+        "role": "aisle_marker",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_store_aisle_marker_1",
+        "category": "floor_detail",
+        "role": "aisle_marker",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_store_aisle_marker_2",
+        "category": "floor_detail",
+        "role": "aisle_marker",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_store_aisle_marker_3",
+        "category": "floor_detail",
+        "role": "aisle_marker",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_store_aisle_marker_4",
+        "category": "floor_detail",
+        "role": "aisle_marker",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_store_palette_panel_0",
+        "category": "decor",
+        "role": "palette_accent_panel",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_store_palette_panel_1",
+        "category": "decor",
+        "role": "palette_accent_panel",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_store_palette_panel_2",
+        "category": "decor",
+        "role": "palette_accent_panel",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_store_floor_stack_0",
+        "category": "store_prop",
+        "role": "store_prop",
+        "asset_id": "box_closed",
+        "anchors": {
+          "support_contact": [
+            0,
+            0,
+            0
+          ]
+        },
+        "constraints": []
+      },
+      {
+        "id": "sak_store_floor_stack_1",
+        "category": "store_prop",
+        "role": "store_prop",
+        "asset_id": "box_closed",
+        "anchors": {
+          "support_contact": [
+            0,
+            0,
+            0
+          ]
+        },
+        "constraints": []
+      },
+      {
+        "id": "sak_store_floor_stack_2",
+        "category": "store_prop",
+        "role": "store_prop",
+        "asset_id": "box_closed",
+        "anchors": {
+          "support_contact": [
+            0,
+            0,
+            0
+          ]
+        },
+        "constraints": []
+      },
+      {
+        "id": "sak_store_plant",
+        "category": "decor_prop",
+        "role": "plant",
+        "asset_id": "potted_plant",
+        "anchors": {
+          "floor_contact": [
+            0,
+            0,
+            0
+          ]
+        },
+        "constraints": []
+      },
+      {
+        "id": "sak_store_floor_lane_0",
+        "category": "floor_detail",
+        "role": "floor_detail_line",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_store_floor_lane_1",
+        "category": "floor_detail",
+        "role": "floor_detail_line",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_store_floor_lane_2",
+        "category": "floor_detail",
+        "role": "floor_detail_line",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_store_floor_lane_3",
+        "category": "floor_detail",
+        "role": "floor_detail_line",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_store_floor_lane_4",
+        "category": "floor_detail",
+        "role": "floor_detail_line",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_store_floor_lane_5",
+        "category": "floor_detail",
+        "role": "floor_detail_line",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_store_floor_lane_6",
+        "category": "floor_detail",
+        "role": "floor_detail_line",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      },
+      {
+        "id": "sak_store_floor_lane_7",
+        "category": "floor_detail",
+        "role": "floor_detail_line",
+        "asset_id": null,
+        "anchors": {},
+        "constraints": [
+          "renderable"
+        ]
+      }
+    ],
+    "relations": [
+      {
+        "type": "supports",
+        "source": "ground",
+        "target": "sak_store_floor",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_store_floor",
+        "target": "room_shell",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "ground",
+        "target": "sak_store_back_wall",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_store_back_wall",
+        "target": "room_shell",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "ground",
+        "target": "sak_store_left_wall",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_store_left_wall",
+        "target": "room_shell",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "ground",
+        "target": "sak_store_right_wall",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_store_right_wall",
+        "target": "room_shell",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "ground",
+        "target": "sak_store_ceiling",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_store_ceiling",
+        "target": "room_shell",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_store_floor",
+        "target": "sak_store_base_trim_back",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_store_base_trim_back",
+        "target": "room_shell",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_store_floor",
+        "target": "sak_store_base_trim_left",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_store_base_trim_left",
+        "target": "room_shell",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_store_floor",
+        "target": "sak_store_base_trim_right",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_store_base_trim_right",
+        "target": "room_shell",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_store_floor",
+        "target": "sak_store_crown_trim_back",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_store_crown_trim_back",
+        "target": "room_shell",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_store_floor",
+        "target": "sak_store_crown_trim_left",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_store_crown_trim_left",
+        "target": "room_shell",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_store_floor",
+        "target": "sak_store_crown_trim_right",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_store_crown_trim_right",
+        "target": "room_shell",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_store_floor",
+        "target": "sak_store_corner_post_0",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_store_corner_post_0",
+        "target": "room_shell",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_store_floor",
+        "target": "sak_store_corner_post_1",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_store_corner_post_1",
+        "target": "room_shell",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_store_floor",
+        "target": "sak_store_back_wall_vertical_trim_0",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_store_back_wall_vertical_trim_0",
+        "target": "room_shell",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_store_floor",
+        "target": "sak_store_back_wall_vertical_trim_1",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_store_back_wall_vertical_trim_1",
+        "target": "room_shell",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_store_floor",
+        "target": "sak_store_back_wall_vertical_trim_2",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_store_back_wall_vertical_trim_2",
+        "target": "room_shell",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_store_floor",
+        "target": "sak_store_back_wall_vertical_trim_3",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_store_back_wall_vertical_trim_3",
+        "target": "room_shell",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_store_floor",
+        "target": "sak_store_back_wall_vertical_trim_4",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_store_back_wall_vertical_trim_4",
+        "target": "room_shell",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_store_floor",
+        "target": "sak_store_back_wall_horizontal_trim_0",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_store_back_wall_horizontal_trim_0",
+        "target": "room_shell",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_store_floor",
+        "target": "sak_store_back_wall_horizontal_trim_1",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_store_back_wall_horizontal_trim_1",
+        "target": "room_shell",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_store_floor",
+        "target": "sak_store_back_wall_horizontal_trim_2",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_store_back_wall_horizontal_trim_2",
+        "target": "room_shell",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_store_floor",
+        "target": "sak_store_left_wall_vertical_trim_0",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_store_left_wall_vertical_trim_0",
+        "target": "room_shell",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_store_floor",
+        "target": "sak_store_left_wall_vertical_trim_1",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_store_left_wall_vertical_trim_1",
+        "target": "room_shell",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_store_floor",
+        "target": "sak_store_left_wall_vertical_trim_2",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_store_left_wall_vertical_trim_2",
+        "target": "room_shell",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_store_floor",
+        "target": "sak_store_right_wall_vertical_trim_0",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_store_right_wall_vertical_trim_0",
+        "target": "room_shell",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_store_floor",
+        "target": "sak_store_right_wall_vertical_trim_1",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_store_right_wall_vertical_trim_1",
+        "target": "room_shell",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_store_floor",
+        "target": "sak_store_right_wall_vertical_trim_2",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_store_right_wall_vertical_trim_2",
+        "target": "room_shell",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_store_floor",
+        "target": "sak_store_checkout_counter",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_store_checkout_counter",
+        "target": "checkout_zone",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_store_checkout_counter",
+        "target": "sak_store_checkout_screen",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_store_checkout_screen",
+        "target": "checkout_zone",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_store_checkout_counter",
+        "target": "sak_store_counter_warm_strip",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_store_counter_warm_strip",
+        "target": "checkout_zone",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_store_floor",
+        "target": "sak_store_stool",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_store_stool",
+        "target": "checkout_zone",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "faces",
+        "source": "sak_store_stool",
+        "target": "sak_store_checkout_counter",
+        "reason": "cashier_faces_counter"
+      },
+      {
+        "type": "supports",
+        "source": "sak_store_floor",
+        "target": "sak_store_shelf_0",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_store_shelf_0",
+        "target": "retail_shelves",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_store_shelf_0",
+        "target": "sak_store_product_box_0_0",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_store_product_box_0_0",
+        "target": "retail_shelves",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_store_shelf_0",
+        "target": "sak_store_product_label_0_0",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_store_product_label_0_0",
+        "target": "retail_shelves",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_store_shelf_0",
+        "target": "sak_store_price_tag_0_0",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_store_price_tag_0_0",
+        "target": "retail_shelves",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_store_shelf_0",
+        "target": "sak_store_product_box_0_1",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_store_product_box_0_1",
+        "target": "retail_shelves",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_store_shelf_0",
+        "target": "sak_store_product_label_0_1",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_store_product_label_0_1",
+        "target": "retail_shelves",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_store_shelf_0",
+        "target": "sak_store_price_tag_0_1",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_store_price_tag_0_1",
+        "target": "retail_shelves",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_store_shelf_0",
+        "target": "sak_store_product_box_0_2",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_store_product_box_0_2",
+        "target": "retail_shelves",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_store_shelf_0",
+        "target": "sak_store_product_label_0_2",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_store_product_label_0_2",
+        "target": "retail_shelves",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_store_shelf_0",
+        "target": "sak_store_price_tag_0_2",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_store_price_tag_0_2",
+        "target": "retail_shelves",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_store_floor",
+        "target": "sak_store_shelf_1",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_store_shelf_1",
+        "target": "retail_shelves",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_store_shelf_1",
+        "target": "sak_store_product_box_1_0",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_store_product_box_1_0",
+        "target": "retail_shelves",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_store_shelf_1",
+        "target": "sak_store_product_label_1_0",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_store_product_label_1_0",
+        "target": "retail_shelves",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_store_shelf_1",
+        "target": "sak_store_price_tag_1_0",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_store_price_tag_1_0",
+        "target": "retail_shelves",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_store_shelf_1",
+        "target": "sak_store_product_box_1_1",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_store_product_box_1_1",
+        "target": "retail_shelves",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_store_shelf_1",
+        "target": "sak_store_product_label_1_1",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_store_product_label_1_1",
+        "target": "retail_shelves",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_store_shelf_1",
+        "target": "sak_store_price_tag_1_1",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_store_price_tag_1_1",
+        "target": "retail_shelves",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_store_shelf_1",
+        "target": "sak_store_product_box_1_2",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_store_product_box_1_2",
+        "target": "retail_shelves",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_store_shelf_1",
+        "target": "sak_store_product_label_1_2",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_store_product_label_1_2",
+        "target": "retail_shelves",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_store_shelf_1",
+        "target": "sak_store_price_tag_1_2",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_store_price_tag_1_2",
+        "target": "retail_shelves",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_store_floor",
+        "target": "sak_store_shelf_2",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_store_shelf_2",
+        "target": "retail_shelves",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_store_shelf_2",
+        "target": "sak_store_product_box_2_0",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_store_product_box_2_0",
+        "target": "retail_shelves",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_store_shelf_2",
+        "target": "sak_store_product_label_2_0",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_store_product_label_2_0",
+        "target": "retail_shelves",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_store_shelf_2",
+        "target": "sak_store_price_tag_2_0",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_store_price_tag_2_0",
+        "target": "retail_shelves",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_store_shelf_2",
+        "target": "sak_store_product_box_2_1",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_store_product_box_2_1",
+        "target": "retail_shelves",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_store_shelf_2",
+        "target": "sak_store_product_label_2_1",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_store_product_label_2_1",
+        "target": "retail_shelves",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_store_shelf_2",
+        "target": "sak_store_price_tag_2_1",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_store_price_tag_2_1",
+        "target": "retail_shelves",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_store_shelf_2",
+        "target": "sak_store_product_box_2_2",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_store_product_box_2_2",
+        "target": "retail_shelves",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_store_shelf_2",
+        "target": "sak_store_product_label_2_2",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_store_product_label_2_2",
+        "target": "retail_shelves",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_store_shelf_2",
+        "target": "sak_store_price_tag_2_2",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_store_price_tag_2_2",
+        "target": "retail_shelves",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_store_back_wall",
+        "target": "sak_store_backwall_sign_panel_0",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "attached_to",
+        "source": "sak_store_backwall_sign_panel_0",
+        "target": "sak_store_back_wall",
+        "reason": "constructor_attachment"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_store_backwall_sign_panel_0",
+        "target": "storefront_dressing",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_store_back_wall",
+        "target": "sak_store_backwall_sign_panel_1",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "attached_to",
+        "source": "sak_store_backwall_sign_panel_1",
+        "target": "sak_store_back_wall",
+        "reason": "constructor_attachment"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_store_backwall_sign_panel_1",
+        "target": "storefront_dressing",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_store_back_wall",
+        "target": "sak_store_backwall_sign_panel_2",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "attached_to",
+        "source": "sak_store_backwall_sign_panel_2",
+        "target": "sak_store_back_wall",
+        "reason": "constructor_attachment"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_store_backwall_sign_panel_2",
+        "target": "storefront_dressing",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_store_back_wall",
+        "target": "sak_store_backwall_sign_panel_3",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "attached_to",
+        "source": "sak_store_backwall_sign_panel_3",
+        "target": "sak_store_back_wall",
+        "reason": "constructor_attachment"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_store_backwall_sign_panel_3",
+        "target": "storefront_dressing",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_store_back_wall",
+        "target": "sak_store_backwall_sign_panel_4",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "attached_to",
+        "source": "sak_store_backwall_sign_panel_4",
+        "target": "sak_store_back_wall",
+        "reason": "constructor_attachment"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_store_backwall_sign_panel_4",
+        "target": "storefront_dressing",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_store_back_wall",
+        "target": "sak_store_backwall_sign_panel_5",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "attached_to",
+        "source": "sak_store_backwall_sign_panel_5",
+        "target": "sak_store_back_wall",
+        "reason": "constructor_attachment"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_store_backwall_sign_panel_5",
+        "target": "storefront_dressing",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_store_hanging_sign",
+        "target": "storefront_dressing",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_store_floor",
+        "target": "sak_store_aisle_marker_0",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_store_aisle_marker_0",
+        "target": "floor_detail",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_store_floor",
+        "target": "sak_store_aisle_marker_1",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_store_aisle_marker_1",
+        "target": "floor_detail",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_store_floor",
+        "target": "sak_store_aisle_marker_2",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_store_aisle_marker_2",
+        "target": "floor_detail",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_store_floor",
+        "target": "sak_store_aisle_marker_3",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_store_aisle_marker_3",
+        "target": "floor_detail",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_store_floor",
+        "target": "sak_store_aisle_marker_4",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_store_aisle_marker_4",
+        "target": "floor_detail",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_store_back_wall",
+        "target": "sak_store_palette_panel_0",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "attached_to",
+        "source": "sak_store_palette_panel_0",
+        "target": "sak_store_back_wall",
+        "reason": "constructor_attachment"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_store_palette_panel_0",
+        "target": "storefront_dressing",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_store_back_wall",
+        "target": "sak_store_palette_panel_1",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "attached_to",
+        "source": "sak_store_palette_panel_1",
+        "target": "sak_store_back_wall",
+        "reason": "constructor_attachment"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_store_palette_panel_1",
+        "target": "storefront_dressing",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_store_back_wall",
+        "target": "sak_store_palette_panel_2",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "attached_to",
+        "source": "sak_store_palette_panel_2",
+        "target": "sak_store_back_wall",
+        "reason": "constructor_attachment"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_store_palette_panel_2",
+        "target": "storefront_dressing",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_store_floor",
+        "target": "sak_store_floor_stack_0",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_store_floor_stack_0",
+        "target": "retail_shelves",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_store_floor",
+        "target": "sak_store_floor_stack_1",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_store_floor_stack_1",
+        "target": "retail_shelves",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_store_floor",
+        "target": "sak_store_floor_stack_2",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_store_floor_stack_2",
+        "target": "retail_shelves",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_store_floor",
+        "target": "sak_store_plant",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_store_plant",
+        "target": "storefront_dressing",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_store_floor",
+        "target": "sak_store_floor_lane_0",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_store_floor_lane_0",
+        "target": "floor_detail",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_store_floor",
+        "target": "sak_store_floor_lane_1",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_store_floor_lane_1",
+        "target": "floor_detail",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_store_floor",
+        "target": "sak_store_floor_lane_2",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_store_floor_lane_2",
+        "target": "floor_detail",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_store_floor",
+        "target": "sak_store_floor_lane_3",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_store_floor_lane_3",
+        "target": "floor_detail",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_store_floor",
+        "target": "sak_store_floor_lane_4",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_store_floor_lane_4",
+        "target": "floor_detail",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_store_floor",
+        "target": "sak_store_floor_lane_5",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_store_floor_lane_5",
+        "target": "floor_detail",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_store_floor",
+        "target": "sak_store_floor_lane_6",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_store_floor_lane_6",
+        "target": "floor_detail",
+        "reason": "constructor_assembly"
+      },
+      {
+        "type": "supports",
+        "source": "sak_store_floor",
+        "target": "sak_store_floor_lane_7",
+        "reason": "constructor_support"
+      },
+      {
+        "type": "part_of",
+        "source": "sak_store_floor_lane_7",
+        "target": "floor_detail",
+        "reason": "constructor_assembly"
+      }
+    ],
+    "validation_view_overrides": {},
+    "warnings": []
+  },
+  "scene_authoring_kernel_v1": {
+    "prompt": "small retail store with checkout counter product shelves boxes signs and aisle lighting",
+    "family": "small_store_day",
+    "variant": 2,
+    "graph_node_count": 88,
+    "graph_relation_count": 185,
+    "warnings": [],
+    "completion_claim_allowed": false,
+    "human_review_required": true
+  },
+  "scene_graph_kernel_v1": {
+    "status": "repaired"
+  }
+}

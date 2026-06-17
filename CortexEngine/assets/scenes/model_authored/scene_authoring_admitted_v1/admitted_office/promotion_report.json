@@ -1,0 +1,14 @@
+{
+  "schema": "cortex.scene_authoring.admitted_selected_promotion.v1",
+  "ledger_item": "L001",
+  "id": "admitted_office",
+  "status": "PROMOTED_FOR_HUMAN_REVIEW",
+  "selected_policy": "scale_readability_repaired",
+  "selected_report": "docs/media/final_art/generated/model_authored/model_authored_multiview_admitted_office_scale_readability_repaired.json",
+  "source_seed": "artifacts/scene_authoring_kernel_v1/admitted_after_scale_repair_facing_batch_v1/admitted_office/facing_relation_scene_seed.json",
+  "promoted_seed": "assets/scenes/model_authored/scene_authoring_admitted_v1/admitted_office/scene_seed.json",
+  "evidence_status": "MULTIVIEW_RENDERED_NEEDS_HUMAN_REVIEW",
+  "notes": "Office admitted candidate with the undersized desk replacement quarantined, the validated desk source restored, facing relations recompiled, and rendered multiview revalidated.",
+  "completion_claim_allowed": false,
+  "human_review_required": true
+}

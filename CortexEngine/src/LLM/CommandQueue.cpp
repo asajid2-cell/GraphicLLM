@@ -568,8 +568,9 @@ void CommandQueue::ExecuteAddEntity(AddEntityCommand* cmd, Scene::ECS_Registry* 
         if (!mesh->hasBounds) {
             mesh->UpdateBounds();
         }
-        const float floorY = shouldAutoPlace ? 0.0f : std::max(0.0f, SanitizeVec3(cmd->position).y);
-        transform.position.y = floorY - mesh->boundsMin.y * transform.scale.y;
+        const float baseY = shouldAutoPlace ? cmd->supportHeight
+                                            : std::max(cmd->supportHeight, SanitizeVec3(cmd->position).y);
+        transform.position.y = baseY - mesh->boundsMin.y * transform.scale.y;
     }
 
     // Add renderable

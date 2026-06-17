@@ -106,7 +106,8 @@ bool Place(std::vector<std::shared_ptr<SceneCommand>>& out,
            float x,
            float z,
            float yawDeg,
-           const glm::vec4& color = glm::vec4(1.0f)) {
+           const glm::vec4& color = glm::vec4(1.0f),
+           float supportHeight = 0.0f) {
     if (!catalog.ResolvePath(key)) {
         spdlog::info("SceneRecipes: skipping unresolved asset '{}'", key);
         return false;
@@ -125,11 +126,21 @@ bool Place(std::vector<std::shared_ptr<SceneCommand>>& out,
     cmd->roughness = 0.7f;
     cmd->rotationEuler = glm::vec3(0.0f, yawDeg, 0.0f);
     cmd->hasRotation = true;
+    cmd->supportHeight = supportHeight; // base rests on this surface (0 = floor)
     cmd->autoPlace = false;
     cmd->allowPlacementJitter = false;
     cmd->disableCollisionAvoidance = true; // recipe positions are deliberate
     out.push_back(std::move(cmd));
     return true;
+}
+
+// Place a prop ON a surface: its base rests at world-Y `surfaceY` (counter top,
+// table top, shelf) rather than the floor — for appliances, books, lamps, decor.
+inline bool PlaceOn(std::vector<std::shared_ptr<SceneCommand>>& out,
+                    const Scene::AssetCatalog& catalog, FootprintCache& cache,
+                    const std::string& key, float targetFootprint, float x, float surfaceY,
+                    float z, float yawDeg, const glm::vec4& color = glm::vec4(1.0f)) {
+    return Place(out, catalog, cache, key, targetFootprint, x, z, yawDeg, color, surfaceY);
 }
 
 // A simple ground plane sized to the room (primitive, sits at y=0).
@@ -230,14 +241,15 @@ void BuildLivingRoom(std::vector<std::shared_ptr<SceneCommand>>& out, const Scen
     Place(out, cat, c, "loungeChair", 0.85f, -2.05f, -0.3f, 50.0f);     // angled into the group
     Place(out, cat, c, "loungeChair", 0.85f, 2.05f, -0.3f, -50.0f);
     Place(out, cat, c, "tableCoffee", 1.2f, 0.0f, -0.7f, 0.0f);         // centre of the seating
+    PlaceOn(out, cat, c, "books", 0.35f, 0.15f, 0.42f, -0.7f, 20.0f);   // on the coffee table
     Place(out, cat, c, "lampRoundFloor", 0.4f, -2.7f, -2.1f, 0.0f);     // floor lamp beside the sofa
     Place(out, cat, c, "sideTable", 0.5f, 2.7f, -2.1f, 0.0f);           // side table other end
+    PlaceOn(out, cat, c, "lampRoundTable", 0.28f, 2.7f, 0.46f, -2.1f, 0.0f); // table lamp on it
     Place(out, cat, c, "bookcaseOpen", 1.1f, -3.0f, 1.0f, 90.0f);       // side wall
     Place(out, cat, c, "cabinetTelevision", 1.6f, 0.0f, 2.7f, 180.0f);  // front wall (behind camera)
     Place(out, cat, c, "televisionModern", 1.2f, 0.0f, 2.5f, 180.0f);
     Place(out, cat, c, "pottedPlant", 0.6f, 2.9f, 1.1f, 0.0f);          // corner greenery
     Place(out, cat, c, "pottedPlant", 0.55f, -3.0f, -2.7f, 0.0f);
-    Place(out, cat, c, "plantSmall1", 0.3f, 2.7f, -2.1f, 0.0f);         // small plant on side-table spot
 }
 
 void BuildBedroom(std::vector<std::shared_ptr<SceneCommand>>& out, const Scene::AssetCatalog& cat, FootprintCache& c) {
@@ -246,7 +258,8 @@ void BuildBedroom(std::vector<std::shared_ptr<SceneCommand>>& out, const Scene::
     Place(out, cat, c, "bedDouble", 2.7f, -0.2f, -1.5f, 0.0f);          // focal: big, back-centre, faces camera
     Place(out, cat, c, "sideTable", 0.5f, -1.9f, -2.3f, 0.0f);
     Place(out, cat, c, "sideTable", 0.5f, 1.5f, -2.3f, 0.0f);
-    Place(out, cat, c, "lampSquareTable", 0.3f, 1.5f, -2.3f, 0.0f);
+    PlaceOn(out, cat, c, "lampSquareTable", 0.3f, 1.5f, 0.46f, -2.3f, 0.0f);  // lamp on nightstand
+    PlaceOn(out, cat, c, "books", 0.26f, -1.9f, 0.46f, -2.3f, 15.0f);          // books on the other
     Place(out, cat, c, "bookcaseClosed", 1.1f, -2.85f, 1.1f, 90.0f);    // left wall, away from camera
     Place(out, cat, c, "coatRackStanding", 0.45f, -2.7f, -2.5f, 0.0f);
     Place(out, cat, c, "pottedPlant", 0.5f, 2.6f, -2.4f, 0.0f);         // back-right corner accent
@@ -256,8 +269,10 @@ void BuildOffice(std::vector<std::shared_ptr<SceneCommand>>& out, const Scene::A
     BuildRoomShell(out, cat, c, 6.4f, 6.2f, glm::vec4(0.46f, 0.46f, 0.48f, 1.0f));
     Place(out, cat, c, "rugSquare", 2.4f, -0.4f, -0.3f, 0.0f, glm::vec4(0.33f, 0.34f, 0.40f, 1.0f));
     Place(out, cat, c, "deskCorner", 1.9f, -0.5f, -1.5f, 8.0f);          // focal: back-centre
-    Place(out, cat, c, "chairDesk", 0.8f, -0.5f, -0.5f, 180.0f);         // seated at the desk
-    Place(out, cat, c, "computerScreen", 0.5f, -0.9f, -1.9f, 170.0f);
+    Place(out, cat, c, "chairDesk", 0.8f, -0.5f, -0.55f, 180.0f);        // seated at the desk, faces it
+    PlaceOn(out, cat, c, "computerScreen", 0.55f, -0.85f, 0.74f, -1.75f, 4.0f);  // monitor on the desk
+    PlaceOn(out, cat, c, "computerKeyboard", 0.4f, -0.7f, 0.74f, -1.25f, 4.0f);  // keyboard
+    PlaceOn(out, cat, c, "lampSquareTable", 0.26f, 0.35f, 0.74f, -1.7f, 0.0f);   // desk lamp
     Place(out, cat, c, "bookcaseOpen", 1.2f, -2.85f, 0.9f, 90.0f);       // left wall
     Place(out, cat, c, "bookcaseClosedWide", 1.5f, -1.3f, -2.95f, 0.0f); // back wall
     Place(out, cat, c, "pottedPlant", 0.55f, 2.6f, -2.3f, 0.0f);         // back-right corner
@@ -265,19 +280,29 @@ void BuildOffice(std::vector<std::shared_ptr<SceneCommand>>& out, const Scene::A
 }
 
 void BuildKitchen(std::vector<std::shared_ptr<SceneCommand>>& out, const Scene::AssetCatalog& cat, FootprintCache& c) {
-    BuildRoomShell(out, cat, c, 7.0f, 7.0f, glm::vec4(0.6f, 0.58f, 0.55f, 1.0f));
-    // Counter run along the back wall.
-    const float backZ = -2.8f;
-    Place(out, cat, c, "kitchenCabinet", 0.9f, -2.0f, backZ, 0.0f);
-    Place(out, cat, c, "kitchenSink", 0.9f, -1.0f, backZ, 0.0f);
-    Place(out, cat, c, "kitchenStove", 0.9f, 0.0f, backZ, 0.0f);
-    Place(out, cat, c, "kitchenCabinet", 0.9f, 1.0f, backZ, 0.0f);
-    Place(out, cat, c, "kitchenFridge", 0.9f, 2.2f, backZ, 0.0f);
-    Place(out, cat, c, "hoodModern", 0.9f, 0.0f, backZ, 0.0f);
-    // Island bar with stools.
-    Place(out, cat, c, "kitchenBar", 1.8f, 0.0f, 0.2f, 0.0f);
-    Place(out, cat, c, "stoolBar", 0.4f, -0.6f, 1.1f, 180.0f);
-    Place(out, cat, c, "stoolBar", 0.4f, 0.6f, 1.1f, 180.0f);
+    BuildRoomShell(out, cat, c, 6.6f, 6.4f, glm::vec4(0.34f, 0.30f, 0.25f, 1.0f)); // warm floor
+    const float backZ = -2.7f;
+    const float counterTop = 0.92f; // lower-cabinet height after scaling
+    // Lower counter run along the back wall.
+    Place(out, cat, c, "kitchenCabinet", 0.95f, -2.2f, backZ, 0.0f);
+    Place(out, cat, c, "kitchenCabinetDrawer", 0.95f, -1.25f, backZ, 0.0f);
+    Place(out, cat, c, "kitchenSink", 0.95f, -0.3f, backZ, 0.0f);
+    Place(out, cat, c, "kitchenStove", 0.95f, 0.65f, backZ, 0.0f);
+    Place(out, cat, c, "kitchenCabinet", 0.95f, 1.6f, backZ, 0.0f);
+    Place(out, cat, c, "kitchenFridge", 1.05f, 2.7f, backZ, 0.0f);
+    // Upper cabinets + range hood mounted on the wall above the run.
+    PlaceOn(out, cat, c, "kitchenCabinetUpper", 0.95f, -2.2f, 1.65f, backZ - 0.06f, 0.0f);
+    PlaceOn(out, cat, c, "kitchenCabinetUpperDouble", 1.3f, -0.9f, 1.65f, backZ - 0.06f, 0.0f);
+    PlaceOn(out, cat, c, "hoodModern", 0.9f, 0.65f, 1.6f, backZ - 0.06f, 0.0f); // over the stove
+    PlaceOn(out, cat, c, "kitchenCabinetUpper", 0.95f, 1.6f, 1.65f, backZ - 0.06f, 0.0f);
+    // Counter-top appliances.
+    PlaceOn(out, cat, c, "kitchenMicrowave", 0.5f, -2.2f, counterTop, backZ, 0.0f);
+    PlaceOn(out, cat, c, "kitchenCoffeeMachine", 0.3f, -1.55f, counterTop, backZ + 0.05f, 0.0f);
+    PlaceOn(out, cat, c, "toaster", 0.25f, 1.55f, counterTop, backZ + 0.05f, 0.0f);
+    // Island bar with stools tucked at the near side (foreground).
+    Place(out, cat, c, "kitchenBar", 1.9f, -0.2f, 0.3f, 0.0f);
+    Place(out, cat, c, "stoolBar", 0.42f, -0.9f, 1.2f, 180.0f);
+    Place(out, cat, c, "stoolBar", 0.42f, 0.5f, 1.2f, 180.0f);
 }
 
 } // namespace

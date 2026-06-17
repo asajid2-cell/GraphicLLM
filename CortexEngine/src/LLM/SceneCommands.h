@@ -76,6 +76,10 @@ struct AddEntityCommand : public SceneCommand {
     glm::vec3 rotationEuler = glm::vec3(0.0f);
     bool hasRotation = false;
 
+    // For Model entities: the world Y that the mesh's BASE rests on (default 0 =
+    // floor). Recipes set this to put props on surfaces (counter/table/shelf).
+    float supportHeight = 0.0f;
+
     // Geometry detail controls for high/low poly variants
     // Used primarily for spheres, cylinders, cones, and tori.
     // Interpreted as "segments around" and "segments along" (or minor segments).

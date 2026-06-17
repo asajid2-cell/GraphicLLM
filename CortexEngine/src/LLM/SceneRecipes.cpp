@@ -223,41 +223,45 @@ void BuildRoomShell(std::vector<std::shared_ptr<SceneCommand>>& out, const Scene
 // pass may flip a piece 180 deg if a Kenney asset's authored front differs.
 
 void BuildLivingRoom(std::vector<std::shared_ptr<SceneCommand>>& out, const Scene::AssetCatalog& cat, FootprintCache& c) {
-    BuildRoomShell(out, cat, c, 7.5f, 7.5f, glm::vec4(0.55f, 0.5f, 0.46f, 1.0f));
-    Place(out, cat, c, "rugRectangle", 3.0f, 0.0f, -0.4f, 0.0f, glm::vec4(0.4f, 0.32f, 0.3f, 1.0f));
-    Place(out, cat, c, "loungeSofa", 2.1f, 0.0f, -2.3f, 0.0f);     // back, faces +Z
-    Place(out, cat, c, "tableCoffee", 1.1f, 0.0f, -0.5f, 0.0f);
-    Place(out, cat, c, "loungeChair", 0.8f, -2.2f, -0.6f, 60.0f);
-    Place(out, cat, c, "loungeChair", 0.8f, 2.2f, -0.6f, -60.0f);
-    Place(out, cat, c, "cabinetTelevision", 1.6f, 0.0f, 2.6f, 180.0f); // front, faces -Z
-    Place(out, cat, c, "televisionModern", 1.2f, 0.0f, 2.4f, 180.0f);
-    Place(out, cat, c, "bookcaseOpen", 1.0f, -3.2f, 1.5f, 90.0f);
-    Place(out, cat, c, "lampRoundFloor", 0.4f, 3.0f, -2.6f, 0.0f);
-    Place(out, cat, c, "pottedPlant", 0.5f, -3.0f, -2.6f, 0.0f);
+    // Cozier footprint so the seating group fills the room instead of floating.
+    BuildRoomShell(out, cat, c, 6.8f, 6.6f, glm::vec4(0.50f, 0.43f, 0.36f, 1.0f)); // warm wood floor
+    Place(out, cat, c, "rugRectangle", 2.9f, 0.0f, -0.3f, 0.0f, glm::vec4(0.47f, 0.30f, 0.26f, 1.0f));
+    Place(out, cat, c, "loungeSofa", 2.3f, 0.0f, -2.0f, 0.0f);          // back wall, faces +Z
+    Place(out, cat, c, "loungeChair", 0.85f, -2.05f, -0.3f, 50.0f);     // angled into the group
+    Place(out, cat, c, "loungeChair", 0.85f, 2.05f, -0.3f, -50.0f);
+    Place(out, cat, c, "tableCoffee", 1.2f, 0.0f, -0.7f, 0.0f);         // centre of the seating
+    Place(out, cat, c, "lampRoundFloor", 0.4f, -2.7f, -2.1f, 0.0f);     // floor lamp beside the sofa
+    Place(out, cat, c, "sideTable", 0.5f, 2.7f, -2.1f, 0.0f);           // side table other end
+    Place(out, cat, c, "bookcaseOpen", 1.1f, -3.0f, 1.0f, 90.0f);       // side wall
+    Place(out, cat, c, "cabinetTelevision", 1.6f, 0.0f, 2.7f, 180.0f);  // front wall (behind camera)
+    Place(out, cat, c, "televisionModern", 1.2f, 0.0f, 2.5f, 180.0f);
+    Place(out, cat, c, "pottedPlant", 0.6f, 2.9f, 1.1f, 0.0f);          // corner greenery
+    Place(out, cat, c, "pottedPlant", 0.55f, -3.0f, -2.7f, 0.0f);
+    Place(out, cat, c, "plantSmall1", 0.3f, 2.7f, -2.1f, 0.0f);         // small plant on side-table spot
 }
 
 void BuildBedroom(std::vector<std::shared_ptr<SceneCommand>>& out, const Scene::AssetCatalog& cat, FootprintCache& c) {
-    BuildRoomShell(out, cat, c, 7.0f, 7.0f, glm::vec4(0.5f, 0.46f, 0.5f, 1.0f));
-    Place(out, cat, c, "bedDouble", 2.2f, 0.0f, -2.0f, 0.0f);
-    Place(out, cat, c, "sideTable", 0.5f, -1.6f, -2.8f, 0.0f);
-    Place(out, cat, c, "sideTable", 0.5f, 1.6f, -2.8f, 0.0f);
-    Place(out, cat, c, "lampSquareTable", 0.3f, -1.6f, -2.8f, 0.0f);
-    Place(out, cat, c, "lampSquareTable", 0.3f, 1.6f, -2.8f, 0.0f);
-    Place(out, cat, c, "bookcaseClosed", 1.0f, 3.0f, 0.0f, -90.0f);
-    Place(out, cat, c, "coatRackStanding", 0.5f, -3.0f, 2.4f, 0.0f);
-    Place(out, cat, c, "rugRound", 2.2f, 0.0f, 1.2f, 0.0f, glm::vec4(0.45f, 0.4f, 0.5f, 1.0f));
+    BuildRoomShell(out, cat, c, 6.4f, 6.2f, glm::vec4(0.48f, 0.44f, 0.46f, 1.0f));
+    Place(out, cat, c, "rugRound", 2.7f, -0.1f, 0.2f, 0.0f, glm::vec4(0.46f, 0.40f, 0.48f, 1.0f));
+    Place(out, cat, c, "bedDouble", 2.7f, -0.2f, -1.5f, 0.0f);          // focal: big, back-centre, faces camera
+    Place(out, cat, c, "sideTable", 0.5f, -1.9f, -2.3f, 0.0f);
+    Place(out, cat, c, "sideTable", 0.5f, 1.5f, -2.3f, 0.0f);
+    Place(out, cat, c, "lampSquareTable", 0.3f, 1.5f, -2.3f, 0.0f);
+    Place(out, cat, c, "bookcaseClosed", 1.1f, -2.85f, 1.1f, 90.0f);    // left wall, away from camera
+    Place(out, cat, c, "coatRackStanding", 0.45f, -2.7f, -2.5f, 0.0f);
+    Place(out, cat, c, "pottedPlant", 0.5f, 2.6f, -2.4f, 0.0f);         // back-right corner accent
 }
 
 void BuildOffice(std::vector<std::shared_ptr<SceneCommand>>& out, const Scene::AssetCatalog& cat, FootprintCache& c) {
-    BuildRoomShell(out, cat, c, 7.0f, 7.0f, glm::vec4(0.5f, 0.5f, 0.52f, 1.0f));
-    Place(out, cat, c, "deskCorner", 1.6f, -1.0f, -2.0f, 0.0f);
-    Place(out, cat, c, "chairDesk", 0.7f, -1.0f, -1.0f, 180.0f);
-    Place(out, cat, c, "computerScreen", 0.5f, -1.4f, -2.4f, 180.0f);
-    Place(out, cat, c, "computerKeyboard", 0.45f, -1.0f, -2.0f, 180.0f);
-    Place(out, cat, c, "bookcaseOpen", 1.0f, 3.0f, 0.0f, -90.0f);
-    Place(out, cat, c, "bookcaseClosedWide", 1.4f, 0.5f, 3.0f, 180.0f);
-    Place(out, cat, c, "pottedPlant", 0.5f, 3.0f, -2.8f, 0.0f);
-    Place(out, cat, c, "trashcan", 0.3f, 0.2f, -1.8f, 0.0f);
+    BuildRoomShell(out, cat, c, 6.4f, 6.2f, glm::vec4(0.46f, 0.46f, 0.48f, 1.0f));
+    Place(out, cat, c, "rugSquare", 2.4f, -0.4f, -0.3f, 0.0f, glm::vec4(0.33f, 0.34f, 0.40f, 1.0f));
+    Place(out, cat, c, "deskCorner", 1.9f, -0.5f, -1.5f, 8.0f);          // focal: back-centre
+    Place(out, cat, c, "chairDesk", 0.8f, -0.5f, -0.5f, 180.0f);         // seated at the desk
+    Place(out, cat, c, "computerScreen", 0.5f, -0.9f, -1.9f, 170.0f);
+    Place(out, cat, c, "bookcaseOpen", 1.2f, -2.85f, 0.9f, 90.0f);       // left wall
+    Place(out, cat, c, "bookcaseClosedWide", 1.5f, -1.3f, -2.95f, 0.0f); // back wall
+    Place(out, cat, c, "pottedPlant", 0.55f, 2.6f, -2.3f, 0.0f);         // back-right corner
+    Place(out, cat, c, "trashcan", 0.3f, 0.8f, -1.1f, 0.0f);
 }
 
 void BuildKitchen(std::vector<std::shared_ptr<SceneCommand>>& out, const Scene::AssetCatalog& cat, FootprintCache& c) {

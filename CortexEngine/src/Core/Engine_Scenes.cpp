@@ -2641,8 +2641,8 @@ void Engine::BuildRecipeScene() {
         renderer->SetIBLEnabled(true);
         renderer->SetIBLIntensity(0.55f, 0.55f);
         renderer->SetBackgroundPresentation(true, 0.95f, 0.0f);
-        renderer->SetAmbientLighting(glm::vec3(0.22f, 0.23f, 0.26f), 1.0f);
-        renderer->SetExposure(1.0f);
+        renderer->SetAmbientLighting(glm::vec3(0.34f, 0.30f, 0.26f), 1.0f); // warm fill, not clinical
+        renderer->SetExposure(1.05f);
         renderer->SetSunDirection(glm::normalize(glm::vec3(-0.35f, 0.82f, 0.45f)));
         renderer->SetShadowBias(0.0035f);
         renderer->SetShadowPCFRadius(2.5f);
@@ -2670,14 +2670,25 @@ void Engine::BuildRecipeScene() {
         entt::entity cam = m_registry->CreateEntity();
         m_registry->AddComponent<Scene::TagComponent>(cam, "MainCamera");
         auto& t = m_registry->AddComponent<TransformComponent>(cam);
-        // Interior eye-level 3/4 view from a front corner (front wall is behind
-        // the camera, so it doesn't occlude) looking across the room toward the
-        // back furniture wall — reads like a real interior photo.
-        t.position = glm::vec3(2.7f, 1.7f, 2.9f);
-        const glm::vec3 target(-0.3f, 0.9f, -1.9f);
+        // Interior eye-level 3/4 view from a front corner (front wall behind the
+        // camera so it doesn't occlude), framed per recipe on its focal furniture.
+        glm::vec3 camPos(2.7f, 1.7f, 2.9f);
+        glm::vec3 target(-0.3f, 0.8f, -1.7f);
+        float camFov = 60.0f;
+        if (recipe == "kitchen") {
+            camPos = glm::vec3(2.6f, 1.7f, 3.0f);
+            target = glm::vec3(0.1f, 0.9f, -2.1f); // counter run + bar
+        } else if (recipe == "bedroom") {
+            camPos = glm::vec3(2.9f, 1.65f, 2.8f);
+            target = glm::vec3(-0.2f, 0.7f, -1.9f); // bed
+        } else if (recipe == "office") {
+            camPos = glm::vec3(2.6f, 1.65f, 2.6f);
+            target = glm::vec3(-1.0f, 0.8f, -1.9f); // desk + chair
+        }
+        t.position = camPos;
         t.rotation = glm::quatLookAtLH(glm::normalize(target - t.position), glm::vec3(0.0f, 1.0f, 0.0f));
         auto& c = m_registry->AddComponent<Scene::CameraComponent>(cam);
-        c.fov = 62.0f;
+        c.fov = camFov;
         ConfigureShowcaseCameraClip(c, 120.0f);
         c.isActive = true;
         m_activeCameraEntity = cam;

@@ -2613,19 +2613,22 @@ void Engine::BuildOutdoorSunsetBeachScene() {
         placeNature("Beach_Branches_A", scannedBranchesMesh, 1.7f, 1.7f, 0.25f, -52.0f, dryCol, 0.85f);
         placeNature("Beach_Stump_A", scannedStumpMesh, 1.0f, -5.6f, -1.5f, 0.0f, woodCol, 0.8f);
 
-        // Dune vegetation: a grass band plus ferns/bushes toward the sides/back,
-        // clustered rather than uniformly scattered.
-        for (int i = 0; i < 7; ++i) {
-            const float t = static_cast<float>(i);
-            const float x = -6.0f + t * 1.95f;
-            const float z = -1.9f + ((i % 2 == 0) ? -0.35f : 0.30f);
-            placeNature("Beach_Grass_" + std::to_string(i), scannedGrassMesh, 1.0f, x, z, 37.0f * t,
+        // Dune vegetation in TIGHT CLUMPS (grass + bush overlapping) toward the
+        // back/sides so the billboard-ish meshes read as planted bushes rather
+        // than a fence of single cards; central foreground stays clear (sightline).
+        struct Clump { float x; float z; };
+        const Clump clumps[] = {{-5.6f, -1.9f}, {-3.3f, -2.5f}, {3.2f, -2.5f}, {5.6f, -1.8f}};
+        int gi = 0;
+        for (const auto& cl : clumps) {
+            placeNature("Beach_Bush_" + std::to_string(gi++), scannedBushMesh, 1.4f, cl.x, cl.z + 0.15f, 60.0f,
+                        leafCol, 0.72f);
+            placeNature("Beach_Grass_" + std::to_string(gi++), scannedGrassMesh, 1.0f, cl.x - 0.35f, cl.z, 25.0f,
                         leafCol, 0.7f);
+            placeNature("Beach_Grass_" + std::to_string(gi++), scannedGrassMesh, 0.85f, cl.x + 0.4f, cl.z - 0.3f,
+                        135.0f, leafCol, 0.7f);
         }
-        placeNature("Beach_Fern_A", scannedFernMesh, 1.1f, -5.8f, -2.0f, 25.0f, leafCol, 0.65f);
-        placeNature("Beach_Fern_B", scannedFernMesh, 0.8f, 5.4f, -1.8f, -40.0f, leafCol, 0.65f);
-        placeNature("Beach_Bush_A", scannedBushMesh, 1.5f, -6.3f, -1.3f, 0.0f, leafCol, 0.7f);
-        placeNature("Beach_Bush_B", scannedBushMesh, 1.3f, 6.0f, -1.1f, 90.0f, leafCol, 0.7f);
+        placeNature("Beach_Fern_A", scannedFernMesh, 1.0f, -4.5f, -2.6f, 25.0f, leafCol, 0.65f);
+        placeNature("Beach_Fern_B", scannedFernMesh, 0.9f, 4.4f, -2.6f, -40.0f, leafCol, 0.65f);
     }
 }
 

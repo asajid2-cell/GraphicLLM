@@ -45,31 +45,31 @@ glm::vec2 Renderer::GetWaterPrimaryDir() const {
 
 void Renderer::SetWaterParams(float levelY, float amplitude, float waveLength, float speed,
                               float dirX, float dirZ, float secondaryAmplitude, float steepness) {
-    m_waterState.levelY = levelY;
-    m_waterState.waveAmplitude = amplitude;
-    m_waterState.waveLength = (waveLength <= 0.0f) ? 1.0f : waveLength;
-    m_waterState.waveSpeed = speed;
+    m_water.State().levelY = levelY;
+    m_water.State().waveAmplitude = amplitude;
+    m_water.State().waveLength = (waveLength <= 0.0f) ? 1.0f : waveLength;
+    m_water.State().waveSpeed = speed;
     glm::vec2 dir(dirX, dirZ);
     if (glm::length2(dir) < 1e-4f) {
         dir = glm::vec2(1.0f, 0.0f);
     }
-    m_waterState.primaryDirection = glm::normalize(dir);
-    m_waterState.secondaryAmplitude = glm::max(0.0f, secondaryAmplitude);
-    m_waterState.steepness = glm::clamp(steepness, 0.0f, 1.0f);
+    m_water.State().primaryDirection = glm::normalize(dir);
+    m_water.State().secondaryAmplitude = glm::max(0.0f, secondaryAmplitude);
+    m_water.State().steepness = glm::clamp(steepness, 0.0f, 1.0f);
 }
 
 void Renderer::SetWaterOptics(float roughness, float fresnelStrength) {
-    m_waterState.roughness = glm::clamp(roughness, 0.01f, 1.0f);
-    m_waterState.fresnelStrength = glm::clamp(fresnelStrength, 0.0f, 3.0f);
+    m_water.State().roughness = glm::clamp(roughness, 0.01f, 1.0f);
+    m_water.State().fresnelStrength = glm::clamp(fresnelStrength, 0.0f, 3.0f);
 }
 
 float Renderer::SampleWaterHeightAt(const glm::vec2& worldXZ) const {
-    const float amplitude = m_waterState.waveAmplitude;
-    const float waveLen   = (m_waterState.waveLength <= 0.0f) ? 1.0f : m_waterState.waveLength;
-    const float speed     = m_waterState.waveSpeed;
-    const float waterY    = m_waterState.levelY;
+    const float amplitude = m_water.State().waveAmplitude;
+    const float waveLen   = (m_water.State().waveLength <= 0.0f) ? 1.0f : m_water.State().waveLength;
+    const float speed     = m_water.State().waveSpeed;
+    const float waterY    = m_water.State().levelY;
 
-    glm::vec2 dir = m_waterState.primaryDirection;
+    glm::vec2 dir = m_water.State().primaryDirection;
     if (glm::length2(dir) < 1e-4f) {
         dir = glm::vec2(1.0f, 0.0f);
     } else {
@@ -84,7 +84,7 @@ float Renderer::SampleWaterHeightAt(const glm::vec2& worldXZ) const {
     const float h0 = amplitude * std::sin(phase0);
 
     const float phase1 = glm::dot(dir2, worldXZ) * k * 1.3f + speed * 0.8f * t;
-    const float h1 = m_waterState.secondaryAmplitude * std::sin(phase1);
+    const float h1 = m_water.State().secondaryAmplitude * std::sin(phase1);
 
     return waterY + h0 + h1;
 }

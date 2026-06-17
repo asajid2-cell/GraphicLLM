@@ -859,15 +859,15 @@ void Renderer::PopulateFrameDebugAndPostConstants(FrameConstants& frameData,
 
     // Water parameters shared with shaders (see ShaderTypes.h / Basic.hlsl).
     frameData.waterParams0 = glm::vec4(
-        m_waterState.waveAmplitude,
-        m_waterState.waveLength,
-        m_waterState.waveSpeed,
-        m_waterState.levelY);
+        m_water.State().waveAmplitude,
+        m_water.State().waveLength,
+        m_water.State().waveSpeed,
+        m_water.State().levelY);
     frameData.waterParams1 = glm::vec4(
-        m_waterState.primaryDirection.x,
-        m_waterState.primaryDirection.y,
-        m_waterState.secondaryAmplitude,
-        m_waterState.steepness);
+        m_water.State().primaryDirection.x,
+        m_water.State().primaryDirection.y,
+        m_water.State().secondaryAmplitude,
+        m_water.State().steepness);
 
     frameData.ssrParams = glm::vec4(
         m_ssr.State().controls.maxDistance,

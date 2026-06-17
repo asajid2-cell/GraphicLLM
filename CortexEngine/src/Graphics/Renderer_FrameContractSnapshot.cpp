@@ -767,14 +767,14 @@ void Renderer::UpdateFrameContractSnapshot(Scene::ECS_Registry* registry,
     contract.particles.uploadBytesThisFrame =
         m_particles.State().frame.frameUploadBytes;
 
-    contract.water.levelY = m_waterState.levelY;
-    contract.water.waveAmplitude = m_waterState.waveAmplitude;
-    contract.water.waveLength = m_waterState.waveLength;
-    contract.water.waveSpeed = m_waterState.waveSpeed;
-    contract.water.secondaryAmplitude = m_waterState.secondaryAmplitude;
-    contract.water.steepness = m_waterState.steepness;
-    contract.water.roughness = m_waterState.roughness;
-    contract.water.fresnelStrength = m_waterState.fresnelStrength;
+    contract.water.levelY = m_water.State().levelY;
+    contract.water.waveAmplitude = m_water.State().waveAmplitude;
+    contract.water.waveLength = m_water.State().waveLength;
+    contract.water.waveSpeed = m_water.State().waveSpeed;
+    contract.water.secondaryAmplitude = m_water.State().secondaryAmplitude;
+    contract.water.steepness = m_water.State().steepness;
+    contract.water.roughness = m_water.State().roughness;
+    contract.water.fresnelStrength = m_water.State().fresnelStrength;
     if (registry) {
         float absorptionSum = 0.0f;
         float foamSum = 0.0f;

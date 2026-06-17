@@ -52,6 +52,7 @@
 #include "Graphics/RendererMaterialTextureState.h"
 #include "Graphics/RendererParticleState.h"
 #include "Graphics/Subsystems/ParticleSubsystem.h"
+#include "Graphics/Subsystems/WaterSubsystem.h"
 #include "Graphics/RendererRTState.h"
 #include "Graphics/RendererSSAOState.h"
 #include "Graphics/Subsystems/SSAOSubsystem.h"
@@ -718,6 +719,7 @@ private:
     void RenderScene(Scene::ECS_Registry* registry);
     void RenderOverlays(Scene::ECS_Registry* registry);
     void RenderWaterSurfaces(Scene::ECS_Registry* registry);
+    WaterRenderContext MakeWaterRenderContext();
     void RenderTransparent(Scene::ECS_Registry* registry);
     void RenderSSR();
     SSRRenderContext MakeSSRRenderContext();
@@ -916,7 +918,7 @@ public:
 
     // Water / liquid parameters shared with shaders via waterParams0/1.
     // Defaults describe a calm, low-amplitude water plane at Y=0.
-    RendererWaterState m_waterState;
+    WaterSubsystem m_water;
 
     // Vegetation rendering system
     VegetationRenderState m_vegetationState;

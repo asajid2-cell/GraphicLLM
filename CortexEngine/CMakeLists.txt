@@ -312,6 +312,7 @@ set(CORTEX_SOURCES
     src/Graphics/Subsystems/SSAOSubsystem.cpp
     src/Graphics/Subsystems/SSRSubsystem.cpp
     src/Graphics/Subsystems/ParticleSubsystem.cpp
+    src/Graphics/Subsystems/WaterSubsystem.cpp
     src/Graphics/Renderer_SSAO.cpp
     src/Graphics/ManyLightReservoir.cpp
     src/Graphics/DiffuseRadianceCache.cpp

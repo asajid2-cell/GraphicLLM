@@ -193,7 +193,7 @@ Renderer::HealthState Renderer::BuildHealthState() const {
 }
 
 Renderer::WaterState Renderer::GetWaterState() const {
-    return m_waterState;
+    return m_water.State();
 }
 
 Renderer::PostProcessState Renderer::GetPostProcessState() const {

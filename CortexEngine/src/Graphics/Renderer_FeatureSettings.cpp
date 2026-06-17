@@ -164,7 +164,7 @@ void Renderer::ToggleTAA() {
 }
 
 void Renderer::SetParticlesEnabled(bool enabled) {
-    m_particleState.controls.enabledForScene = enabled;
+    m_particles.State().controls.enabledForScene = enabled;
 }
 
 bool Renderer::GetParticlesEnabled() const {
@@ -172,26 +172,26 @@ bool Renderer::GetParticlesEnabled() const {
 }
 
 void Renderer::SetParticleDensityScale(float scale) {
-    m_particleState.controls.SetDensityScale(scale);
+    m_particles.State().controls.SetDensityScale(scale);
 }
 
 float Renderer::GetParticleDensityScale() const {
-    return m_particleState.controls.densityScale;
+    return m_particles.State().controls.densityScale;
 }
 
 void Renderer::SetParticleTuning(float qualityScale,
                                  float bloomContribution,
                                  float softDepthFade,
                                  float windInfluence) {
-    m_particleState.controls.SetTuning(qualityScale, bloomContribution, softDepthFade, windInfluence);
+    m_particles.State().controls.SetTuning(qualityScale, bloomContribution, softDepthFade, windInfluence);
 }
 
 void Renderer::SetParticleEffectPreset(const std::string& presetId) {
-    m_particleState.controls.SetEffectPreset(presetId);
+    m_particles.State().controls.SetEffectPreset(presetId);
 }
 
 const std::string& Renderer::GetParticleEffectPreset() const {
-    return m_particleState.controls.effectPreset;
+    return m_particles.State().controls.effectPreset;
 }
 
 bool Renderer::UsesGpuParticleLifecycle() const {

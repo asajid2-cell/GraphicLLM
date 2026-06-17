@@ -75,7 +75,7 @@ FrameExecutionContext Renderer::BuildFrameExecutionContext(Scene::ECS_Registry* 
     featureInputs.hasVelocityBuffer = (m_temporalScreenState.velocityBuffer != nullptr);
     featureInputs.hasDepthBuffer = (m_depthResources.resources.buffer != nullptr);
     featureInputs.hasPostProcessPipeline = pipelineReadiness.postProcess;
-    featureInputs.particlesEnabledForScene = m_particleState.controls.enabledForScene;
+    featureInputs.particlesEnabledForScene = m_particles.State().controls.enabledForScene;
 
     frameCtx.features = BuildFrameFeaturePlan(featureInputs);
     return frameCtx;

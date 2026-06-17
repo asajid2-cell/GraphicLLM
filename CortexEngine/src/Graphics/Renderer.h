@@ -51,6 +51,7 @@
 #include "Graphics/RendererMainTargetState.h"
 #include "Graphics/RendererMaterialTextureState.h"
 #include "Graphics/RendererParticleState.h"
+#include "Graphics/Subsystems/ParticleSubsystem.h"
 #include "Graphics/RendererRTState.h"
 #include "Graphics/RendererSSAOState.h"
 #include "Graphics/Subsystems/SSAOSubsystem.h"
@@ -765,6 +766,7 @@ private:
     void UpdateRTFramePlan(const FrameFeaturePlan& featurePlan);
     void ExecuteRTDenoisePass(const char* frameNormalRoughnessResource);
     void RenderParticles(Scene::ECS_Registry* registry);
+    ParticleRenderContext MakeParticleRenderContext();
 
     // Vegetation rendering helpers
     Result<void> CreateVegetationPipelines();
@@ -838,7 +840,7 @@ public:
 
     RendererPipelineState m_pipelineState;
 
-    ParticleRenderState m_particleState;
+    ParticleSubsystem m_particles;
 
     RendererDebugOverlayState m_debugOverlayState;
 

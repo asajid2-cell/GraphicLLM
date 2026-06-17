@@ -76,7 +76,7 @@ void Renderer::ExecuteGeometryFramePhase(const FrameExecutionContext& frameCtx) 
         FramePhase::EndGpuScope(m_commandResources.graphicsList.Get());
         RecordFramePass("VisibilityBuffer",
                         true,
-                        m_visibilityBufferState.renderedThisFrame,
+                        m_vb.State().renderedThisFrame,
                         m_frameDiagnostics.contract.drawCounts.visibilityBufferInstances - vbInstancesBefore,
                         {"frame_constants", "depth", "shadow_map", "renderables", "rt_shadow_mask", "rt_gi"},
                         {"hdr_color",
@@ -96,8 +96,8 @@ void Renderer::ExecuteGeometryFramePhase(const FrameExecutionContext& frameCtx) 
 
     // If VB is disabled or fails to produce a lit HDR frame, fall back to the
     // existing opaque render paths for robustness.
-    if (!featurePlan.debug.disableOpaqueGeometry && (!vbEnabled || !m_visibilityBufferState.renderedThisFrame)) {
-        if (vbEnabled && !m_visibilityBufferState.renderedThisFrame && m_depthResources.resources.buffer && m_depthResources.resources.resourceState != D3D12_RESOURCE_STATE_DEPTH_WRITE) {
+    if (!featurePlan.debug.disableOpaqueGeometry && (!vbEnabled || !m_vb.State().renderedThisFrame)) {
+        if (vbEnabled && !m_vb.State().renderedThisFrame && m_depthResources.resources.buffer && m_depthResources.resources.resourceState != D3D12_RESOURCE_STATE_DEPTH_WRITE) {
             DepthWriteTransitionPass::TransitionContext depthTransitionContext{};
             depthTransitionContext.commandList = m_commandResources.graphicsList.Get();
             depthTransitionContext.depthBuffer = m_depthResources.resources.buffer.Get();
@@ -162,7 +162,7 @@ void Renderer::ExecuteGeometryFramePhase(const FrameExecutionContext& frameCtx) 
 
     // When VB debug visualization is active, keep the frame clean by skipping
     // passes that can obscure the intermediate buffer being inspected.
-    if (m_visibilityBufferState.debugOverrideThisFrame) {
+    if (m_vb.State().debugOverrideThisFrame) {
         return;
     }
 
@@ -217,7 +217,7 @@ Renderer::MainSceneEffectsResult Renderer::ExecuteMainSceneEffectsFramePhase(con
     const FrameFeaturePlan& featurePlan = frameCtx.features;
     MainSceneEffectsResult result{};
     result.frameNormalRoughnessResource =
-        m_visibilityBufferState.renderedThisFrame ? "vb_gbuffer_normal_roughness" : "gbuffer_normal_roughness";
+        m_vb.State().renderedThisFrame ? "vb_gbuffer_normal_roughness" : "gbuffer_normal_roughness";
 
     if (m_framePlanning.rtPlan.enabled) {
         FramePhase::BeginGpuScope(m_commandResources.graphicsList.Get(), "RTReflections", "RayTracing");

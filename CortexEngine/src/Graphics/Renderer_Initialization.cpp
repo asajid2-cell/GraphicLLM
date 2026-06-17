@@ -225,7 +225,7 @@ Result<void> Renderer::Initialize(DX12Device* device, Window* window) {
         const bool vbDisabled = (std::getenv("CORTEX_DISABLE_VISIBILITY_BUFFER") != nullptr);
         const bool vbEnabledLegacy = (std::getenv("CORTEX_ENABLE_VISIBILITY_BUFFER") != nullptr);
         // VB is enabled by default; opt out via env var.
-        m_visibilityBufferState.enabled = !vbDisabled;
+        m_vb.State().enabled = !vbDisabled;
         if (vbDisabled) {
             spdlog::info("VisibilityBuffer disabled via CORTEX_DISABLE_VISIBILITY_BUFFER=1 (using forward rendering).");
         } else if (vbEnabledLegacy) {

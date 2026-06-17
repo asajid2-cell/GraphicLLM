@@ -31,7 +31,7 @@ TemporalContext Renderer::MakeTemporalContext() {
     ctx.historyManager = &m_temporalHistory.manager;
     ctx.renderFrameCounter = m_frameLifecycle.renderFrameCounter;
     ctx.visibilityBuffer = m_services.visibilityBuffer.get();
-    ctx.vbState = &m_visibilityBufferState;
+    ctx.vbState = &m_vb.State();
     ctx.updateResolveTable = [this]() { UpdateTAAResolveDescriptorTable(); };
     return ctx;
 }

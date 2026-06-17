@@ -69,6 +69,7 @@
 #include "Graphics/RendererTextureUploadState.h"
 #include "Graphics/RendererVegetationState.h"
 #include "Graphics/RendererVisibilityBufferState.h"
+#include "Graphics/Subsystems/VisibilityBufferSubsystem.h"
 #include "Graphics/RendererUploadState.h"
 #include "Graphics/RendererVoxelState.h"
 #include "Graphics/Subsystems/VoxelSubsystem.h"
@@ -787,19 +788,12 @@ private:
                                                              bool& completedPath);
     [[nodiscard]] bool RenderVisibilityBufferMaterialResolveStage(uint32_t debugView,
                                                                   bool& completedPath);
-    struct VisibilityBufferDeferredLightingInputs {
-        std::vector<Light> localLights;
-        std::vector<VBReflectionProbe> reflectionProbes;
-        uint32_t skippedReflectionProbes = 0;
-        VisibilityBufferRenderer::DeferredLightingParams params{};
-        ID3D12Resource* envDiffuseResource = nullptr;
-        ID3D12Resource* envSpecularResource = nullptr;
-        DXGI_FORMAT envFormat = DXGI_FORMAT_R8G8B8A8_UNORM;
-    };
+    using VisibilityBufferDeferredLightingInputs = VisibilityBufferSubsystem::DeferredLightingInputs;
     [[nodiscard]] VisibilityBufferDeferredLightingInputs
     PrepareVisibilityBufferDeferredLighting(Scene::ECS_Registry* registry);
     void ApplyVisibilityBufferDeferredLighting(const VisibilityBufferDeferredLightingInputs& inputs);
     void RenderVisibilityBufferDeferredLightingStage(Scene::ECS_Registry* registry);
+    VisibilityBufferContext MakeVisibilityBufferContext();
 
     // Debug drawing API
 public:
@@ -874,7 +868,7 @@ public:
     RendererCameraFrameState m_cameraState;
 
     GpuCullingRuntimeState m_gpuCullingState;
-    RendererVisibilityBufferState m_visibilityBufferState;
+    VisibilityBufferSubsystem m_vb;
     RendererFrameLifecycleState m_frameLifecycle;
     RendererFramePlanningState m_framePlanning;
     RendererTemporalHistoryState m_temporalHistory;

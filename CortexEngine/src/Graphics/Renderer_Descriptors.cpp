@@ -62,7 +62,7 @@ void Renderer::UpdateTAAResolveDescriptorTable() {
     }
 
     ID3D12Resource* normalRes = m_mainTargets.normalRoughness.resources.texture.Get();
-    if (m_visibilityBufferState.renderedThisFrame && m_services.visibilityBuffer && m_services.visibilityBuffer->GetNormalRoughnessBuffer()) {
+    if (m_vb.State().renderedThisFrame && m_services.visibilityBuffer && m_services.visibilityBuffer->GetNormalRoughnessBuffer()) {
         normalRes = m_services.visibilityBuffer->GetNormalRoughnessBuffer();
     }
 
@@ -347,18 +347,18 @@ void Renderer::UpdatePostProcessDescriptorTable() {
     }
 
     ID3D12Resource* normalRes = m_mainTargets.normalRoughness.resources.texture.Get();
-    if (m_visibilityBufferState.renderedThisFrame && m_services.visibilityBuffer && m_services.visibilityBuffer->GetNormalRoughnessBuffer()) {
+    if (m_vb.State().renderedThisFrame && m_services.visibilityBuffer && m_services.visibilityBuffer->GetNormalRoughnessBuffer()) {
         normalRes = m_services.visibilityBuffer->GetNormalRoughnessBuffer();
     }
 
     ID3D12Resource* emissiveMetallicRes = nullptr;
-    if (m_visibilityBufferState.renderedThisFrame && m_services.visibilityBuffer && m_services.visibilityBuffer->GetEmissiveMetallicBuffer()) {
+    if (m_vb.State().renderedThisFrame && m_services.visibilityBuffer && m_services.visibilityBuffer->GetEmissiveMetallicBuffer()) {
         emissiveMetallicRes = m_services.visibilityBuffer->GetEmissiveMetallicBuffer();
     }
 
     ID3D12Resource* materialExt1Res = nullptr;
     ID3D12Resource* materialExt2Res = nullptr;
-    if (m_visibilityBufferState.renderedThisFrame && m_services.visibilityBuffer) {
+    if (m_vb.State().renderedThisFrame && m_services.visibilityBuffer) {
         materialExt1Res = m_services.visibilityBuffer->GetMaterialExt1Buffer();
         materialExt2Res = m_services.visibilityBuffer->GetMaterialExt2Buffer();
     }

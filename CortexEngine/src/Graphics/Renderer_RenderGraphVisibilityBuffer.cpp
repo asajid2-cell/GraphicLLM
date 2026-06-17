@@ -64,9 +64,9 @@ Renderer::ExecuteVisibilityBufferInRenderGraph(Scene::ECS_Registry* registry) {
         m_services.visibilityBuffer->GetMaterialExt1Buffer() &&
         m_services.visibilityBuffer->GetMaterialExt2Buffer()) {
         CollectInstancesForVisibilityBuffer(registry);
-        if (m_visibilityBufferState.instances.empty() || m_visibilityBufferState.meshDraws.empty()) {
+        if (m_vb.State().instances.empty() || m_vb.State().meshDraws.empty()) {
             spdlog::warn("VB: No instances collected (instances={}, meshDraws={})",
-                         m_visibilityBufferState.instances.size(), m_visibilityBufferState.meshDraws.size());
+                         m_vb.State().instances.size(), m_vb.State().meshDraws.size());
             return result;
         }
 
@@ -185,10 +185,10 @@ Renderer::ExecuteVisibilityBufferInRenderGraph(Scene::ECS_Registry* registry) {
         vbGraphContext.visibility.depthBuffer = m_depthResources.resources.buffer.Get();
         vbGraphContext.visibility.depthDSV = m_depthResources.descriptors.dsv.cpu;
         vbGraphContext.visibility.viewProjection = &m_constantBuffers.frameCPU.viewProjectionMatrix;
-        vbGraphContext.visibility.meshDraws = &m_visibilityBufferState.meshDraws;
+        vbGraphContext.visibility.meshDraws = &m_vb.State().meshDraws;
         vbGraphContext.visibility.cullMaskAddress = vbCullMaskAddress;
         vbGraphContext.visibility.depthState = &m_depthResources.resources.resourceState;
-        vbGraphContext.visibility.instanceCount = static_cast<uint32_t>(m_visibilityBufferState.instances.size());
+        vbGraphContext.visibility.instanceCount = static_cast<uint32_t>(m_vb.State().instances.size());
         vbGraphContext.visibility.contractInstances = &m_frameDiagnostics.contract.drawCounts.visibilityBufferInstances;
         vbGraphContext.visibility.contractMeshes = &m_frameDiagnostics.contract.drawCounts.visibilityBufferMeshes;
         vbGraphContext.visibility.contractDrawBatches = &m_frameDiagnostics.contract.drawCounts.visibilityBufferDrawBatches;
@@ -198,7 +198,7 @@ Renderer::ExecuteVisibilityBufferInRenderGraph(Scene::ECS_Registry* registry) {
         vbGraphContext.materialResolve.depthBuffer = m_depthResources.resources.buffer.Get();
         vbGraphContext.materialResolve.depthSRV = m_depthResources.descriptors.srv.cpu;
         vbGraphContext.materialResolve.viewProjection = &m_constantBuffers.frameCPU.viewProjectionMatrix;
-        vbGraphContext.materialResolve.meshDraws = &m_visibilityBufferState.meshDraws;
+        vbGraphContext.materialResolve.meshDraws = &m_vb.State().meshDraws;
         vbGraphContext.materialResolve.biomeMaterialsAddress =
             m_constantBuffers.biomeMaterials.gpuAddress;
         vbGraphContext.materialResolve.depthState = &m_depthResources.resources.resourceState;
@@ -218,8 +218,8 @@ Renderer::ExecuteVisibilityBufferInRenderGraph(Scene::ECS_Registry* registry) {
         vbGraphContext.debugBlit.gbufferSource = SelectVBGBufferDebugBuffer(vbDebugView);
         vbGraphContext.debugBlit.hdrState = &m_mainTargets.hdr.resources.state;
         vbGraphContext.debugBlit.depthState = &m_depthResources.resources.resourceState;
-        vbGraphContext.debugBlit.renderedThisFrame = &m_visibilityBufferState.renderedThisFrame;
-        vbGraphContext.debugBlit.debugOverrideThisFrame = &m_visibilityBufferState.debugOverrideThisFrame;
+        vbGraphContext.debugBlit.renderedThisFrame = &m_vb.State().renderedThisFrame;
+        vbGraphContext.debugBlit.debugOverrideThisFrame = &m_vb.State().debugOverrideThisFrame;
         vbGraphContext.debugBlit.failure = vbFailure;
         vbGraphContext.brdfLut.renderer = m_services.visibilityBuffer.get();
         vbGraphContext.brdfLut.commandList = m_commandResources.graphicsList.Get();
@@ -249,7 +249,7 @@ Renderer::ExecuteVisibilityBufferInRenderGraph(Scene::ECS_Registry* registry) {
         vbGraphContext.deferredLighting.rtGIValid = vbResources.rtGI.IsValid();
         vbGraphContext.deferredLighting.brdfLutValid = vbResources.brdfLut.IsValid();
         vbGraphContext.deferredLighting.clusterGraphOwned = clusterGraphOwned;
-        vbGraphContext.deferredLighting.renderedThisFrame = &m_visibilityBufferState.renderedThisFrame;
+        vbGraphContext.deferredLighting.renderedThisFrame = &m_vb.State().renderedThisFrame;
         vbGraphContext.deferredLighting.failure = vbFailure;
         vbGraphContext.fullSceneLightingV3.renderer = m_services.visibilityBuffer.get();
         vbGraphContext.fullSceneLightingV3.commandList = m_commandResources.graphicsList.Get();
@@ -356,7 +356,7 @@ Renderer::ExecuteVisibilityBufferInRenderGraph(Scene::ECS_Registry* registry) {
                                 false, nullptr, true);
             }
             if (debugPath) {
-                RecordFramePass("VBDebugBlit", true, m_visibilityBufferState.renderedThisFrame, 1,
+                RecordFramePass("VBDebugBlit", true, m_vb.State().renderedThisFrame, 1,
                                 debugVisibility ? std::initializer_list<const char*>{"vb_visibility"} :
                                 (debugDepth ? std::initializer_list<const char*>{"depth"} :
                                               std::initializer_list<const char*>{"vb_debug_source"}),
@@ -376,7 +376,7 @@ Renderer::ExecuteVisibilityBufferInRenderGraph(Scene::ECS_Registry* registry) {
                                 false, nullptr, true);
             }
             if (!debugPath) {
-                RecordFramePass("VBDeferredLighting", true, m_visibilityBufferState.renderedThisFrame, 1,
+                RecordFramePass("VBDeferredLighting", true, m_vb.State().renderedThisFrame, 1,
                                 {"depth", "gbuffer_albedo", "gbuffer_normal_roughness", "gbuffer_emissive_metallic",
                                  "gbuffer_material_ext0", "gbuffer_material_ext1", "gbuffer_material_ext2",
                                  "brdf_lut", "cluster_ranges", "cluster_light_indices", "shadow_map"},
@@ -394,12 +394,12 @@ Renderer::ExecuteVisibilityBufferInRenderGraph(Scene::ECS_Registry* registry) {
                                 false, nullptr, true);
             }
             if (debugLightingV3) {
-                RecordFramePass("FullSceneLightingV3DebugBlit", true, m_visibilityBufferState.renderedThisFrame, 1,
+                RecordFramePass("FullSceneLightingV3DebugBlit", true, m_vb.State().renderedThisFrame, 1,
                                 {SelectVBFullSceneLightingV3DebugResourceName(vbDebugView)},
                                 {"hdr_color"},
                                 false, nullptr, true);
             }
-            result.executed = m_visibilityBufferState.renderedThisFrame;
+            result.executed = m_vb.State().renderedThisFrame;
         }
         m_services.renderGraph->EndFrame();
 

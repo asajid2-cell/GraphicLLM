@@ -23,7 +23,7 @@ void Renderer::BuildTemporalRejectionMask(const char* frameNormalRoughnessResour
     D3D12_RESOURCE_STATES* normalState = &m_mainTargets.normalRoughness.resources.state;
     VisibilityBufferRenderer::ResourceStateSnapshot vbStates{};
     bool usingVBNormal = false;
-    if (m_visibilityBufferState.renderedThisFrame && m_services.visibilityBuffer && m_services.visibilityBuffer->GetNormalRoughnessBuffer()) {
+    if (m_vb.State().renderedThisFrame && m_services.visibilityBuffer && m_services.visibilityBuffer->GetNormalRoughnessBuffer()) {
         const DescriptorHandle& vbNormalSrv = m_services.visibilityBuffer->GetNormalRoughnessSRVHandle();
         if (vbNormalSrv.IsValid()) {
             vbStates = m_services.visibilityBuffer->GetResourceStateSnapshot();

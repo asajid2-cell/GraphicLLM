@@ -565,17 +565,17 @@ void Renderer::SetVisibilityBufferEnabled(bool enabled) {
         enabled = false;
     }
 
-    if (m_visibilityBufferState.enabled == enabled) {
+    if (m_vb.State().enabled == enabled) {
         return;
     }
 
-    m_visibilityBufferState.enabled = enabled;
-    m_visibilityBufferState.ClearDrawInputs();
+    m_vb.State().enabled = enabled;
+    m_vb.State().ClearDrawInputs();
     spdlog::info("VisibilityBuffer {}", enabled ? "ENABLED" : "DISABLED");
 }
 
 bool Renderer::IsVisibilityBufferEnabled() const {
-    return m_visibilityBufferState.enabled;
+    return m_vb.State().enabled;
 }
 
 void Renderer::SetBackgroundPresentation(bool visible, float exposure, float blur) {

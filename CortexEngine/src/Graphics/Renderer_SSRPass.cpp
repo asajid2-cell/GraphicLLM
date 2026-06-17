@@ -23,7 +23,7 @@ SSRRenderContext Renderer::MakeSSRRenderContext() {
     ctx.normalRoughnessState = &m_mainTargets.normalRoughness.resources.state;
     ctx.depthBuffer = m_depthResources.resources.buffer.Get();
     ctx.depthState = &m_depthResources.resources.resourceState;
-    ctx.vbRenderedThisFrame = m_visibilityBufferState.renderedThisFrame;
+    ctx.vbRenderedThisFrame = m_vb.State().renderedThisFrame;
     ctx.vbNormalRoughness = m_services.visibilityBuffer ? m_services.visibilityBuffer->GetNormalRoughnessBuffer() : nullptr;
     ctx.shadowAndEnvDescriptor = m_environmentState.shadowAndEnvDescriptors[0];
     return ctx;

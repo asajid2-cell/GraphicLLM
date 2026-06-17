@@ -363,11 +363,11 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
                 bloomHandle = m_services.renderGraph->ImportResource(bloomRes, m_bloom.State().resources.resourceState[level][0], "BloomCombined");
             }
         }
-        if (m_visibilityBufferState.renderedThisFrame && m_services.visibilityBuffer) {
+        if (m_vb.State().renderedThisFrame && m_services.visibilityBuffer) {
             vbPostInitialStates = m_services.visibilityBuffer->GetResourceStateSnapshot();
             hasVBPostStates = true;
         }
-        if (m_visibilityBufferState.renderedThisFrame && m_services.visibilityBuffer && m_services.visibilityBuffer->GetAlbedoBuffer()) {
+        if (m_vb.State().renderedThisFrame && m_services.visibilityBuffer && m_services.visibilityBuffer->GetAlbedoBuffer()) {
             postAlbedoResource = m_services.visibilityBuffer->GetAlbedoBuffer();
             albedoHandle = m_services.renderGraph->ImportResource(
                 postAlbedoResource,
@@ -377,7 +377,7 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
         {
             ID3D12Resource* normalRes = m_mainTargets.normalRoughness.resources.texture.Get();
             D3D12_RESOURCE_STATES normalState = m_mainTargets.normalRoughness.resources.state;
-            if (m_visibilityBufferState.renderedThisFrame && m_services.visibilityBuffer && m_services.visibilityBuffer->GetNormalRoughnessBuffer()) {
+            if (m_vb.State().renderedThisFrame && m_services.visibilityBuffer && m_services.visibilityBuffer->GetNormalRoughnessBuffer()) {
                 normalRes = m_services.visibilityBuffer->GetNormalRoughnessBuffer();
                 normalState = vbPostInitialStates.normalRoughness;
             }
@@ -386,21 +386,21 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
                 normalHandle = m_services.renderGraph->ImportResource(normalRes, normalState, "NormalRoughness");
             }
         }
-        if (m_visibilityBufferState.renderedThisFrame && m_services.visibilityBuffer && m_services.visibilityBuffer->GetEmissiveMetallicBuffer()) {
+        if (m_vb.State().renderedThisFrame && m_services.visibilityBuffer && m_services.visibilityBuffer->GetEmissiveMetallicBuffer()) {
             postEmissiveMetallicResource = m_services.visibilityBuffer->GetEmissiveMetallicBuffer();
             emissiveMetallicHandle = m_services.renderGraph->ImportResource(
                 postEmissiveMetallicResource,
                 vbPostInitialStates.emissiveMetallic,
                 "EmissiveMetallic");
         }
-        if (m_visibilityBufferState.renderedThisFrame && m_services.visibilityBuffer && m_services.visibilityBuffer->GetMaterialExt1Buffer()) {
+        if (m_vb.State().renderedThisFrame && m_services.visibilityBuffer && m_services.visibilityBuffer->GetMaterialExt1Buffer()) {
             postMaterialExt1Resource = m_services.visibilityBuffer->GetMaterialExt1Buffer();
             materialExt1Handle = m_services.renderGraph->ImportResource(
                 postMaterialExt1Resource,
                 vbPostInitialStates.materialExt1,
                 "MaterialExt1");
         }
-        if (m_visibilityBufferState.renderedThisFrame && m_services.visibilityBuffer && m_services.visibilityBuffer->GetMaterialExt2Buffer()) {
+        if (m_vb.State().renderedThisFrame && m_services.visibilityBuffer && m_services.visibilityBuffer->GetMaterialExt2Buffer()) {
             postMaterialExt2Resource = m_services.visibilityBuffer->GetMaterialExt2Buffer();
             materialExt2Handle = m_services.renderGraph->ImportResource(
                 postMaterialExt2Resource,
@@ -1175,7 +1175,7 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
         if (ssrHandle.IsValid()) m_ssr.State().resources.resourceState = m_services.renderGraph->GetResourceState(ssrHandle);
         if (historyHandle.IsValid()) m_temporal.ScreenState().historyState = m_services.renderGraph->GetResourceState(historyHandle);
         if (depthPpHandle.IsValid()) m_depthResources.resources.resourceState = m_services.renderGraph->GetResourceState(depthPpHandle);
-        if (!m_visibilityBufferState.renderedThisFrame && normalHandle.IsValid()) {
+        if (!m_vb.State().renderedThisFrame && normalHandle.IsValid()) {
             m_mainTargets.normalRoughness.resources.state = m_services.renderGraph->GetResourceState(normalHandle);
         }
         if (hasVBPostStates) {

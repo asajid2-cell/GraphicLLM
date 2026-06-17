@@ -31,7 +31,7 @@ Renderer::ExecuteSSRInRenderGraph() {
     ID3D12Resource* normalResource = m_mainTargets.normalRoughness.resources.texture.Get();
     D3D12_RESOURCE_STATES normalState = m_mainTargets.normalRoughness.resources.state;
     const bool usesVBNormal =
-        m_visibilityBufferState.renderedThisFrame &&
+        m_vb.State().renderedThisFrame &&
         m_services.visibilityBuffer &&
         m_services.visibilityBuffer->GetNormalRoughnessBuffer();
 

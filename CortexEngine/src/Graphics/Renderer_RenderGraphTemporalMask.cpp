@@ -32,7 +32,7 @@ Renderer::ExecuteTemporalRejectionMaskInRenderGraph(const char* frameNormalRough
     ID3D12Resource* normalResource = m_mainTargets.normalRoughness.resources.texture.Get();
     D3D12_RESOURCE_STATES normalState = m_mainTargets.normalRoughness.resources.state;
     VisibilityBufferRenderer::ResourceStateSnapshot vbStates{};
-    if (m_visibilityBufferState.renderedThisFrame && m_services.visibilityBuffer && m_services.visibilityBuffer->GetNormalRoughnessBuffer()) {
+    if (m_vb.State().renderedThisFrame && m_services.visibilityBuffer && m_services.visibilityBuffer->GetNormalRoughnessBuffer()) {
         const DescriptorHandle& vbNormalSRV = m_services.visibilityBuffer->GetNormalRoughnessSRVHandle();
         if (vbNormalSRV.IsValid()) {
             usesVBNormal = true;

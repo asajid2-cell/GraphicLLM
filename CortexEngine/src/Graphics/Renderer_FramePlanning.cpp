@@ -13,7 +13,7 @@ void Renderer::ResetFrameExecutionState() {
     // buffer index so logs can be correlated easily.
     ++m_frameLifecycle.renderFrameCounter;
     MarkPassComplete("Render_Entry");
-    m_visibilityBufferState.ResetFrameFlags();
+    m_vb.State().ResetFrameFlags();
     m_gpuCullingState.hzbOcclusionUsedThisFrame = false;
     m_frameDiagnostics.contract.drawCounts = {};
     m_frameDiagnostics.contract.motionVectors = {};
@@ -43,7 +43,7 @@ FrameExecutionContext Renderer::BuildFrameExecutionContext(Scene::ECS_Registry* 
     featureInputs.rtGIEnabled = m_rt.RuntimeState().giEnabled;
     featureInputs.shadowsEnabled = m_shadows.Resources().controls.enabled;
     featureInputs.gpuCullingEnabled = m_gpuCullingState.enabled;
-    featureInputs.visibilityBufferEnabled = m_visibilityBufferState.enabled;
+    featureInputs.visibilityBufferEnabled = m_vb.State().enabled;
     featureInputs.taaEnabled = m_temporal.AAState().enabled;
     featureInputs.ssrEnabled = m_ssr.State().controls.enabled;
     featureInputs.ssaoEnabled = m_ssao.State().controls.enabled;
@@ -148,7 +148,7 @@ bool Renderer::BeginFrameExecution(FrameExecutionContext& frameCtx) {
 
     // VB instance/mesh lists are rebuilt only when the VB path is taken; clear
     // them every frame so downstream passes (motion vectors) don't see stale data.
-    m_visibilityBufferState.ClearDrawInputs();
+    m_vb.State().ClearDrawInputs();
     m_framePlanning.sceneSnapshot = BuildRendererSceneSnapshot(frameCtx.registry, m_frameLifecycle.renderFrameCounter);
     UpdateRTFramePlan(featurePlan);
     MarkPassComplete("BeginFrame_Done");

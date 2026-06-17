@@ -43,7 +43,7 @@ RTContext Renderer::MakeRTContext() {
     ctx.velocitySrv = m_temporal.ScreenState().velocitySRV;
 
     ctx.environment = &m_environmentState;
-    ctx.visibilityBufferRenderedThisFrame = m_visibilityBufferState.renderedThisFrame;
+    ctx.visibilityBufferRenderedThisFrame = m_vb.State().renderedThisFrame;
     ctx.debugViewMode = m_debugViewState.mode;
     ctx.historyManager = &m_temporalHistory.manager;
 

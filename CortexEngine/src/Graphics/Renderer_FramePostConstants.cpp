@@ -772,8 +772,8 @@ void Renderer::PopulateFrameDebugAndPostConstants(FrameConstants& frameData,
     //   bits 5-7: RT reflection composition strength quantized to 0..7
     //   bits 16-23: RT reflection denoise alpha quantized to 0..255
     //   bit24: V2 reflection resolver candidate drives beauty (debug/review)
-    m_visibilityBufferState.plannedThisFrame = false;
-    if (m_visibilityBufferState.enabled && m_services.visibilityBuffer && registry) {
+    m_vb.State().plannedThisFrame = false;
+    if (m_vb.State().enabled && m_services.visibilityBuffer && registry) {
         auto renderableView = registry->View<Scene::RenderableComponent>();
         for (auto entity : renderableView) {
             const auto& renderable = renderableView.get<Scene::RenderableComponent>(entity);
@@ -783,7 +783,7 @@ void Renderer::PopulateFrameDebugAndPostConstants(FrameConstants& frameData,
             if (IsTransparentRenderable(renderable)) {
                 continue;
             }
-            m_visibilityBufferState.plannedThisFrame = true;
+            m_vb.State().plannedThisFrame = true;
             break;
         }
     }
@@ -817,7 +817,7 @@ void Renderer::PopulateFrameDebugAndPostConstants(FrameConstants& frameData,
     if (s_disableRtReflTemporal) {
         postFxFlags |= 8u;
     }
-    if (m_visibilityBufferState.plannedThisFrame) {
+    if (m_vb.State().plannedThisFrame) {
         postFxFlags |= 16u;
     }
     const uint32_t rtReflectionComposition =

@@ -34,11 +34,11 @@ Renderer::ExecuteMotionVectorsInRenderGraph() {
         vbMotionEnv && std::string(vbMotionEnv) == "1";
     const bool useVisibilityBufferMotion =
         allowVisibilityBufferMotion &&
-        m_visibilityBufferState.enabled &&
+        m_vb.State().enabled &&
         m_services.visibilityBuffer &&
         m_services.visibilityBuffer->GetVisibilityBuffer() &&
-        !m_visibilityBufferState.meshDraws.empty() &&
-        !m_visibilityBufferState.instances.empty();
+        !m_vb.State().meshDraws.empty() &&
+        !m_vb.State().instances.empty();
     m_frameDiagnostics.contract.motionVectors.visibilityBufferMotion = useVisibilityBufferMotion;
     m_frameDiagnostics.contract.motionVectors.cameraOnlyFallback = !useVisibilityBufferMotion;
 
@@ -71,7 +71,7 @@ Renderer::ExecuteMotionVectorsInRenderGraph() {
     graphContext.visibilityMotion.commandList = m_commandResources.graphicsList.Get();
     graphContext.visibilityMotion.velocityBuffer = m_temporal.ScreenState().velocityBuffer.Get();
     graphContext.visibilityMotion.velocityState = &m_temporal.ScreenState().velocityState;
-    graphContext.visibilityMotion.meshDraws = &m_visibilityBufferState.meshDraws;
+    graphContext.visibilityMotion.meshDraws = &m_vb.State().meshDraws;
     graphContext.visibilityMotion.frameConstants = m_constantBuffers.currentFrameGPU;
     graphContext.visibilityMotion.visibilityShaderResourceState = kScreenSpaceShaderResourceState;
     graphContext.visibilityMotion.error = &motionStageError;

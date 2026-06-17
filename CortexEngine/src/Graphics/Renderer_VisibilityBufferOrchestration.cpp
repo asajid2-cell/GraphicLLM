@@ -1,94 +1,61 @@
 #include "Renderer.h"
 
-#include "Graphics/MaterialModel.h"
-#include "Graphics/MaterialState.h"
-#include "Graphics/RenderableClassification.h"
-#include "Graphics/RendererGeometryUtils.h"
-#include "Graphics/SurfaceClassification.h"
 #include "Scene/ECS_Registry.h"
 #include "Scene/Components.h"
 
-#include <algorithm>
-#include <array>
-#include <cmath>
-#include <cstdlib>
-#include <cstring>
-#include <string>
-#include <unordered_map>
-#include <unordered_set>
-#include <vector>
-
-#include <spdlog/spdlog.h>
+// VisibilityBufferSubsystem context builder + path forwarder. The VB collect /
+// cull / visibility / material-resolve / deferred-lighting passes live in
+// Graphics/Subsystems/VisibilityBufferSubsystem; MakeVisibilityBufferContext
+// snapshots the per-frame Renderer dependencies they need.
 namespace Cortex::Graphics {
-namespace {
-constexpr uint32_t kVBDebugNone = 0;
-constexpr uint32_t kVBDebugVisibility = 1;
-constexpr uint32_t kVBDebugDepth = 2;
-constexpr uint32_t kVBDebugGBufferAlbedo = 3;
-constexpr uint32_t kVBDebugGBufferNormal = 4;
-constexpr uint32_t kVBDebugGBufferEmissive = 5;
-constexpr uint32_t kVBDebugGBufferExt0 = 6;
-constexpr uint32_t kVBDebugGBufferExt1 = 7;
-constexpr uint32_t kVBDebugGBufferExt2 = 8;
-constexpr uint32_t kVBDebugMaterialId = 9;
-constexpr uint32_t kVBDebugStableObjectId = 10;
-constexpr uint32_t kVBDebugMaterialFamily = 11;
-constexpr uint32_t kVBDebugReflectionPolicy = 12;
-constexpr uint32_t kVBDebugTemporalPolicy = 13;
-constexpr uint32_t kVBDebugPostSensitivity = 14;
-constexpr uint32_t kVBDebugMaterialMissingChannelMask = 20;
 
-bool IsVisibilityBufferDebugView(uint32_t debugView) {
-    return debugView != kVBDebugNone;
+VisibilityBufferContext Renderer::MakeVisibilityBufferContext() {
+    VisibilityBufferContext ctx{};
+    ctx.device = m_services.device;
+    ctx.descriptorManager = m_services.descriptorManager.get();
+    ctx.window = m_services.window;
+    ctx.visibilityBuffer = m_services.visibilityBuffer.get();
+    ctx.gpuCulling = m_services.gpuCulling.get();
+    ctx.commandList = m_commandResources.graphicsList.Get();
+
+    ctx.frameIndex = m_frameRuntime.frameIndex;
+    ctx.renderFrameCounter = m_frameLifecycle.renderFrameCounter;
+    ctx.debugViewMode = m_debugViewState.mode;
+    ctx.internalRenderWidth = GetInternalRenderWidth();
+    ctx.internalRenderHeight = GetInternalRenderHeight();
+
+    ctx.gpuCullingState = &m_gpuCullingState;
+    ctx.frameDiagnostics = &m_frameDiagnostics;
+    ctx.framePlanning = &m_framePlanning;
+    ctx.depthResources = &m_depthResources;
+    ctx.mainTargets = &m_mainTargets;
+    ctx.constantBuffers = &m_constantBuffers;
+    ctx.lightingState = &m_lightingState;
+    ctx.environment = &m_environmentState;
+    ctx.materialFallbacks = &m_materialFallbacks;
+    ctx.hzb = &m_hzb;
+    ctx.shadows = &m_shadows;
+
+    ctx.prepareMaterialResources = [this](Scene::RenderableComponent& renderable) {
+        PrepareMaterialResources(renderable);
+    };
+    ctx.enqueueMeshUpload = [this](const std::shared_ptr<Scene::MeshData>& mesh, const char* label) {
+        return EnqueueMeshUpload(mesh, label);
+    };
+    ctx.ensureEnvironmentBindlessSRVs = [this](EnvironmentMaps& env) {
+        EnsureEnvironmentBindlessSRVs(env);
+    };
+    ctx.buildSceneLocalEnvironmentV3PayloadParams = [this]() {
+        return BuildSceneLocalEnvironmentV3PayloadParams();
+    };
+    ctx.buildCinematicStabilityParams = [this]() {
+        return BuildCinematicStabilityParams();
+    };
+    return ctx;
 }
 
-bool IsVisibilityBufferUnculledDebugView(uint32_t debugView) {
-    return debugView == kVBDebugVisibility ||
-           debugView == kVBDebugDepth ||
-           debugView == kVBDebugMaterialId ||
-           debugView == kVBDebugStableObjectId ||
-           debugView == kVBDebugMaterialFamily ||
-           debugView == kVBDebugReflectionPolicy ||
-           debugView == kVBDebugTemporalPolicy ||
-           debugView == kVBDebugPostSensitivity ||
-           debugView == kVBDebugMaterialMissingChannelMask;
-}
-
-bool IsVisibilityBufferGBufferDebugView(uint32_t debugView) {
-    return debugView >= kVBDebugGBufferAlbedo && debugView <= kVBDebugGBufferExt2;
-}
-} // namespace
 void Renderer::RenderVisibilityBufferPath(Scene::ECS_Registry* registry) {
-    if (!m_services.visibilityBuffer || !m_visibilityBufferState.enabled) {
-        spdlog::warn("VB: Disabled or not initialized");
-        return;
-    }
-
-    // Collect and upload instance data + mesh draw info
-    CollectInstancesForVisibilityBuffer(registry);
-
-    if (m_visibilityBufferState.instances.empty() || m_visibilityBufferState.meshDraws.empty()) {
-        spdlog::warn("VB: No instances collected (instances={}, meshDraws={})",
-                     m_visibilityBufferState.instances.size(), m_visibilityBufferState.meshDraws.size());
-        return;
-    }
-
-    const uint32_t vbDebugView = GetVisibilityBufferDebugView();
-    if (IsVisibilityBufferDebugView(vbDebugView)) {
-        m_visibilityBufferState.debugOverrideThisFrame = true;
-    }
-
-    const D3D12_GPU_VIRTUAL_ADDRESS vbCullMaskAddress = ResolveVisibilityBufferCullMask(vbDebugView);
-    LogVisibilityBufferFirstFrame();
-
-    bool completedPath = false;
-    if (!RenderVisibilityBufferVisibilityStage(vbCullMaskAddress, vbDebugView, completedPath) || completedPath) {
-        return;
-    }
-    if (!RenderVisibilityBufferMaterialResolveStage(vbDebugView, completedPath) || completedPath) {
-        return;
-    }
-    RenderVisibilityBufferDeferredLightingStage(registry);
+    m_vb.RenderVisibilityBufferPath(registry, MakeVisibilityBufferContext());
 }
 
 } // namespace Cortex::Graphics

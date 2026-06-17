@@ -182,7 +182,7 @@ void Renderer::UpdateFrameContractHistories() {
     if (m_framePlanning.sceneSnapshot.IsValidForFrame(m_frameLifecycle.renderFrameCounter)) {
         const uint32_t snapshotDepthWriting =
             static_cast<uint32_t>(m_framePlanning.sceneSnapshot.depthWritingIndices.size());
-        if (m_visibilityBufferState.renderedThisFrame &&
+        if (m_vb.State().renderedThisFrame &&
             m_frameDiagnostics.contract.drawCounts.visibilityBufferInstances != snapshotDepthWriting) {
             m_frameDiagnostics.contract.contract.warnings.push_back(
                 "visibility_buffer_instance_count_mismatch: snapshot_depth_writing=" +
@@ -207,12 +207,12 @@ void Renderer::UpdateFrameContractHistories() {
     m_frameDiagnostics.contract.contract.culling.gpuCullingEnabled = m_gpuCullingState.enabled;
     m_frameDiagnostics.contract.contract.culling.cullingFrozen =
         m_gpuCullingState.freeze || (std::getenv("CORTEX_GPUCULL_FREEZE") != nullptr);
-    m_frameDiagnostics.contract.contract.culling.visibilityBufferPlanned = m_visibilityBufferState.plannedThisFrame;
-    m_frameDiagnostics.contract.contract.culling.visibilityBufferRendered = m_visibilityBufferState.renderedThisFrame;
+    m_frameDiagnostics.contract.contract.culling.visibilityBufferPlanned = m_vb.State().plannedThisFrame;
+    m_frameDiagnostics.contract.contract.culling.visibilityBufferRendered = m_vb.State().renderedThisFrame;
     m_frameDiagnostics.contract.contract.culling.hzbResourceValid = m_hzb.State().resources.texture != nullptr;
     m_frameDiagnostics.contract.contract.culling.hzbValid = m_hzb.State().resources.valid;
     m_frameDiagnostics.contract.contract.culling.hzbCaptureValid = m_hzb.State().capture.captureValid;
-    m_frameDiagnostics.contract.contract.culling.hzbOcclusionUsedByVisibilityBuffer = m_visibilityBufferState.hzbOcclusionUsedThisFrame;
+    m_frameDiagnostics.contract.contract.culling.hzbOcclusionUsedByVisibilityBuffer = m_vb.State().hzbOcclusionUsedThisFrame;
     m_frameDiagnostics.contract.contract.culling.hzbOcclusionUsedByGpuCulling = m_gpuCullingState.hzbOcclusionUsedThisFrame;
     m_frameDiagnostics.contract.contract.culling.hzbWidth = m_hzb.State().resources.width;
     m_frameDiagnostics.contract.contract.culling.hzbHeight = m_hzb.State().resources.height;

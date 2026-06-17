@@ -341,9 +341,9 @@ void Renderer::UpdateFrameContractSnapshot(Scene::ECS_Registry* registry,
     contract.environment.residentLimit = m_framePlanning.budgetPlan.iblResidentEnvironmentLimit;
     contract.environment.residentBytes = health.environmentBytes;
     contract.environment.localReflectionProbeCount =
-        static_cast<uint32_t>(m_visibilityBufferState.reflectionProbes.size());
-    contract.environment.localReflectionProbeSkipped = m_visibilityBufferState.reflectionProbeSkipped;
-    contract.environment.localReflectionProbeTableValid = m_visibilityBufferState.reflectionProbeTableValid;
+        static_cast<uint32_t>(m_vb.State().reflectionProbes.size());
+    contract.environment.localReflectionProbeSkipped = m_vb.State().reflectionProbeSkipped;
+    contract.environment.localReflectionProbeTableValid = m_vb.State().reflectionProbeTableValid;
     contract.environment.localReflectionProbeRadianceEnabled =
         m_environmentState.localProbeRadianceEnabled;
     contract.environment.localReflectionProbeDiffuseIntensity =
@@ -690,12 +690,12 @@ void Renderer::UpdateFrameContractSnapshot(Scene::ECS_Registry* registry,
 
     contract.culling.gpuCullingEnabled = m_gpuCullingState.enabled;
     contract.culling.cullingFrozen = m_gpuCullingState.freeze || (std::getenv("CORTEX_GPUCULL_FREEZE") != nullptr);
-    contract.culling.visibilityBufferPlanned = m_visibilityBufferState.plannedThisFrame;
-    contract.culling.visibilityBufferRendered = m_visibilityBufferState.renderedThisFrame;
+    contract.culling.visibilityBufferPlanned = m_vb.State().plannedThisFrame;
+    contract.culling.visibilityBufferRendered = m_vb.State().renderedThisFrame;
     contract.culling.hzbResourceValid = m_hzb.State().resources.texture != nullptr;
     contract.culling.hzbValid = m_hzb.State().resources.valid;
     contract.culling.hzbCaptureValid = m_hzb.State().capture.captureValid;
-    contract.culling.hzbOcclusionUsedByVisibilityBuffer = m_visibilityBufferState.hzbOcclusionUsedThisFrame;
+    contract.culling.hzbOcclusionUsedByVisibilityBuffer = m_vb.State().hzbOcclusionUsedThisFrame;
     contract.culling.hzbOcclusionUsedByGpuCulling = m_gpuCullingState.hzbOcclusionUsedThisFrame;
     contract.culling.hzbWidth = m_hzb.State().resources.width;
     contract.culling.hzbHeight = m_hzb.State().resources.height;

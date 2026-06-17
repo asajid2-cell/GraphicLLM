@@ -69,7 +69,7 @@ Renderer::ExecuteTAAInRenderGraph() {
     VisibilityBufferRenderer::ResourceStateSnapshot vbStates{};
     ID3D12Resource* normalResource = nullptr;
     D3D12_RESOURCE_STATES normalState = D3D12_RESOURCE_STATE_COMMON;
-    if (m_visibilityBufferState.renderedThisFrame && m_services.visibilityBuffer && m_services.visibilityBuffer->GetNormalRoughnessBuffer()) {
+    if (m_vb.State().renderedThisFrame && m_services.visibilityBuffer && m_services.visibilityBuffer->GetNormalRoughnessBuffer()) {
         usesVBNormal = true;
         vbStates = m_services.visibilityBuffer->GetResourceStateSnapshot();
         normalResource = m_services.visibilityBuffer->GetNormalRoughnessBuffer();

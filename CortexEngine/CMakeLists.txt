@@ -317,6 +317,7 @@ set(CORTEX_SOURCES
     src/Graphics/Subsystems/ShadowSubsystem.cpp
     src/Graphics/Subsystems/TemporalSubsystem.cpp
     src/Graphics/Subsystems/RTSubsystem.cpp
+    src/Graphics/Subsystems/VisibilityBufferSubsystem.cpp
     src/Graphics/Renderer_SSAO.cpp
     src/Graphics/ManyLightReservoir.cpp
     src/Graphics/DiffuseRadianceCache.cpp

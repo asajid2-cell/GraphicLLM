@@ -492,10 +492,10 @@ void Renderer::LogDiagnostics() const {
     spdlog::info("Backbuffer used-as-RT: {}", m_frameLifecycle.backBufferUsedAsRTThisFrame);
 
     spdlog::info("VB: enabled={} renderedThisFrame={} instances={} meshes={}",
-                 m_visibilityBufferState.enabled,
-                 m_visibilityBufferState.renderedThisFrame,
-                 m_visibilityBufferState.instances.size(),
-                 m_visibilityBufferState.meshDraws.size());
+                 m_vb.State().enabled,
+                 m_vb.State().renderedThisFrame,
+                 m_vb.State().instances.size(),
+                 m_vb.State().meshDraws.size());
     spdlog::info("GPU culling: enabled={} totalInstances={} visibleInstances={}",
                  m_gpuCullingState.enabled,
                  GetGPUTotalInstances(),

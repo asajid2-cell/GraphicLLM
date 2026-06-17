@@ -304,6 +304,7 @@ private:
     float m_cameraMouseJitterPreviousYawOffset = 0.0f;
     float m_cameraMouseJitterPreviousPitchOffset = 0.0f;
     bool m_startupArchitectCommandSubmitted = false;
+    bool m_startupSceneRecipeSubmitted = false;
     std::string m_startupArchitectCommandJson;
 
     // HUD / debug overlay

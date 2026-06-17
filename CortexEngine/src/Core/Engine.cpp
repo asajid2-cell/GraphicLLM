@@ -13,6 +13,7 @@
 #include "Utils/GLTFLoader.h"
 #include "Utils/FileUtils.h"
 #include "LLM/SceneCommands.h"
+#include "LLM/SceneRecipes.h"
 #include "LLM/RegressionTests.h"
 #include "UI/TextPrompt.h"
 #include "UI/DebugMenu.h"
@@ -1457,6 +1458,22 @@ void Engine::Update(float deltaTime) {
             spdlog::info("[Architect] Queued {} startup Architect command(s) ({} direct Dreamer)",
                          queueCommands.size(),
                          commands.size() - queueCommands.size());
+        }
+    }
+
+    // Headless/demo hook: CORTEX_SCENE_RECIPE=<living_room|bedroom|office|kitchen>
+    // builds that scene from the real asset catalog at startup (no LLM needed).
+    // Combine with --smoke-frames / --exit-after-visual-validation to capture it.
+    if (!m_startupSceneRecipeSubmitted && m_commandQueue) {
+        if (const char* recipeEnv = std::getenv("CORTEX_SCENE_RECIPE"); recipeEnv && *recipeEnv) {
+            m_startupSceneRecipeSubmitted = true;
+            auto cmds = LLM::BuildSceneRecipe(recipeEnv, m_commandQueue->EnsureCatalog());
+            if (!cmds.empty()) {
+                m_commandQueue->PushBatch(cmds);
+                spdlog::info("[Recipe] Startup scene recipe '{}' queued {} commands", recipeEnv, cmds.size());
+            } else {
+                spdlog::warn("[Recipe] Startup scene recipe '{}' produced no commands", recipeEnv);
+            }
         }
     }
 

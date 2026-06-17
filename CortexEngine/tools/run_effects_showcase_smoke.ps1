@@ -7,6 +7,8 @@ param(
     [double]$MaxVisualCenterLuma = 210.0,
     [double]$MinVisualNonBlackRatio = 0.80,
     [double]$MaxVisualSaturatedRatio = 0.20,
+    [int]$VisualValidationMinFrame = 80,
+    [switch]$SkipGpuFrameBudget,
     [string]$LogDir = "",
     [switch]$IsolatedLogs,
     [switch]$NoBuild
@@ -44,9 +46,11 @@ if (-not (Test-Path $exe)) {
 New-Item -ItemType Directory -Force -Path $activeLogDir | Out-Null
 Remove-Item -Force -ErrorAction SilentlyContinue $reportPath, $visualPath, $runLogPath
 
+$oldDisablePerfGovernor = $env:CORTEX_DISABLE_PERF_QUALITY_GOVERNOR
 $env:CORTEX_CAPTURE_VISUAL_VALIDATION = "1"
 $env:CORTEX_DISABLE_DEBUG_LAYER = "1"
-$env:CORTEX_VISUAL_VALIDATION_MIN_FRAME = "30"
+$env:CORTEX_DISABLE_PERF_QUALITY_GOVERNOR = "1"
+$env:CORTEX_VISUAL_VALIDATION_MIN_FRAME = [string]$VisualValidationMinFrame
 
 Push-Location (Split-Path -Parent $exe)
 try {
@@ -67,6 +71,11 @@ try {
     Pop-Location
     Remove-Item Env:\CORTEX_CAPTURE_VISUAL_VALIDATION -ErrorAction SilentlyContinue
     Remove-Item Env:\CORTEX_DISABLE_DEBUG_LAYER -ErrorAction SilentlyContinue
+    if ($null -eq $oldDisablePerfGovernor) {
+        Remove-Item Env:\CORTEX_DISABLE_PERF_QUALITY_GOVERNOR -ErrorAction SilentlyContinue
+    } else {
+        $env:CORTEX_DISABLE_PERF_QUALITY_GOVERNOR = $oldDisablePerfGovernor
+    }
     Remove-Item Env:\CORTEX_VISUAL_VALIDATION_MIN_FRAME -ErrorAction SilentlyContinue
     Remove-Item Env:\CORTEX_LOG_DIR -ErrorAction SilentlyContinue
 }
@@ -113,7 +122,7 @@ if ($failures.Count -eq 0) {
     if ($report.frame_contract.warnings.Count -ne 0) {
         Add-Failure "frame_contract warnings is not empty: $($report.frame_contract.warnings -join ', ')"
     }
-    if ([double]$report.gpu_frame_ms -gt $MaxGpuFrameMs) {
+    if (-not $SkipGpuFrameBudget -and [double]$report.gpu_frame_ms -gt $MaxGpuFrameMs) {
         Add-Failure "gpu_frame_ms is $($report.gpu_frame_ms), budget is <= $MaxGpuFrameMs"
     }
     if ([string]$report.frame_contract.environment.active -ne "night_city") {

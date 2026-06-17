@@ -6,6 +6,7 @@
 
 #include <spdlog/spdlog.h>
 
+#include <cstdlib>
 #include <span>
 #include <string>
 
@@ -28,7 +29,11 @@ Renderer::ExecuteMotionVectorsInRenderGraph() {
         return result;
     }
 
+    const char* vbMotionEnv = std::getenv("CORTEX_ENABLE_VB_MOTION_VECTORS");
+    const bool allowVisibilityBufferMotion =
+        vbMotionEnv && std::string(vbMotionEnv) == "1";
     const bool useVisibilityBufferMotion =
+        allowVisibilityBufferMotion &&
         m_visibilityBufferState.enabled &&
         m_services.visibilityBuffer &&
         m_services.visibilityBuffer->GetVisibilityBuffer() &&

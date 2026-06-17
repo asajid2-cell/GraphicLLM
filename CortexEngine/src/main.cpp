@@ -30,6 +30,7 @@
 #include <cctype>
 #include <utility>
 #include <limits>
+#include <optional>
 #include <nlohmann/json.hpp>
 
 using namespace Cortex;
@@ -437,6 +438,19 @@ bool DirectoryHasEngine(const std::string& dir) {
     return true;
 }
 
+struct LauncherSceneOption {
+    std::wstring label;
+    std::string preset;
+    std::string modelAuthoredSeed;
+    bool generatedSceneAuthoring = false;
+};
+
+struct BuiltinLauncherSceneOption {
+    const wchar_t* label;
+    const char* preset;
+    const char* modelAuthoredSeed;
+};
+
 struct LauncherState {
     HWND hwnd = nullptr;
     HFONT font = nullptr;
@@ -452,8 +466,360 @@ struct LauncherState {
     HWND btnEditor = nullptr;
     HWND btnCancel = nullptr;
     EngineConfig* config = nullptr;
+    std::vector<LauncherSceneOption> sceneOptions;
     bool accepted = false;
 };
+
+static constexpr BuiltinLauncherSceneOption kBuiltinLauncherSceneOptions[] = {
+    {L"RT Showcase Gallery", "rt_showcase", ""},
+    {L"IBL Gallery", "ibl_gallery", ""},
+    {L"Material Lab", "material_lab", ""},
+    {L"Glass and Water Courtyard", "glass_water_courtyard", ""},
+    {L"Outdoor Sunset Beach", "outdoor_sunset_beach", ""},
+    {L"Liquid Gallery", "liquid_gallery", ""},
+    {L"Coastal Cliff Foundry", "coastal_cliff_foundry", ""},
+    {L"Rain Glass Pavilion", "rain_glass_pavilion", ""},
+    {L"Desert Relic Gallery", "desert_relic_gallery", ""},
+    {L"Neon Alley Material Market", "neon_alley_material_market", ""},
+    {L"Forest Creek Shrine", "forest_creek_shrine", ""},
+    {L"Effects Showcase", "effects_showcase", ""},
+    {L"Cornell Box", "cornell", ""},
+    {L"Dragon Over Water", "dragon", ""},
+    {L"God Rays Atrium", "god_rays", ""},
+    {L"Temporal Validation", "temporal_validation", ""},
+    {L"Model Progress: Latest", "model_authored_scene", ""},
+    {
+        L"Scene Authoring V1: Admitted Kitchen",
+        "model_authored_scene",
+        "assets/scenes/model_authored/scene_authoring_admitted_v1/admitted_kitchen/scene_seed.json"
+    },
+    {
+        L"Scene Authoring V1: Admitted Office",
+        "model_authored_scene",
+        "assets/scenes/model_authored/scene_authoring_admitted_v1/admitted_office/scene_seed.json"
+    },
+    {
+        L"Scene Authoring V1: Admitted Red Room",
+        "model_authored_scene",
+        "assets/scenes/model_authored/scene_authoring_admitted_v1/admitted_red_room/scene_seed.json"
+    },
+    {
+        L"Scene Authoring V1: Admitted Stadium",
+        "model_authored_scene",
+        "assets/scenes/model_authored/scene_authoring_admitted_v1/admitted_stadium/scene_seed.json"
+    },
+    {
+        L"Scene Authoring V1: Admitted Basketball Gym",
+        "model_authored_scene",
+        "assets/scenes/model_authored/scene_authoring_admitted_v1/admitted_basketball_gym/scene_seed.json"
+    },
+    {
+        L"Scene Authoring V1: Admitted Classroom",
+        "model_authored_scene",
+        "assets/scenes/model_authored/scene_authoring_admitted_v1/admitted_classroom/scene_seed.json"
+    },
+    {
+        L"Scene Authoring V1: Admitted Concert",
+        "model_authored_scene",
+        "assets/scenes/model_authored/scene_authoring_admitted_v1/admitted_concert/scene_seed.json"
+    },
+    {
+        L"Scene Authoring V1: Admitted Bedroom",
+        "model_authored_scene",
+        "assets/scenes/model_authored/scene_authoring_admitted_v1/admitted_bedroom/scene_seed.json"
+    },
+    {
+        L"Scene Authoring V1: Admitted Bathroom",
+        "model_authored_scene",
+        "assets/scenes/model_authored/scene_authoring_admitted_v1/admitted_bathroom/scene_seed.json"
+    },
+    {
+        L"Scene Authoring V1: Admitted Store",
+        "model_authored_scene",
+        "assets/scenes/model_authored/scene_authoring_admitted_v1/admitted_store/scene_seed.json"
+    },
+    {
+        L"Scene Authoring V1: Novel Kitchen",
+        "model_authored_scene",
+        "assets/scenes/model_authored/scene_authoring_closed_loop_v1/novel_kitchen/scene_seed.json"
+    },
+    {
+        L"Scene Authoring V1: Novel Office",
+        "model_authored_scene",
+        "assets/scenes/model_authored/scene_authoring_closed_loop_v1/novel_office/scene_seed.json"
+    },
+    {
+        L"Scene Authoring V1: Novel Basketball Gym",
+        "model_authored_scene",
+        "assets/scenes/model_authored/scene_authoring_closed_loop_v1/novel_basketball_gym/scene_seed.json"
+    },
+    {
+        L"Scene Authoring V1: Novel Classroom",
+        "model_authored_scene",
+        "assets/scenes/model_authored/scene_authoring_closed_loop_v1/novel_classroom/scene_seed.json"
+    },
+    {
+        L"Scene Authoring V1: Novel Concert",
+        "model_authored_scene",
+        "assets/scenes/model_authored/scene_authoring_closed_loop_v1/novel_concert/scene_seed.json"
+    },
+    {
+        L"Scene Authoring V1: Novel Red Room",
+        "model_authored_scene",
+        "assets/scenes/model_authored/scene_authoring_closed_loop_v1/novel_red_room/scene_seed.json"
+    },
+    {
+        L"Scene Authoring V1: Novel Stadium",
+        "model_authored_scene",
+        "assets/scenes/model_authored/scene_authoring_closed_loop_v1/novel_stadium/scene_seed.json"
+    },
+    {
+        L"Scene Authoring V1: Novel Bedroom",
+        "model_authored_scene",
+        "assets/scenes/model_authored/scene_authoring_closed_loop_v1/novel_bedroom/scene_seed.json"
+    },
+    {
+        L"Scene Authoring V1: Novel Bathroom",
+        "model_authored_scene",
+        "assets/scenes/model_authored/scene_authoring_closed_loop_v1/novel_bathroom/scene_seed.json"
+    },
+    {
+        L"Scene Authoring V1: Novel Store",
+        "model_authored_scene",
+        "assets/scenes/model_authored/scene_authoring_closed_loop_v1/novel_store/scene_seed.json"
+    },
+    {
+        L"Model Progress: Kitchen v50 SGK",
+        "model_authored_scene",
+        "assets/scenes/model_authored/scene_graph_kernel_v1/home_kitchen_lantern_v50_sgk/scene_seed.json"
+    },
+    {
+        L"Model Progress: Office v50 SGK",
+        "model_authored_scene",
+        "assets/scenes/model_authored/scene_graph_kernel_v1/home_office_evening_v50_sgk/scene_seed.json"
+    },
+    {
+        L"Model Progress: Basketball Gym v387 SGK",
+        "model_authored_scene",
+        "assets/scenes/model_authored/scene_graph_kernel_v1/basketball_gym_v387_sgk/scene_seed.json"
+    },
+    {
+        L"Model Progress: Classroom v431 SGK",
+        "model_authored_scene",
+        "assets/scenes/model_authored/scene_graph_kernel_v1/school_classroom_v431_sgk/scene_seed.json"
+    },
+    {
+        L"Model Progress: Red Room v397 SGK",
+        "model_authored_scene",
+        "assets/scenes/model_authored/scene_graph_kernel_v1/red_light_room_v397_sgk/scene_seed.json"
+    },
+    {
+        L"Model Progress: Concert v375 SGK",
+        "model_authored_scene",
+        "assets/scenes/model_authored/scene_graph_kernel_v1/neon_streamer_concert_v375_sgk/scene_seed.json"
+    },
+    {
+        L"Model Progress: Stadium v431 SGK",
+        "model_authored_scene",
+        "assets/scenes/model_authored/scene_graph_kernel_v1/stadium_night_match_v431_sgk/scene_seed.json"
+    },
+};
+
+std::wstring Utf8ToWide(const std::string& value) {
+    if (value.empty()) {
+        return {};
+    }
+    const int required = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, value.c_str(), -1, nullptr, 0);
+    if (required <= 0) {
+        return std::wstring(value.begin(), value.end());
+    }
+    std::wstring wide(static_cast<size_t>(required - 1), L'\0');
+    MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, value.c_str(), -1, wide.data(), required);
+    return wide;
+}
+
+std::string WideToUtf8(const std::wstring& value) {
+    if (value.empty()) {
+        return {};
+    }
+    const int required = WideCharToMultiByte(CP_UTF8, 0, value.c_str(), -1, nullptr, 0, nullptr, nullptr);
+    if (required <= 0) {
+        std::string fallback;
+        fallback.reserve(value.size());
+        for (const wchar_t ch : value) {
+            fallback.push_back(ch >= 0 && ch <= 0x7F ? static_cast<char>(ch) : '?');
+        }
+        return fallback;
+    }
+    std::string utf8(static_cast<size_t>(required - 1), '\0');
+    WideCharToMultiByte(CP_UTF8, 0, value.c_str(), -1, utf8.data(), required, nullptr, nullptr);
+    return utf8;
+}
+
+std::optional<std::filesystem::path> ResolveLauncherRuntimePath(const std::filesystem::path& relativePath) {
+    namespace fs = std::filesystem;
+    std::vector<fs::path> candidates;
+    fs::path cwd;
+    try {
+        cwd = fs::current_path();
+    } catch (...) {
+        cwd = fs::path(".");
+    }
+    const fs::path exeDir = fs::path(GetExecutableDirectory());
+    candidates.push_back(cwd / relativePath);
+    candidates.push_back(cwd / ".." / relativePath);
+    candidates.push_back(cwd / ".." / ".." / relativePath);
+    candidates.push_back(exeDir / relativePath);
+    candidates.push_back(exeDir / ".." / relativePath);
+    candidates.push_back(exeDir / ".." / ".." / relativePath);
+    for (const auto& candidate : candidates) {
+        std::error_code ec;
+        if (fs::exists(candidate, ec)) {
+            return fs::weakly_canonical(candidate, ec);
+        }
+    }
+    return std::nullopt;
+}
+
+std::optional<nlohmann::json> LoadLauncherJson(const std::filesystem::path& relativePath) {
+    const auto path = ResolveLauncherRuntimePath(relativePath);
+    if (!path) {
+        return std::nullopt;
+    }
+    try {
+        std::ifstream file(*path);
+        return nlohmann::json::parse(file);
+    } catch (const std::exception& ex) {
+        spdlog::warn("Failed to parse launcher scene-authoring JSON '{}': {}", path->string(), ex.what());
+        return std::nullopt;
+    }
+}
+
+bool LauncherSeedExists(const std::string& seedPath) {
+    if (seedPath.empty()) {
+        return true;
+    }
+    return ResolveLauncherRuntimePath(std::filesystem::path(seedPath)).has_value();
+}
+
+bool LauncherHasSeed(const std::vector<LauncherSceneOption>& options, const std::string& seedPath) {
+    return std::any_of(options.begin(), options.end(), [&](const LauncherSceneOption& option) {
+        return option.modelAuthoredSeed == seedPath;
+    });
+}
+
+std::vector<LauncherSceneOption> LoadSceneAuthoringLauncherOptions() {
+    std::vector<LauncherSceneOption> generated;
+    const auto config = LoadLauncherJson("assets/config/scene_authoring_launcher_sets.json");
+    if (!config || !config->contains("sets") || !(*config)["sets"].is_array()) {
+        return generated;
+    }
+    for (const auto& set : (*config)["sets"]) {
+        if (!set.is_object() || !set.value("enabled", true)) {
+            continue;
+        }
+        const std::string labelPrefix = set.value("label_prefix", std::string("Scene Authoring"));
+        const std::string indexPath = set.value("promotion_index", std::string{});
+        if (indexPath.empty()) {
+            continue;
+        }
+        const auto index = LoadLauncherJson(indexPath);
+        if (!index || !index->contains("results") || !(*index)["results"].is_array()) {
+            spdlog::warn("Scene-authoring launcher set '{}' could not load promotion index '{}'",
+                         set.value("id", std::string("unknown")),
+                         indexPath);
+            continue;
+        }
+        const auto displayNames = set.contains("display_names") && set["display_names"].is_object()
+            ? set["display_names"]
+            : nlohmann::json::object();
+        for (const auto& result : (*index)["results"]) {
+            if (!result.is_object()) {
+                continue;
+            }
+            const std::string sceneId = result.value("id", std::string{});
+            const std::string seedPath = result.value("promoted_seed", std::string{});
+            if (sceneId.empty() || seedPath.empty()) {
+                continue;
+            }
+            if (!LauncherSeedExists(seedPath)) {
+                spdlog::warn("Skipping scene-authoring launcher entry '{}' because seed is missing: {}",
+                             sceneId,
+                             seedPath);
+                continue;
+            }
+            const std::string displayName = displayNames.value(sceneId, sceneId);
+            generated.push_back({
+                Utf8ToWide(labelPrefix + ": " + displayName),
+                "model_authored_scene",
+                seedPath,
+                true,
+            });
+        }
+    }
+    return generated;
+}
+
+std::vector<LauncherSceneOption> BuildLauncherSceneOptions() {
+    std::vector<LauncherSceneOption> options;
+    options.reserve((sizeof(kBuiltinLauncherSceneOptions) / sizeof(kBuiltinLauncherSceneOptions[0])) + 16);
+    for (const auto& option : kBuiltinLauncherSceneOptions) {
+        options.push_back({
+            option.label,
+            option.preset ? option.preset : "",
+            option.modelAuthoredSeed ? option.modelAuthoredSeed : "",
+            false,
+        });
+    }
+    for (auto& generated : LoadSceneAuthoringLauncherOptions()) {
+        if (!LauncherHasSeed(options, generated.modelAuthoredSeed)) {
+            options.push_back(std::move(generated));
+        }
+    }
+    return options;
+}
+
+nlohmann::json LauncherSceneOptionsReport() {
+    const auto options = BuildLauncherSceneOptions();
+    nlohmann::json scenes = nlohmann::json::array();
+    int generatedCount = 0;
+    for (const auto& option : options) {
+        const bool generated = option.generatedSceneAuthoring;
+        if (generated) {
+            ++generatedCount;
+        }
+        scenes.push_back({
+            {"label", WideToUtf8(option.label)},
+            {"preset", option.preset},
+            {"model_authored_seed", option.modelAuthoredSeed},
+            {"seed_exists", LauncherSeedExists(option.modelAuthoredSeed)},
+            {"generated_scene_authoring_entry", generated},
+        });
+    }
+    return {
+        {"schema", "cortex.launcher.scene_options_report.v1"},
+        {"status", generatedCount > 0 ? "LAUNCHER_SCENE_OPTIONS_READY" : "LAUNCHER_SCENE_OPTIONS_NO_GENERATED_ENTRIES"},
+        {"scene_count", options.size()},
+        {"generated_scene_authoring_count", generatedCount},
+        {"scenes", scenes},
+        {"completion_claim_allowed", false},
+    };
+}
+
+void ApplyLauncherSceneSelection(EngineConfig& config, const std::vector<LauncherSceneOption>& options, int selectedIndex) {
+    if (options.empty()) {
+        config.initialScenePreset = "rt_showcase";
+        _putenv_s("CORTEX_MODEL_AUTHORED_SCENE_SEED", "");
+        return;
+    }
+    if (selectedIndex < 0 || selectedIndex >= static_cast<int>(options.size())) {
+        selectedIndex = 0;
+    }
+
+    const LauncherSceneOption& option = options[static_cast<size_t>(selectedIndex)];
+    config.initialScenePreset = option.preset;
+    _putenv_s("CORTEX_MODEL_AUTHORED_SCENE_SEED", option.modelAuthoredSeed.c_str());
+}
 
 enum LauncherControlId : int {
     IDC_LAUNCH_SCENE    = 2001,
@@ -551,13 +917,10 @@ LRESULT CALLBACK LauncherWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lPar
         // Scene selection
         makeLabel(L"Scene", y);
         state->comboScene = makeCombo(IDC_LAUNCH_SCENE, y);
-        SendMessageW(state->comboScene, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(L"RT Showcase Gallery"));
-        SendMessageW(state->comboScene, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(L"Material Lab"));
-        SendMessageW(state->comboScene, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(L"Glass and Water Courtyard"));
-        SendMessageW(state->comboScene, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(L"Effects Showcase"));
-        SendMessageW(state->comboScene, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(L"Cornell Box"));
-        SendMessageW(state->comboScene, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(L"Dragon Over Water"));
-        SendMessageW(state->comboScene, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(L"God Rays Atrium"));
+        state->sceneOptions = BuildLauncherSceneOptions();
+        for (const LauncherSceneOption& option : state->sceneOptions) {
+            SendMessageW(state->comboScene, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(option.label.c_str()));
+        }
         SendMessageW(state->comboScene, CB_SETCURSEL, 0, 0);
         y += labelH + rowGap * 2;
 
@@ -635,16 +998,7 @@ LRESULT CALLBACK LauncherWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lPar
             if (id == IDC_LAUNCH_OK && state && state->config) {
                 // Scene
                 int selScene = static_cast<int>(SendMessageW(state->comboScene, CB_GETCURSEL, 0, 0));
-                switch (selScene) {
-                default:
-                case 0: state->config->initialScenePreset = "rt_showcase"; break;
-                case 1: state->config->initialScenePreset = "material_lab"; break;
-                case 2: state->config->initialScenePreset = "glass_water_courtyard"; break;
-                case 3: state->config->initialScenePreset = "effects_showcase"; break;
-                case 4: state->config->initialScenePreset = "cornell";     break;
-                case 5: state->config->initialScenePreset = "dragon";      break;
-                case 6: state->config->initialScenePreset = "god_rays";    break;
-                }
+                ApplyLauncherSceneSelection(*state->config, state->sceneOptions, selScene);
                 // Graphics preset
                 int selGraphicsPreset = static_cast<int>(SendMessageW(state->comboGraphicsPreset, CB_GETCURSEL, 0, 0));
                 state->config->initialGraphicsPreset =
@@ -864,6 +1218,12 @@ int main(int argc, char* argv[]) {
             const std::string report = Scene::RunAuthoringInputRouterSelfTestJson();
             std::cout << report << std::endl;
             return report.find("\"pass\": true") != std::string::npos ? 0 : 1;
+        }
+
+        if (HasArg(argc, argv, "--list-launcher-scenes")) {
+            const nlohmann::json report = LauncherSceneOptionsReport();
+            std::cout << report.dump(2) << std::endl;
+            return report.value("status", std::string{}) == "LAUNCHER_SCENE_OPTIONS_READY" ? 0 : 1;
         }
 
         // Create engine configuration

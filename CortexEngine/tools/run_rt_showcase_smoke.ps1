@@ -13,6 +13,7 @@ param(
     [double]$MaxTemporalMeanAbsLumaDelta = 2.5,
     [double]$MaxTemporalChangedPixelRatio = 0.08,
     [int]$MaxPersistentDescriptors = 1024,
+    [int]$MaxBindlessDescriptors = 64,
     [int]$MaxStagingDescriptors = 128,
     [int]$MaxTextureUploadPending = 0,
     [int]$MinRTTLASInstances = 16,
@@ -29,7 +30,9 @@ param(
     [double]$MinVisualAvgLuma = 60.0,
     [double]$MinVisualCenterLuma = 60.0,
     [double]$MaxVisualDarkDetailRatio = 0.68,
+    [int]$VisualValidationMinFrame = 30,
     [double]$MaxCameraPositionError = 0.25,
+    [switch]$SkipGpuFrameBudget,
     [string]$CameraBookmark = "hero",
     [bool]$ValidateSurfaceDebug = $true,
     [switch]$SkipSurfaceDebug,
@@ -103,7 +106,7 @@ Remove-Item -Force -ErrorAction SilentlyContinue (Join-Path $activeLogDir "visua
 $env:CORTEX_CAPTURE_VISUAL_VALIDATION = "1"
 $env:CORTEX_DISABLE_DEBUG_LAYER = "1"
 $env:CORTEX_DEBUG_CULLING = "1"
-$env:CORTEX_VISUAL_VALIDATION_MIN_FRAME = "30"
+$env:CORTEX_VISUAL_VALIDATION_MIN_FRAME = [string]$VisualValidationMinFrame
 if (-not [string]::IsNullOrWhiteSpace($RTBudgetProfile)) {
     $env:CORTEX_RT_BUDGET_PROFILE = $RTBudgetProfile
 }
@@ -865,7 +868,7 @@ if ([int]$report.smoke_automation.total_frames -gt $MaxExpectedFrames) {
 if ($null -eq $report.gpu_frame_ms -or [double]$report.gpu_frame_ms -le 0.0) {
     Add-Failure "GPU frame timing was not available"
 }
-if ($null -ne $report.gpu_frame_ms -and [double]$report.gpu_frame_ms -gt $MaxGpuFrameMs) {
+if (-not $SkipGpuFrameBudget -and $null -ne $report.gpu_frame_ms -and [double]$report.gpu_frame_ms -gt $MaxGpuFrameMs) {
     Add-Failure "GPU frame time is $([double]$report.gpu_frame_ms) ms, budget is <= $MaxGpuFrameMs ms"
 }
 if ($null -ne $report.dxgi_memory_mb.current_usage -and [double]$report.dxgi_memory_mb.current_usage -gt $MaxDxgiMemoryMb) {
@@ -1018,8 +1021,23 @@ if ($null -ne $report.frame_contract.ray_tracing.material_surface_parity_mismatc
     [int]$report.frame_contract.ray_tracing.material_surface_parity_mismatches -ne 0) {
     Add-Failure "RT material/snapshot surface parity mismatch count is $($report.frame_contract.ray_tracing.material_surface_parity_mismatches), expected 0"
 }
-if ($null -ne $report.descriptors.persistent_used -and [int]$report.descriptors.persistent_used -gt $MaxPersistentDescriptors) {
-    Add-Failure "persistent descriptors used is $([int]$report.descriptors.persistent_used), budget is <= $MaxPersistentDescriptors"
+if ($null -ne $report.descriptors.bindless_allocated -and [int]$report.descriptors.bindless_allocated -gt $MaxBindlessDescriptors) {
+    Add-Failure "bindless descriptors allocated is $([int]$report.descriptors.bindless_allocated), budget is <= $MaxBindlessDescriptors"
+}
+if ($null -ne $report.descriptors.persistent_used) {
+    $persistentUsed = [int]$report.descriptors.persistent_used
+    $bindlessAllocated = 0
+    if ($null -ne $report.descriptors.bindless_allocated) {
+        $bindlessAllocated = [int]$report.descriptors.bindless_allocated
+    }
+    $persistentWithoutBindless = [Math]::Max(0, $persistentUsed - $bindlessAllocated)
+    if ($persistentWithoutBindless -gt $MaxPersistentDescriptors) {
+        Add-Failure "persistent descriptors excluding bindless used is $persistentWithoutBindless (total=$persistentUsed bindless=$bindlessAllocated), budget is <= $MaxPersistentDescriptors"
+    }
+    $combinedBudget = $MaxPersistentDescriptors + $MaxBindlessDescriptors
+    if ($persistentUsed -gt $combinedBudget) {
+        Add-Failure "combined persistent descriptors used is $persistentUsed (non-bindless budget=$MaxPersistentDescriptors bindless budget=$MaxBindlessDescriptors), budget is <= $combinedBudget"
+    }
 }
 if ($null -ne $report.descriptors.staging_used -and [int]$report.descriptors.staging_used -gt $MaxStagingDescriptors) {
     Add-Failure "staging descriptors used is $([int]$report.descriptors.staging_used), budget is <= $MaxStagingDescriptors"
@@ -1081,7 +1099,7 @@ if ($failures.Count -eq 0 -and $TemporalRuns -gt 1) {
         $env:CORTEX_CAPTURE_VISUAL_VALIDATION = "1"
         $env:CORTEX_DISABLE_DEBUG_LAYER = "1"
         $env:CORTEX_DEBUG_CULLING = "1"
-        $env:CORTEX_VISUAL_VALIDATION_MIN_FRAME = "30"
+        $env:CORTEX_VISUAL_VALIDATION_MIN_FRAME = [string]$VisualValidationMinFrame
         if (-not [string]::IsNullOrWhiteSpace($RTBudgetProfile)) {
             $env:CORTEX_RT_BUDGET_PROFILE = $RTBudgetProfile
         }
@@ -1167,7 +1185,7 @@ if ($failures.Count -eq 0 -and $ValidateSurfaceDebug) {
     $env:CORTEX_CAPTURE_VISUAL_VALIDATION = "1"
     $env:CORTEX_DISABLE_DEBUG_LAYER = "1"
     $env:CORTEX_DEBUG_CULLING = "1"
-    $env:CORTEX_VISUAL_VALIDATION_MIN_FRAME = "30"
+    $env:CORTEX_VISUAL_VALIDATION_MIN_FRAME = [string]$VisualValidationMinFrame
     $env:CORTEX_DEBUG_VIEW = [string]$SurfaceDebugView
     if (-not [string]::IsNullOrWhiteSpace($RTBudgetProfile)) {
         $env:CORTEX_RT_BUDGET_PROFILE = $RTBudgetProfile

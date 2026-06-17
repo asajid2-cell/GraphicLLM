@@ -1,6 +1,7 @@
 param(
     [int]$SmokeFrames = 140,
     [double]$MaxGpuFrameMs = 16.7,
+    [switch]$SkipGpuFrameBudget,
     [double]$MinTemporalDisocclusionRatio = 0.0005,
     [double]$MinTemporalHighMotionRatio = 0.00001,
     [double]$MaxTemporalOutOfBoundsRatio = 0.20,
@@ -145,7 +146,7 @@ if ($report.health_warnings.Count -gt 0) {
 if ($report.frame_contract.warnings.Count -gt 0) {
     Add-Failure "frame contract warnings were reported: $($report.frame_contract.warnings -join ', ')"
 }
-if ([double]$report.gpu_frame_ms -gt $MaxGpuFrameMs) {
+if (-not $SkipGpuFrameBudget -and [double]$report.gpu_frame_ms -gt $MaxGpuFrameMs) {
     Add-Failure "GPU frame time exceeded budget: $($report.gpu_frame_ms) ms > $MaxGpuFrameMs ms"
 }
 if ($null -eq $report.frame_contract.renderer_budget) {
@@ -165,6 +166,37 @@ if ($null -eq $report.texture_upload_queue) {
     }
     if ($texturePending -gt $MaxTextureUploadPending) {
         Add-Failure "texture upload queue pending jobs is $texturePending, budget is <= $MaxTextureUploadPending"
+    }
+}
+
+$materials = $report.frame_contract.materials
+if ($null -eq $materials) {
+    Add-Failure "frame contract does not include material diagnostics"
+} else {
+    $prepareCalls = [int64]$materials.resource_prepare_calls
+    $refreshChecks = [int64]$materials.descriptor_refresh_checks
+    $refreshFailures = [int64]$materials.descriptor_refresh_failures
+    $readyAfterPrepare = [int64]$materials.descriptor_tables_ready_after_prepare
+    $missingAfterPrepare = [int64]$materials.descriptor_tables_missing_after_prepare
+    $tableWrites = [int64]$materials.descriptor_table_writes
+
+    if ($prepareCalls -le 0) {
+        Add-Failure "material resource preparation did not run"
+    }
+    if ($refreshChecks -lt $prepareCalls) {
+        Add-Failure "material descriptor refresh checks ($refreshChecks) are below prepare calls ($prepareCalls)"
+    }
+    if ($refreshFailures -ne 0) {
+        Add-Failure "material descriptor refresh failures reported: $refreshFailures"
+    }
+    if ($missingAfterPrepare -ne 0) {
+        Add-Failure "material descriptor tables missing after prepare: $missingAfterPrepare"
+    }
+    if ($readyAfterPrepare -lt $prepareCalls) {
+        Add-Failure "material descriptor ready count ($readyAfterPrepare) is below prepare calls ($prepareCalls)"
+    }
+    if ($tableWrites -gt $refreshChecks) {
+        Add-Failure "material descriptor table writes ($tableWrites) exceed refresh checks ($refreshChecks)"
     }
 }
 

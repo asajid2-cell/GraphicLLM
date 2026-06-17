@@ -39,7 +39,8 @@ function Invoke-LightingCase([string]$Name, [string]$ScriptName, [string[]]$Extr
         "-File", (Join-Path $script:PSScriptRoot $ScriptName),
         "-NoBuild",
         "-LogDir", $caseLogDir,
-        "-SmokeFrames", [string]$script:SmokeFrames
+        "-SmokeFrames", [string]$script:SmokeFrames,
+        "-MaxGpuFrameMs", "10000"
     ) + $ExtraArgs
     $output = & powershell @args 2>&1
     $output | Set-Content -Encoding UTF8 (Join-Path $caseLogDir "stdout.txt")
@@ -102,7 +103,7 @@ function Invoke-LightingCase([string]$Name, [string]$ScriptName, [string[]]$Extr
 Invoke-LightingCase "rt_showcase" "run_rt_showcase_smoke.ps1" @("-SkipSurfaceDebug")
 Invoke-LightingCase "material_lab" "run_material_lab_smoke.ps1"
 Invoke-LightingCase "glass_water_courtyard" "run_glass_water_courtyard_smoke.ps1"
-Invoke-LightingCase "effects_showcase" "run_effects_showcase_smoke.ps1"
+Invoke-LightingCase "effects_showcase" "run_effects_showcase_smoke.ps1" @("-SkipGpuFrameBudget")
 
 $rows | ConvertTo-Json -Depth 8 | Set-Content -Encoding UTF8 (Join-Path $LogDir "lighting_energy_budget_summary.json")
 

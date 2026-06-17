@@ -3,6 +3,7 @@ param(
     [int]$MotionFrames = 80,
     [double]$MinCameraDelta = 0.35,
     [double]$MaxGpuFrameMs = 16.7,
+    [switch]$SkipGpuFrameBudget,
     [double]$MinVisualAvgLuma = 45.0,
     [double]$MinVisualNonBlackRatio = 0.90,
     [string]$LogDir = "",
@@ -131,7 +132,7 @@ if ($failures.Count -eq 0) {
     if ($report.frame_contract.warnings.Count -gt 0) {
         Add-Failure "frame contract warnings were reported: $($report.frame_contract.warnings -join ', ')"
     }
-    if ([double]$report.gpu_frame_ms -gt $MaxGpuFrameMs) {
+    if (-not $SkipGpuFrameBudget -and [double]$report.gpu_frame_ms -gt $MaxGpuFrameMs) {
         Add-Failure "GPU frame time exceeded budget: $($report.gpu_frame_ms) ms > $MaxGpuFrameMs ms"
     }
     if ($null -eq $report.visual_validation -or -not [bool]$report.visual_validation.captured) {

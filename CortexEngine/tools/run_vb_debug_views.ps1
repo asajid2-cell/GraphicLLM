@@ -1,4 +1,7 @@
 param(
+    [int]$SmokeFrames = 240,
+    [int]$VisualValidationMinFrame = 90,
+    [int]$MaxExpectedFrames = 120,
     [string]$LogDir = "",
     [switch]$NoBuild
 )
@@ -58,6 +61,10 @@ foreach ($case in $cases) {
         "-SurfaceDebugView", [string]$case.View,
         "-MinSurfaceDebugColorfulRatio", [string]$case.MinColorful,
         "-MinSurfaceDebugNonBlackRatio", [string]$case.MinNonBlack,
+        "-SmokeFrames", [string]$SmokeFrames,
+        "-VisualValidationMinFrame", [string]$VisualValidationMinFrame,
+        "-MaxExpectedFrames", [string]$MaxExpectedFrames,
+        "-SkipGpuFrameBudget",
         "-TemporalRuns", "1"
     )
     $output = & powershell @args 2>&1

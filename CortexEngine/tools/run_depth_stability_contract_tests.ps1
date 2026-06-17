@@ -79,6 +79,15 @@ if ($release -notmatch "depth_stability_contract" -or $release -notmatch "run_de
 if ($release -notmatch "camera_motion_stability" -or $release -notmatch "run_camera_motion_stability_smoke\.ps1") {
     Add-Failure "release validation must include the moving-camera stability smoke"
 }
+if ($release -notmatch "renderer_stability_audit" -or $release -notmatch "run_renderer_stability_audit\.ps1") {
+    Add-Failure "release validation must include the renderer stability audit"
+}
+if ($release -notmatch "material_motion_pop" -or $release -notmatch "run_material_motion_pop_smoke\.ps1") {
+    Add-Failure "release validation must include the adjacent-frame material motion pop smoke"
+}
+if ($release -notmatch "renderer_debug_layer_smoke" -or $release -notmatch "run_renderer_debug_layer_smoke\.ps1") {
+    Add-Failure "release validation must include the D3D12 debug-layer renderer smoke"
+}
 
 if ($failures.Count -gt 0) {
     Write-Host "Depth stability contract failed:" -ForegroundColor Red

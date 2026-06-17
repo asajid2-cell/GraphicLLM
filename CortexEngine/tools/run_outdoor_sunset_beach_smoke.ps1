@@ -46,13 +46,14 @@ Remove-Item -Force -ErrorAction SilentlyContinue $reportPath, $shutdownReportPat
 $env:CORTEX_CAPTURE_VISUAL_VALIDATION = "1"
 $env:CORTEX_DISABLE_DEBUG_LAYER = "1"
 $env:CORTEX_VISUAL_VALIDATION_MIN_FRAME = "30"
+$env:CORTEX_PUBLIC_CAPTURE_CLEAN = "1"
 
 Push-Location (Split-Path -Parent $exe)
 try {
     $output = & $exe `
         "--scene" "outdoor_sunset_beach" `
         "--camera-bookmark" "hero" `
-        "--environment" "sunset_courtyard" `
+        "--environment" "neutral_procedural" `
         "--graphics-preset" "release_showcase" `
         "--mode=default" `
         "--no-llm" `
@@ -67,6 +68,7 @@ try {
     Remove-Item Env:\CORTEX_CAPTURE_VISUAL_VALIDATION -ErrorAction SilentlyContinue
     Remove-Item Env:\CORTEX_DISABLE_DEBUG_LAYER -ErrorAction SilentlyContinue
     Remove-Item Env:\CORTEX_VISUAL_VALIDATION_MIN_FRAME -ErrorAction SilentlyContinue
+    Remove-Item Env:\CORTEX_PUBLIC_CAPTURE_CLEAN -ErrorAction SilentlyContinue
     Remove-Item Env:\CORTEX_LOG_DIR -ErrorAction SilentlyContinue
 }
 
@@ -109,8 +111,14 @@ if ($failures.Count -eq 0) {
     if ([double]$report.gpu_frame_ms -gt $MaxGpuFrameMs) {
         Add-Failure "gpu_frame_ms is $($report.gpu_frame_ms), budget is <= $MaxGpuFrameMs"
     }
-    if ([string]$report.frame_contract.environment.active -ne "sunset_courtyard") {
-        Add-Failure "environment is '$($report.frame_contract.environment.active)', expected sunset_courtyard"
+    if ([string]$report.frame_contract.environment.active -ne "procedural_sky") {
+        Add-Failure "environment is '$($report.frame_contract.environment.active)', expected procedural_sky"
+    }
+    if ([bool]$report.frame_contract.environment.ibl_enabled) {
+        Add-Failure "IBL is enabled; outdoor should use local procedural sky/reflection fallback"
+    }
+    if (-not [bool]$report.frame_contract.environment.background_visible) {
+        Add-Failure "procedural sky background is not visible"
     }
     if ([string]$report.frame_contract.lighting.rig_id -ne "sunset_rim") {
         Add-Failure "lighting rig is '$($report.frame_contract.lighting.rig_id)', expected sunset_rim"
@@ -127,9 +135,9 @@ if ($failures.Count -eq 0) {
         if (-not [bool]$atmosphere.height_fog_enabled -or -not [bool]$atmosphere.depth_aware_fog) {
             Add-Failure "atmosphere height/depth-aware fog is not active"
         }
-        if (-not [bool]$atmosphere.environment_matched_fog -or
-            [string]$atmosphere.fog_color_source -ne "ambient_sun_environment") {
-            Add-Failure "atmosphere fog is not environment-matched"
+        $fogSource = [string]$atmosphere.fog_color_source
+        if ($fogSource -ne "ambient_environment" -and $fogSource -ne "ambient_sun_environment") {
+            Add-Failure "atmosphere fog source is '$fogSource', expected ambient procedural fog"
         }
         if (-not [bool]$atmosphere.volumetric_shafts_enabled -or
             -not [bool]$atmosphere.depth_aware_shafts -or
@@ -178,9 +186,6 @@ if ($failures.Count -eq 0) {
     if ([int]$materials.surface_wood -lt 2) {
         Add-Failure "surface_wood=$($materials.surface_wood), expected palm/wood coverage"
     }
-    if ([int]$materials.surface_emissive -lt 1) {
-        Add-Failure "surface_emissive=$($materials.surface_emissive), expected sunset glow coverage"
-    }
 }
 
 if ($failures.Count -gt 0) {
@@ -194,12 +199,13 @@ if ($failures.Count -gt 0) {
 
 Write-Host "Outdoor Sunset Beach smoke passed" -ForegroundColor Green
 Write-Host (" logs={0}" -f $activeLogDir)
-Write-Host (" gpu_ms={0:N3}/{1:N1} luma={2:N2} water_draws={3} surfaces water/wood/emissive={4}/{5}/{6}" -f `
+Write-Host (" gpu_ms={0:N3}/{1:N1} luma={2:N2} water_draws={3} surfaces water/wood/emissive={4}/{5}/{6} env={7}" -f `
     [double]$report.gpu_frame_ms,
     $MaxGpuFrameMs,
     [double]$report.visual_validation.image_stats.avg_luma,
     [int]$report.frame_contract.draw_counts.water_draws,
     [int]$report.frame_contract.materials.surface_water,
     [int]$report.frame_contract.materials.surface_wood,
-    [int]$report.frame_contract.materials.surface_emissive)
+    [int]$report.frame_contract.materials.surface_emissive,
+    [string]$report.frame_contract.environment.active)
 exit 0

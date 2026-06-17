@@ -21,13 +21,15 @@ void Renderer::RenderScene(Scene::ECS_Registry* registry) {
         ? m_services.descriptorManager->GetCBV_SRV_UAV_Heap()
         : nullptr;
     pipelineContext.frameConstants = m_constantBuffers.currentFrameGPU;
+    pipelineContext.shadowConstants = m_constantBuffers.shadow.gpuAddress;
     pipelineContext.shadowEnvironmentTable = m_environmentState.shadowAndEnvDescriptors[0];
     if (!MeshDrawPass::BindPipelineState(pipelineContext)) {
         return;
     }
 
-    // Bind biome materials buffer (b4) if valid
-    if (m_constantBuffers.biomeMaterialsValid) {
+    // Always bind the b4 biome-material slot. Non-terrain/model-authored
+    // scenes use the zero-biome default buffer initialized at renderer start.
+    if (m_constantBuffers.biomeMaterials.gpuAddress != 0) {
         (void)MeshDrawPass::BindBiomeMaterialConstants(
             m_commandResources.graphicsList.Get(),
             m_constantBuffers.biomeMaterials.gpuAddress);

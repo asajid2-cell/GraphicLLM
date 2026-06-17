@@ -162,7 +162,7 @@ bool Renderer::RenderVisibilityBufferMaterialResolveStage(uint32_t debugView, bo
         m_depthResources.descriptors.srv.cpu,
         m_visibilityBufferState.meshDraws,
         m_constantBuffers.frameCPU.viewProjectionMatrix,
-        m_constantBuffers.biomeMaterialsValid ? m_constantBuffers.biomeMaterials.gpuAddress : 0);
+        m_constantBuffers.biomeMaterials.gpuAddress);
 
     if (resolveResult.IsErr()) {
         spdlog::error("Material resolve failed: {}", resolveResult.Error());

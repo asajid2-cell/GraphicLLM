@@ -430,6 +430,8 @@ Result<void> Renderer::Initialize(DX12Device* device, Window* window) {
     if (cbResult.IsErr()) {
         return Result<void>::Err("Failed to create shadow constant buffer: " + cbResult.Error());
     }
+    ShadowConstants defaultShadowConstants = {};
+    m_constantBuffers.shadow.UpdateData(defaultShadowConstants);
 
     // Biome materials constant buffer for GPU-side material lookups.
     // Single slot since biome configs are static per-frame.
@@ -437,6 +439,13 @@ Result<void> Renderer::Initialize(DX12Device* device, Window* window) {
     if (cbResult.IsErr()) {
         return Result<void>::Err("Failed to create biome materials constant buffer: " + cbResult.Error());
     }
+    // The common graphics/material-resolve root signatures expose b4 for
+    // BiomeMaterials.hlsli. Model-authored and gallery scenes often have no
+    // biome configs, but shaders may still evaluate g_BiomeCount while
+    // rejecting terrain pixels. Keep b4 bound to a valid zero-biome buffer
+    // even when biomeMaterialsValid remains false for semantic reporting.
+    Scene::BiomeMaterialsCBuffer defaultBiomeMaterials = {};
+    m_constantBuffers.biomeMaterials.UpdateData(defaultBiomeMaterials);
 
     // Initialize GPU breadcrumb buffer for device-removed diagnostics.
     auto breadcrumbResult = CreateBreadcrumbBuffer();

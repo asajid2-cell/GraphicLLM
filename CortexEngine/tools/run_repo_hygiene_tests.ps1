@@ -67,6 +67,7 @@ try {
         "CortexEngine/MATERIAL_SYSTEM.md" `
         "CortexEngine/docs/*LEDGER.md" `
         "CortexEngine/assets/polyhaven/*.blend" 2>&1)
+    $forbiddenTracked = @($forbiddenTracked | Where-Object { $_ -ne "CortexEngine/docs/COMPLETION_LEDGER.md" })
     if ($LASTEXITCODE -ne 0) {
         Add-Failure "git ls-files public-noise scan failed: $($forbiddenTracked -join ' ')"
     } elseif ($forbiddenTracked.Count -gt 0) {

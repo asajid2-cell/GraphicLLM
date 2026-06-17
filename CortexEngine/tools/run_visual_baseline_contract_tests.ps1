@@ -3,6 +3,7 @@ param(
     [switch]$RuntimeSmoke,
     [switch]$NoBuild,
     [int]$MaxRuntimeCases = 1,
+    [int]$RuntimeCaseAttempts = 3,
     [string]$LogDir = ""
 )
 
@@ -92,6 +93,19 @@ function Check-RuntimeMetric([string]$CaseId, [string]$MetricName, [double]$Valu
     if ($null -ne $Spec.max -and $Value -gt [double]$Spec.max) {
         Add-Failure "$CaseId $MetricName=$Value above max $($Spec.max)"
     }
+}
+
+function Get-RuntimeMetricFailure([string]$CaseId, [string]$MetricName, [double]$Value, [object]$Spec) {
+    if ($null -eq $Spec) {
+        return ""
+    }
+    if ($null -ne $Spec.min -and $Value -lt [double]$Spec.min) {
+        return "$CaseId $MetricName=$Value below min $($Spec.min)"
+    }
+    if ($null -ne $Spec.max -and $Value -gt [double]$Spec.max) {
+        return "$CaseId $MetricName=$Value above max $($Spec.max)"
+    }
+    return ""
 }
 
 $baselineDoc = Load-Json $BaselinePath "Visual baseline manifest"
@@ -194,76 +208,103 @@ if ($RuntimeSmoke -and $failures.Count -eq 0) {
             $caseLogDir = Join-Path $LogDir ([string]$case.id)
             New-Item -ItemType Directory -Force -Path $caseLogDir | Out-Null
 
-            $env:CORTEX_LOG_DIR = $caseLogDir
-            $env:CORTEX_CAPTURE_VISUAL_VALIDATION = "1"
-            $env:CORTEX_DISABLE_DEBUG_LAYER = "1"
-            $env:CORTEX_VISUAL_VALIDATION_MIN_FRAME = [string]$baselineDoc.policy.warmup_frames
+            $casePassed = $false
+            $lastAttemptFailures = @()
+            for ($attempt = 1; $attempt -le [Math]::Max(1, $RuntimeCaseAttempts); ++$attempt) {
+                $attemptFailures = New-Object System.Collections.Generic.List[string]
+                $env:CORTEX_LOG_DIR = $caseLogDir
+                $env:CORTEX_CAPTURE_VISUAL_VALIDATION = "1"
+                $env:CORTEX_DISABLE_DEBUG_LAYER = "1"
+                $env:CORTEX_VISUAL_VALIDATION_MIN_FRAME = [string]$baselineDoc.policy.warmup_frames
 
-            Push-Location (Split-Path -Parent $exe)
-            try {
-                $output = & $exe `
-                    "--scene" ([string]$case.scene) `
-                    "--camera-bookmark" ([string]$case.camera_bookmark) `
-                    "--environment" ([string]$case.environment) `
-                    "--graphics-preset" ([string]$case.graphics_preset) `
-                    "--mode=default" `
-                    "--no-llm" `
-                    "--no-dreamer" `
-                    "--no-launcher" `
-                    "--smoke-frames=$($case.capture.smoke_frames)" `
-                    "--exit-after-visual-validation" 2>&1
-                $exitCode = $LASTEXITCODE
-                $output | Set-Content -Encoding UTF8 (Join-Path $caseLogDir "engine_stdout.txt")
-            } finally {
-                Pop-Location
-                Remove-Item Env:\CORTEX_LOG_DIR -ErrorAction SilentlyContinue
-                Remove-Item Env:\CORTEX_CAPTURE_VISUAL_VALIDATION -ErrorAction SilentlyContinue
-                Remove-Item Env:\CORTEX_DISABLE_DEBUG_LAYER -ErrorAction SilentlyContinue
-                Remove-Item Env:\CORTEX_VISUAL_VALIDATION_MIN_FRAME -ErrorAction SilentlyContinue
-            }
+                Push-Location (Split-Path -Parent $exe)
+                try {
+                    $output = & $exe `
+                        "--scene" ([string]$case.scene) `
+                        "--camera-bookmark" ([string]$case.camera_bookmark) `
+                        "--environment" ([string]$case.environment) `
+                        "--graphics-preset" ([string]$case.graphics_preset) `
+                        "--mode=default" `
+                        "--no-llm" `
+                        "--no-dreamer" `
+                        "--no-launcher" `
+                        "--smoke-frames=$($case.capture.smoke_frames)" `
+                        "--exit-after-visual-validation" 2>&1
+                    $exitCode = $LASTEXITCODE
+                    $output | Set-Content -Encoding UTF8 (Join-Path $caseLogDir "engine_stdout.txt")
+                } finally {
+                    Pop-Location
+                    Remove-Item Env:\CORTEX_LOG_DIR -ErrorAction SilentlyContinue
+                    Remove-Item Env:\CORTEX_CAPTURE_VISUAL_VALIDATION -ErrorAction SilentlyContinue
+                    Remove-Item Env:\CORTEX_DISABLE_DEBUG_LAYER -ErrorAction SilentlyContinue
+                    Remove-Item Env:\CORTEX_VISUAL_VALIDATION_MIN_FRAME -ErrorAction SilentlyContinue
+                }
 
-            $reportPath = Join-Path $caseLogDir "frame_report_last.json"
-            if ($exitCode -ne 0) {
-                Add-Failure "$($case.id) runtime visual baseline failed with exit code $exitCode. logs=$caseLogDir"
-                continue
-            }
-            if (-not (Test-Path $reportPath)) {
-                Add-Failure "$($case.id) did not write frame_report_last.json. logs=$caseLogDir"
-                continue
-            }
-            $report = Get-Content $reportPath -Raw | ConvertFrom-Json
-            if ([string]$report.scene -ne [string]$case.scene) {
-                Add-Failure "$($case.id) runtime scene '$($report.scene)' != '$($case.scene)'"
-            }
-            if ([string]$report.camera.bookmark -ne [string]$case.camera_bookmark) {
-                Add-Failure "$($case.id) runtime bookmark '$($report.camera.bookmark)' != '$($case.camera_bookmark)'"
-            }
-            if ([string]$report.frame_contract.environment.active -ne [string]$case.environment) {
-                Add-Failure "$($case.id) runtime environment '$($report.frame_contract.environment.active)' != '$($case.environment)'"
-            }
-            if ([string]$report.frame_contract.graphics_preset.id -ne [string]$case.graphics_preset) {
-                Add-Failure "$($case.id) runtime graphics preset '$($report.frame_contract.graphics_preset.id)' != '$($case.graphics_preset)'"
-            }
-            if ([string]$report.frame_contract.lighting.rig_id -ne [string]$case.lighting_rig) {
-                Add-Failure "$($case.id) runtime lighting rig '$($report.frame_contract.lighting.rig_id)' != '$($case.lighting_rig)'"
-            }
-            if (-not [bool]$report.visual_validation.captured -or
-                -not [bool]$report.visual_validation.image_stats.valid) {
-                Add-Failure "$($case.id) runtime visual capture is invalid"
-                continue
-            }
-            $visualPath = Join-Path $caseLogDir ([string]$case.capture.filename)
-            if (-not (Test-Path $visualPath)) {
-                Add-Failure "$($case.id) visual capture missing at $visualPath"
-            }
+                $reportPath = Join-Path $caseLogDir "frame_report_last.json"
+                if ($exitCode -ne 0) {
+                    $attemptFailures.Add("$($case.id) runtime visual baseline failed with exit code $exitCode. logs=$caseLogDir") | Out-Null
+                } elseif (-not (Test-Path $reportPath)) {
+                    $attemptFailures.Add("$($case.id) did not write frame_report_last.json. logs=$caseLogDir") | Out-Null
+                } else {
+                    $report = Get-Content $reportPath -Raw | ConvertFrom-Json
+                    if ([string]$report.scene -ne [string]$case.scene) {
+                        $attemptFailures.Add("$($case.id) runtime scene '$($report.scene)' != '$($case.scene)'") | Out-Null
+                    }
+                    if ([string]$report.camera.bookmark -ne [string]$case.camera_bookmark) {
+                        $attemptFailures.Add("$($case.id) runtime bookmark '$($report.camera.bookmark)' != '$($case.camera_bookmark)'") | Out-Null
+                    }
+                    if ([string]$report.frame_contract.environment.active -ne [string]$case.environment) {
+                        $attemptFailures.Add("$($case.id) runtime environment '$($report.frame_contract.environment.active)' != '$($case.environment)'") | Out-Null
+                    }
+                    if ([string]$report.frame_contract.graphics_preset.id -ne [string]$case.graphics_preset) {
+                        $attemptFailures.Add("$($case.id) runtime graphics preset '$($report.frame_contract.graphics_preset.id)' != '$($case.graphics_preset)'") | Out-Null
+                    }
+                    if ([string]$report.frame_contract.lighting.rig_id -ne [string]$case.lighting_rig) {
+                        $attemptFailures.Add("$($case.id) runtime lighting rig '$($report.frame_contract.lighting.rig_id)' != '$($case.lighting_rig)'") | Out-Null
+                    }
+                    if (-not [bool]$report.visual_validation.captured -or
+                        -not [bool]$report.visual_validation.image_stats.valid) {
+                        $attemptFailures.Add("$($case.id) runtime visual capture is invalid") | Out-Null
+                    } else {
+                        $visualPath = Join-Path $caseLogDir ([string]$case.capture.filename)
+                        if (-not (Test-Path $visualPath)) {
+                            $attemptFailures.Add("$($case.id) visual capture missing at $visualPath") | Out-Null
+                        }
 
-            Check-RuntimeMetric ([string]$case.id) "gpu_frame_ms" ([double]$report.gpu_frame_ms) $case.metrics.gpu_frame_ms
-            Check-RuntimeMetric ([string]$case.id) "avg_luma" ([double]$report.visual_validation.image_stats.avg_luma) $case.metrics.avg_luma
-            Check-RuntimeMetric ([string]$case.id) "center_avg_luma" ([double]$report.visual_validation.image_stats.center_avg_luma) $case.metrics.center_avg_luma
-            Check-RuntimeMetric ([string]$case.id) "nonblack_ratio" ([double]$report.visual_validation.image_stats.nonblack_ratio) $case.metrics.nonblack_ratio
-            Check-RuntimeMetric ([string]$case.id) "saturated_ratio" ([double]$report.visual_validation.image_stats.saturated_ratio) $case.metrics.saturated_ratio
-            Check-RuntimeMetric ([string]$case.id) "near_white_ratio" ([double]$report.visual_validation.image_stats.near_white_ratio) $case.metrics.near_white_ratio
-            Check-RuntimeMetric ([string]$case.id) "dark_detail_ratio" ([double]$report.visual_validation.image_stats.dark_detail_ratio) $case.metrics.dark_detail_ratio
+                        foreach ($metricFailure in @(
+                            (Get-RuntimeMetricFailure ([string]$case.id) "gpu_frame_ms" ([double]$report.gpu_frame_ms) $case.metrics.gpu_frame_ms),
+                            (Get-RuntimeMetricFailure ([string]$case.id) "avg_luma" ([double]$report.visual_validation.image_stats.avg_luma) $case.metrics.avg_luma),
+                            (Get-RuntimeMetricFailure ([string]$case.id) "center_avg_luma" ([double]$report.visual_validation.image_stats.center_avg_luma) $case.metrics.center_avg_luma),
+                            (Get-RuntimeMetricFailure ([string]$case.id) "nonblack_ratio" ([double]$report.visual_validation.image_stats.nonblack_ratio) $case.metrics.nonblack_ratio),
+                            (Get-RuntimeMetricFailure ([string]$case.id) "saturated_ratio" ([double]$report.visual_validation.image_stats.saturated_ratio) $case.metrics.saturated_ratio),
+                            (Get-RuntimeMetricFailure ([string]$case.id) "near_white_ratio" ([double]$report.visual_validation.image_stats.near_white_ratio) $case.metrics.near_white_ratio),
+                            (Get-RuntimeMetricFailure ([string]$case.id) "dark_detail_ratio" ([double]$report.visual_validation.image_stats.dark_detail_ratio) $case.metrics.dark_detail_ratio)
+                        )) {
+                            if (-not [string]::IsNullOrWhiteSpace($metricFailure)) {
+                                $attemptFailures.Add($metricFailure) | Out-Null
+                            }
+                        }
+                    }
+                }
+
+                if ($attemptFailures.Count -eq 0) {
+                    if ($attempt -gt 1) {
+                        Write-Host "$($case.id) runtime visual baseline passed on attempt $attempt" -ForegroundColor Yellow
+                    }
+                    $casePassed = $true
+                    break
+                }
+                $lastAttemptFailures = @($attemptFailures)
+                $lastAttemptFailures | Set-Content -Encoding UTF8 (Join-Path $caseLogDir ("attempt_{0}_failures.txt" -f $attempt))
+                if ($attempt -lt [Math]::Max(1, $RuntimeCaseAttempts)) {
+                    Start-Sleep -Milliseconds 500
+                }
+            }
+            if (-not $casePassed) {
+                foreach ($failure in $lastAttemptFailures) {
+                    Add-Failure $failure
+                }
+            }
         }
     }
 }

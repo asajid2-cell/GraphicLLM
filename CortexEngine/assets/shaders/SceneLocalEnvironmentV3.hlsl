@@ -116,16 +116,25 @@ PSOutput PSMain(VSOutput input) {
     const float payloadTextureRichness = saturate(g_FogExtraParams.z);
     const float payloadInfluence = saturate(g_FogExtraParams.w) * payloadReady;
     const float2 payloadUv = input.texCoord * float2(2.0f, 1.35f);
-    const float3 payloadAlbedoSample =
-        max(g_SceneLocalPayloadAlbedo.SampleLevel(g_LinearWrapSampler, payloadUv, 0.0f).rgb, 0.0f.xxx);
-    const float3 payloadNormalSample =
-        max(g_SceneLocalPayloadNormal.SampleLevel(g_LinearWrapSampler, payloadUv, 0.0f).rgb, 0.0f.xxx);
-    const float3 irradianceProxySample =
-        max(g_SceneLocalIrradianceProxy.SampleLevel(g_LinearWrapSampler, payloadUv * 0.45f, 0.0f).rgb, 0.0f.xxx);
-    const float3 specularProxySample =
-        max(g_SceneLocalSpecularProxy.SampleLevel(g_LinearWrapSampler, payloadUv * 0.65f, 0.0f).rgb, 0.0f.xxx);
-    const float3 visibleProxySample =
-        max(g_SceneLocalVisibleBackgroundProxy.SampleLevel(g_LinearWrapSampler, payloadUv * 0.35f, 0.0f).rgb, 0.0f.xxx);
+    float3 payloadAlbedoSample = 0.0f.xxx;
+    float3 payloadNormalSample = 0.5f.xxx;
+    float3 irradianceProxySample = 0.0f.xxx;
+    float3 specularProxySample = 0.0f.xxx;
+    float3 visibleProxySample = 0.0f.xxx;
+    [branch]
+    if (payloadReady > 0.5f)
+    {
+        payloadAlbedoSample =
+            max(g_SceneLocalPayloadAlbedo.SampleLevel(g_LinearWrapSampler, payloadUv, 0.0f).rgb, 0.0f.xxx);
+        payloadNormalSample =
+            max(g_SceneLocalPayloadNormal.SampleLevel(g_LinearWrapSampler, payloadUv, 0.0f).rgb, 0.0f.xxx);
+        irradianceProxySample =
+            max(g_SceneLocalIrradianceProxy.SampleLevel(g_LinearWrapSampler, payloadUv * 0.45f, 0.0f).rgb, 0.0f.xxx);
+        specularProxySample =
+            max(g_SceneLocalSpecularProxy.SampleLevel(g_LinearWrapSampler, payloadUv * 0.65f, 0.0f).rgb, 0.0f.xxx);
+        visibleProxySample =
+            max(g_SceneLocalVisibleBackgroundProxy.SampleLevel(g_LinearWrapSampler, payloadUv * 0.35f, 0.0f).rgb, 0.0f.xxx);
+    }
     const float payloadAlbedoSignal = step(0.002f, Luma(payloadAlbedoSample));
     const float irradianceProxySignal = step(0.002f, Luma(irradianceProxySample));
     const float specularProxySignal = step(0.002f, Luma(specularProxySample));

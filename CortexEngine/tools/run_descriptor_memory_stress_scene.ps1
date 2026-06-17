@@ -2,6 +2,7 @@ param(
     [int]$SmokeFrames = 240,
     [int]$MinPersistentDescriptors = 900,
     [int]$MaxPersistentDescriptors = 1024,
+    [int]$MaxBindlessDescriptors = 64,
     [int]$MaxStagingDescriptors = 128,
     [double]$MaxDxgiMemoryMb = 512.0,
     [double]$MaxEstimatedMemoryMb = 256.0,
@@ -36,10 +37,12 @@ $smokeArgs = @(
     "-SmokeFrames", [string]$SmokeFrames,
     "-TemporalRuns", "1",
     "-SkipSurfaceDebug",
+    "-SkipGpuFrameBudget",
     "-AllowRTCadenceSkips",
     "-RTBudgetProfile", "8gb_balanced",
     "-ExpectedRTBudgetProfile", "8gb_balanced",
     "-MaxPersistentDescriptors", [string]$MaxPersistentDescriptors,
+    "-MaxBindlessDescriptors", [string]$MaxBindlessDescriptors,
     "-MaxStagingDescriptors", [string]$MaxStagingDescriptors,
     "-MaxDxgiMemoryMb", [string]$MaxDxgiMemoryMb,
     "-MaxEstimatedMemoryMb", [string]$MaxEstimatedMemoryMb,
@@ -79,6 +82,7 @@ function Add-Failure([string]$message) {
 $persistentUsed = [int]$report.descriptors.persistent_used
 $stagingUsed = [int]$report.descriptors.staging_used
 $bindlessAllocated = [int]$report.descriptors.bindless_allocated
+$persistentWithoutBindless = [Math]::Max(0, $persistentUsed - $bindlessAllocated)
 $transientStart = [int]$report.descriptors.transient_start
 $transientEnd = [int]$report.descriptors.transient_end
 $transientBudget = $transientEnd - $transientStart
@@ -90,11 +94,18 @@ $dxgiMemoryMb = [double]$report.dxgi_memory_mb.current_usage
 $rtAvgLuma = [double]$report.frame_contract.ray_tracing.reflection_signal_avg_luma
 $rtHistoryAvgLuma = [double]$report.frame_contract.ray_tracing.reflection_history_signal_avg_luma
 
-if ($persistentUsed -lt $MinPersistentDescriptors) {
-    Add-Failure "persistent descriptors used is $persistentUsed, expected descriptor-stress pressure >= $MinPersistentDescriptors"
+if ($persistentWithoutBindless -lt $MinPersistentDescriptors) {
+    Add-Failure "persistent descriptors excluding bindless used is $persistentWithoutBindless (total=$persistentUsed bindless=$bindlessAllocated), expected descriptor-stress pressure >= $MinPersistentDescriptors"
 }
-if ($persistentUsed -gt $MaxPersistentDescriptors) {
-    Add-Failure "persistent descriptors used is $persistentUsed, budget is <= $MaxPersistentDescriptors"
+if ($persistentWithoutBindless -gt $MaxPersistentDescriptors) {
+    Add-Failure "persistent descriptors excluding bindless used is $persistentWithoutBindless (total=$persistentUsed bindless=$bindlessAllocated), budget is <= $MaxPersistentDescriptors"
+}
+if ($bindlessAllocated -gt $MaxBindlessDescriptors) {
+    Add-Failure "bindless descriptors allocated is $bindlessAllocated, budget is <= $MaxBindlessDescriptors"
+}
+$combinedPersistentBudget = $MaxPersistentDescriptors + $MaxBindlessDescriptors
+if ($persistentUsed -gt $combinedPersistentBudget) {
+    Add-Failure "combined persistent descriptors used is $persistentUsed (non-bindless budget=$MaxPersistentDescriptors bindless budget=$MaxBindlessDescriptors), budget is <= $combinedPersistentBudget"
 }
 if ($stagingUsed -gt $MaxStagingDescriptors) {
     Add-Failure "staging descriptors used is $stagingUsed, budget is <= $MaxStagingDescriptors"
@@ -136,10 +147,12 @@ $summary = [pscustomobject]@{
     scene = "rt_showcase_descriptor_memory_stress"
     report = $reportPath
     persistent_descriptors = $persistentUsed
+    persistent_descriptors_excluding_bindless = $persistentWithoutBindless
     persistent_descriptor_budget = $MaxPersistentDescriptors
     staging_descriptors = $stagingUsed
     staging_descriptor_budget = $MaxStagingDescriptors
     bindless_allocated = $bindlessAllocated
+    bindless_descriptor_budget = $MaxBindlessDescriptors
     transient_descriptor_budget = $transientBudget
     transient_descriptor_delta = $transientDelta
     dxgi_memory_mb = $dxgiMemoryMb
@@ -162,8 +175,11 @@ if ($failures.Count -gt 0) {
 }
 
 Write-Host "Descriptor/memory stress scene passed." -ForegroundColor Green
-Write-Host ("  persistent_descriptors={0}/{1} staging={2}/{3} transient_budget={4} transient_delta={5}" -f `
-    $persistentUsed, $MaxPersistentDescriptors, $stagingUsed, $MaxStagingDescriptors, $transientBudget, $transientDelta)
+Write-Host ("  persistent_descriptors={0}/{1} total={2}/{3} bindless={4}/{5} staging={6}/{7} transient_budget={8} transient_delta={9}" -f `
+    $persistentWithoutBindless, $MaxPersistentDescriptors,
+    $persistentUsed, $combinedPersistentBudget,
+    $bindlessAllocated, $MaxBindlessDescriptors,
+    $stagingUsed, $MaxStagingDescriptors, $transientBudget, $transientDelta)
 Write-Host ("  dxgi_mb={0:N2}/{1:N0} estimated_mb={2:N2}/{3:N0} write_mb={4:N2}/{5:N0}" -f `
     $dxgiMemoryMb, $MaxDxgiMemoryMb, $estimatedMemoryMb, $MaxEstimatedMemoryMb, $estimatedWriteMb, $MaxEstimatedWriteMb)
 Write-Host ("  rt_signal_avg={0:N4} rt_history_avg={1:N4}" -f $rtAvgLuma, $rtHistoryAvgLuma)

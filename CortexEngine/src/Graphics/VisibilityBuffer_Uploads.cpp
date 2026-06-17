@@ -380,6 +380,10 @@ Result<void> VisibilityBufferRenderer::UpdateMeshTable(const std::vector<VBMeshD
 
     std::vector<VBMeshTableEntry> meshEntries;
     meshEntries.resize(meshCount);
+    const uint32_t persistentDescriptorCount =
+        m_descriptorManager ? m_descriptorManager->GetCBVSrvUavPersistentCount() : 0u;
+    const uint32_t transientDescriptorStart =
+        m_descriptorManager ? m_descriptorManager->GetCBVSrvUavTransientStart() : 0u;
 
     for (uint32_t meshIdx = 0; meshIdx < meshCount; ++meshIdx) {
         const auto& draw = meshDraws[meshIdx];
@@ -392,6 +396,24 @@ Result<void> VisibilityBufferRenderer::UpdateMeshTable(const std::vector<VBMeshD
 
         if (entry.vertexBufferIndex == 0xFFFFFFFFu || entry.indexBufferIndex == 0xFFFFFFFFu) {
             return Result<void>::Err("VB mesh table missing persistent VB/IB SRV indices (mesh upload must register SRVs)");
+        }
+        const bool descriptorRangeKnown = persistentDescriptorCount > 0u && transientDescriptorStart > 0u;
+        const bool vertexDescriptorResident =
+            descriptorRangeKnown &&
+            entry.vertexBufferIndex < persistentDescriptorCount &&
+            entry.vertexBufferIndex < transientDescriptorStart;
+        const bool indexDescriptorResident =
+            descriptorRangeKnown &&
+            entry.indexBufferIndex < persistentDescriptorCount &&
+            entry.indexBufferIndex < transientDescriptorStart;
+        if (!vertexDescriptorResident || !indexDescriptorResident) {
+            return Result<void>::Err(
+                "VB mesh table references non-persistent bindless mesh SRV index (mesh=" +
+                std::to_string(meshIdx) +
+                ", vb=" + std::to_string(entry.vertexBufferIndex) +
+                ", ib=" + std::to_string(entry.indexBufferIndex) +
+                ", persistent=" + std::to_string(persistentDescriptorCount) +
+                ", transient_start=" + std::to_string(transientDescriptorStart) + ")");
         }
 
         meshEntries[meshIdx] = entry;

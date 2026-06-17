@@ -12,6 +12,7 @@ struct RestoreGraphicsStateContext {
     ID3D12PipelineState* pipelineState = nullptr;
     ID3D12DescriptorHeap* cbvSrvUavHeap = nullptr;
     D3D12_GPU_VIRTUAL_ADDRESS frameConstants = 0;
+    D3D12_GPU_VIRTUAL_ADDRESS shadowConstants = 0;
     DescriptorHandle environmentTable{};
     DescriptorHandle fallbackMaterialTable{};
     D3D12_GPU_VIRTUAL_ADDRESS biomeMaterials = 0;

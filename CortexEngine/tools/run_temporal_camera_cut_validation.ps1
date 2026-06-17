@@ -1,6 +1,7 @@
 param(
     [int]$SmokeFrames = 96,
     [int]$CutFrame = 20,
+    [int]$VisualValidationMinFrame = 80,
     [string]$InitialCameraBookmark = "hero",
     [string]$CutCameraBookmark = "reflection_closeup",
     [double]$MaxGpuFrameMs = 16.7,
@@ -63,7 +64,7 @@ Remove-Item -Force -ErrorAction SilentlyContinue $reportPath, $shutdownReportPat
 
 $env:CORTEX_CAPTURE_VISUAL_VALIDATION = "1"
 $env:CORTEX_DISABLE_DEBUG_LAYER = "1"
-$env:CORTEX_VISUAL_VALIDATION_MIN_FRAME = "50"
+$env:CORTEX_VISUAL_VALIDATION_MIN_FRAME = [string]$VisualValidationMinFrame
 $env:CORTEX_CAMERA_CUT_FRAME = [string]$CutFrame
 $env:CORTEX_CAMERA_CUT_BOOKMARK = $CutCameraBookmark
 
@@ -114,6 +115,40 @@ function Get-History([object]$ReportObject, [string]$Name) {
         }
     }
     return $null
+}
+
+function Test-MaterialDescriptorStability([object]$ReportObject, [string]$Label) {
+    $materials = $ReportObject.frame_contract.materials
+    if ($null -eq $materials) {
+        Add-Failure "$Label frame contract does not include material diagnostics"
+        return
+    }
+
+    $prepareCalls = [int64]$materials.resource_prepare_calls
+    $refreshChecks = [int64]$materials.descriptor_refresh_checks
+    $refreshFailures = [int64]$materials.descriptor_refresh_failures
+    $readyAfterPrepare = [int64]$materials.descriptor_tables_ready_after_prepare
+    $missingAfterPrepare = [int64]$materials.descriptor_tables_missing_after_prepare
+    $tableWrites = [int64]$materials.descriptor_table_writes
+
+    if ($prepareCalls -le 0) {
+        Add-Failure "$Label material resource preparation did not run"
+    }
+    if ($refreshChecks -lt $prepareCalls) {
+        Add-Failure "$Label material descriptor refresh checks ($refreshChecks) are below prepare calls ($prepareCalls)"
+    }
+    if ($refreshFailures -ne 0) {
+        Add-Failure "$Label material descriptor refresh failures reported: $refreshFailures"
+    }
+    if ($missingAfterPrepare -ne 0) {
+        Add-Failure "$Label material descriptor tables missing after prepare: $missingAfterPrepare"
+    }
+    if ($readyAfterPrepare -lt $prepareCalls) {
+        Add-Failure "$Label material descriptor ready count ($readyAfterPrepare) is below prepare calls ($prepareCalls)"
+    }
+    if ($tableWrites -gt $refreshChecks) {
+        Add-Failure "$Label material descriptor table writes ($tableWrites) exceed refresh checks ($refreshChecks)"
+    }
 }
 
 function Get-BmpInfo([string]$Path) {
@@ -215,6 +250,7 @@ if ($report.frame_contract.warnings.Count -gt 0) {
 if ([double]$report.gpu_frame_ms -gt $MaxGpuFrameMs) {
     Add-Failure "GPU frame time exceeded budget: $($report.gpu_frame_ms) ms > $MaxGpuFrameMs ms"
 }
+Test-MaterialDescriptorStability $report "camera-cut"
 
 foreach ($historyName in @("rt_shadow_mask", "rt_reflection", "rt_gi")) {
     $history = Get-History $report $historyName
@@ -261,7 +297,7 @@ if ($failures.Count -eq 0) {
 
     $env:CORTEX_CAPTURE_VISUAL_VALIDATION = "1"
     $env:CORTEX_DISABLE_DEBUG_LAYER = "1"
-    $env:CORTEX_VISUAL_VALIDATION_MIN_FRAME = "50"
+    $env:CORTEX_VISUAL_VALIDATION_MIN_FRAME = [string]$VisualValidationMinFrame
 
     try {
         $cleanExitCode = Invoke-CortexEngine @(
@@ -297,6 +333,7 @@ if ($failures.Count -eq 0) {
         if ($cleanReport.frame_contract.warnings.Count -gt 0) {
             Add-Failure "clean destination frame contract warnings were reported: $($cleanReport.frame_contract.warnings -join ', ')"
         }
+        Test-MaterialDescriptorStability $cleanReport "clean-destination"
 
         $cutVsCleanDiff = Measure-BmpLumaDifference $cleanVisualPath $cutVisualPath
         if (-not [bool]$cutVsCleanDiff.valid) {

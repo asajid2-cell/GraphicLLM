@@ -1289,6 +1289,8 @@ def main() -> int:
         "human_review_packet_ready",
         "contact_sheet",
         "nonblank_beauty_count",
+        "legacy_visual_quality_notes",
+        "legacy_visual_quality_note_count",
         "build_material_v3_quality_matrix.py",
         "material_quality_matrix.v1",
         "material_quality_ready",

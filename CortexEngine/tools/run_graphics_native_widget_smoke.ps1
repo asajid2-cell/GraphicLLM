@@ -30,8 +30,16 @@ using System.Runtime.InteropServices;
 using System.Text;
 
 public static class CortexWin32UiSmoke {
+    public delegate bool EnumChildProc(IntPtr hWnd, IntPtr lParam);
+
     [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
     public static extern IntPtr FindWindow(string lpClassName, string lpWindowName);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    public static extern bool EnumChildWindows(IntPtr hWndParent, EnumChildProc lpEnumFunc, IntPtr lParam);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    public static extern int GetDlgCtrlID(IntPtr hWnd);
 
     [DllImport("user32.dll", SetLastError = true)]
     public static extern IntPtr GetDlgItem(IntPtr hDlg, int nIDDlgItem);
@@ -50,6 +58,18 @@ public static class CortexWin32UiSmoke {
 
     [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
     public static extern int GetWindowText(IntPtr hWnd, StringBuilder lpString, int nMaxCount);
+
+    public static IntPtr FindChildById(IntPtr parent, int id) {
+        IntPtr found = IntPtr.Zero;
+        EnumChildWindows(parent, delegate(IntPtr child, IntPtr lParam) {
+            if (GetDlgCtrlID(child) == id) {
+                found = child;
+                return false;
+            }
+            return true;
+        }, IntPtr.Zero);
+        return found;
+    }
 }
 "@
 
@@ -60,6 +80,7 @@ $TB_ENDTRACK = 8
 $BM_CLICK = 0x00F5
 $BM_GETCHECK = 0x00F0
 $BST_CHECKED = 1
+$CB_GETCURSEL = 0x0147
 $CB_SETCURSEL = 0x014E
 $CBN_SELCHANGE = 1
 
@@ -185,6 +206,9 @@ function Wait-GraphicsWindow([System.Diagnostics.Process]$Process, [int]$Timeout
 function Get-Control([IntPtr]$Parent, [int]$Id) {
     $control = [CortexWin32UiSmoke]::GetDlgItem($Parent, $Id)
     if ($control -eq [IntPtr]::Zero) {
+        $control = [CortexWin32UiSmoke]::FindChildById($Parent, $Id)
+    }
+    if ($control -eq [IntPtr]::Zero) {
         throw "Missing graphics UI control id $Id"
     }
     return $control
@@ -215,6 +239,10 @@ function Set-CheckboxState([IntPtr]$Parent, [int]$Id, [bool]$Checked) {
 
 function Select-ComboIndex([IntPtr]$Parent, [int]$Id, [int]$Index) {
     $control = Get-Control $Parent $Id
+    $current = [CortexWin32UiSmoke]::SendMessage($control, $CB_GETCURSEL, [IntPtr]::Zero, [IntPtr]::Zero).ToInt32()
+    if ($current -eq $Index) {
+        return
+    }
     [void][CortexWin32UiSmoke]::SendMessage($control, $CB_SETCURSEL, [IntPtr]$Index, [IntPtr]::Zero)
     $wParam = ($CBN_SELCHANGE -shl 16) -bor ($Id -band 0xffff)
     [void][CortexWin32UiSmoke]::SendMessage($Parent, $WM_COMMAND, [IntPtr]$wParam, $control)
@@ -240,12 +268,13 @@ try {
     if ($window -eq [IntPtr]::Zero) {
         Add-Failure "Cortex Graphics Settings native window did not appear for process $($process.Id)."
     } else {
-        Select-ComboIndex $window $IDC_GFX_QUALITY_PRESET_SELECT 1
         Select-ComboIndex $window $IDC_GFX_QUALITY_PRESET_SELECT 0
+        Start-Sleep -Milliseconds 1000
         # Render scale slider range is 0.50..1.00, so position 40 requests
         # 0.70 explicitly. Earlier versions requested 0.84 while expecting
         # 0.75, which made the smoke depend on budget-plan clamping.
         Set-Trackbar $window $IDC_GFX_RENDER_SCALE 40
+        Start-Sleep -Milliseconds 1000
         Set-CheckboxState $window $IDC_GFX_SAFE_LIGHTING $false
         Set-Trackbar $window $IDC_GFX_SSR_DISTANCE 47
         Set-Trackbar $window $IDC_GFX_SSR_THICKNESS 28
@@ -353,8 +382,8 @@ if (-not (Test-Path $reportPath)) {
     if (-not [bool]$fc.graphics_preset.dirty_from_ui) {
         Add-Failure "graphics_preset.dirty_from_ui was false after native slider automation"
     }
-    if ([string]$fc.graphics_preset.id -ne "release_showcase") {
-        Add-Failure "graphics_preset.id was '$($fc.graphics_preset.id)', expected release_showcase after quality preset dropdown"
+    if ([string]$fc.graphics_preset.id -ne "runtime") {
+        Add-Failure "graphics_preset.id was '$($fc.graphics_preset.id)', expected runtime after manual native graphics edits"
     }
     Assert-Near "render_scale" ([double]$fc.graphics_preset.render_scale) 0.70 0.04
     if ([bool]$fc.lighting.safe_rig_on_low_vram) {

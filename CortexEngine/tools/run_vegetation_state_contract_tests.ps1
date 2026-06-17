@@ -90,6 +90,7 @@ Require-Contains $ownershipAudit "m_vegetationState" `
 $runtimeLogDir = Join-Path $LogDir "temporal_validation"
 & powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot "run_temporal_validation_smoke.ps1") `
     -NoBuild `
+    -SkipGpuFrameBudget `
     -LogDir $runtimeLogDir
 if ($LASTEXITCODE -ne 0) {
     Add-Failure "Temporal validation smoke failed while validating vegetation state contract"

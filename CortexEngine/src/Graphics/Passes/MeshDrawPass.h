@@ -15,6 +15,7 @@ struct PipelineStateContext {
     ID3D12PipelineState* pipelineState = nullptr;
     ID3D12DescriptorHeap* cbvSrvUavHeap = nullptr;
     D3D12_GPU_VIRTUAL_ADDRESS frameConstants = 0;
+    D3D12_GPU_VIRTUAL_ADDRESS shadowConstants = 0;
     DescriptorHandle shadowEnvironmentTable{};
     D3D12_PRIMITIVE_TOPOLOGY topology = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
 };

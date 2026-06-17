@@ -119,6 +119,9 @@ void Renderer::RunPreFrameServices(const FrameExecutionContext& frameCtx) {
             residentLimit - static_cast<uint32_t>(m_environmentState.maps.size()));
     }
     ProcessPendingEnvironmentMaps(maxEnvLoadsPerFrame);
+    if (m_sceneVisualContract.active) {
+        (void)BuildSceneLocalEnvironmentV3PayloadBindingInfo(true);
+    }
     ProcessTextureUploadJobsPerFrame(m_assetRuntime.textureUploads.queue.maxJobsPerFrame);
 
     // Process a limited number of heavy GPU jobs (mesh uploads / BLAS builds)

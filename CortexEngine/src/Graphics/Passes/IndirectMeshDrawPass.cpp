@@ -19,6 +19,9 @@ bool RestoreGraphicsState(const RestoreGraphicsStateContext& context) {
     if (context.frameConstants != 0) {
         context.commandList->SetGraphicsRootConstantBufferView(1, context.frameConstants);
     }
+    if (context.shadowConstants != 0) {
+        context.commandList->SetGraphicsRootConstantBufferView(5, context.shadowConstants);
+    }
     if (context.environmentTable.IsValid()) {
         context.commandList->SetGraphicsRootDescriptorTable(4, context.environmentTable.gpu);
     }

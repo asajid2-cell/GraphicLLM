@@ -7,6 +7,7 @@
 #include <cctype>
 #include <cmath>
 #include <cstdint>
+#include <cstdlib>
 #include <string>
 #include <utility>
 #include <vector>
@@ -560,6 +561,10 @@ void Renderer::SetIBLEnabled(bool enabled) {
 }
 
 void Renderer::SetVisibilityBufferEnabled(bool enabled) {
+    if (enabled && std::getenv("CORTEX_DISABLE_VISIBILITY_BUFFER") != nullptr) {
+        enabled = false;
+    }
+
     if (m_visibilityBufferState.enabled == enabled) {
         return;
     }

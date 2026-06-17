@@ -21,6 +21,9 @@ bool BindPipelineState(const PipelineStateContext& context) {
     if (context.frameConstants != 0) {
         context.commandList->SetGraphicsRootConstantBufferView(1, context.frameConstants);
     }
+    if (context.shadowConstants != 0) {
+        context.commandList->SetGraphicsRootConstantBufferView(5, context.shadowConstants);
+    }
 
     if (context.shadowEnvironmentTable.IsValid()) {
         context.commandList->SetGraphicsRootDescriptorTable(4, context.shadowEnvironmentTable.gpu);

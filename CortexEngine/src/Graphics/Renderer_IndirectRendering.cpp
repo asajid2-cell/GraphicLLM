@@ -305,9 +305,10 @@ namespace Cortex::Graphics {
         m_pipelineState.geometry->GetPipelineState(),
         heaps[0],
         m_constantBuffers.currentFrameGPU,
+        m_constantBuffers.shadow.gpuAddress,
         m_environmentState.shadowAndEnvDescriptors[0],
         m_materialFallbacks.descriptorTable[0],
-        m_constantBuffers.biomeMaterialsValid ? m_constantBuffers.biomeMaterials.gpuAddress : 0
+        m_constantBuffers.biomeMaterials.gpuAddress
     });
     if (!graphicsStateRestored) {
         spdlog::warn("RenderSceneIndirect: could not restore graphics state for ExecuteIndirect");

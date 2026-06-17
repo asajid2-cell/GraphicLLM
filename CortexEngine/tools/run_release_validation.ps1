@@ -364,6 +364,14 @@ if ($failures.Count -eq 0) {
 }
 
 if ($failures.Count -eq 0) {
+    Invoke-ReleaseStep "renderer_stability_audit" @(
+        "-NoProfile",
+        "-ExecutionPolicy", "Bypass",
+        "-File", (Join-Path $PSScriptRoot "run_renderer_stability_audit.ps1")
+    )
+}
+
+if ($failures.Count -eq 0) {
     Invoke-ReleaseStep "editor_frame_contract" @(
         "-NoProfile",
         "-ExecutionPolicy", "Bypass",
@@ -378,6 +386,7 @@ if ($failures.Count -eq 0) {
         "-File", (Join-Path $PSScriptRoot "run_temporal_validation_smoke.ps1"),
         "-NoBuild",
         "-IsolatedLogs",
+        "-SkipGpuFrameBudget",
         "-SmokeFrames", [string]$TemporalSmokeFrames
     )
 }
@@ -397,6 +406,47 @@ if ($failures.Count -eq 0) {
         "-NoProfile",
         "-ExecutionPolicy", "Bypass",
         "-File", (Join-Path $PSScriptRoot "run_camera_motion_stability_smoke.ps1"),
+        "-NoBuild",
+        "-IsolatedLogs",
+        "-SkipGpuFrameBudget"
+    )
+}
+
+if ($failures.Count -eq 0) {
+    Invoke-ReleaseStep "dragon_mouse_look_surface_stability" @(
+        "-NoProfile",
+        "-ExecutionPolicy", "Bypass",
+        "-File", (Join-Path $PSScriptRoot "run_dragon_mouse_look_surface_stability_smoke.ps1"),
+        "-NoBuild",
+        "-IsolatedLogs"
+    )
+}
+
+if ($failures.Count -eq 0) {
+    Invoke-ReleaseStep "rt_showcase_wall_floor_flicker_stability" @(
+        "-NoProfile",
+        "-ExecutionPolicy", "Bypass",
+        "-File", (Join-Path $PSScriptRoot "run_rt_showcase_wall_floor_flicker_stability_smoke.ps1"),
+        "-NoBuild",
+        "-IsolatedLogs"
+    )
+}
+
+if ($failures.Count -eq 0) {
+    Invoke-ReleaseStep "material_motion_pop" @(
+        "-NoProfile",
+        "-ExecutionPolicy", "Bypass",
+        "-File", (Join-Path $PSScriptRoot "run_material_motion_pop_smoke.ps1"),
+        "-NoBuild",
+        "-IsolatedLogs"
+    )
+}
+
+if ($failures.Count -eq 0) {
+    Invoke-ReleaseStep "renderer_debug_layer_smoke" @(
+        "-NoProfile",
+        "-ExecutionPolicy", "Bypass",
+        "-File", (Join-Path $PSScriptRoot "run_renderer_debug_layer_smoke.ps1"),
         "-NoBuild",
         "-IsolatedLogs"
     )

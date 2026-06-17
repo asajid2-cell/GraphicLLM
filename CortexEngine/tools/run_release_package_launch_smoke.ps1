@@ -24,10 +24,12 @@ function Resolve-GlobFiles([string]$Base, [string]$Pattern) {
     $normalized = Normalize-Rel $Pattern
     $literalPrefix = $normalized
     $wildcardIndex = $normalized.IndexOfAny([char[]]"*?[")
+    $recursive = $false
     if ($wildcardIndex -ge 0) {
         $slashIndex = $normalized.LastIndexOf("/", $wildcardIndex)
         if ($slashIndex -ge 0) {
             $literalPrefix = $normalized.Substring(0, $slashIndex)
+            $recursive = $true
         } else {
             $literalPrefix = ""
         }
@@ -42,7 +44,13 @@ function Resolve-GlobFiles([string]$Base, [string]$Pattern) {
         return @()
     }
 
-    return @(Get-ChildItem -Path $searchRoot -File -Recurse | Where-Object {
+    $files = if ($recursive) {
+        Get-ChildItem -Path $searchRoot -File -Recurse
+    } else {
+        Get-ChildItem -Path $searchRoot -File
+    }
+
+    return @($files | Where-Object {
         (Get-RelativePath $Base $_.FullName) -like $normalized
     })
 }

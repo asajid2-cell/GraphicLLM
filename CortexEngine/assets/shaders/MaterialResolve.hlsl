@@ -145,7 +145,8 @@ struct WorldGradients {
 UVGradients ComputePerspectiveCorrectUVGradients(
     float2 uv0, float2 uv1, float2 uv2,
     float2 screen0, float2 screen1, float2 screen2,
-    float w0, float w1, float w2)
+    float w0, float w1, float w2,
+    float3 screenBary)
 {
     UVGradients result;
     result.ddx = float2(0.0f, 0.0f);
@@ -183,14 +184,23 @@ UVGradients ComputePerspectiveCorrectUVGradients(
     float2 dUVOverWdx = (uvOverW1 - uvOverW0) * e02.y * invArea2 - (uvOverW2 - uvOverW0) * e01.y * invArea2;
     float2 dUVOverWdy = -(uvOverW1 - uvOverW0) * e02.x * invArea2 + (uvOverW2 - uvOverW0) * e01.x * invArea2;
 
-    // Apply quotient rule: d(UV) = d(UV/w) / (1/w) - UV * d(1/w) / (1/w)
-    // Simplified: d(UV) = w * d(UV/w) - UV * w * d(1/w)
-    // At the center of the triangle (approximate), use average values
-    float wAvg = (w0 + w1 + w2) / 3.0f;
-    float2 uvAvg = (uv0 + uv1 + uv2) / 3.0f;
+    // Apply the quotient rule at this pixel, not at the triangle center.
+    // The previous center-average approximation selected the wrong mip on
+    // large oblique room-shell triangles, which made broad floors/walls crawl
+    // during mouse-look in the visibility-buffer path.
+    float denom =
+        screenBary.x * invW0 +
+        screenBary.y * invW1 +
+        screenBary.z * invW2;
+    float2 uvOverW =
+        screenBary.x * uvOverW0 +
+        screenBary.y * uvOverW1 +
+        screenBary.z * uvOverW2;
+    denom = max(abs(denom), 1e-7f) * ((denom < 0.0f) ? -1.0f : 1.0f);
+    float invDenom2 = 1.0f / (denom * denom);
 
-    result.ddx = wAvg * dUVOverWdx - uvAvg * wAvg * dInvWdx;
-    result.ddy = wAvg * dUVOverWdy - uvAvg * wAvg * dInvWdy;
+    result.ddx = (dUVOverWdx * denom - uvOverW * dInvWdx) * invDenom2;
+    result.ddy = (dUVOverWdy * denom - uvOverW * dInvWdy) * invDenom2;
 
     // Clamp gradients to prevent extreme mip selection (prevents shimmer)
     const float maxGrad = 4.0f; // Maximum 4 texels per pixel
@@ -203,7 +213,8 @@ UVGradients ComputePerspectiveCorrectUVGradients(
 WorldGradients ComputePerspectiveCorrectWorldGradients(
     float3 world0, float3 world1, float3 world2,
     float2 screen0, float2 screen1, float2 screen2,
-    float w0, float w1, float w2)
+    float w0, float w1, float w2,
+    float3 screenBary)
 {
     WorldGradients result;
     result.ddx = float3(0.0f, 0.0f, 0.0f);
@@ -234,11 +245,19 @@ WorldGradients ComputePerspectiveCorrectWorldGradients(
     float3 dWorldOverWdx = (worldOverW1 - worldOverW0) * e02.y * invArea2 - (worldOverW2 - worldOverW0) * e01.y * invArea2;
     float3 dWorldOverWdy = -(worldOverW1 - worldOverW0) * e02.x * invArea2 + (worldOverW2 - worldOverW0) * e01.x * invArea2;
 
-    float wAvg = (w0 + w1 + w2) / 3.0f;
-    float3 worldAvg = (world0 + world1 + world2) / 3.0f;
+    float denom =
+        screenBary.x * invW0 +
+        screenBary.y * invW1 +
+        screenBary.z * invW2;
+    float3 worldOverW =
+        screenBary.x * worldOverW0 +
+        screenBary.y * worldOverW1 +
+        screenBary.z * worldOverW2;
+    denom = max(abs(denom), 1e-7f) * ((denom < 0.0f) ? -1.0f : 1.0f);
+    float invDenom2 = 1.0f / (denom * denom);
 
-    result.ddx = wAvg * dWorldOverWdx - worldAvg * wAvg * dInvWdx;
-    result.ddy = wAvg * dWorldOverWdy - worldAvg * wAvg * dInvWdy;
+    result.ddx = (dWorldOverWdx * denom - worldOverW * dInvWdx) * invDenom2;
+    result.ddy = (dWorldOverWdy * denom - worldOverW * dInvWdy) * invDenom2;
 
     const float maxGrad = 2.0f;
     result.ddx = clamp(result.ddx, -maxGrad, maxGrad);
@@ -601,6 +620,7 @@ void CSMain(uint3 dispatchThreadID : SV_DispatchThreadID) {
 
     // Compute 2D screen-space barycentrics using edge function
     float3 bary = ComputeScreenSpaceBarycentrics(pixelUV, screen0, screen1, screen2);
+    float3 screenBary = bary;
 
     // Apply perspective correction using 1/w interpolation
     float3 baryPersp = bary / float3(clipPos0.w, clipPos1.w, clipPos2.w);
@@ -709,13 +729,15 @@ void CSMain(uint3 dispatchThreadID : SV_DispatchThreadID) {
             UVGradients uvGrad = ComputePerspectiveCorrectUVGradients(
                 v0.texCoord, v1.texCoord, v2.texCoord,
                 screen0, screen1, screen2,
-                clipPos0.w, clipPos1.w, clipPos2.w);
+                clipPos0.w, clipPos1.w, clipPos2.w,
+                screenBary);
             ddxUV = uvGrad.ddx;
             ddyUV = uvGrad.ddy;
             WorldGradients worldGrad = ComputePerspectiveCorrectWorldGradients(
                 worldPos0, worldPos1, worldPos2,
                 screen0, screen1, screen2,
-                clipPos0.w, clipPos1.w, clipPos2.w);
+                clipPos0.w, clipPos1.w, clipPos2.w,
+                screenBary);
             ddxWorld = worldGrad.ddx;
             ddyWorld = worldGrad.ddy;
         }

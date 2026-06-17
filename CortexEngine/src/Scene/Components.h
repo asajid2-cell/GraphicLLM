@@ -257,6 +257,7 @@ struct LightComponent {
     // orientation plus this size in local X/Y as their emitting surface.
     glm::vec2 areaSize = glm::vec2(1.0f, 1.0f);
     bool twoSided = false;
+    uint32_t semanticClassId = 0; // Renderer-owned fixture class, 0 = generic.
 };
 
 // Camera Component

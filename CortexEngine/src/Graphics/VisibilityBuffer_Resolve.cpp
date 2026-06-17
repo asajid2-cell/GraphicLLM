@@ -137,9 +137,10 @@ Result<void> VisibilityBufferRenderer::ResolveMaterials(
     cmdList->SetComputeRootShaderResourceView(5, materialBufferAddress);
 
     // Param 6 (b4): Biome materials constants (CBV - root descriptor)
-    if (biomeMaterialsAddress != 0) {
-        cmdList->SetComputeRootConstantBufferView(6, biomeMaterialsAddress);
+    if (biomeMaterialsAddress == 0) {
+        return Result<void>::Err("Material resolve requires a valid biome materials CBV, even for zero-biome scenes");
     }
+    cmdList->SetComputeRootConstantBufferView(6, biomeMaterialsAddress);
 
     auto meshTableResult = UpdateMeshTable(meshDraws);
     if (meshTableResult.IsErr()) {

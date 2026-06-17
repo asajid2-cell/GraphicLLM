@@ -151,6 +151,7 @@ def packet_row(packet_root: Path, required_views: list[str]) -> dict[str, Any]:
         "review_cell_count": 0,
         "nonblank_beauty_count": 0,
         "visual_quality_status": None,
+        "legacy_visual_quality_notes": [],
         "family_rows": [],
         "failures": [],
         "warnings": [],
@@ -173,11 +174,11 @@ def packet_row(packet_root: Path, required_views: list[str]) -> dict[str, Any]:
         visual_quality = load_json(visual_quality_path)
         row["visual_quality_status"] = str(visual_quality.get("status", ""))
         if visual_quality.get("release_gate") == "FAIL":
-            row["warnings"].append("legacy visual_quality_analysis release gate failed")
+            row["legacy_visual_quality_notes"].append("legacy visual_quality_analysis release gate failed")
         elif visual_quality.get("release_gate") == "REVIEW_REQUIRED":
-            row["warnings"].append("visual_quality_analysis requires human review")
+            row["legacy_visual_quality_notes"].append("legacy visual_quality_analysis requires human review")
     else:
-        row["warnings"].append("visual_quality_analysis.json missing")
+        row["legacy_visual_quality_notes"].append("legacy visual_quality_analysis.json missing")
 
     for family in sorted(family_views):
         views = family_views[family]
@@ -346,11 +347,14 @@ def build_matrix(
     )
     failures: list[str] = []
     warnings: list[str] = []
+    legacy_visual_quality_notes: list[str] = []
     for row in rows:
         for failure in row.get("failures", []):
             failures.append(f"{row.get('packet_root')}: {failure}")
         for warning in row.get("warnings", []):
             warnings.append(f"{row.get('packet_root')}: {warning}")
+        for note in row.get("legacy_visual_quality_notes", []):
+            legacy_visual_quality_notes.append(f"{row.get('packet_root')}: {note}")
 
     missing_families = sorted(set(required_families) - set(observed_families))
     missing_motion_modes = sorted(set(required_motion_modes) - set(observed_motion_modes))
@@ -388,6 +392,8 @@ def build_matrix(
         "human_visual_acceptance_required": True,
         "visual_artifact_review_ready": not failures,
         "human_review_packet_ready": not failures and sheet["contact_sheet_exists"],
+        "legacy_visual_quality_note_count": len(legacy_visual_quality_notes),
+        "legacy_visual_quality_notes": legacy_visual_quality_notes,
         "failures": failures,
         "warnings": warnings,
         "rows": rows,
@@ -411,6 +417,7 @@ def write_markdown(matrix: dict[str, Any], output: Path) -> None:
         f"- review cells: `{matrix['review_cell_count']}`",
         f"- nonblank beauty captures: `{matrix['nonblank_beauty_count']}`",
         f"- contact sheet: `{matrix['contact_sheet']['contact_sheet']}`",
+        f"- legacy visual-quality notes: `{matrix['legacy_visual_quality_note_count']}`",
         f"- failures: `{len(matrix['failures'])}`",
         f"- warnings: `{len(matrix['warnings'])}`",
         "",
@@ -430,6 +437,9 @@ def write_markdown(matrix: dict[str, Any], output: Path) -> None:
                 warnings=len(row.get("warnings", [])),
             )
         )
+    if matrix.get("legacy_visual_quality_notes"):
+        lines.extend(["", "## Legacy Visual-Quality Notes", ""])
+        lines.extend(f"- {note}" for note in matrix["legacy_visual_quality_notes"])
     if matrix["warnings"]:
         lines.extend(["", "## Warnings", ""])
         lines.extend(f"- {warning}" for warning in matrix["warnings"])

@@ -125,14 +125,14 @@ struct TextureDescriptorState {
             return Result<void>::Err("Renderer is not initialized for persistent material descriptors");
         }
 
-        auto tableResult = descriptorManager->AllocateCBV_SRV_UAVRange(MaterialGPUState::kSlotCount);
+        auto tableResult = descriptorManager->AllocateCBV_SRV_UAVRange(MaterialGPUState::kDescriptorCount);
         if (tableResult.IsErr()) {
             state.descriptorsReady = false;
             return Result<void>::Err("Failed to allocate persistent material descriptor table: " + tableResult.Error());
         }
 
         const DescriptorHandle base = tableResult.Value();
-        for (uint32_t i = 0; i < MaterialGPUState::kSlotCount; ++i) {
+        for (uint32_t i = 0; i < MaterialGPUState::kDescriptorCount; ++i) {
             state.descriptors[i] = descriptorManager->GetCBV_SRV_UAVHandle(base.index + i);
             if (!state.descriptors[i].IsValid()) {
                 state.descriptorsReady = false;
@@ -212,6 +212,9 @@ struct TextureDescriptorState {
             if (!WriteTexture2DSRV(device, resolvedTextures[i], state.descriptors[i].cpu)) {
                 WriteNullTexture2DSRV(device, DXGI_FORMAT_R8G8B8A8_UNORM, state.descriptors[i].cpu);
             }
+        }
+        for (size_t i = MaterialGPUState::kSlotCount; i < MaterialGPUState::kDescriptorCount; ++i) {
+            WriteNullTexture2DSRV(device, DXGI_FORMAT_R8G8B8A8_UNORM, state.descriptors[i].cpu);
         }
 
         for (size_t i = 0; i < sources.size(); ++i) {

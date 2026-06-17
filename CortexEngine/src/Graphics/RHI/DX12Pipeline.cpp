@@ -188,6 +188,9 @@ Result<void> DX12Pipeline::Initialize(
     blendDesc.RenderTarget[0].DestBlendAlpha = D3D12_BLEND_ONE;
     blendDesc.RenderTarget[0].BlendOpAlpha = D3D12_BLEND_OP_ADD;
     blendDesc.RenderTarget[0].RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;
+    for (UINT i = 1; i < 8; ++i) {
+        blendDesc.RenderTarget[i] = blendDesc.RenderTarget[0];
+    }
 
     // Create depth-stencil state
     D3D12_DEPTH_STENCIL_DESC depthStencilDesc = {};

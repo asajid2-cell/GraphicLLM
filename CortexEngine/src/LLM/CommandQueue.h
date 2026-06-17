@@ -75,6 +75,10 @@ public:
     // Build a compact scene summary for prompt conditioning
     std::string BuildSceneSummary(Scene::ECS_Registry* registry, size_t maxChars = 1200) const;
 
+    // Access the real tagged asset library (registry + Kenney kit), loading it
+    // on first use. Used by scene recipes to compose real assets.
+    Scene::AssetCatalog& EnsureCatalog();
+
     // Last high-level scene recipe generated from a scene_plan (if any).
     std::string GetLastSceneRecipe() const { return m_lastSceneRecipe; }
 

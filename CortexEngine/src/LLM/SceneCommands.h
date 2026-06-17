@@ -66,9 +66,15 @@ struct AddEntityCommand : public SceneCommand {
     std::string name;
     bool autoPlace = false;       // let the executor pick a spawn position if true
 
-    // For entityType == Model, this names the asset from the
-    // glTF-Sample-Models library (e.g., "DamagedHelmet", "DragonAttenuation").
+    // For entityType == Model, this names the asset: first resolved against the
+    // real tagged AssetCatalog (registry id / Kenney name / semantic role), then
+    // the glTF-Sample-Models library (e.g., "DamagedHelmet").
     std::string asset;
+
+    // Optional euler rotation in DEGREES (pitch=x, yaw=y, roll=z), applied as a
+    // quaternion. Used by layout recipes to face furniture into a room.
+    glm::vec3 rotationEuler = glm::vec3(0.0f);
+    bool hasRotation = false;
 
     // Geometry detail controls for high/low poly variants
     // Used primarily for spheres, cylinders, cones, and tori.

@@ -333,6 +333,17 @@ void CommandQueue::ExecuteCommand(SceneCommand* command, Scene::ECS_Registry* re
     }
 }
 
+Scene::AssetCatalog& CommandQueue::EnsureCatalog() {
+    if (!m_assetCatalogLoadAttempted) {
+        m_assetCatalogLoadAttempted = true;
+        auto r = m_assetCatalog.Load();
+        if (r.IsErr()) {
+            spdlog::warn("AssetCatalog load failed: {}", r.Error());
+        }
+    }
+    return m_assetCatalog;
+}
+
 void CommandQueue::ExecuteAddEntity(AddEntityCommand* cmd, Scene::ECS_Registry* registry, Graphics::Renderer* renderer) {
     if (!registry || !renderer || !cmd) {
         PushStatus(false, "AddEntity skipped: missing registry or renderer");
@@ -355,15 +366,9 @@ void CommandQueue::ExecuteAddEntity(AddEntityCommand* cmd, Scene::ECS_Registry* 
                 // First try the real tagged asset library (registry + Kenney kit):
                 // resolves "chair"/"bench"/a semantic role to a real glTF on disk
                 // so the scene gets a real mesh instead of a primitive stand-in.
-                if (!m_assetCatalogLoadAttempted) {
-                    m_assetCatalogLoadAttempted = true;
-                    auto catResult = m_assetCatalog.Load();
-                    if (catResult.IsErr()) {
-                        spdlog::warn("AssetCatalog load failed: {}", catResult.Error());
-                    }
-                }
-                if (m_assetCatalog.IsLoaded()) {
-                    if (auto resolved = m_assetCatalog.ResolvePath(cmd->asset, m_spawnIndex)) {
+                Scene::AssetCatalog& catalog = EnsureCatalog();
+                if (catalog.IsLoaded()) {
+                    if (auto resolved = catalog.ResolvePath(cmd->asset, m_spawnIndex)) {
                         auto meshResult = Utils::LoadGLTFMesh(*resolved);
                         if (meshResult.IsErr()) {
                             spdlog::warn("AssetCatalog: failed to load '{}' ({}): {}", cmd->asset, *resolved,
@@ -550,6 +555,10 @@ void CommandQueue::ExecuteAddEntity(AddEntityCommand* cmd, Scene::ECS_Registry* 
     }
 
     transform.scale = safeScale;
+
+    if (cmd->hasRotation) {
+        transform.rotation = glm::quat(glm::radians(SanitizeVec3(cmd->rotationEuler, 0.0f, false)));
+    }
 
     // Real catalog/model assets are authored resting on the ground with a
     // corner-ish (non-centered) origin, so the generic y>=0.5 lift makes them

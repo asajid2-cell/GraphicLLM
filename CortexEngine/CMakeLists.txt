@@ -365,6 +365,7 @@ set(CORTEX_SOURCES
     ${CORTEX_LLM_SERVICE_SOURCE}
     src/LLM/SceneCommands.cpp
     src/LLM/CommandQueue.cpp
+    src/LLM/SceneRecipes.cpp
     src/LLM/RendererCommandApplier.cpp
     src/LLM/SceneLookup.cpp
     src/LLM/RegressionTests.cpp

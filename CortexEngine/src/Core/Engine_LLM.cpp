@@ -1,5 +1,7 @@
 #include "Engine.h"
 #include "LLM/SceneCommands.h"
+#include "LLM/SceneRecipes.h"
+#include "LLM/CommandQueue.h"
 #include "AI/Vision/DreamerService.h"
 #include "Graphics/Renderer.h"
 #include "Scene/Components.h"
@@ -338,6 +340,23 @@ std::vector<std::shared_ptr<LLM::SceneCommand>> Engine::BuildHeuristicCommands(c
 }
 
 void Engine::SubmitNaturalLanguageCommand(const std::string& command) {
+    // Deterministic real-asset scene recipes run FIRST, even when the LLM is
+    // disabled: a clear "build a <room>" request is generated directly from the
+    // real asset catalog (Kenney + registry) instead of relying on the model.
+    // This is the robust default; arbitrary requests still fall through to the LLM.
+    if (m_commandQueue) {
+        if (auto recipe = LLM::MatchSceneRecipe(command)) {
+            auto cmds = LLM::BuildSceneRecipe(*recipe, m_commandQueue->EnsureCatalog());
+            if (!cmds.empty()) {
+                m_commandQueue->PushBatch(cmds);
+                spdlog::info("Scene recipe '{}' generated {} commands from the real asset catalog",
+                             *recipe, cmds.size());
+                return;
+            }
+            spdlog::warn("Scene recipe '{}' matched but produced no commands; falling through", *recipe);
+        }
+    }
+
     if (!m_llmService || !m_llmEnabled) {
         spdlog::warn("LLM service not available");
         return;

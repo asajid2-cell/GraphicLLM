@@ -20,7 +20,7 @@ try {
     $clCmd = $null
 }
 
-if (-not $clCmd) {
+if (-not $clCmd -or -not $env:INCLUDE) {
     try {
         $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
         if (Test-Path $vswhere) {
@@ -29,17 +29,11 @@ if (-not $clCmd) {
                 $vsDevCmd = Join-Path $vsPath "Common7\Tools\VsDevCmd.bat"
                 if (Test-Path $vsDevCmd) {
                     Write-Host "Importing Visual Studio build environment..." -ForegroundColor Gray
-                    $tempFile = [System.IO.Path]::GetTempFileName()
-                    cmd /c " `"$vsDevCmd`" -arch=amd64 -host_arch=amd64 > NUL && set > `"$tempFile`" "
-                    Get-Content $tempFile | ForEach-Object {
-                        if ($_ -match "^(.*?)=(.*)$") {
-                            $name = $matches[1]; $value = $matches[2]
-                            if ($name -match '^(PATH|INCLUDE|LIB|LIBPATH|VC|WindowsSDK)') {
-                                Set-Item -Path "env:$name" -Value $value
-                            }
+                    cmd /c "`"$vsDevCmd`" -arch=amd64 -host_arch=amd64 > NUL 2>&1 && set" | ForEach-Object {
+                        if ($_ -match '^([^=]+)=(.*)$') {
+                            Set-Item -Path "env:$($matches[1])" -Value $matches[2] -ErrorAction SilentlyContinue
                         }
                     }
-                    Remove-Item $tempFile -Force
                 }
             }
         }

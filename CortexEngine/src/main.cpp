@@ -11,6 +11,9 @@
 #include "Scene/SemanticRuntimeCompiler.h"
 #include "Scene/SceneTransactionRuntime.h"
 #include "Scene/AuthoringInputRouter.h"
+#include "Scene/AssetCatalog.h"
+#include "LLM/SceneRecipes.h"
+#include "LLM/SceneCommands.h"
 #include "Graphics/ManyLightReservoir.h"
 #include "Graphics/DiffuseRadianceCache.h"
 #include <spdlog/spdlog.h>
@@ -1224,6 +1227,62 @@ int main(int argc, char* argv[]) {
             const nlohmann::json report = LauncherSceneOptionsReport();
             std::cout << report.dump(2) << std::endl;
             return report.value("status", std::string{}) == "LAUNCHER_SCENE_OPTIONS_READY" ? 0 : 1;
+        }
+
+        // Headless scene-recipe self-test. Runs BEFORE the launcher/window so it
+        // works without an interactive desktop. Verifies the named recipe builds
+        // commands that all resolve to real catalog glTF meshes. PASS => exit 0.
+        //   --recipe-self-test=<living_room|bedroom|office|kitchen>
+        //   (or set CORTEX_RECIPE_SELFTEST=<name>)
+        {
+            std::string recipeName;
+            for (int i = 1; i < argc; ++i) {
+                const std::string a = argv[i];
+                if (a.rfind("--recipe-self-test=", 0) == 0) {
+                    recipeName = a.substr(std::string("--recipe-self-test=").size());
+                } else if (a == "--recipe-self-test" && i + 1 < argc) {
+                    recipeName = argv[i + 1];
+                }
+            }
+            if (recipeName.empty()) {
+                if (const char* env = std::getenv("CORTEX_RECIPE_SELFTEST"); env && *env) {
+                    recipeName = env;
+                }
+            }
+            if (!recipeName.empty()) {
+                Scene::AssetCatalog catalog;
+                auto loadRes = catalog.Load();
+                std::cout << "[RecipeSelfTest] catalog loaded=" << catalog.IsLoaded() << " size=" << catalog.Size()
+                          << " (" << (loadRes.IsErr() ? loadRes.Error() : std::string("ok")) << ")\n";
+                auto cmds = LLM::BuildSceneRecipe(recipeName, catalog);
+                int models = 0, resolved = 0, unresolved = 0, prims = 0;
+                for (const auto& c : cmds) {
+                    if (!c || c->type != LLM::CommandType::AddEntity) {
+                        continue;
+                    }
+                    auto* ae = static_cast<LLM::AddEntityCommand*>(c.get());
+                    if (ae->entityType == LLM::AddEntityCommand::EntityType::Model) {
+                        ++models;
+                        if (auto p = catalog.ResolvePath(ae->asset)) {
+                            ++resolved;
+                            char buf[64];
+                            std::snprintf(buf, sizeof(buf), "pos(%.1f,%.1f,%.1f) yaw%.0f scale%.2f", ae->position.x,
+                                          ae->position.y, ae->position.z, ae->rotationEuler.y, ae->scale.x);
+                            std::cout << "  [ok] " << ae->asset << " -> " << *p << "  " << buf << "\n";
+                        } else {
+                            ++unresolved;
+                            std::cout << "  [MISS] " << ae->asset << " did not resolve\n";
+                        }
+                    } else {
+                        ++prims;
+                    }
+                }
+                const bool ok = !cmds.empty() && unresolved == 0 && resolved > 0;
+                std::cout << "[RecipeSelfTest] '" << recipeName << "': " << cmds.size() << " cmds (" << models
+                          << " models " << resolved << " resolved/" << unresolved << " unresolved, " << prims
+                          << " prims) -> " << (ok ? "PASS" : "FAIL") << std::endl;
+                return ok ? 0 : 1;
+            }
         }
 
         // Create engine configuration

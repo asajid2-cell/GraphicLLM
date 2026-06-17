@@ -327,11 +327,14 @@ std::optional<std::string> MatchSceneRecipe(const std::string& prompt) {
     if (Contains(p, "kitchen")) {
         return std::string("kitchen");
     }
+    if (Contains(p, "dining") || Contains(p, "dinner")) {
+        return std::string("dining_room");
+    }
     return std::nullopt;
 }
 
 std::vector<std::string> AvailableSceneRecipes() {
-    return {"living_room", "bedroom", "office", "kitchen"};
+    return {"living_room", "bedroom", "office", "kitchen", "dining_room"};
 }
 
 ScenePromptRoute RouteScenePrompt(const std::string& prompt) {
@@ -362,6 +365,9 @@ ScenePromptRoute RouteScenePrompt(const std::string& prompt) {
     if (has("kitchen") || has("cook")) {
         return {"recipe", "kitchen"};
     }
+    if (has("dining") || has("dinner")) {
+        return {"recipe", "dining_room"};
+    }
     if (has("office") || has("study") || has("workspace") || has("desk")) {
         return {"recipe", "office"};
     }
@@ -371,6 +377,27 @@ ScenePromptRoute RouteScenePrompt(const std::string& prompt) {
 
     // Default: a furnished living room.
     return {"recipe", "living_room"};
+}
+
+void BuildDiningRoom(std::vector<std::shared_ptr<SceneCommand>>& out, const Scene::AssetCatalog& cat, FootprintCache& c) {
+    BuildRoomShell(out, cat, c, 6.6f, 6.4f, glm::vec4(0.46f, 0.40f, 0.34f, 1.0f)); // warm wood floor
+    const float tz = -1.1f; // table centre
+    Place(out, cat, c, "rugRounded", 3.0f, 0.0f, tz, 0.0f, glm::vec4(0.40f, 0.30f, 0.26f, 1.0f));
+    Place(out, cat, c, "tableCloth", 1.7f, 0.0f, tz, 0.0f);                     // focal: dining table
+    // Six chairs pulled up to the table, each facing in.
+    Place(out, cat, c, "chairCushion", 0.55f, -0.95f, tz - 0.5f, -90.0f);       // left side
+    Place(out, cat, c, "chairCushion", 0.55f, -0.95f, tz + 0.5f, -90.0f);
+    Place(out, cat, c, "chairCushion", 0.55f, 0.95f, tz - 0.5f, 90.0f);         // right side
+    Place(out, cat, c, "chairCushion", 0.55f, 0.95f, tz + 0.5f, 90.0f);
+    Place(out, cat, c, "chairCushion", 0.55f, 0.0f, tz - 1.05f, 0.0f);          // head
+    Place(out, cat, c, "chairCushion", 0.55f, 0.0f, tz + 1.05f, 180.0f);        // foot
+    // Sideboard against the left wall with decor on top.
+    Place(out, cat, c, "cabinetTelevisionDoors", 1.4f, -2.7f, 1.3f, 90.0f);
+    PlaceOn(out, cat, c, "books", 0.3f, -2.7f, 0.62f, 1.3f, 12.0f);
+    PlaceOn(out, cat, c, "plantSmall2", 0.25f, -2.7f, 0.62f, 0.7f, 0.0f);
+    // Corner greenery, kept at the BACK so it doesn't crowd the camera.
+    Place(out, cat, c, "pottedPlant", 0.55f, 2.7f, -2.4f, 0.0f);  // back-right corner
+    Place(out, cat, c, "pottedPlant", 0.5f, -2.7f, -2.4f, 0.0f);  // back-left corner
 }
 
 std::vector<std::shared_ptr<SceneCommand>> BuildSceneRecipe(const std::string& recipeName,
@@ -390,6 +417,8 @@ std::vector<std::shared_ptr<SceneCommand>> BuildSceneRecipe(const std::string& r
         BuildOffice(out, catalog, cache);
     } else if (recipeName == "kitchen") {
         BuildKitchen(out, catalog, cache);
+    } else if (recipeName == "dining_room") {
+        BuildDiningRoom(out, catalog, cache);
     } else {
         spdlog::warn("SceneRecipes: unknown recipe '{}'", recipeName);
         return out;

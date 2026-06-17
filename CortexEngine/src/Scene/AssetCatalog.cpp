@@ -75,6 +75,13 @@ std::vector<std::string> InferRolesFromId(const std::string& idLower) {
         {"speaker", "electronics"},    {"laptop", "electronics"},
         {"door", "architecture"},      {"window", "architecture"},
         {"stairs", "architecture"},
+        // Outdoor / nature (naturalistic_showcase).
+        {"boulder", "rock"},  {"rock", "rock"},     {"stone", "rock"},
+        {"tree", "tree"},     {"trunk", "wood"},    {"stump", "wood"},
+        {"branch", "wood"},   {"log", "wood"},      {"driftwood", "wood"},
+        {"fern", "foliage"},  {"grass", "foliage"}, {"bush", "foliage"},
+        {"rooibos", "foliage"}, {"shrub", "foliage"},
+        {"barrel", "prop"},
     };
     std::vector<std::string> roles;
     for (const auto& k : kws) {
@@ -220,6 +227,43 @@ Result<void> AssetCatalog::Load(const fs::path& assetsRoot) {
         }
     } else {
         spdlog::info("AssetCatalog: no Kenney kit at {}", kenney.string());
+    }
+
+    // 3) Nature/outdoor pack (naturalistic_showcase): <name>/<name>_1k.gltf,
+    //    falling back to any .gltf in the folder. Folder name is the id; roles
+    //    are inferred (rock/wood/tree/foliage/prop) so outdoor recipes resolve
+    //    them the same way as furniture.
+    const fs::path nature = m_assetsRoot / "assets" / "models" / "naturalistic_showcase";
+    if (fs::is_directory(nature, ec)) {
+        for (const auto& entry : fs::directory_iterator(nature, ec)) {
+            if (ec) {
+                break;
+            }
+            if (!entry.is_directory(ec)) {
+                continue;
+            }
+            const std::string name = entry.path().filename().string();
+            fs::path gltf = entry.path() / (name + "_1k.gltf");
+            if (!fs::exists(gltf, ec)) {
+                gltf.clear();
+                for (const auto& f : fs::directory_iterator(entry.path(), ec)) {
+                    if (f.path().extension() == ".gltf") {
+                        gltf = f.path();
+                        break;
+                    }
+                }
+            }
+            if (gltf.empty() || !fs::exists(gltf, ec)) {
+                continue;
+            }
+            CatalogAsset asset;
+            asset.id = name;
+            asset.runtimeAssetPath = gltf.lexically_normal().string();
+            asset.semanticRoles = InferRolesFromId(ToLower(name));
+            asset.sourceClass = "naturalistic_showcase";
+            asset.fromRegistry = false;
+            AddAsset(std::move(asset));
+        }
     }
 
     Index();

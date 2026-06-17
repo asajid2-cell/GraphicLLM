@@ -352,17 +352,50 @@ void CommandQueue::ExecuteAddEntity(AddEntityCommand* cmd, Scene::ECS_Registry* 
             }
 
             if (!mesh || !mesh->gpuBuffers || !mesh->gpuBuffers->vertexBuffer || !mesh->gpuBuffers->indexBuffer) {
-                auto meshResult = Utils::LoadSampleModelMesh(cmd->asset);
-                if (meshResult.IsErr()) {
-                    spdlog::warn("Failed to load sample model '{}': {}", cmd->asset, meshResult.Error());
-                } else {
-                    mesh = meshResult.Value();
-                    auto uploadResult = renderer->UploadMesh(mesh);
-                    if (uploadResult.IsErr()) {
-                        spdlog::warn("Failed to upload sample model mesh '{}': {}", cmd->asset, uploadResult.Error());
-                        mesh.reset();
+                // First try the real tagged asset library (registry + Kenney kit):
+                // resolves "chair"/"bench"/a semantic role to a real glTF on disk
+                // so the scene gets a real mesh instead of a primitive stand-in.
+                if (!m_assetCatalogLoadAttempted) {
+                    m_assetCatalogLoadAttempted = true;
+                    auto catResult = m_assetCatalog.Load();
+                    if (catResult.IsErr()) {
+                        spdlog::warn("AssetCatalog load failed: {}", catResult.Error());
+                    }
+                }
+                if (m_assetCatalog.IsLoaded()) {
+                    if (auto resolved = m_assetCatalog.ResolvePath(cmd->asset, m_spawnIndex)) {
+                        auto meshResult = Utils::LoadGLTFMesh(*resolved);
+                        if (meshResult.IsErr()) {
+                            spdlog::warn("AssetCatalog: failed to load '{}' ({}): {}", cmd->asset, *resolved,
+                                         meshResult.Error());
+                        } else {
+                            mesh = meshResult.Value();
+                            auto uploadResult = renderer->UploadMesh(mesh);
+                            if (uploadResult.IsErr()) {
+                                spdlog::warn("Failed to upload catalog mesh '{}': {}", cmd->asset, uploadResult.Error());
+                                mesh.reset();
+                            } else {
+                                m_modelMeshCache[cmd->asset] = mesh;
+                                spdlog::info("AssetCatalog: placed real asset '{}' from {}", cmd->asset, *resolved);
+                            }
+                        }
+                    }
+                }
+
+                // Fall back to the Khronos sample-model library (e.g. "DamagedHelmet").
+                if (!mesh) {
+                    auto meshResult = Utils::LoadSampleModelMesh(cmd->asset);
+                    if (meshResult.IsErr()) {
+                        spdlog::warn("Failed to load sample model '{}': {}", cmd->asset, meshResult.Error());
                     } else {
-                        m_modelMeshCache[cmd->asset] = mesh;
+                        mesh = meshResult.Value();
+                        auto uploadResult = renderer->UploadMesh(mesh);
+                        if (uploadResult.IsErr()) {
+                            spdlog::warn("Failed to upload sample model mesh '{}': {}", cmd->asset, uploadResult.Error());
+                            mesh.reset();
+                        } else {
+                            m_modelMeshCache[cmd->asset] = mesh;
+                        }
                     }
                 }
             }
@@ -517,6 +550,18 @@ void CommandQueue::ExecuteAddEntity(AddEntityCommand* cmd, Scene::ECS_Registry* 
     }
 
     transform.scale = safeScale;
+
+    // Real catalog/model assets are authored resting on the ground with a
+    // corner-ish (non-centered) origin, so the generic y>=0.5 lift makes them
+    // float. Snap the mesh's scaled bottom to the floor instead: auto-placed
+    // models rest on y=0; explicitly-positioned models rest on their requested y.
+    if (cmd->entityType == AddEntityCommand::EntityType::Model && mesh) {
+        if (!mesh->hasBounds) {
+            mesh->UpdateBounds();
+        }
+        const float floorY = shouldAutoPlace ? 0.0f : std::max(0.0f, SanitizeVec3(cmd->position).y);
+        transform.position.y = floorY - mesh->boundsMin.y * transform.scale.y;
+    }
 
     // Add renderable
     auto& renderable = registry->AddComponent<Scene::RenderableComponent>(entity);

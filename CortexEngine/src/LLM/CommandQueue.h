@@ -2,6 +2,7 @@
 
 #include "SceneCommands.h"
 #include "Scene/ECS_Registry.h"
+#include "Scene/AssetCatalog.h"
 #include "SceneLookup.h"
 #include <queue>
 #include <mutex>
@@ -166,6 +167,12 @@ private:
     std::unordered_map<MeshKey, std::shared_ptr<Scene::MeshData>, MeshKeyHasher> m_meshCache;
     // Separate cache for glTF sample models keyed by asset name (e.g., "DamagedHelmet").
     std::unordered_map<std::string, std::shared_ptr<Scene::MeshData>> m_modelMeshCache;
+
+    // Real tagged asset library (registry + Kenney kit). Lazy-loaded on first
+    // Model resolution; lets a command place a real mesh by semantic id/role
+    // (e.g. asset="chair") instead of a primitive stand-in.
+    Scene::AssetCatalog m_assetCatalog;
+    bool m_assetCatalogLoadAttempted = false;
 
     void PushStatus(bool success, const std::string& message);
 };

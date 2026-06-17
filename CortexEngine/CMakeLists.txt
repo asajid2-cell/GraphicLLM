@@ -324,6 +324,7 @@ set(CORTEX_SOURCES
 
     src/Scene/ECS_Registry.cpp
     src/Scene/Components.cpp
+    src/Scene/AssetCatalog.cpp
     src/Scene/SemanticGraph.cpp
     src/Scene/SceneTransaction.cpp
     src/Scene/SceneIR.cpp

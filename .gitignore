@@ -55,3 +55,7 @@ CortexEngine/debug_menu_state.json
 
 # Source archives (extracted content is tracked separately)
 CortexEngine/assets/source_assets/**/*.zip
+
+# Generated scene-authoring evidence/state (tooling archived out of repo)
+CortexEngine/assets/final_art/
+CortexEngine/docs/media/final_art/

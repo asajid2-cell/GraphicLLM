@@ -2666,17 +2666,19 @@ void Engine::BuildRecipeScene() {
         renderer->SetIBLEnabled(true);
         // Outdoor: the SUN is the key light; keep the (gray neutral) IBL modest so
         // it doesn't flood the scene flat-gray, and use a gentle sky-blue fill.
-        const float iblBase = outdoor ? 0.45f : 0.55f;
-        const float ibl = std::clamp(iblBase + style.brightness * 0.25f, 0.2f, 1.3f);
-        renderer->SetIBLIntensity(ibl, ibl);
+        const float iblBase = outdoor ? 0.45f : 0.18f;
+        const float ibl = outdoor
+            ? std::clamp(iblBase + style.brightness * 0.25f, 0.2f, 1.3f)
+            : std::clamp(iblBase + style.brightness * 0.10f, 0.08f, 0.42f);
+        renderer->SetIBLIntensity(ibl, outdoor ? ibl : ibl * 0.72f);
         renderer->SetBackgroundPresentation(true, 0.95f, 0.0f);
         // Warmth shifts the ambient toward warm/cool; brightness scales the fill.
-        glm::vec3 amb = outdoor ? glm::vec3(0.24f, 0.27f, 0.31f) : glm::vec3(0.30f, 0.29f, 0.28f);
+        glm::vec3 amb = outdoor ? glm::vec3(0.24f, 0.27f, 0.31f) : glm::vec3(0.13f, 0.12f, 0.115f);
         amb.r += style.warmth * 0.06f;
         amb.b -= style.warmth * 0.06f;
-        amb *= (1.0f + style.brightness * 0.35f);
-        renderer->SetAmbientLighting(glm::max(amb, glm::vec3(0.05f)), 1.0f);
-        renderer->SetExposure(std::clamp((outdoor ? 0.80f : 1.05f) + style.brightness * 0.18f, 0.7f, 1.4f));
+        amb *= (1.0f + style.brightness * (outdoor ? 0.35f : 0.16f));
+        renderer->SetAmbientLighting(glm::max(amb, glm::vec3(outdoor ? 0.05f : 0.035f)), outdoor ? 1.0f : 0.72f);
+        renderer->SetExposure(std::clamp((outdoor ? 0.80f : 0.76f) + style.brightness * 0.08f, 0.62f, outdoor ? 1.4f : 0.96f));
         // Global warm/cool grade makes the modern <-> rustic difference clear.
         renderer->SetColorGrade(std::max(0.0f, style.warmth) * 0.38f,
                                 std::max(0.0f, -style.warmth) * 0.32f);
@@ -2684,9 +2686,12 @@ void Engine::BuildRecipeScene() {
         if (outdoor) {
             renderer->SetSunColor(glm::vec3(1.0f, 0.95f, 0.86f)); // warm daylight
             renderer->SetSunIntensity(1.9f);
+        } else {
+            renderer->SetSunColor(glm::vec3(1.0f, 0.92f, 0.80f));
+            renderer->SetSunIntensity(std::clamp(1.22f + style.brightness * 0.18f, 0.85f, 1.58f));
         }
-        renderer->SetShadowBias(0.0035f);
-        renderer->SetShadowPCFRadius(2.5f);
+        renderer->SetShadowBias(outdoor ? 0.0035f : 0.0014f);
+        renderer->SetShadowPCFRadius(outdoor ? 2.5f : 1.65f);
         // Run the recipe scenes through the FULL-quality path (scene presets
         // otherwise default to 0.85 render scale + IBL off): full-res, TAA,
         // screen-space reflections + AO. Re-asserted last so no profile undoes it.
@@ -2694,6 +2699,7 @@ void Engine::BuildRecipeScene() {
         renderer->SetTAAEnabled(true);
         renderer->SetSSREnabled(true);
         renderer->SetSSAOEnabled(true);
+        renderer->SetSSAOParams(outdoor ? 0.75f : 1.18f, outdoor ? 0.020f : 0.012f, outdoor ? 1.35f : 3.10f);
         renderer->SetShadowsEnabled(true);
     }
 
@@ -2702,17 +2708,18 @@ void Engine::BuildRecipeScene() {
         entt::entity e = m_registry->CreateEntity();
         m_registry->AddComponent<Scene::TagComponent>(e, "Recipe_KeyLight");
         auto& t = m_registry->AddComponent<TransformComponent>(e);
-        t.position = glm::vec3(2.5f, 6.5f, -2.0f);
-        t.rotation = glm::quatLookAtLH(glm::normalize(glm::vec3(-0.3f, -1.0f, 0.4f)), glm::vec3(0.0f, 1.0f, 0.0f));
+        t.position = outdoor ? glm::vec3(2.5f, 6.5f, -2.0f) : glm::vec3(2.6f, 4.7f, 1.7f);
+        const glm::vec3 keyTarget = outdoor ? glm::vec3(0.55f, 0.0f, 0.6f) : glm::vec3(-0.45f, 0.45f, -1.25f);
+        t.rotation = glm::quatLookAtLH(glm::normalize(keyTarget - t.position), glm::vec3(0.0f, 1.0f, 0.0f));
         auto& l = m_registry->AddComponent<Scene::LightComponent>(e);
         l.type = Scene::LightType::Spot;
         // Warm or cool key light by style (cool modern <-> warm rustic).
         l.color = glm::mix(glm::vec3(0.92f, 0.96f, 1.0f), glm::vec3(1.0f, 0.90f, 0.78f),
                            glm::clamp(style.warmth * 0.5f + 0.5f, 0.0f, 1.0f));
-        l.intensity = 16.0f + style.brightness * 4.0f;
-        l.range = 24.0f;
-        l.innerConeDegrees = 48.0f;
-        l.outerConeDegrees = 80.0f;
+        l.intensity = outdoor ? (16.0f + style.brightness * 4.0f) : (8.8f + style.brightness * 1.25f);
+        l.range = outdoor ? 24.0f : 18.0f;
+        l.innerConeDegrees = outdoor ? 48.0f : 30.0f;
+        l.outerConeDegrees = outdoor ? 80.0f : 62.0f;
         l.castsShadows = true;
     }
 

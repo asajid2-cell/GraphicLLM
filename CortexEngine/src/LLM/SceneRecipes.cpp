@@ -104,6 +104,28 @@ glm::vec4 ColorForKey(const std::string& k) {
     return glm::vec4(0.72f, 0.71f, 0.70f, 1.0f); // neutral
 }
 
+// Per-semantic-class PBR response (roughness, metallic). Flat uniform roughness
+// makes everything read like the same plastic; real materials differ in how they
+// catch light — glossy glass/metal, satin wood, matte fabric/plaster.
+struct PbrResponse { float roughness; float metallic; };
+PbrResponse PbrForKey(const std::string& k) {
+    auto has = [&](const char* n) { return k.find(n) != std::string::npos; };
+    if (has("mirror") || has("glass") || has("window")) return {0.06f, 0.0f};        // glossy glass
+    if (has("screen") || has("television") || has("monitor")) return {0.18f, 0.0f};   // screen glass
+    if (has("fridge") || has("stove") || has("sink") || has("hood") || has("microwave") ||
+        has("oven") || has("toaster") || has("kettle") || has("dishwasher")) return {0.34f, 0.85f}; // brushed metal
+    if (has("lamp") || has("lantern")) return {0.40f, 0.45f};                          // metal lamp body
+    if (has("sofa") || has("couch") || has("chair") || has("cushion") || has("stool") ||
+        has("bed") || has("pillow") || has("rug") || has("doormat") || has("lounge") ||
+        has("bench") || has("coat")) return {0.90f, 0.0f};                             // matte fabric
+    if (has("plant") || has("fern") || has("grass") || has("bush") || has("foliage")) return {0.65f, 0.0f};
+    if (has("rock") || has("boulder") || has("stone")) return {0.85f, 0.0f};
+    if (has("table") || has("desk") || has("cabinet") || has("bookcase") || has("shelf") ||
+        has("wood") || has("stump") || has("trunk") || has("branch") || has("dresser") ||
+        has("wardrobe") || has("drawer") || has("barrel")) return {0.55f, 0.0f};       // satin wood
+    return {0.7f, 0.0f};
+}
+
 // Emit one real catalog asset, normalized so its largest horizontal extent ~=
 // targetFootprint meters, placed at (x,0,z), yawed yawDeg about Y, ground-snapped
 // by the executor. Returns false (and emits nothing) if the asset can't resolve.
@@ -160,7 +182,9 @@ bool Place(std::vector<std::shared_ptr<SceneCommand>>& out,
         cmd->setEmissiveBloom = true;
         cmd->emissiveBloom = 0.2f;
     }
-    cmd->roughness = 0.7f;
+    const PbrResponse pbr = PbrForKey(lk); // per-class material response (glossy/metal/satin/matte)
+    cmd->roughness = pbr.roughness;
+    cmd->metallic = pbr.metallic;
     cmd->rotationEuler = glm::vec3(0.0f, yawDeg, 0.0f);
     cmd->hasRotation = true;
     cmd->supportHeight = supportHeight; // base rests on this surface (0 = floor)
@@ -202,7 +226,7 @@ void PlaceFloor(std::vector<std::shared_ptr<SceneCommand>>& out, float width, fl
     cmd->position = glm::vec3(0.0f, 0.0f, 0.0f);
     cmd->scale = glm::vec3(width * 0.5f, 1.0f, depth * 0.5f);
     cmd->color = color;
-    cmd->roughness = 0.9f;
+    cmd->roughness = 0.52f; // satin floor: catches soft reflections of the room (SSR) instead of dead-matte
     cmd->metallic = 0.0f;
     cmd->allowPlacementJitter = false;
     cmd->disableCollisionAvoidance = true;

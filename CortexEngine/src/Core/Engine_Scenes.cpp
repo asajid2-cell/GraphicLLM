@@ -2417,12 +2417,13 @@ void Engine::BuildOutdoorSunsetBeachScene() {
         renderer->SetExposure(1.02f);
         renderer->SetBloomIntensity(0.12f);
         renderer->SetColorGrade(0.46f, 0.06f); // push warm sunset temperature
-        renderer->SetSunDirection(glm::normalize(glm::vec3(0.28f, 0.22f, 0.93f))); // low sun over the water
+        renderer->SetSunDirection(glm::normalize(glm::vec3(0.30f, 0.10f, 0.95f))); // low sun over the water
         renderer->SetSunColor(glm::vec3(1.0f, 0.56f, 0.30f));                        // golden-hour sun
         renderer->SetSunIntensity(2.7f);
         renderer->SetWaterParams(-0.02f, 0.046f, 9.8f, 0.42f, 0.88f, 0.30f, 0.020f, 0.44f);
         renderer->SetWaterOptics(0.050f, 1.48f);
-        renderer->SetFogParams(0.020f, 0.0f, 0.45f);
+        renderer->SetFogEnabled(true);
+        renderer->SetFogParams(0.018f, 0.0f, 0.34f, 4.0f);
         renderer->SetGodRayIntensity(0.34f);
         renderer->SetShadowBias(0.0035f);
         renderer->SetShadowPCFRadius(3.25f);
@@ -2682,7 +2683,7 @@ void Engine::BuildRecipeScene() {
         // Global warm/cool grade makes the modern <-> rustic difference clear.
         renderer->SetColorGrade(std::max(0.0f, style.warmth) * 0.38f,
                                 std::max(0.0f, -style.warmth) * 0.32f);
-        renderer->SetSunDirection(glm::normalize(glm::vec3(-0.35f, 0.82f, 0.45f)));
+        renderer->SetSunDirection(glm::normalize(outdoor ? glm::vec3(-0.59f, 0.05f, -0.79f) : glm::vec3(-0.35f, 0.82f, 0.45f)));
         if (outdoor) {
             renderer->SetSunColor(glm::vec3(1.0f, 0.95f, 0.86f)); // warm daylight
             renderer->SetSunIntensity(1.9f);
@@ -2701,8 +2702,8 @@ void Engine::BuildRecipeScene() {
         renderer->SetSSAOEnabled(true);
         renderer->SetSSAOParams(outdoor ? 0.75f : 1.18f, outdoor ? 0.020f : 0.012f, outdoor ? 1.35f : 3.10f);
         renderer->SetShadowsEnabled(true);
-        renderer->SetFogEnabled(!outdoor);
-        renderer->SetFogParams(outdoor ? 0.001f : 0.016f, 0.15f, outdoor ? 0.20f : 0.42f);
+        renderer->SetFogEnabled(true);
+        renderer->SetFogParams(outdoor ? 0.0075f : 0.016f, outdoor ? 0.05f : 0.15f, outdoor ? 0.34f : 0.42f, outdoor ? 4.0f : 0.0f);
         renderer->SetGodRayIntensity(outdoor ? 0.0f : 0.40f);
         renderer->SetBloomShape(outdoor ? 1.05f : 1.02f, outdoor ? 0.45f : 0.50f, outdoor ? 2.0f : 0.82f);
     }

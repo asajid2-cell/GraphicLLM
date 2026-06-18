@@ -302,6 +302,74 @@ float LiquidSpecularGlint(float3 R, float3 L, float NdotV, float viscosity, floa
     return (sharp + broad * 0.42f + grazing * 0.08f) * brokenSurface;
 }
 
+float3 GetAtmosphereSunDirection()
+{
+    if (g_LightCount.x > 0 && (uint)g_Lights[0].position_type.w == 0u)
+    {
+        return normalize(g_Lights[0].direction_cosInner.xyz);
+    }
+    return normalize(float3(0.35f, 0.70f, 0.55f));
+}
+
+float3 GetAtmosphereSunColor()
+{
+    if (g_LightCount.x > 0 && (uint)g_Lights[0].position_type.w == 0u)
+    {
+        return max(g_Lights[0].color_range.rgb, 0.0f.xxx);
+    }
+    return float3(1.0f, 0.86f, 0.62f);
+}
+
+float HazePhaseHG(float cosTheta, float g)
+{
+    float g2 = g * g;
+    float denom = max(1.0f + g2 - 2.0f * g * cosTheta, 1.0e-3f);
+    return (1.0f - g2) / pow(denom, 1.5f);
+}
+
+float3 ApplyAerialPerspective(float3 hdrColor, float3 worldPos)
+{
+    if (g_FogParams.w <= 0.5f)
+    {
+        return hdrColor;
+    }
+
+    float density = max(g_FogParams.x, 0.0f);
+    if (density <= 1.0e-5f)
+    {
+        return hdrColor;
+    }
+
+    float3 viewVec = worldPos - g_CameraPosition.xyz;
+    float dist = length(viewVec);
+    if (dist <= 1.0e-3f)
+    {
+        return hdrColor;
+    }
+
+    float3 rayDir = viewVec / dist;
+    float baseHeight = g_FogParams.y;
+    float falloff = max(g_FogParams.z, 0.0f);
+    float heightFactor = exp(-falloff * max(worldPos.y - baseHeight, 0.0f));
+    float nearFade = max(g_FogExtraParams.z, 0.35f);
+    float nearMask = saturate((dist - 3.0f) / max(10.0f, nearFade * 12.0f));
+    nearMask *= nearMask;
+
+    float fogAmount = 1.0f - exp(-density * dist * heightFactor * nearMask);
+    fogAmount = min(saturate(fogAmount * max(g_FogExtraParams.y, 0.0f) * 0.72f), 0.55f);
+
+    float3 sunDir = GetAtmosphereSunDirection();
+    float3 sunTint = GetAtmosphereSunColor();
+    float anisotropy = clamp(g_FogExtraParams.x, -0.65f, 0.65f);
+    float sunPhase = HazePhaseHG(saturate(dot(rayDir, sunDir)), anisotropy);
+    float horizon = pow(saturate(1.0f - abs(rayDir.y)), 1.35f);
+    float3 baseTint = lerp(float3(0.56f, 0.68f, 0.86f), max(g_AmbientColor.rgb, 0.0f.xxx) * 1.9f, 0.35f);
+    float3 fogTint = baseTint + sunTint * sunPhase * (0.055f + horizon * 0.035f);
+    fogTint = min(fogTint, clamp(g_FogExtraParams.w, 0.25f, 6.0f).xxx);
+
+    return lerp(hdrColor, fogTint, fogAmount);
+}
+
 float4 WaterPS(PSInput input) : SV_TARGET
 {
     float3 N = normalize(input.normal);
@@ -548,6 +616,8 @@ float4 WaterPS(PSInput input) : SV_TARGET
         alpha = max(alpha, 0.95f);
     }
     alpha = saturate(alpha + bodyThickness * 0.06f + meniscus * 0.08f);
+
+    color = ApplyAerialPerspective(color, input.worldPos);
 
     return float4(color, alpha);
 }

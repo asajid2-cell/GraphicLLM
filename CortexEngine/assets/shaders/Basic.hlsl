@@ -1749,6 +1749,104 @@ PSOutput MakePSOutput(float4 color, float3 normal, float roughness)
     return o;
 }
 
+float3 GetAtmosphereSunDirection()
+{
+    if (g_LightCount.x > 0 && (uint)g_Lights[0].position_type.w == LIGHT_TYPE_DIRECTIONAL)
+    {
+        return normalize(g_Lights[0].direction_cosInner.xyz);
+    }
+    return normalize(float3(0.35f, 0.70f, 0.55f));
+}
+
+float3 GetAtmosphereSunColor()
+{
+    if (g_LightCount.x > 0 && (uint)g_Lights[0].position_type.w == LIGHT_TYPE_DIRECTIONAL)
+    {
+        return max(g_Lights[0].color_range.rgb, 0.0f.xxx);
+    }
+    return float3(1.0f, 0.86f, 0.62f);
+}
+
+float HazePhaseHG(float cosTheta, float g)
+{
+    float g2 = g * g;
+    float denom = max(1.0f + g2 - 2.0f * g * cosTheta, 1.0e-3f);
+    return (1.0f - g2) / pow(denom, 1.5f);
+}
+
+float3 ProceduralAtmosphereSky(float3 dir)
+{
+    dir = normalize(dir);
+    float3 sunDir = GetAtmosphereSunDirection();
+    float3 sunTint = max(GetAtmosphereSunColor(), float3(1.0f, 0.78f, 0.48f));
+
+    float up = saturate(dir.y * 0.5f + 0.5f);
+    float aboveHorizon = saturate(dir.y * 8.0f + 0.5f);
+    float horizon = pow(saturate(1.0f - abs(dir.y)), 2.2f);
+    float sunElev = saturate(sunDir.y * 1.35f + 0.18f);
+    float mu = dot(dir, sunDir);
+
+    float3 zenith = lerp(float3(0.045f, 0.115f, 0.315f), float3(0.18f, 0.40f, 0.88f), sunElev);
+    float3 horizonBlue = lerp(float3(0.34f, 0.45f, 0.62f), float3(0.72f, 0.86f, 1.0f), sunElev);
+    float3 warmHorizon = sunTint * lerp(0.38f, 0.16f, sunElev) + float3(0.42f, 0.24f, 0.12f) * (1.0f - sunElev);
+    float3 sky = lerp(horizonBlue + warmHorizon * horizon, zenith, pow(up, 0.70f));
+
+    float rayleigh = 0.62f + 0.38f * (1.0f + mu * mu) * 0.5f;
+    float mieHalo = pow(saturate(mu), lerp(18.0f, 42.0f, sunElev));
+    float sunDisc = smoothstep(0.99935f, 0.99986f, mu);
+    sky *= rayleigh;
+    sky += sunTint * (mieHalo * (0.62f + horizon * 0.72f));
+    sky += sunTint * sunDisc * 18.0f;
+
+    float3 groundHaze = lerp(float3(0.42f, 0.45f, 0.46f), horizonBlue * 0.70f + warmHorizon * 0.35f, aboveHorizon);
+    sky = lerp(groundHaze, sky, aboveHorizon);
+    return sky * max(g_EnvParams.w, 0.35f);
+}
+
+float3 ApplyAerialPerspective(float3 hdrColor, float3 worldPos)
+{
+    if (g_FogParams.w <= 0.5f)
+    {
+        return hdrColor;
+    }
+
+    float density = max(g_FogParams.x, 0.0f);
+    if (density <= 1.0e-5f)
+    {
+        return hdrColor;
+    }
+
+    float3 viewVec = worldPos - g_CameraPosition.xyz;
+    float dist = length(viewVec);
+    if (dist <= 1.0e-3f)
+    {
+        return hdrColor;
+    }
+
+    float3 rayDir = viewVec / dist;
+    float baseHeight = g_FogParams.y;
+    float falloff = max(g_FogParams.z, 0.0f);
+    float heightFactor = exp(-falloff * max(worldPos.y - baseHeight, 0.0f));
+    float nearFade = max(g_FogExtraParams.z, 0.35f);
+    float nearMask = saturate((dist - 3.0f) / max(10.0f, nearFade * 12.0f));
+    nearMask *= nearMask;
+
+    float scatterStrength = max(g_FogExtraParams.y, 0.0f);
+    float fogAmount = 1.0f - exp(-density * dist * heightFactor * nearMask);
+    fogAmount = min(saturate(fogAmount * scatterStrength * 0.72f), 0.55f);
+
+    float3 sunDir = GetAtmosphereSunDirection();
+    float3 sunTint = GetAtmosphereSunColor();
+    float anisotropy = clamp(g_FogExtraParams.x, -0.65f, 0.65f);
+    float sunPhase = HazePhaseHG(saturate(dot(rayDir, sunDir)), anisotropy);
+    float horizon = pow(saturate(1.0f - abs(rayDir.y)), 1.35f);
+    float3 baseTint = lerp(float3(0.56f, 0.68f, 0.86f), max(g_AmbientColor.rgb, 0.0f.xxx) * 1.9f, 0.35f);
+    float3 fogTint = baseTint + sunTint * sunPhase * (0.055f + horizon * 0.035f);
+    fogTint = min(fogTint, clamp(g_FogExtraParams.w, 0.25f, 6.0f).xxx);
+
+    return lerp(hdrColor, fogTint, fogAmount);
+}
+
 // === Debug line rendering (overlay) ===
 
 struct DebugVSInput
@@ -2291,6 +2389,8 @@ PSOutput PSMainInternal(PSInput input, bool useClusteredLocalLights)
         finalOpacity = 0.99f + 0.01f * saturate(taaWeight);
     }
 
+    color = ApplyAerialPerspective(color, input.worldPos);
+
     // Output linear HDR color; exposure/tonemapping is applied in a post-process pass.
     return MakePSOutput(float4(color, finalOpacity), normal, roughness);
 }
@@ -2367,10 +2467,12 @@ float4 SkyboxPS(SkyboxVSOutput input) : SV_TARGET
         return float4(dbg, 1.0f);
     }
 
-    // If IBL is disabled, fall back to flat ambient
+    float3 proceduralSky = ProceduralAtmosphereSky(dir);
+
+    // If IBL is disabled, use the procedural physical sky instead of flat ambient.
     if (g_EnvParams.z <= 0.5f)
     {
-        return float4(g_AmbientColor.rgb * g_EnvParams.w, 1.0f);
+        return float4(proceduralSky, 1.0f);
     }
 
     // Proper 3D environment sampling: convert the world-space direction to
@@ -2385,5 +2487,9 @@ float4 SkyboxPS(SkyboxVSOutput input) : SV_TARGET
     float backgroundMip = max(backgroundBlurMip, backgroundFootprintMip);
     float3 color = g_EnvSpecular.SampleLevel(g_Sampler, skyUV, backgroundMip).rgb *
                    g_EnvParams.y * g_EnvParams.w;
+    float sunDisc = smoothstep(0.99935f, 0.99986f, dot(normalize(dir), GetAtmosphereSunDirection()));
+    float skyAssist = saturate(g_FogParams.w * g_FogParams.x * 120.0f);
+    color = lerp(color, max(color, proceduralSky * 0.85f), skyAssist);
+    color += GetAtmosphereSunColor() * sunDisc * (1.0f + skyAssist * 8.0f);
     return float4(color, 1.0f);
 }

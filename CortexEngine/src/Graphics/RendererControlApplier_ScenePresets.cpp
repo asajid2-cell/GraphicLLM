@@ -441,7 +441,7 @@ void ApplyOutdoorWorldSceneControls(Renderer& renderer,
     renderer.SetSSREnabled(true);
     renderer.SetRTReflectionsEnabled(true);
     renderer.SetFogEnabled(true);
-    renderer.SetFogParams(0.001f, 0.0f, 0.2f);
+    renderer.SetFogParams(0.010f, 0.0f, 0.34f, 4.0f);
     renderer.SetExposure(1.0f);
     renderer.SetShadowsEnabled(true);
     renderer.SetSSAOEnabled(true);

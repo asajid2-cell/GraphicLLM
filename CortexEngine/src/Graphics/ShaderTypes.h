@@ -122,10 +122,8 @@ struct FrameConstants {
     // Exponential height fog parameters:
     // x = density, y = base height, z = height falloff, w = enabled (>0.5)
     glm::vec4 fogParams;
-    // x = fog start distance,
-    // y = SceneLocalEnvironmentV3 payload ready,
-    // z = SceneLocalEnvironmentV3 texture richness,
-    // w = SceneLocalEnvironmentV3 payload shader influence.
+    // x = haze anisotropy, y = scattering strength,
+    // z = near fade distance, w = max haze/source luma.
     glm::vec4 fogExtraParams;
     // x = SSAO enabled (>0.5), y = radius, z = bias, w = intensity
     glm::vec4 aoParams;

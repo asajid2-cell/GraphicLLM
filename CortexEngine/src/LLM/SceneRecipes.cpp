@@ -71,7 +71,7 @@ glm::vec4 ColorForKey(const std::string& k) {
         return glm::vec4(0.36f, 0.45f, 0.43f, 1.0f); // muted sage-teal sofa
     }
     if (has("bed")) {
-        return glm::vec4(0.82f, 0.78f, 0.70f, 1.0f); // cream bedding
+        return glm::vec4(0.68f, 0.64f, 0.56f, 1.0f); // cream bedding
     }
     if (has("chair") || has("cushion") || has("stool") || has("lounge")) {
         return glm::vec4(0.55f, 0.48f, 0.40f, 1.0f); // warm taupe upholstery
@@ -85,7 +85,7 @@ glm::vec4 ColorForKey(const std::string& k) {
         return glm::vec4(0.78f, 0.79f, 0.82f, 1.0f); // brushed appliance
     }
     if (has("lamp")) {
-        return glm::vec4(0.88f, 0.80f, 0.55f, 1.0f); // warm shade
+        return glm::vec4(0.70f, 0.60f, 0.38f, 1.0f); // warm shade
     }
     if (has("rug") || has("doormat")) {
         return glm::vec4(0.45f, 0.32f, 0.28f, 1.0f);
@@ -170,7 +170,7 @@ bool Place(std::vector<std::shared_ptr<SceneCommand>>& out,
     if ((lk.find("lamp") != std::string::npos || lk.find("lantern") != std::string::npos) &&
         lk.find("ceiling") == std::string::npos) {
         cmd->setEmissiveStrength = true;
-        cmd->emissiveStrength = 1.7f;
+        cmd->emissiveStrength = 0.55f;
         cmd->emissiveColor = glm::vec4(1.0f, 0.86f, 0.60f, 1.0f); // warm bulb
         cmd->setEmissiveBloom = true;
         cmd->emissiveBloom = 0.25f;
@@ -212,8 +212,8 @@ inline void AddPointLight(std::vector<std::shared_ptr<SceneCommand>>& out, float
     cmd->lightType = AddLightCommand::LightType::Point;
     cmd->position = glm::vec3(x, y, z);
     cmd->color = color;
-    cmd->intensity = intensity;
-    cmd->range = range;
+    cmd->intensity = std::min(intensity, 7.0f);
+    cmd->range = std::min(range, 4.8f);
     cmd->name = "RecipeLampLight";
     out.push_back(std::move(cmd));
 }
@@ -336,9 +336,9 @@ void BuildRoomShell(std::vector<std::shared_ptr<SceneCommand>>& out, const Scene
         pane->metallic = 0.0f;
         pane->roughness = 0.2f;
         pane->setEmissiveStrength = true;
-        pane->emissiveStrength = 1.8f;   // bright but below hard clip
+        pane->emissiveStrength = 0.78f;  // bright but below hard clip
         pane->setEmissiveBloom = true;
-        pane->emissiveBloom = 0.55f;     // more bloom -> reads as a soft glow, not a flat white panel
+        pane->emissiveBloom = 0.28f;     // soft glow, not a flat white panel
         pane->allowPlacementJitter = false;
         pane->disableCollisionAvoidance = true;
         out.push_back(std::move(pane));
@@ -361,10 +361,10 @@ void BuildLivingRoom(std::vector<std::shared_ptr<SceneCommand>>& out, const Scen
     Place(out, cat, c, "tableCoffee", 1.2f, 0.0f, -0.7f, 0.0f);         // centre of the seating
     PlaceOn(out, cat, c, "books", 0.35f, 0.15f, 0.42f, -0.7f, 20.0f);   // on the coffee table
     Place(out, cat, c, "lampRoundFloor", 0.4f, -2.7f, -2.1f, 0.0f);     // floor lamp beside the sofa
-    AddPointLight(out, -2.55f, 1.45f, -2.1f, glm::vec3(1.0f, 0.82f, 0.55f), 9.0f, 5.5f);
+    AddPointLight(out, -2.55f, 1.45f, -2.1f, glm::vec3(1.0f, 0.78f, 0.48f), 5.4f, 4.3f);
     Place(out, cat, c, "sideTable", 0.5f, 2.7f, -2.1f, 0.0f);           // side table other end
     PlaceOn(out, cat, c, "lampRoundTable", 0.28f, 2.7f, 0.46f, -2.1f, 0.0f); // table lamp on it
-    AddPointLight(out, 2.55f, 0.82f, -2.1f, glm::vec3(1.0f, 0.82f, 0.55f), 5.5f, 3.8f);
+    AddPointLight(out, 2.55f, 0.82f, -2.1f, glm::vec3(1.0f, 0.78f, 0.48f), 3.8f, 3.3f);
     Place(out, cat, c, "bookcaseOpen", 1.1f, -3.0f, 1.0f, 90.0f);       // side wall
     Place(out, cat, c, "cabinetTelevision", 1.6f, 0.0f, 2.7f, 180.0f);  // front wall (behind camera)
     Place(out, cat, c, "televisionModern", 1.2f, 0.0f, 2.5f, 180.0f);
@@ -381,7 +381,7 @@ void BuildBedroom(std::vector<std::shared_ptr<SceneCommand>>& out, const Scene::
     Place(out, cat, c, "sideTable", 0.5f, -1.9f, -2.3f, 0.0f);
     Place(out, cat, c, "sideTable", 0.5f, 1.5f, -2.3f, 0.0f);
     PlaceOn(out, cat, c, "lampSquareTable", 0.3f, 1.5f, 0.46f, -2.3f, 0.0f);  // lamp on nightstand
-    AddPointLight(out, 1.5f, 0.82f, -2.3f, glm::vec3(1.0f, 0.80f, 0.52f), 5.5f, 3.8f);
+    AddPointLight(out, 1.5f, 0.82f, -2.3f, glm::vec3(1.0f, 0.77f, 0.46f), 3.8f, 3.3f);
     PlaceOn(out, cat, c, "books", 0.26f, -1.9f, 0.46f, -2.3f, 15.0f);          // books on the other
     Place(out, cat, c, "bookcaseClosed", 1.1f, -2.85f, 1.1f, 90.0f);    // left wall, away from camera
     Place(out, cat, c, "coatRackStanding", 0.45f, -2.7f, -2.5f, 0.0f);

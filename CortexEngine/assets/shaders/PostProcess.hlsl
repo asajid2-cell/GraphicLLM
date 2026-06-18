@@ -45,7 +45,7 @@ cbuffer FrameConstants : register(b1)
     float4   g_ColorGrade;
     // x = fog density, y = base height, z = height falloff, w = fog enabled (>0.5)
     float4   g_FogParams;
-    // x = fog start distance, y/z/w reserved
+    // x = anisotropy, y = scattering strength, z = near fade, w = max fog luma
     float4   g_FogExtraParams;
     // x = SSAO enabled (>0.5), y = radius, z = bias, w = intensity
     float4   g_AOParams;
@@ -807,6 +807,163 @@ float3 SoftLimitReflectionLuma(float3 color, float maxLumaOverride)
     float range = max(maxLuma - kneeLuma, 1e-3f);
     float limitedLuma = kneeLuma + range * (over / (over + range));
     return color * saturate(limitedLuma / max(luma, 1e-5f));
+}
+
+float Hash12(float2 p)
+{
+    float3 p3 = frac(float3(p.xyx) * 0.1031f);
+    p3 += dot(p3, p3.yzx + 33.33f);
+    return frac((p3.x + p3.y) * p3.z);
+}
+
+float HazePhaseHG(float cosTheta, float anisotropy)
+{
+    float g = clamp(anisotropy, -0.75f, 0.75f);
+    float gg = g * g;
+    float denom = max(1.0f + gg - 2.0f * g * cosTheta, 1e-3f);
+    return (1.0f - gg) / (4.0f * PI * denom * sqrt(denom));
+}
+
+float3 LimitHazeLuma(float3 color, float maxLuma)
+{
+    float luma = dot(color, float3(0.2126f, 0.7152f, 0.0722f));
+    if (luma <= maxLuma || luma <= 1e-5f)
+    {
+        return color;
+    }
+    return color * (maxLuma / luma);
+}
+
+float3 ApplyLocalizedSingleScatterHaze(float3 hdrColor, float2 uv)
+{
+    float depth = g_Depth.Sample(g_Sampler, uv).r;
+    if (depth >= 1.0f - 1e-4f)
+    {
+        return hdrColor;
+    }
+
+    float3 camPos = g_CameraPosition.xyz;
+    float3 worldPos = ReconstructWorldPosition(uv, depth);
+    float3 viewRay = worldPos - camPos;
+    float rayLength = length(viewRay);
+    if (rayLength <= 1e-3f)
+    {
+        return hdrColor;
+    }
+
+    float3 rayDir = viewRay / rayLength;
+    float density = max(g_FogParams.x, 0.0f);
+    float scatteringStrength = max(g_FogExtraParams.y, 0.0f);
+    if (density <= 1e-5f || scatteringStrength <= 1e-5f)
+    {
+        return hdrColor;
+    }
+
+    float anisotropy = clamp(g_FogExtraParams.x, -0.65f, 0.65f);
+    float nearFade = max(g_FogExtraParams.z, 0.05f);
+    float maxFogLuma = clamp(g_FogExtraParams.w, 0.25f, 6.0f);
+    float fogStart = 0.20f;
+    float marchLength = max(rayLength - fogStart, 0.0f);
+    if (marchLength <= 1e-3f)
+    {
+        return hdrColor;
+    }
+
+    const int kHazeSteps = 10;
+    float stepLength = marchLength / (float)kHazeSteps;
+    float jitter = Hash12(uv * float2(173.3f, 419.7f) + g_TimeAndExposure.xx);
+    float3 scatter = 0.0f.xxx;
+    float transmittance = 1.0f;
+    float baseHeight = g_FogParams.y;
+    float falloff = max(g_FogParams.z, 0.0f);
+    float3 ambientTint = max(g_AmbientColor.rgb, 0.0f.xxx);
+
+    [unroll]
+    for (int i = 0; i < kHazeSteps; ++i)
+    {
+        float t = ((float)i + jitter) / (float)kHazeSteps;
+        float dist = fogStart + t * marchLength;
+        float3 p = camPos + rayDir * dist;
+
+        float heightFactor = exp(-falloff * max(p.y - baseHeight, 0.0f));
+        float localDensity = density * heightFactor * saturate((dist - fogStart) / nearFade);
+
+        float3 inscatter = ambientTint * 0.045f;
+        if (g_LightCount.x > 0)
+        {
+            Light sun = g_Lights[0];
+            if ((uint)sun.position_type.w == 0)
+            {
+                float3 toLight = -normalize(sun.direction_cosInner.xyz);
+                float sunPhase = HazePhaseHG(dot(toLight, -rayDir), anisotropy);
+                float3 sunTint = max(sun.color_range.rgb, 0.0f.xxx);
+                inscatter += sunTint * sunPhase * 1.35f;
+            }
+        }
+
+        uint lightCount = min(g_LightCount.x, LIGHT_MAX);
+        [unroll]
+        for (uint li = 1u; li < LIGHT_MAX; ++li)
+        {
+            if (li >= lightCount)
+            {
+                break;
+            }
+
+            Light light = g_Lights[li];
+            uint lightType = (uint)light.position_type.w;
+            if (lightType != 1u && lightType != 2u && lightType != 3u)
+            {
+                continue;
+            }
+
+            float3 lightPos = light.position_type.xyz;
+            float3 toLightVec = lightPos - p;
+            float distToLight = max(length(toLightVec), 1e-3f);
+            float range = max(light.color_range.w, 0.1f);
+            float rangeFalloff = saturate(1.0f - distToLight / range);
+            rangeFalloff *= rangeFalloff;
+
+            float3 toLight = toLightVec / distToLight;
+            float spotAtten = 1.0f;
+            if (lightType == 2u)
+            {
+                float cd = dot(-toLight, normalize(light.direction_cosInner.xyz));
+                float inner = light.direction_cosInner.w;
+                float outer = light.params.x;
+                spotAtten = saturate((cd - outer) / max(inner - outer, 1e-3f));
+                spotAtten *= spotAtten;
+            }
+
+            float fixturePhase = HazePhaseHG(dot(toLight, -rayDir), anisotropy * 0.70f);
+            float distAtten = 1.0f / max(distToLight * distToLight, 0.25f);
+            float3 fixtureRadiance = max(light.color_range.rgb, 0.0f.xxx);
+            inscatter += fixtureRadiance * fixturePhase * rangeFalloff * spotAtten * distAtten * 3.2f;
+        }
+
+        float segmentOpticalDepth = localDensity * stepLength;
+        float segmentScatter = saturate(segmentOpticalDepth * scatteringStrength);
+        scatter += transmittance * inscatter * segmentScatter;
+        transmittance *= exp(-segmentOpticalDepth * 0.72f);
+    }
+
+    float depthLayer = saturate(marchLength / 7.5f);
+    float extinction = 1.0f - exp(-density * marchLength * 0.38f);
+    float3 coolWindowTint = float3(0.72f, 0.82f, 1.0f);
+    float3 mediumTint = lerp(ambientTint, coolWindowTint, 0.35f);
+    float3 softened = lerp(hdrColor, mediumTint * maxFogLuma * 0.16f, saturate(extinction * scatteringStrength * depthLayer));
+    scatter = LimitHazeLuma(scatter, maxFogLuma);
+
+    float sourceLuma = dot(hdrColor, float3(0.2126f, 0.7152f, 0.0722f));
+    if (sourceLuma > maxFogLuma)
+    {
+        float knee = maxFogLuma * 0.58f;
+        float compressed = knee + (sourceLuma - knee) * 0.45f;
+        hdrColor *= compressed / max(sourceLuma, 1e-4f);
+        softened = lerp(hdrColor, softened, 0.65f);
+    }
+
+    return min(softened + scatter, maxFogLuma.xxx);
 }
 
 float2 DirectionToLatLong(float3 dir)
@@ -2332,55 +2489,12 @@ float4 PSMain(VSOutput input) : SV_TARGET
         }
     }
 
-    // Exponential height fog in HDR space, using the depth buffer and
-    // reconstructed world position. Applied before bloom so fogged highlights
-    // still contribute naturally to bloom.
+    // Localized single-scatter interior haze. Applied before bloom/tonemap so
+    // bright windows and practical lamps create subtle air volume instead of
+    // hard white rectangles.
     if (g_FogParams.w > 0.5f)
     {
-        float depth = g_Depth.Sample(g_Sampler, uv).r;
-        if (depth < 1.0f - 1e-4f)
-        {
-            float3 worldPos = ReconstructWorldPosition(uv, depth);
-            float3 camPos = g_CameraPosition.xyz;
-
-            float distance = length(worldPos - camPos);
-            float density = max(g_FogParams.x, 0.0f);
-            float fogStart = max(g_FogExtraParams.x, 0.0f);
-            float fogDistance = max(distance - fogStart, 0.0f);
-
-            // Base exponential distance fog
-            float fog = 1.0f - exp(-density * fogDistance);
-
-            // Optional height falloff so fog thickens near a reference plane.
-            float baseHeight = g_FogParams.y;
-            float falloff = max(g_FogParams.z, 0.0f);
-            float h = worldPos.y - baseHeight;
-            // Fog weaker above the base height, stronger below.
-            float heightFactor = exp(-falloff * max(h, 0.0f));
-
-            fog *= heightFactor;
-            fog = saturate(fog);
-
-            float3 fogColor = g_AmbientColor.rgb;
-            if (g_LightCount.x > 0)
-            {
-                Light sun = g_Lights[0];
-                uint sunType = (uint)sun.position_type.w;
-                if (sunType == 0) // LIGHT_TYPE_DIRECTIONAL
-                {
-                    float3 viewDirWS = normalize(worldPos - camPos);
-                    float3 sunDirWS = -normalize(sun.direction_cosInner.xyz);
-                    float sunFacing = saturate(dot(viewDirWS, sunDirWS));
-                    float3 sunRadiance = max(sun.color_range.rgb, 0.0f.xxx);
-                    float sunMax = max(max(sunRadiance.r, sunRadiance.g), sunRadiance.b);
-                    float3 sunTint = (sunMax > 1e-3f) ? (sunRadiance / sunMax) : max(g_AmbientColor.rgb, 0.0f.xxx);
-                    float horizonScatter = saturate(1.0f - abs(viewDirWS.y));
-                    float environmentScatter = saturate(sunFacing * horizonScatter * (0.20f + g_ColorGrade.z * 0.30f));
-                    fogColor = lerp(fogColor, sunTint, environmentScatter);
-                }
-            }
-            hdrBlurred = lerp(hdrBlurred, fogColor, fog);
-        }
+        hdrBlurred = ApplyLocalizedSingleScatterHaze(hdrBlurred, uv);
     }
 
     // Underwater grading: when the camera is below the global water level,

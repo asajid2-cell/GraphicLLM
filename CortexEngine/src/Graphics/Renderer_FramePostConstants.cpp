@@ -739,18 +739,23 @@ void Renderer::PopulateFrameDebugAndPostConstants(FrameConstants& frameData,
         m_postProcessState.godRayIntensity,
         m_postProcessState.EffectiveVignette());
 
-    // Exponential height fog parameters
+    // Interior visible-medium parameters. Kept deliberately subtle: the shader
+    // uses this as single-scatter haze around bright windows/practicals, not
+    // as outdoor blanket fog.
     frameData.fogParams = glm::vec4(
         m_fogState.density,
         m_fogState.height,
         m_fogState.falloff,
         m_fogState.enabled ? 1.0f : 0.0f);
-    const glm::vec4 sceneLocalPayload = BuildSceneLocalEnvironmentV3PayloadParams();
+    const float hazeAnisotropy = 0.38f;
+    const float hazeScatterStrength = glm::clamp(0.76f + m_postProcessState.godRayIntensity * 0.22f, 0.50f, 1.20f);
+    const float hazeNearFade = 0.85f;
+    const float hazeMaxLuma = 3.2f;
     frameData.fogExtraParams = glm::vec4(
-        m_fogState.startDistance,
-        sceneLocalPayload.x,
-        sceneLocalPayload.y,
-        sceneLocalPayload.w);
+        hazeAnisotropy,
+        hazeScatterStrength,
+        hazeNearFade,
+        hazeMaxLuma);
 
     // SSAO parameters packed into aoParams. Disable sampling if the SSAO
     // resources are unavailable so post-process does not read null SRVs.

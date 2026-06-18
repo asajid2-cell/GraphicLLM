@@ -152,7 +152,7 @@ void Renderer::ApplyLightingRig(LightingRig rig, Scene::ECS_Registry* registry) 
             auto& l = enttReg.emplace<Scene::LightComponent>(e);
             l.type = Scene::LightType::Spot;
             l.color = glm::vec3(1.0f, 0.95f, 0.85f);
-            l.intensity = useSafeRig ? 10.0f : 14.0f;
+            l.intensity = useSafeRig ? 8.5f : 11.5f;
             l.range = useSafeRig ? 18.0f : 25.0f;
             l.innerConeDegrees = 20.0f;
             l.outerConeDegrees = 35.0f;
@@ -168,7 +168,7 @@ void Renderer::ApplyLightingRig(LightingRig rig, Scene::ECS_Registry* registry) 
             auto& l = enttReg.emplace<Scene::LightComponent>(e);
             l.type = Scene::LightType::Point;
             l.color = glm::vec3(0.8f, 0.85f, 1.0f);
-            l.intensity = useSafeRig ? 3.0f : 5.0f;
+            l.intensity = useSafeRig ? 2.6f : 4.2f;
             l.range = useSafeRig ? 14.0f : 20.0f;
             l.castsShadows = false;
         }
@@ -188,7 +188,7 @@ void Renderer::ApplyLightingRig(LightingRig rig, Scene::ECS_Registry* registry) 
             auto& l = enttReg.emplace<Scene::LightComponent>(e);
             l.type = Scene::LightType::Spot;
             l.color = glm::vec3(0.9f, 0.9f, 1.0f);
-            l.intensity = useSafeRig ? 5.0f : 8.0f;
+            l.intensity = useSafeRig ? 4.2f : 6.6f;
             l.range = useSafeRig ? 18.0f : 25.0f;
             l.innerConeDegrees = 25.0f;
             l.outerConeDegrees = 40.0f;
@@ -225,7 +225,7 @@ void Renderer::ApplyLightingRig(LightingRig rig, Scene::ECS_Registry* registry) 
                 auto& l = enttReg.emplace<Scene::LightComponent>(e);
                 l.type = Scene::LightType::Point;
                 l.color = glm::vec3(0.9f, 0.95f, 1.0f);
-                l.intensity = useSafeRig ? 7.0f : 10.0f;
+                l.intensity = useSafeRig ? 6.0f : 8.2f;
                 l.range = useSafeRig ? 8.0f : 10.0f;
                 // On safe rigs keep the center light unshadowed; rely on
                 // cascades and ambient for structure.
@@ -316,8 +316,8 @@ void Renderer::ApplyLightingRig(LightingRig rig, Scene::ECS_Registry* registry) 
             // Warm sodium-vapor style color
             l.color = glm::vec3(1.0f, 0.85f, 0.55f);
             // Strong intensity and generous range so they fill the street.
-            l.intensity = useSafeRig ? 15.0f : 24.0f;
-            l.range = useSafeRig ? 14.0f : 18.0f;
+            l.intensity = useSafeRig ? 11.0f : 17.0f;
+            l.range = useSafeRig ? 12.0f : 15.5f;
             // Let every second lantern cast shadows in the high variant; in
             // the safe variant only every fourth lantern is shadowed.
             if (useSafeRig) {

@@ -2673,6 +2673,9 @@ void Engine::BuildRecipeScene() {
         amb *= (1.0f + style.brightness * 0.35f);
         renderer->SetAmbientLighting(glm::max(amb, glm::vec3(0.05f)), 1.0f);
         renderer->SetExposure(std::clamp(1.05f + style.brightness * 0.18f, 0.7f, 1.4f));
+        // Global warm/cool grade makes the modern <-> rustic difference clear.
+        renderer->SetColorGrade(std::max(0.0f, style.warmth) * 0.38f,
+                                std::max(0.0f, -style.warmth) * 0.32f);
         renderer->SetSunDirection(glm::normalize(glm::vec3(-0.35f, 0.82f, 0.45f)));
         renderer->SetShadowBias(0.0035f);
         renderer->SetShadowPCFRadius(2.5f);

@@ -168,7 +168,7 @@ void ApplyRtDiffuseGI(inout float3 ambient,
         return;
     }
 
-    const float cinematicScale = 1.35f;
+    const float cinematicScale = 2.6f; // stronger bounce so indirect GI clearly reads
     ambient += albedoColor * max(rtGI.rgb, 0.0f.xxx) * kD * (cinematicScale * aoDiffuse);
     float visibility = max(lerp(1.0f, saturate(rtGI.a), 0.35f), 0.88f);
     ambient *= visibility;

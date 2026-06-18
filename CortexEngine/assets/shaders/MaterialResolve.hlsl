@@ -562,12 +562,30 @@ float TriplanarWoodGrain(float3 worldPos, float3 normalWS)
     return dot(float3(x, y, z), w);
 }
 
+float WearPlane(float2 p)
+{
+    float2 q = p * 0.82f;
+    float broad = ValueNoise2D(q + float2(4.7f, 1.3f));
+    float mid = ValueNoise2D(q * 2.35f + float2(17.1f, 6.4f));
+    return broad * 0.68f + mid * 0.32f;
+}
+
+float TriplanarWearField(float3 worldPos, float3 normalWS)
+{
+    float3 w = ProceduralTriplanarWeights(normalWS);
+    float x = WearPlane(worldPos.zy);
+    float y = WearPlane(worldPos.xz);
+    float z = WearPlane(worldPos.xy);
+    return dot(float3(x, y, z), w);
+}
+
 void ApplyProceduralSurfaceDetailVB(float3 worldPos,
                                     float3 tangentWS,
                                     float tangentSign,
                                     inout float3 normalWS,
                                     inout float3 albedo,
                                     inout float roughness,
+                                    inout float ao,
                                     float metallic,
                                     uint materialClass)
 {
@@ -606,6 +624,43 @@ void ApplyProceduralSurfaceDetailVB(float3 worldPos,
 
     float roughDelta = highRough * fine * 0.018f + midRough * wood * 0.045f;
     roughness = saturate(roughness + roughDelta);
+
+    float cleanClass =
+        (materialClass == SURFACE_CLASS_GLASS ||
+         materialClass == SURFACE_CLASS_MIRROR ||
+         materialClass == SURFACE_CLASS_WATER ||
+         materialClass == SURFACE_CLASS_EMISSIVE) ? 1.0f : 0.0f;
+    float grimeEligible = nonMetal * (1.0f - cleanClass) *
+                          smoothstep(0.30f, 0.62f, saturate(roughness));
+
+    float lowBand = 1.0f - smoothstep(0.03f, 0.46f, max(worldPos.y, 0.0f));
+    float wallJunction = lowBand * smoothstep(0.22f, 0.88f, 1.0f - abs(N.y));
+    float floorFilm = lowBand * smoothstep(0.34f, 0.92f, N.y) * 0.22f;
+    float underside = (1.0f - smoothstep(0.30f, 1.15f, max(worldPos.y, 0.0f))) *
+                      (1.0f - smoothstep(-0.78f, -0.18f, N.y)) * 0.42f;
+    float grimeMottle = lerp(0.76f, 1.0f,
+                             TriplanarWearField(worldPos * 0.72f + float3(13.0f, 13.0f, 13.0f), N));
+    float contactGrime = saturate(wallJunction + floorFilm + underside) *
+                         grimeMottle * grimeEligible;
+    albedo = saturate(albedo * (1.0f - contactGrime * 0.16f));  // visible contact darkening (grounds junctions/undersides)
+    roughness = saturate(roughness + contactGrime * 0.055f);
+    ao = saturate(ao * (1.0f - contactGrime * 0.10f));
+
+    float paintedOrWood = saturate(max(midRough, semanticWood * nonMetal) * (1.0f - cleanClass));
+    float wearBase = TriplanarWearField(worldPos * 0.95f, N);
+    const float wearEps = 0.090f;
+    float wearT = TriplanarWearField((worldPos + T * wearEps) * 0.95f, N);
+    float wearB = TriplanarWearField((worldPos + B * wearEps) * 0.95f, N);
+    float wearN = TriplanarWearField((worldPos + N * wearEps) * 0.95f, N);
+    float wearGradient = abs(wearT - wearBase) + abs(wearB - wearBase) + abs(wearN - wearBase);
+    float handledHeight = 1.0f - smoothstep(2.6f, 4.8f, max(worldPos.y, 0.0f));
+    float edgeWear = smoothstep(0.050f, 0.155f, wearGradient) *
+                     paintedOrWood * handledHeight * (1.0f - contactGrime * 0.55f);
+    float luma = dot(albedo, float3(0.2126f, 0.7152f, 0.0722f));
+    float3 softened = lerp(albedo, luma.xxx, edgeWear * 0.16f);
+    float3 worn = saturate(softened + (1.0f - softened) * (edgeWear * 0.035f));
+    albedo = lerp(albedo, worn, edgeWear);
+    roughness = saturate(roughness - edgeWear * 0.020f);
 }
 
 // Compute shader: One thread per pixel
@@ -952,6 +1007,7 @@ void CSMain(uint3 dispatchThreadID : SV_DispatchThreadID) {
             normalWS,
             albedo,
             roughness,
+            ao,
             metallic,
             mat.materialClass);
 

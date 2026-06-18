@@ -145,7 +145,8 @@ bool Place(std::vector<std::shared_ptr<SceneCommand>>& out,
         cmd->color = glm::vec4(glm::clamp(glm::vec3(cmd->color) * jitter, 0.0f, 1.0f), cmd->color.a);
     }
     // Light sources + screens glow when "on" — a cheap, automatic realism touch.
-    if (lk.find("lamp") != std::string::npos && lk.find("ceiling") == std::string::npos) {
+    if ((lk.find("lamp") != std::string::npos || lk.find("lantern") != std::string::npos) &&
+        lk.find("ceiling") == std::string::npos) {
         cmd->setEmissiveStrength = true;
         cmd->emissiveStrength = 1.7f;
         cmd->emissiveColor = glm::vec4(1.0f, 0.86f, 0.60f, 1.0f); // warm bulb
@@ -415,11 +416,15 @@ std::optional<std::string> MatchSceneRecipe(const std::string& prompt) {
         Contains(p, "restroom") || Contains(p, "toilet")) {
         return std::string("bathroom");
     }
+    if (Contains(p, "garden") || Contains(p, "patio") || Contains(p, "backyard") ||
+        Contains(p, "courtyard") || Contains(p, "terrace")) {
+        return std::string("garden");
+    }
     return std::nullopt;
 }
 
 std::vector<std::string> AvailableSceneRecipes() {
-    return {"living_room", "bedroom", "office", "kitchen", "dining_room", "bathroom"};
+    return {"living_room", "bedroom", "office", "kitchen", "dining_room", "bathroom", "garden"};
 }
 
 SceneStyle ParseSceneStyle(const std::string& prompt) {
@@ -488,6 +493,10 @@ ScenePromptRoute RouteScenePrompt(const std::string& prompt) {
         has("toilet") || has("shower")) {
         return {"recipe", "bathroom"};
     }
+    if (has("garden") || has("patio") || has("backyard") || has("courtyard") ||
+        has("terrace") || has("yard")) {
+        return {"recipe", "garden"};
+    }
     if (has("office") || has("study") || has("workspace") || has("desk")) {
         return {"recipe", "office"};
     }
@@ -531,6 +540,45 @@ void BuildBathroom(std::vector<std::shared_ptr<SceneCommand>>& out, const Scene:
     Place(out, cat, c, "plantSmall3", 0.3f, 1.8f, 1.4f, 0.0f);
 }
 
+// Outdoor garden/patio: a lawn (no room shell) with a patio seating set framed by
+// trees, bushes, rocks and grass tufts using the naturalistic nature meshes.
+void BuildGarden(std::vector<std::shared_ptr<SceneCommand>>& out, const Scene::AssetCatalog& cat, FootprintCache& c) {
+    // Lawn as a thin wide cube slab (renders reliably, like the room walls; the
+    // Plane primitive did not show in the open outdoor view).
+    {
+        auto ground = std::make_shared<AddEntityCommand>();
+        ground->entityType = AddEntityCommand::EntityType::Cube;
+        ground->name = "Garden_Lawn";
+        ground->position = glm::vec3(0.0f, -0.06f, 0.0f);
+        ground->scale = glm::vec3(16.0f, 0.12f, 15.0f);
+        ground->color = glm::vec4(0.22f, 0.33f, 0.15f, 1.0f); // deeper grass so props read
+        ground->roughness = 0.95f;
+        ground->metallic = 0.0f;
+        ground->allowPlacementJitter = false;
+        ground->disableCollisionAvoidance = true;
+        out.push_back(std::move(ground));
+    }
+    Place(out, cat, c, "rugSquare", 3.6f, 0.3f, -0.6f, 0.0f, glm::vec4(0.58f, 0.56f, 0.52f, 1.0f)); // stone patio
+    // Patio seating set (known-good Kenney pieces that scale correctly).
+    Place(out, cat, c, "tableCoffee", 1.2f, 0.3f, -0.7f, 0.0f);
+    Place(out, cat, c, "loungeChair", 0.9f, -0.8f, -0.1f, 45.0f);
+    Place(out, cat, c, "loungeChair", 0.9f, 1.4f, -0.1f, -45.0f);
+    Place(out, cat, c, "bench", 1.5f, 0.3f, -2.0f, 0.0f);
+    Place(out, cat, c, "Barrel_01", 0.6f, 2.3f, -2.0f, 0.0f); // planter/decor (lantern blooms out in daylight)
+    // Trees / greenery framing the garden.
+    Place(out, cat, c, "dead_tree_trunk", 3.6f, -5.0f, -3.2f, 0.0f, glm::vec4(0.34f, 0.26f, 0.17f, 1.0f));
+    Place(out, cat, c, "wild_rooibos_bush", 1.7f, -4.2f, -1.4f, 0.0f);
+    Place(out, cat, c, "wild_rooibos_bush", 1.5f, 4.4f, -2.1f, 40.0f);
+    Place(out, cat, c, "fern_02", 1.1f, 3.8f, 0.6f, 0.0f);
+    Place(out, cat, c, "rock_moss_set_01", 1.3f, -3.4f, 1.4f, 20.0f);
+    Place(out, cat, c, "boulder_01", 1.6f, 4.6f, 1.1f, -30.0f);
+    Place(out, cat, c, "tree_stump_01", 0.8f, -5.0f, 0.6f, 0.0f);
+    // Grass tufts scattered across the lawn.
+    Place(out, cat, c, "grass_bermuda_01", 1.0f, -2.2f, 2.6f, 0.0f);
+    Place(out, cat, c, "grass_bermuda_01", 0.9f, 2.5f, 2.7f, 90.0f);
+    Place(out, cat, c, "grass_bermuda_01", 0.95f, 0.4f, 3.0f, 45.0f);
+}
+
 std::vector<std::shared_ptr<SceneCommand>> BuildSceneRecipe(const std::string& recipeName,
                                                             const Scene::AssetCatalog& catalog,
                                                             std::uint32_t /*seed*/) {
@@ -552,6 +600,8 @@ std::vector<std::shared_ptr<SceneCommand>> BuildSceneRecipe(const std::string& r
         BuildDiningRoom(out, catalog, cache);
     } else if (recipeName == "bathroom") {
         BuildBathroom(out, catalog, cache);
+    } else if (recipeName == "garden") {
+        BuildGarden(out, catalog, cache);
     } else {
         spdlog::warn("SceneRecipes: unknown recipe '{}'", recipeName);
         return out;

@@ -2660,23 +2660,31 @@ void Engine::BuildRecipeScene() {
                      style.name.empty() ? "(brightness)" : style.name, style.warmth, style.brightness);
     }
 
+    const bool outdoor = (recipe == "garden");
     if (auto* renderer = m_renderer.get()) {
         renderer->SetEnvironmentPreset("neutral_procedural");
         renderer->SetIBLEnabled(true);
-        const float ibl = std::clamp(0.55f + style.brightness * 0.25f, 0.2f, 0.95f);
+        // Outdoor: the SUN is the key light; keep the (gray neutral) IBL modest so
+        // it doesn't flood the scene flat-gray, and use a gentle sky-blue fill.
+        const float iblBase = outdoor ? 0.45f : 0.55f;
+        const float ibl = std::clamp(iblBase + style.brightness * 0.25f, 0.2f, 1.3f);
         renderer->SetIBLIntensity(ibl, ibl);
         renderer->SetBackgroundPresentation(true, 0.95f, 0.0f);
         // Warmth shifts the ambient toward warm/cool; brightness scales the fill.
-        glm::vec3 amb(0.30f, 0.29f, 0.28f);
+        glm::vec3 amb = outdoor ? glm::vec3(0.24f, 0.27f, 0.31f) : glm::vec3(0.30f, 0.29f, 0.28f);
         amb.r += style.warmth * 0.06f;
         amb.b -= style.warmth * 0.06f;
         amb *= (1.0f + style.brightness * 0.35f);
         renderer->SetAmbientLighting(glm::max(amb, glm::vec3(0.05f)), 1.0f);
-        renderer->SetExposure(std::clamp(1.05f + style.brightness * 0.18f, 0.7f, 1.4f));
+        renderer->SetExposure(std::clamp((outdoor ? 0.80f : 1.05f) + style.brightness * 0.18f, 0.7f, 1.4f));
         // Global warm/cool grade makes the modern <-> rustic difference clear.
         renderer->SetColorGrade(std::max(0.0f, style.warmth) * 0.38f,
                                 std::max(0.0f, -style.warmth) * 0.32f);
         renderer->SetSunDirection(glm::normalize(glm::vec3(-0.35f, 0.82f, 0.45f)));
+        if (outdoor) {
+            renderer->SetSunColor(glm::vec3(1.0f, 0.95f, 0.86f)); // warm daylight
+            renderer->SetSunIntensity(1.9f);
+        }
         renderer->SetShadowBias(0.0035f);
         renderer->SetShadowPCFRadius(2.5f);
     }
@@ -2725,6 +2733,10 @@ void Engine::BuildRecipeScene() {
         } else if (recipe == "bathroom") {
             camPos = glm::vec3(1.9f, 1.55f, 1.95f); // smaller room: camera sits inside
             target = glm::vec3(-0.1f, 0.55f, -1.4f); // tub + fixtures
+        } else if (recipe == "garden") {
+            camPos = glm::vec3(3.9f, 2.1f, 3.9f);  // outdoor 3/4 view centred on the patio set
+            target = glm::vec3(0.2f, 0.35f, -0.9f);
+            camFov = 52.0f;
         }
         t.position = camPos;
         t.rotation = glm::quatLookAtLH(glm::normalize(target - t.position), glm::vec3(0.0f, 1.0f, 0.0f));

@@ -196,37 +196,51 @@ void BuildRoomShell(std::vector<std::shared_ptr<SceneCommand>>& out, const Scene
     // than tiled, gapped, untextured Kenney wall panels. The front (+Z) wall is
     // split around a central doorway so the room reads as enterable, and the
     // camera looks in over the tops.
-    const glm::vec4 wallColor(0.82f, 0.78f, 0.72f, 1.0f);
+    const glm::vec4 wallColor(0.84f, 0.81f, 0.76f, 1.0f);     // warm off-white
+    const glm::vec4 backWallColor(0.52f, 0.53f, 0.58f, 1.0f); // muted feature wall for depth
+    const glm::vec4 baseColor(0.24f, 0.20f, 0.17f, 1.0f);     // dark-wood baseboard + trim
     const float wallH = 2.8f;
     const float wallTh = 0.16f;
+    const float baseH = 0.16f;  // baseboard height
+    const float baseTh = 0.24f; // sits slightly proud of the wall plane
     const float hw = width * 0.5f;
     const float hd = depth * 0.5f;
 
-    auto boxWall = [&](const std::string& tag, float cx, float cz, float sx, float sz) {
+    auto box = [&](const std::string& tag, float cx, float cy, float cz, float sx, float sy, float sz,
+                   const glm::vec4& col) {
         auto cmd = std::make_shared<AddEntityCommand>();
         cmd->entityType = AddEntityCommand::EntityType::Cube; // unit cube (+/-0.5)
         cmd->name = tag;
-        cmd->position = glm::vec3(cx, wallH * 0.5f, cz); // base on the floor
-        cmd->scale = glm::vec3(sx, wallH, sz);
-        cmd->color = wallColor;
+        cmd->position = glm::vec3(cx, cy, cz);
+        cmd->scale = glm::vec3(sx, sy, sz);
+        cmd->color = col;
         cmd->metallic = 0.0f;
         cmd->roughness = 0.92f;
         cmd->allowPlacementJitter = false;
         cmd->disableCollisionAvoidance = true;
         out.push_back(std::move(cmd));
     };
+    auto wall = [&](const std::string& tag, float cx, float cz, float sx, float sz, const glm::vec4& col) {
+        box(tag, cx, wallH * 0.5f, cz, sx, wallH, sz, col); // base on the floor
+    };
 
-    boxWall("Wall_Back", 0.0f, -hd, width, wallTh);
-    boxWall("Wall_Left", -hw, 0.0f, wallTh, depth);
-    boxWall("Wall_Right", hw, 0.0f, wallTh, depth);
+    wall("Wall_Back", 0.0f, -hd, width, wallTh, backWallColor);
+    wall("Wall_Left", -hw, 0.0f, wallTh, depth, wallColor);
+    wall("Wall_Right", hw, 0.0f, wallTh, depth, wallColor);
 
     const float doorW = 2.4f;
     const float segW = (width - doorW) * 0.5f;
     if (segW > 0.1f) {
         const float off = doorW * 0.5f + segW * 0.5f;
-        boxWall("Wall_FrontL", -off, hd, segW, wallTh);
-        boxWall("Wall_FrontR", off, hd, segW, wallTh);
+        wall("Wall_FrontL", -off, hd, segW, wallTh, wallColor);
+        wall("Wall_FrontR", off, hd, segW, wallTh, wallColor);
     }
+
+    // Baseboards along the foot of the walls — a small detail that makes the
+    // floor/wall junction read as finished rather than a bare box.
+    box("Base_Back", 0.0f, baseH * 0.5f, -hd, width, baseH, baseTh, baseColor);
+    box("Base_Left", -hw, baseH * 0.5f, 0.0f, baseTh, baseH, depth, baseColor);
+    box("Base_Right", hw, baseH * 0.5f, 0.0f, baseTh, baseH, depth, baseColor);
 }
 
 // ---- recipes ---------------------------------------------------------------
@@ -238,6 +252,8 @@ void BuildLivingRoom(std::vector<std::shared_ptr<SceneCommand>>& out, const Scen
     BuildRoomShell(out, cat, c, 6.8f, 6.6f, glm::vec4(0.50f, 0.43f, 0.36f, 1.0f)); // warm wood floor
     Place(out, cat, c, "rugRectangle", 2.9f, 0.0f, -0.3f, 0.0f, glm::vec4(0.47f, 0.30f, 0.26f, 1.0f));
     Place(out, cat, c, "loungeSofa", 2.3f, 0.0f, -2.0f, 0.0f);          // back wall, faces +Z
+    PlaceOn(out, cat, c, "pillowBlue", 0.45f, -0.55f, 0.48f, -2.15f, 8.0f);  // throw pillows on the sofa
+    PlaceOn(out, cat, c, "pillow", 0.42f, 0.55f, 0.48f, -2.15f, -10.0f);
     Place(out, cat, c, "loungeChair", 0.85f, -2.05f, -0.3f, 50.0f);     // angled into the group
     Place(out, cat, c, "loungeChair", 0.85f, 2.05f, -0.3f, -50.0f);
     Place(out, cat, c, "tableCoffee", 1.2f, 0.0f, -0.7f, 0.0f);         // centre of the seating
@@ -256,6 +272,8 @@ void BuildBedroom(std::vector<std::shared_ptr<SceneCommand>>& out, const Scene::
     BuildRoomShell(out, cat, c, 6.4f, 6.2f, glm::vec4(0.48f, 0.44f, 0.46f, 1.0f));
     Place(out, cat, c, "rugRound", 2.7f, -0.1f, 0.2f, 0.0f, glm::vec4(0.46f, 0.40f, 0.48f, 1.0f));
     Place(out, cat, c, "bedDouble", 2.7f, -0.2f, -1.5f, 0.0f);          // focal: big, back-centre, faces camera
+    PlaceOn(out, cat, c, "pillowLong", 0.75f, -0.6f, 0.54f, -2.35f, 0.0f);   // pillows at the head
+    PlaceOn(out, cat, c, "pillowBlue", 0.4f, 0.35f, 0.58f, -2.3f, 6.0f);
     Place(out, cat, c, "sideTable", 0.5f, -1.9f, -2.3f, 0.0f);
     Place(out, cat, c, "sideTable", 0.5f, 1.5f, -2.3f, 0.0f);
     PlaceOn(out, cat, c, "lampSquareTable", 0.3f, 1.5f, 0.46f, -2.3f, 0.0f);  // lamp on nightstand
@@ -330,11 +348,15 @@ std::optional<std::string> MatchSceneRecipe(const std::string& prompt) {
     if (Contains(p, "dining") || Contains(p, "dinner")) {
         return std::string("dining_room");
     }
+    if (Contains(p, "bathroom") || Contains(p, "bath room") || Contains(p, "washroom") ||
+        Contains(p, "restroom") || Contains(p, "toilet")) {
+        return std::string("bathroom");
+    }
     return std::nullopt;
 }
 
 std::vector<std::string> AvailableSceneRecipes() {
-    return {"living_room", "bedroom", "office", "kitchen", "dining_room"};
+    return {"living_room", "bedroom", "office", "kitchen", "dining_room", "bathroom"};
 }
 
 ScenePromptRoute RouteScenePrompt(const std::string& prompt) {
@@ -368,6 +390,10 @@ ScenePromptRoute RouteScenePrompt(const std::string& prompt) {
     if (has("dining") || has("dinner")) {
         return {"recipe", "dining_room"};
     }
+    if (has("bathroom") || has("bath room") || has("washroom") || has("restroom") ||
+        has("toilet") || has("shower")) {
+        return {"recipe", "bathroom"};
+    }
     if (has("office") || has("study") || has("workspace") || has("desk")) {
         return {"recipe", "office"};
     }
@@ -400,6 +426,17 @@ void BuildDiningRoom(std::vector<std::shared_ptr<SceneCommand>>& out, const Scen
     Place(out, cat, c, "pottedPlant", 0.5f, -2.7f, -2.4f, 0.0f);  // back-left corner
 }
 
+void BuildBathroom(std::vector<std::shared_ptr<SceneCommand>>& out, const Scene::AssetCatalog& cat, FootprintCache& c) {
+    BuildRoomShell(out, cat, c, 5.0f, 4.8f, glm::vec4(0.60f, 0.62f, 0.64f, 1.0f)); // tile floor
+    Place(out, cat, c, "bathtub", 2.3f, 0.0f, -1.6f, 0.0f);                  // focal: tub on the back wall
+    Place(out, cat, c, "toilet", 0.7f, -1.7f, -1.2f, 90.0f);                 // left wall
+    Place(out, cat, c, "bathroomSink", 0.8f, 1.7f, -1.2f, -90.0f);           // right wall
+    PlaceOn(out, cat, c, "bathroomMirror", 0.7f, 2.3f, 1.45f, -1.2f, -90.0f); // mirror above the sink
+    Place(out, cat, c, "bathroomCabinet", 0.7f, -1.7f, 0.5f, 90.0f);
+    Place(out, cat, c, "rugDoormat", 1.1f, 0.1f, 0.7f, 0.0f, glm::vec4(0.40f, 0.45f, 0.50f, 1.0f));
+    Place(out, cat, c, "plantSmall3", 0.3f, 1.8f, 1.4f, 0.0f);
+}
+
 std::vector<std::shared_ptr<SceneCommand>> BuildSceneRecipe(const std::string& recipeName,
                                                             const Scene::AssetCatalog& catalog,
                                                             std::uint32_t /*seed*/) {
@@ -419,6 +456,8 @@ std::vector<std::shared_ptr<SceneCommand>> BuildSceneRecipe(const std::string& r
         BuildKitchen(out, catalog, cache);
     } else if (recipeName == "dining_room") {
         BuildDiningRoom(out, catalog, cache);
+    } else if (recipeName == "bathroom") {
+        BuildBathroom(out, catalog, cache);
     } else {
         spdlog::warn("SceneRecipes: unknown recipe '{}'", recipeName);
         return out;

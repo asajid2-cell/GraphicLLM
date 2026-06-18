@@ -2690,6 +2690,9 @@ void Engine::BuildRecipeScene() {
         } else if (recipe == "dining_room") {
             camPos = glm::vec3(2.7f, 1.78f, 3.0f);
             target = glm::vec3(-0.1f, 0.6f, -1.3f); // table + chairs
+        } else if (recipe == "bathroom") {
+            camPos = glm::vec3(1.9f, 1.55f, 1.95f); // smaller room: camera sits inside
+            target = glm::vec3(-0.1f, 0.55f, -1.4f); // tub + fixtures
         }
         t.position = camPos;
         t.rotation = glm::quatLookAtLH(glm::normalize(target - t.position), glm::vec3(0.0f, 1.0f, 0.0f));

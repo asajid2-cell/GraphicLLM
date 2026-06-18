@@ -2413,10 +2413,13 @@ void Engine::BuildOutdoorSunsetBeachScene() {
         renderer->SetIBLEnabled(false);
         renderer->SetIBLIntensity(0.0f, 0.0f);
         renderer->SetBackgroundPresentation(true, 0.94f, 0.0f);
-        renderer->SetAmbientLighting(glm::vec3(0.092f, 0.122f, 0.104f), 1.0f);
-        renderer->SetExposure(0.92f);
-        renderer->SetBloomIntensity(0.08f);
-        renderer->SetColorGrade(0.32f, 0.02f);
+        renderer->SetAmbientLighting(glm::vec3(0.20f, 0.135f, 0.10f), 1.0f); // warm golden-hour fill
+        renderer->SetExposure(1.02f);
+        renderer->SetBloomIntensity(0.12f);
+        renderer->SetColorGrade(0.46f, 0.06f); // push warm sunset temperature
+        renderer->SetSunDirection(glm::normalize(glm::vec3(0.28f, 0.22f, 0.93f))); // low sun over the water
+        renderer->SetSunColor(glm::vec3(1.0f, 0.56f, 0.30f));                        // golden-hour sun
+        renderer->SetSunIntensity(2.7f);
         renderer->SetWaterParams(-0.02f, 0.046f, 9.8f, 0.42f, 0.88f, 0.30f, 0.020f, 0.44f);
         renderer->SetWaterOptics(0.050f, 1.48f);
         renderer->SetFogParams(0.020f, 0.0f, 0.45f);
@@ -2612,6 +2615,13 @@ void Engine::BuildOutdoorSunsetBeachScene() {
         placeNature("Beach_Driftwood_A", scannedTrunkMesh, 2.6f, -1.7f, 0.45f, 78.0f, woodCol, 0.8f);
         placeNature("Beach_Branches_A", scannedBranchesMesh, 1.7f, 1.7f, 0.25f, -52.0f, dryCol, 0.85f);
         placeNature("Beach_Stump_A", scannedStumpMesh, 1.0f, -5.6f, -1.5f, 0.0f, woodCol, 0.8f);
+
+        // Foreground pebbles + a driftwood twig near the camera give the empty
+        // near-sand depth and a sense of scale leading the eye to the water.
+        placeNature("Beach_Pebble_A", scannedMossRockMesh, 0.5f, -3.6f, -1.9f, 30.0f, rockCol, 0.8f);
+        placeNature("Beach_Pebble_B", scannedBoulderMesh, 0.38f, -2.9f, -1.4f, 110.0f, rockCol, 0.85f);
+        placeNature("Beach_Pebble_C", scannedMossRockMesh, 0.32f, -2.3f, -2.0f, 200.0f, rockCol, 0.8f);
+        placeNature("Beach_Driftwood_F", scannedBranchesMesh, 0.85f, -3.9f, -0.9f, 65.0f, dryCol, 0.85f);
 
         // Dune vegetation in TIGHT CLUMPS (grass + bush overlapping) toward the
         // back/sides so the billboard-ish meshes read as planted bushes rather

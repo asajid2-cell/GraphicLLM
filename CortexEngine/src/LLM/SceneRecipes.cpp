@@ -343,6 +343,29 @@ void BuildRoomShell(std::vector<std::shared_ptr<SceneCommand>>& out, const Scene
         pane->disableCollisionAvoidance = true;
         out.push_back(std::move(pane));
     }
+
+    // Framed wall art on the left wall — fills the blank side wall the camera sees
+    // (interiors only; the small bathroom's side walls hold fixtures).
+    if (depth > 5.0f) {
+        const float artY = 1.55f;
+        const float leftFace = -hw + wallTh * 0.5f;
+        auto artPanel = [&](const std::string& tag, float cz, const glm::vec4& canvas) {
+            box(tag + "_F", leftFace + 0.02f, artY, cz, 0.06f, 0.94f, 0.74f, baseColor); // dark frame
+            auto a = std::make_shared<AddEntityCommand>();
+            a->entityType = AddEntityCommand::EntityType::Cube;
+            a->name = tag;
+            a->position = glm::vec3(leftFace + 0.05f, artY, cz);
+            a->scale = glm::vec3(0.04f, 0.80f, 0.60f);
+            a->color = canvas;
+            a->metallic = 0.0f;
+            a->roughness = 0.7f;
+            a->allowPlacementJitter = false;
+            a->disableCollisionAvoidance = true;
+            out.push_back(std::move(a));
+        };
+        artPanel("WallArtA", -0.75f, glm::vec4(0.40f, 0.33f, 0.47f, 1.0f)); // dusty plum canvas
+        artPanel("WallArtB", 0.70f, glm::vec4(0.28f, 0.40f, 0.42f, 1.0f));  // muted teal canvas
+    }
 }
 
 // ---- recipes ---------------------------------------------------------------

@@ -131,7 +131,23 @@ bool Place(std::vector<std::shared_ptr<SceneCommand>>& out,
     cmd->name = key;
     cmd->position = glm::vec3(x, 0.0f, z);
     cmd->scale = glm::vec3(scale);
-    cmd->color = (color == glm::vec4(1.0f)) ? ColorForKey(ToLower(key)) : color;
+    const std::string lk = ToLower(key);
+    cmd->color = (color == glm::vec4(1.0f)) ? ColorForKey(lk) : color;
+    // Light sources + screens glow when "on" — a cheap, automatic realism touch.
+    if (lk.find("lamp") != std::string::npos && lk.find("ceiling") == std::string::npos) {
+        cmd->setEmissiveStrength = true;
+        cmd->emissiveStrength = 1.7f;
+        cmd->emissiveColor = glm::vec4(1.0f, 0.86f, 0.60f, 1.0f); // warm bulb
+        cmd->setEmissiveBloom = true;
+        cmd->emissiveBloom = 0.25f;
+    } else if (lk.find("screen") != std::string::npos || lk.find("television") != std::string::npos ||
+               lk.find("monitor") != std::string::npos) {
+        cmd->setEmissiveStrength = true;
+        cmd->emissiveStrength = 1.3f;
+        cmd->emissiveColor = glm::vec4(0.45f, 0.62f, 0.85f, 1.0f); // screen glow
+        cmd->setEmissiveBloom = true;
+        cmd->emissiveBloom = 0.2f;
+    }
     cmd->roughness = 0.7f;
     cmd->rotationEuler = glm::vec3(0.0f, yawDeg, 0.0f);
     cmd->hasRotation = true;

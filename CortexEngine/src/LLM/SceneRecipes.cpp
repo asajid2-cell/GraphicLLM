@@ -308,13 +308,13 @@ void BuildRoomShell(std::vector<std::shared_ptr<SceneCommand>>& out, const Scene
         pane->name = "Window_Pane";
         pane->position = glm::vec3(0.0f, winY, wallFace + 0.05f);
         pane->scale = glm::vec3(winW, winH, 0.05f);
-        pane->color = glm::vec4(0.66f, 0.80f, 0.96f, 1.0f); // daylight sky
+        pane->color = glm::vec4(0.70f, 0.83f, 0.98f, 1.0f); // daylight sky
         pane->metallic = 0.0f;
         pane->roughness = 0.2f;
         pane->setEmissiveStrength = true;
-        pane->emissiveStrength = 2.6f;
+        pane->emissiveStrength = 1.8f;   // bright but below hard clip
         pane->setEmissiveBloom = true;
-        pane->emissiveBloom = 0.3f;
+        pane->emissiveBloom = 0.55f;     // more bloom -> reads as a soft glow, not a flat white panel
         pane->allowPlacementJitter = false;
         pane->disableCollisionAvoidance = true;
         out.push_back(std::move(pane));

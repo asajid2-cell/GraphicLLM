@@ -422,6 +422,37 @@ std::vector<std::string> AvailableSceneRecipes() {
     return {"living_room", "bedroom", "office", "kitchen", "dining_room", "bathroom"};
 }
 
+SceneStyle ParseSceneStyle(const std::string& prompt) {
+    const std::string p = ToLower(prompt);
+    auto has = [&](const char* n) { return p.find(n) != std::string::npos; };
+    SceneStyle s;
+    if (has("modern") || has("minimalist") || has("minimal") || has("sleek") ||
+        has("contemporary") || has("scandi")) {
+        s.warmth = -0.55f;
+        s.brightness = 0.2f;
+        s.name = "modern";
+    } else if (has("rustic") || has("cozy") || has("cosy") || has("farmhouse") ||
+               has("vintage") || has("traditional") || has("warm ")) {
+        s.warmth = 0.7f;
+        s.brightness = -0.05f;
+        s.name = "rustic";
+    } else if (has("industrial") || has("loft") || has("concrete")) {
+        s.warmth = -0.2f;
+        s.brightness = -0.25f;
+        s.name = "industrial";
+    }
+    // Brightness words stack on top of the base style.
+    if (has("bright") || has("airy") || has("sunny") || has("luminous") || has("light-filled")) {
+        s.brightness += 0.45f;
+    }
+    if (has("moody") || has("dark") || has("dim") || has("dramatic")) {
+        s.brightness -= 0.45f;
+    }
+    s.warmth = std::clamp(s.warmth, -1.0f, 1.0f);
+    s.brightness = std::clamp(s.brightness, -1.0f, 1.0f);
+    return s;
+}
+
 ScenePromptRoute RouteScenePrompt(const std::string& prompt) {
     const std::string p = ToLower(prompt);
     auto has = [&](const char* n) { return p.find(n) != std::string::npos; };

@@ -38,6 +38,16 @@ struct ScenePromptRoute {
 // All recipe keys this module can build.
 [[nodiscard]] std::vector<std::string> AvailableSceneRecipes();
 
+// A style read from descriptive words in the prompt (modern/rustic/cozy/bright/
+// moody/industrial...). Lets the same room recipe take on a different mood.
+// warmth: -1 cool .. +1 warm; brightness: -1 moody .. +1 airy.
+struct SceneStyle {
+    float warmth = 0.0f;
+    float brightness = 0.0f;
+    std::string name; // human-readable style label ("modern", "rustic", ...) or empty
+};
+[[nodiscard]] SceneStyle ParseSceneStyle(const std::string& prompt);
+
 // Build the command batch that assembles a named scene from real catalog assets.
 // Self-calibrates to each asset's measured footprint so layout stays correct as
 // assets change. Returns empty if the recipe is unknown or the catalog cannot

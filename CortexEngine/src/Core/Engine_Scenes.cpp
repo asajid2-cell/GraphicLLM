@@ -2649,13 +2649,30 @@ void Engine::BuildRecipeScene() {
     }
     spdlog::info("Building scene: procedural recipe '{}'", recipe);
 
+    // Style read from descriptive words in the prompt (modern/rustic/cozy/bright/
+    // moody...) modulates the mood so the same room recipe isn't always identical.
+    LLM::SceneStyle style;
+    if (const char* pr = std::getenv("CORTEX_SCENE_PROMPT"); pr && *pr) {
+        style = LLM::ParseSceneStyle(pr);
+    }
+    if (!style.name.empty() || style.brightness != 0.0f) {
+        spdlog::info("Recipe style '{}' warmth={:.2f} brightness={:.2f}",
+                     style.name.empty() ? "(brightness)" : style.name, style.warmth, style.brightness);
+    }
+
     if (auto* renderer = m_renderer.get()) {
         renderer->SetEnvironmentPreset("neutral_procedural");
         renderer->SetIBLEnabled(true);
-        renderer->SetIBLIntensity(0.55f, 0.55f);
+        const float ibl = std::clamp(0.55f + style.brightness * 0.25f, 0.2f, 0.95f);
+        renderer->SetIBLIntensity(ibl, ibl);
         renderer->SetBackgroundPresentation(true, 0.95f, 0.0f);
-        renderer->SetAmbientLighting(glm::vec3(0.34f, 0.30f, 0.26f), 1.0f); // warm fill, not clinical
-        renderer->SetExposure(1.05f);
+        // Warmth shifts the ambient toward warm/cool; brightness scales the fill.
+        glm::vec3 amb(0.30f, 0.29f, 0.28f);
+        amb.r += style.warmth * 0.06f;
+        amb.b -= style.warmth * 0.06f;
+        amb *= (1.0f + style.brightness * 0.35f);
+        renderer->SetAmbientLighting(glm::max(amb, glm::vec3(0.05f)), 1.0f);
+        renderer->SetExposure(std::clamp(1.05f + style.brightness * 0.18f, 0.7f, 1.4f));
         renderer->SetSunDirection(glm::normalize(glm::vec3(-0.35f, 0.82f, 0.45f)));
         renderer->SetShadowBias(0.0035f);
         renderer->SetShadowPCFRadius(2.5f);
@@ -2670,8 +2687,10 @@ void Engine::BuildRecipeScene() {
         t.rotation = glm::quatLookAtLH(glm::normalize(glm::vec3(-0.3f, -1.0f, 0.4f)), glm::vec3(0.0f, 1.0f, 0.0f));
         auto& l = m_registry->AddComponent<Scene::LightComponent>(e);
         l.type = Scene::LightType::Spot;
-        l.color = glm::vec3(1.0f, 0.97f, 0.92f);
-        l.intensity = 16.0f;
+        // Warm or cool key light by style (cool modern <-> warm rustic).
+        l.color = glm::mix(glm::vec3(0.92f, 0.96f, 1.0f), glm::vec3(1.0f, 0.90f, 0.78f),
+                           glm::clamp(style.warmth * 0.5f + 0.5f, 0.0f, 1.0f));
+        l.intensity = 16.0f + style.brightness * 4.0f;
         l.range = 24.0f;
         l.innerConeDegrees = 48.0f;
         l.outerConeDegrees = 80.0f;

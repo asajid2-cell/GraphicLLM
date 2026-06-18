@@ -180,6 +180,20 @@ inline bool PlaceOn(std::vector<std::shared_ptr<SceneCommand>>& out,
     return Place(out, catalog, cache, key, targetFootprint, x, z, yawDeg, color, surfaceY);
 }
 
+// Author a real point light (e.g. a lamp's bulb) so props actually light the room
+// — motivated lighting, not just a glowing mesh.
+inline void AddPointLight(std::vector<std::shared_ptr<SceneCommand>>& out, float x, float y, float z,
+                          const glm::vec3& color, float intensity, float range) {
+    auto cmd = std::make_shared<AddLightCommand>();
+    cmd->lightType = AddLightCommand::LightType::Point;
+    cmd->position = glm::vec3(x, y, z);
+    cmd->color = color;
+    cmd->intensity = intensity;
+    cmd->range = range;
+    cmd->name = "RecipeLampLight";
+    out.push_back(std::move(cmd));
+}
+
 // A simple ground plane sized to the room (primitive, sits at y=0).
 void PlaceFloor(std::vector<std::shared_ptr<SceneCommand>>& out, float width, float depth, const glm::vec4& color) {
     auto cmd = std::make_shared<AddEntityCommand>();
@@ -323,8 +337,10 @@ void BuildLivingRoom(std::vector<std::shared_ptr<SceneCommand>>& out, const Scen
     Place(out, cat, c, "tableCoffee", 1.2f, 0.0f, -0.7f, 0.0f);         // centre of the seating
     PlaceOn(out, cat, c, "books", 0.35f, 0.15f, 0.42f, -0.7f, 20.0f);   // on the coffee table
     Place(out, cat, c, "lampRoundFloor", 0.4f, -2.7f, -2.1f, 0.0f);     // floor lamp beside the sofa
+    AddPointLight(out, -2.55f, 1.45f, -2.1f, glm::vec3(1.0f, 0.82f, 0.55f), 9.0f, 5.5f);
     Place(out, cat, c, "sideTable", 0.5f, 2.7f, -2.1f, 0.0f);           // side table other end
     PlaceOn(out, cat, c, "lampRoundTable", 0.28f, 2.7f, 0.46f, -2.1f, 0.0f); // table lamp on it
+    AddPointLight(out, 2.55f, 0.82f, -2.1f, glm::vec3(1.0f, 0.82f, 0.55f), 5.5f, 3.8f);
     Place(out, cat, c, "bookcaseOpen", 1.1f, -3.0f, 1.0f, 90.0f);       // side wall
     Place(out, cat, c, "cabinetTelevision", 1.6f, 0.0f, 2.7f, 180.0f);  // front wall (behind camera)
     Place(out, cat, c, "televisionModern", 1.2f, 0.0f, 2.5f, 180.0f);
@@ -341,6 +357,7 @@ void BuildBedroom(std::vector<std::shared_ptr<SceneCommand>>& out, const Scene::
     Place(out, cat, c, "sideTable", 0.5f, -1.9f, -2.3f, 0.0f);
     Place(out, cat, c, "sideTable", 0.5f, 1.5f, -2.3f, 0.0f);
     PlaceOn(out, cat, c, "lampSquareTable", 0.3f, 1.5f, 0.46f, -2.3f, 0.0f);  // lamp on nightstand
+    AddPointLight(out, 1.5f, 0.82f, -2.3f, glm::vec3(1.0f, 0.80f, 0.52f), 5.5f, 3.8f);
     PlaceOn(out, cat, c, "books", 0.26f, -1.9f, 0.46f, -2.3f, 15.0f);          // books on the other
     Place(out, cat, c, "bookcaseClosed", 1.1f, -2.85f, 1.1f, 90.0f);    // left wall, away from camera
     Place(out, cat, c, "coatRackStanding", 0.45f, -2.7f, -2.5f, 0.0f);
@@ -355,6 +372,7 @@ void BuildOffice(std::vector<std::shared_ptr<SceneCommand>>& out, const Scene::A
     PlaceOn(out, cat, c, "computerScreen", 0.55f, -0.85f, 0.74f, -1.75f, 4.0f);  // monitor on the desk
     PlaceOn(out, cat, c, "computerKeyboard", 0.4f, -0.7f, 0.74f, -1.25f, 4.0f);  // keyboard
     PlaceOn(out, cat, c, "lampSquareTable", 0.26f, 0.35f, 0.74f, -1.7f, 0.0f);   // desk lamp
+    AddPointLight(out, 0.35f, 1.02f, -1.7f, glm::vec3(1.0f, 0.80f, 0.52f), 5.0f, 3.4f);
     Place(out, cat, c, "bookcaseOpen", 1.2f, -2.85f, 0.9f, 90.0f);       // left wall
     Place(out, cat, c, "bookcaseClosedWide", 1.5f, -1.3f, -2.95f, 0.0f); // back wall
     Place(out, cat, c, "pottedPlant", 0.55f, 2.6f, -2.3f, 0.0f);         // back-right corner

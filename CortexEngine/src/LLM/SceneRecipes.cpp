@@ -250,6 +250,33 @@ void BuildRoomShell(std::vector<std::shared_ptr<SceneCommand>>& out, const Scene
     box("Base_Back", 0.0f, baseH * 0.5f, -hd, width, baseH, baseTh, baseColor);
     box("Base_Left", -hw, baseH * 0.5f, 0.0f, baseTh, baseH, depth, baseColor);
     box("Base_Right", hw, baseH * 0.5f, 0.0f, baseTh, baseH, depth, baseColor);
+
+    // A glowing daylight window on the feature wall: a dark frame + an emissive
+    // sky-blue pane. Breaks the blank plane, reads as a real window, and (via GI)
+    // throws a little light into the room. Sits high enough to clear back-wall
+    // furniture (counters/beds/sofas).
+    const float winW = std::min(1.9f, width * 0.42f);
+    const float winH = 1.25f;
+    const float winY = 1.78f;
+    const float wallFace = -hd + wallTh * 0.5f; // inner face of the back wall
+    box("Window_Frame", 0.0f, winY, wallFace + 0.02f, winW + 0.18f, winH + 0.18f, 0.06f, baseColor);
+    {
+        auto pane = std::make_shared<AddEntityCommand>();
+        pane->entityType = AddEntityCommand::EntityType::Cube;
+        pane->name = "Window_Pane";
+        pane->position = glm::vec3(0.0f, winY, wallFace + 0.05f);
+        pane->scale = glm::vec3(winW, winH, 0.05f);
+        pane->color = glm::vec4(0.66f, 0.80f, 0.96f, 1.0f); // daylight sky
+        pane->metallic = 0.0f;
+        pane->roughness = 0.2f;
+        pane->setEmissiveStrength = true;
+        pane->emissiveStrength = 2.6f;
+        pane->setEmissiveBloom = true;
+        pane->emissiveBloom = 0.3f;
+        pane->allowPlacementJitter = false;
+        pane->disableCollisionAvoidance = true;
+        out.push_back(std::move(pane));
+    }
 }
 
 // ---- recipes ---------------------------------------------------------------

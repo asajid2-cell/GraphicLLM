@@ -80,6 +80,14 @@ struct AddEntityCommand : public SceneCommand {
     // floor). Recipes set this to put props on surfaces (counter/table/shelf).
     float supportHeight = 0.0f;
 
+    // Optional emissive glow (windows, screens, lamps). emissiveColor defaults to
+    // the albedo when left at zero.
+    bool setEmissiveStrength = false;
+    float emissiveStrength = 1.0f;
+    bool setEmissiveBloom = false;
+    float emissiveBloom = 0.0f;
+    glm::vec4 emissiveColor = glm::vec4(0.0f);
+
     // Geometry detail controls for high/low poly variants
     // Used primarily for spheres, cylinders, cones, and tori.
     // Interpreted as "segments around" and "segments along" (or minor segments).

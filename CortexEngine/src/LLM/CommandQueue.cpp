@@ -597,6 +597,18 @@ void CommandQueue::ExecuteAddEntity(AddEntityCommand* cmd, Scene::ECS_Registry* 
         renderable.presetName = cmd->presetName;
     }
     renderable.visible = true;
+    if (cmd->setEmissiveStrength) {
+        renderable.emissiveStrength = std::clamp(cmd->emissiveStrength, 0.0f, 16.0f);
+        if (glm::length2(glm::vec3(cmd->emissiveColor)) > 1.0e-6f) {
+            renderable.emissiveColor = glm::vec3(cmd->emissiveColor);
+        } else if (renderable.emissiveStrength > 1.0f &&
+                   glm::length2(renderable.emissiveColor) < 1.0e-6f) {
+            renderable.emissiveColor = glm::max(glm::vec3(renderable.albedoColor), glm::vec3(0.05f));
+        }
+    }
+    if (cmd->setEmissiveBloom) {
+        renderable.emissiveBloomFactor = SaturateScalar(cmd->emissiveBloom);
+    }
     renderable.textures.albedo = renderer->GetPlaceholderTexture();
     renderable.textures.normal = renderer->GetPlaceholderNormal();
     renderable.textures.metallic = renderer->GetPlaceholderMetallic();

@@ -120,6 +120,7 @@ struct DeferredLightingContext {
     DescriptorHandle depthSRV{};
     ID3D12Resource* envDiffuseResource = nullptr;
     ID3D12Resource* envSpecularResource = nullptr;
+    ID3D12Resource* rtGIResource = nullptr;
     DXGI_FORMAT envFormat = DXGI_FORMAT_R8G8B8A8_UNORM;
     DescriptorHandle shadowMapSRV{};
     VisibilityBufferRenderer::DeferredLightingParams params{};
@@ -145,6 +146,7 @@ struct FullSceneLightingV3Context {
     DescriptorHandle depthSRV{};
     ID3D12Resource* envDiffuseResource = nullptr;
     ID3D12Resource* envSpecularResource = nullptr;
+    ID3D12Resource* rtGIResource = nullptr;
     DXGI_FORMAT envFormat = DXGI_FORMAT_R8G8B8A8_UNORM;
     DescriptorHandle shadowMapSRV{};
     VisibilityBufferRenderer::DeferredLightingParams params{};

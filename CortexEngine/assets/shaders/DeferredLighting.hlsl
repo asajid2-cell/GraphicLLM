@@ -34,6 +34,7 @@ Texture2D<float4> g_EnvDiffuse : register(t7);  // lat-long (equirect) irradianc
 Texture2D<float4> g_EnvSpecular : register(t8); // lat-long (equirect) prefiltered specular
 Texture2DArray<float> g_ShadowMap : register(t9);
 Texture2D<float2> g_BRDFLUT : register(t10);
+Texture2D<float4> g_RtGI : register(t11);
 
 struct Light {
     float4 position_type;
@@ -42,9 +43,9 @@ struct Light {
     float4 params;
 };
 
-StructuredBuffer<Light> g_LocalLights : register(t11);
-StructuredBuffer<uint2> g_ClusterRanges : register(t12);
-StructuredBuffer<uint> g_ClusterLightIndices : register(t13);
+StructuredBuffer<Light> g_LocalLights : register(t12);
+StructuredBuffer<uint2> g_ClusterRanges : register(t13);
+StructuredBuffer<uint> g_ClusterLightIndices : register(t14);
 
 uint DecodeFixtureClass(uint type, Light light) {
     if (type == LIGHT_TYPE_AREA_RECT) {
@@ -117,6 +118,61 @@ cbuffer PerFrameData : register(b0) {
     float4 g_SceneLocalPayloadParams;      // x=payload ready, y=texture richness, z=proxy score, w=shader influence
     float4 g_CinematicStabilityParams;     // x=specular damping, y=debug stability, z=shadow softness, w=highlight protection
 };
+
+float4 SampleRtDiffuseGI(uint2 pixelCoord)
+{
+    static const int2 offsets[5] = {
+        int2( 0,  0),
+        int2( 1,  0),
+        int2(-1,  0),
+        int2( 0,  1),
+        int2( 0, -1)
+    };
+
+    uint2 giDim = max(g_ScreenAndCluster.xy / 2u, uint2(1u, 1u));
+    int2 giBase = int2(pixelCoord / 2u);
+    float3 radianceSum = 0.0f.xxx;
+    float visibilitySum = 0.0f;
+    float count = 0.0f;
+
+    [unroll]
+    for (int i = 0; i < 5; ++i)
+    {
+        int2 p = giBase + offsets[i];
+        if (p.x < 0 || p.y < 0 || p.x >= (int)giDim.x || p.y >= (int)giDim.y)
+        {
+            continue;
+        }
+
+        float4 s = g_RtGI.Load(int3(p, 0));
+        radianceSum += max(s.rgb, 0.0f.xxx);
+        visibilitySum += s.a;
+        count += 1.0f;
+    }
+
+    return (count > 0.0f)
+        ? float4(radianceSum / count, saturate(visibilitySum / count))
+        : float4(0.0f, 0.0f, 0.0f, 1.0f);
+}
+
+void ApplyRtDiffuseGI(inout float3 ambient,
+                      uint2 pixelCoord,
+                      float3 albedoColor,
+                      float3 kD,
+                      float aoDiffuse)
+{
+    float4 rtGI = SampleRtDiffuseGI(pixelCoord);
+    float rtEnergy = max(max(rtGI.r, rtGI.g), rtGI.b);
+    if (rtEnergy <= 1e-5f && rtGI.a <= 1e-5f)
+    {
+        return;
+    }
+
+    const float cinematicScale = 1.35f;
+    ambient += albedoColor * max(rtGI.rgb, 0.0f.xxx) * kD * (cinematicScale * aoDiffuse);
+    float visibility = max(lerp(1.0f, saturate(rtGI.a), 0.35f), 0.88f);
+    ambient *= visibility;
+}
 
 static const uint INVALID_BINDLESS_INDEX = 0xFFFFFFFFu;
 
@@ -1634,6 +1690,7 @@ float4 PSMain(VSOutput input) : SV_Target0 {
     ambient *= aoDiffuse;
     ambient += diffuseIBL * (iblEnabled ? g_EnvParams.x : 1.0f) * aoDiffuse;
     ambient += specularIBL * aoSpec;
+    ApplyRtDiffuseGI(ambient, pixelCoord, albedoColor, kD_ibl, aoDiffuse);
     if (iblEnabled &&
         surfaceClass != SURFACE_CLASS_GLASS &&
         surfaceClass != SURFACE_CLASS_WATER &&
@@ -2131,6 +2188,7 @@ FullSceneLightingV3Output PSMainV3LightingSplit(VSOutput input) {
     ambient *= aoDiffuse;
     ambient += diffuseIBL * (iblEnabled ? g_EnvParams.x : 1.0f) * aoDiffuse;
     ambient += specularIBL * aoSpec;
+    ApplyRtDiffuseGI(ambient, pixelCoord, albedoColor, kD_ibl, aoDiffuse);
     if (iblEnabled &&
         surfaceClass != SURFACE_CLASS_GLASS &&
         surfaceClass != SURFACE_CLASS_WATER &&

@@ -884,6 +884,7 @@ VisibilityBufferSubsystem::DeferredLightingInputs
 VisibilityBufferSubsystem::PrepareVisibilityBufferDeferredLighting(Scene::ECS_Registry* registry,
                                                                    const VisibilityBufferContext& ctx) {
     DeferredLightingInputs inputs{};
+    inputs.rtGIResource = ctx.rtGIResource;
     {
         auto lightView = registry->View<Scene::LightComponent, Scene::TransformComponent>();
         for (auto entity : lightView) {
@@ -1039,6 +1040,7 @@ void VisibilityBufferSubsystem::ApplyVisibilityBufferDeferredLighting(const Defe
         inputs.envSpecularResource,
         inputs.envFormat,
         ctx.shadows->Resources().resources.srv,
+        inputs.rtGIResource,
         inputs.params);
     if (lightingResult.IsErr()) {
         spdlog::warn("VB deferred lighting failed: {}", lightingResult.Error());

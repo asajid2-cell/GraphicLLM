@@ -1641,20 +1641,10 @@ float3 CalculateLighting(float3 normal, float3 worldPos, float3 albedo, float me
         ambient = g_AmbientColor.rgb * albedo * ao;
     }
 
-    // Optional RT diffuse GI: when the DXR path is active (toggled via V and
-    // gated on device support), sample the RT GI buffer as a low-frequency
-    // ambient/IBL occlusion term rather than an additive light source. The
-    // GI pass encodes visibility in alpha (0 = fully occluded, 1 = fully
-    // visible), with rgb containing a debug-only color. The RT GI buffers
-    // are allocated at half-resolution relative to the main render target,
-    // so we convert from full-resolution pixel coordinates to GI texel
-    // coordinates when sampling.
+    // Optional RT diffuse GI. The GI pass writes low-frequency diffuse
+    // irradiance in RGB and a separate visibility/confidence term in alpha.
     float giVisibility = 1.0f;
-    // To reduce single-sample noise, apply a small 5-tap cross filter in
-    // screen space over the RT GI alpha channel. We always allow the current
-    // GI buffer to influence shading when RTX is enabled; g_DebugMode.w is
-    // used only to gate history blending once the CPU has populated the
-    // GI history buffer at least once.
+    float3 rtDiffuseGI = 0.0f.xxx;
     if (g_PostParams.w > 0.5f && debugView != 22u)
     {
         static const int2 offsets[5] = {
@@ -1665,7 +1655,8 @@ float3 CalculateLighting(float3 normal, float3 worldPos, float3 albedo, float me
             int2( 0, -1)
         };
 
-        float sum = 0.0f;
+        float3 radianceSum = 0.0f.xxx;
+        float visibilitySum = 0.0f;
         float count = 0.0f;
 
         // Derive approximate render size from 1 / resolution stored in
@@ -1690,42 +1681,45 @@ float3 CalculateLighting(float3 normal, float3 worldPos, float3 albedo, float me
             {
                 continue;
             }
-            float a = g_RtGI.Load(int3(p, 0)).a;
-            sum += a;
+            float4 s = g_RtGI.Load(int3(p, 0));
+            radianceSum += max(s.rgb, 0.0f.xxx);
+            visibilitySum += s.a;
             count += 1.0f;
         }
 
-        float giCurr = (count > 0.0f) ? saturate(sum / count) : 1.0f;
+        float4 giCurr = (count > 0.0f)
+            ? float4(radianceSum / count, saturate(visibilitySum / count))
+            : float4(0.0f, 0.0f, 0.0f, 1.0f);
 
         // Temporal accumulation: blend with a simple history buffer when
         // available to reduce frame-to-frame noise from single-sample RT GI.
         if (g_DebugMode.w > 0.5f)
         {
-            float giHistory = g_RtGIHistory.Load(int3(giBase, 0)).a;
-            float diff = abs(giCurr - giHistory);
+            float4 giHistory = g_RtGIHistory.Load(int3(giBase, 0));
+            float diff = max(abs(giCurr.a - giHistory.a),
+                             max(max(abs(giCurr.r - giHistory.r),
+                                     abs(giCurr.g - giHistory.g)),
+                                 abs(giCurr.b - giHistory.b)));
             // When GI is stable, lean more on history; when it changes a lot,
             // trust the new sample to avoid visible ghosts/afterimages.
             float historyWeight = lerp(0.7f, 0.1f, saturate(diff * 4.0f));
-            giVisibility = lerp(giCurr, giHistory, historyWeight);
+            float4 giBlended = lerp(giCurr, giHistory, historyWeight);
+            rtDiffuseGI = max(giBlended.rgb, 0.0f.xxx);
+            giVisibility = saturate(giBlended.a);
         }
         else
         {
-            giVisibility = giCurr;
+            rtDiffuseGI = giCurr.rgb;
+            giVisibility = giCurr.a;
         }
 
-        // Soften RT GI influence to reduce visible flicker: treat the raw
-        // visibility as a suggestion and blend it back towards 1.0 so that
-        // ambient is only gently modulated by the RT term. Also clamp to a
-        // minimum so GI never fully crushes ambient, which helps avoid
-        // "breathing" artifacts when rays flip between occluded / clear.
         const float giStrength = saturate(g_CinematicParams.z);
-        giVisibility = lerp(1.0f, giVisibility, giStrength);
-        giVisibility = max(giVisibility, 0.8f);
+        float3 Fgi = FresnelSchlickRoughness(saturate(dot(normalize(normal), normalize(g_CameraPosition.xyz - worldPos))), F0, roughness);
+        float3 kDgi = (1.0f - metallic) * (1.0f - Fgi);
+        ambient += albedo * rtDiffuseGI * kDgi * (1.35f * giStrength);
+        giVisibility = max(lerp(1.0f, giVisibility, giStrength * 0.35f), 0.88f);
     }
 
-    // Apply GI as an occlusion term on top of the existing ambient/IBL
-    // contribution so that indirect lighting is reduced in crevices and
-    // contact zones instead of simply increasing total energy.
     ambient *= giVisibility;
 
     // Clamp combined direct + ambient radiance to a sane range before HDR,

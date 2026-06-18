@@ -189,6 +189,7 @@ Result<void> VisibilityBufferRenderer::ApplyDeferredLighting(
     ID3D12Resource* envSpecularResource,
     DXGI_FORMAT envFormat,
     const DescriptorHandle& shadowMapSRV,
+    ID3D12Resource* rtGIResource,
     const DeferredLightingParams& params
 ) {
     if (!m_deferredLightingPipeline) {
@@ -414,12 +415,13 @@ Result<void> VisibilityBufferRenderer::ApplyDeferredLighting(
 
     cmdList->SetGraphicsRootDescriptorTable(1, gbufferTable[0].gpu);
 
-    // t7-t10: Environment (diffuse+specular) + shadow map + BRDF LUT SRVs (descriptor table)
+    // t7-t11: Environment (diffuse+specular) + shadow map + BRDF LUT + RTGI SRVs (descriptor table)
     auto& envShadowTable = m_deferredEnvShadowSrvTables[m_frameIndex];
     D3D12_CPU_DESCRIPTOR_HANDLE envDst = envShadowTable[0].cpu;
     D3D12_CPU_DESCRIPTOR_HANDLE specDst = envShadowTable[1].cpu;
     D3D12_CPU_DESCRIPTOR_HANDLE shadowDst = envShadowTable[2].cpu;
     D3D12_CPU_DESCRIPTOR_HANDLE brdfDst = envShadowTable[3].cpu;
+    D3D12_CPU_DESCRIPTOR_HANDLE rtGIDst = envShadowTable[4].cpu;
 
     // Create SRVs directly from resources to avoid copying from shader-visible heaps
     auto createSrvOrNull = [&](D3D12_CPU_DESCRIPTOR_HANDLE dst, ID3D12Resource* resource, DXGI_FORMAT fmt) {
@@ -449,6 +451,8 @@ Result<void> VisibilityBufferRenderer::ApplyDeferredLighting(
     brdfSrvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
     brdfSrvDesc.Texture2D.MipLevels = 1;
     m_device->GetDevice()->CreateShaderResourceView(m_brdfLut.Get(), &brdfSrvDesc, brdfDst);
+
+    createSrvOrNull(rtGIDst, rtGIResource, DXGI_FORMAT_R16G16B16A16_FLOAT);
 
     cmdList->SetGraphicsRootDescriptorTable(2, envShadowTable[0].gpu);
 
@@ -480,6 +484,7 @@ Result<void> VisibilityBufferRenderer::ApplyFullSceneLightingV3(
     ID3D12Resource* envSpecularResource,
     DXGI_FORMAT envFormat,
     const DescriptorHandle& shadowMapSRV,
+    ID3D12Resource* rtGIResource,
     const DeferredLightingParams& params
 ) {
     if (!m_fullSceneLightingV3Pipeline) {
@@ -717,6 +722,8 @@ Result<void> VisibilityBufferRenderer::ApplyFullSceneLightingV3(
     brdfSrvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
     brdfSrvDesc.Texture2D.MipLevels = 1;
     m_device->GetDevice()->CreateShaderResourceView(m_brdfLut.Get(), &brdfSrvDesc, envShadowTable[3].cpu);
+
+    createSrvOrNull(envShadowTable[4].cpu, rtGIResource, DXGI_FORMAT_R16G16B16A16_FLOAT);
 
     cmdList->SetGraphicsRootDescriptorTable(2, envShadowTable[0].gpu);
 

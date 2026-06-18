@@ -35,6 +35,7 @@ VisibilityBufferContext Renderer::MakeVisibilityBufferContext() {
     ctx.materialFallbacks = &m_materialFallbacks;
     ctx.hzb = &m_hzb;
     ctx.shadows = &m_shadows;
+    ctx.rtGIResource = m_rt.GITargets().color.Get();
 
     ctx.prepareMaterialResources = [this](Scene::RenderableComponent& renderable) {
         PrepareMaterialResources(renderable);

@@ -62,9 +62,16 @@ cbuffer FrameConstants : register(b0, space0)
 
 struct GIPayload
 {
-    // 0 = unoccluded, 1 = fully occluded along the sampled direction.
-    float occlusion;
+    float3 radiance;
+    // 0 = fully blocked by diffuse geometry, 1 = open along the sampled direction.
+    float visibility;
 };
+
+static const uint LIGHT_TYPE_DIRECTIONAL = 0u;
+static const uint LIGHT_TYPE_POINT       = 1u;
+static const uint LIGHT_TYPE_SPOT        = 2u;
+static const uint LIGHT_TYPE_AREA_RECT   = 3u;
+static const float GI_PI = 3.14159265359f;
 
 // Reconstruct world-space position from depth and dispatch index, matching the
 // mapping used in the main PBR and post-process passes.
@@ -141,18 +148,97 @@ void StoreGIBlock(uint2 launchIndex, uint2 launchDims, float4 value)
     }
 }
 
+uint HashGI(uint x)
+{
+    x ^= x >> 16;
+    x *= 0x7feb352du;
+    x ^= x >> 15;
+    x *= 0x846ca68bu;
+    x ^= x >> 16;
+    return x;
+}
+
+float RandomGI(inout uint state)
+{
+    state = HashGI(state);
+    return (float)(state & 0x00FFFFFFu) / 16777216.0f;
+}
+
+float3 CosineHemisphereDirection(float2 u, float3 N, float3 T, float3 B)
+{
+    float phi = 2.0f * GI_PI * u.x;
+    float r = sqrt(saturate(u.y));
+    float x = r * cos(phi);
+    float y = r * sin(phi);
+    float z = sqrt(saturate(1.0f - u.y));
+    return normalize(T * x + B * y + N * z);
+}
+
+float3 EstimateHitRadiance(RTMaterial material, float3 hitPos)
+{
+    float3 albedo = saturate(material.albedoMetallic.rgb);
+    float metallic = saturate(material.albedoMetallic.a);
+    float diffuseWeight = RTMaterialDiffuseGIVisibility(material) * (1.0f - metallic);
+    float3 emissive = max(material.emissiveRoughness.rgb, 0.0f.xxx);
+
+    float3 incident = max(g_AmbientColor.rgb, 0.0f.xxx) * 0.65f;
+    uint lightCount = min(g_LightCount.x, 16u);
+    [loop]
+    for (uint i = 0u; i < lightCount; ++i)
+    {
+        Light light = g_Lights[i];
+        uint type = (uint)round(light.position_type.w);
+        float3 lightRadiance = max(light.color_range.rgb, 0.0f.xxx);
+        if (type == LIGHT_TYPE_DIRECTIONAL)
+        {
+            incident += lightRadiance * 0.035f;
+            continue;
+        }
+
+        float3 toLight = light.position_type.xyz - hitPos;
+        float distSq = max(dot(toLight, toLight), 1e-4f);
+        float range = max(light.color_range.w, 0.01f);
+        float dist = sqrt(distSq);
+        float rangeAtten = saturate(1.0f - dist / range);
+        rangeAtten *= rangeAtten;
+
+        float coneAtten = 1.0f;
+        if (type == LIGHT_TYPE_SPOT)
+        {
+            float3 L = toLight / dist;
+            float spotCos = dot(normalize(-light.direction_cosInner.xyz), L);
+            float outerCos = light.params.x;
+            float innerCos = light.direction_cosInner.w;
+            coneAtten = saturate((spotCos - outerCos) / max(innerCos - outerCos, 1e-3f));
+            coneAtten *= coneAtten;
+        }
+        else if (type == LIGHT_TYPE_AREA_RECT)
+        {
+            rangeAtten *= 0.8f;
+        }
+
+        incident += lightRadiance * rangeAtten * coneAtten * 0.18f;
+    }
+
+    float3 bounced = albedo * incident * diffuseWeight;
+    return min(emissive + bounced, 32.0f.xxx);
+}
+
 [shader("miss")]
 void Miss_GI(inout GIPayload payload)
 {
-    // No geometry encountered along the sampled ray: treat as unoccluded.
-    payload.occlusion = 0.0f;
+    payload.radiance = 0.0f.xxx;
+    payload.visibility = 1.0f;
 }
 
 [shader("closesthit")]
 void ClosestHit_GI(inout GIPayload payload, in BuiltInTriangleIntersectionAttributes /*attribs*/)
 {
     RTMaterial material = g_RTMaterials[InstanceID()];
-    payload.occlusion = RTMaterialDiffuseGIVisibility(material);
+    float occlusion = RTMaterialDiffuseGIVisibility(material);
+    float3 hitPos = WorldRayOrigin() + WorldRayDirection() * RayTCurrent();
+    payload.radiance = EstimateHitRadiance(material, hitPos);
+    payload.visibility = saturate(1.0f - occlusion);
 }
 
 [shader("raygeneration")]
@@ -189,11 +275,6 @@ void RayGen_GI()
     float3 worldPos = ReconstructWorldPositionUV(uv, depth);
     float3 N = ApproximateNormal((uint2)centerPix, depthDim);
 
-    // Cast a small number of rays in the local hemisphere around the
-    // approximate normal and treat the result as a simple visibility term
-    // for ambient/diffuse IBL. This is closer to ray-traced ambient
-    // occlusion than full multi-bounce GI, but with two directions per
-    // pixel it produces smoother, more stable results than a single ray.
     const float bias = 0.05f;
     float3 origin = worldPos + N * bias;
     const float rayDistance = clamp(g_CinematicParams.w, 0.5f, 20.0f);
@@ -203,43 +284,27 @@ void RayGen_GI()
     float3 T = normalize(cross(up, N));
     float3 B = cross(N, T);
 
-    float occlusionSum = 0.0f;
-    const int kRayCount = 2;
+    float3 radianceSum = 0.0f.xxx;
+    float visibilitySum = 0.0f;
+    const int kRayCount = 4;
+    uint rng = HashGI(launchIndex.x * 1973u ^
+                      launchIndex.y * 9277u ^
+                      (uint)(g_TimeAndExposure.x * 60.0f) * 26699u);
 
-    // Ray 0: along the normal.
+    [unroll]
+    for (int i = 0; i < kRayCount; ++i)
     {
+        float2 u = float2(RandomGI(rng), RandomGI(rng));
+        u.x = frac(u.x + ((float)i + 0.5f) / (float)kRayCount);
+        float3 dir = CosineHemisphereDirection(u, N, T, B);
+
         GIPayload payload;
-        payload.occlusion = 0.0f;
+        payload.radiance = 0.0f.xxx;
+        payload.visibility = 1.0f;
 
         RayDesc ray;
         ray.Origin = origin;
-        ray.Direction = N;
-        ray.TMin = 0.0f;
-        ray.TMax = rayDistance; // local occlusion radius
-
-        TraceRay(
-            g_TopLevel,
-            RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH,
-            /*InstanceInclusionMask*/ 0xFF,
-            /*RayContributionToHitGroupIndex*/ 0,
-            /*MultiplierForGeometryContributionToHitGroupIndex*/ 0,
-            /*MissShaderIndex*/ 0,
-            ray,
-            payload);
-
-        occlusionSum += payload.occlusion;
-    }
-
-    // Ray 1: a slightly tilted direction in the tangent/bitangent plane.
-    {
-        float3 dir1 = normalize(N + 0.5f * T + 0.25f * B);
-
-        GIPayload payload;
-        payload.occlusion = 0.0f;
-
-        RayDesc ray;
-        ray.Origin = origin;
-        ray.Direction = dir1;
+        ray.Direction = dir;
         ray.TMin = 0.0f;
         ray.TMax = rayDistance;
 
@@ -253,13 +318,11 @@ void RayGen_GI()
             ray,
             payload);
 
-        occlusionSum += payload.occlusion;
+        radianceSum += payload.radiance;
+        visibilitySum += payload.visibility;
     }
 
-    float visibility = saturate(1.0f - occlusionSum / (float)kRayCount);
-
-    // Encode visibility in both rgb (for debug visualization) and alpha so
-    // the main PBR shader can treat this as an ambient/IBL occlusion factor.
-    float3 giColor = g_AmbientColor.rgb * visibility;
-    StoreGIBlock(launchIndex, launchDims, float4(giColor, visibility));
+    float3 irradiance = max(radianceSum / (float)kRayCount, 0.0f.xxx);
+    float visibility = saturate(visibilitySum / (float)kRayCount);
+    StoreGIBlock(launchIndex, launchDims, float4(min(irradiance, 32.0f.xxx), visibility));
 }

@@ -93,7 +93,7 @@ Result<void> DX12RaytracingContext::InitializeGIPipeline() {
 
         // Subobject 2: Shader config (payload + attributes)
         D3D12_RAYTRACING_SHADER_CONFIG shaderConfig{};
-        shaderConfig.MaxPayloadSizeInBytes = 4; // single float occlusion factor
+        shaderConfig.MaxPayloadSizeInBytes = 16; // float3 radiance + float visibility
         shaderConfig.MaxAttributeSizeInBytes = 8; // barycentrics
 
         subobjects[2].Type = D3D12_STATE_SUBOBJECT_TYPE_RAYTRACING_SHADER_CONFIG;

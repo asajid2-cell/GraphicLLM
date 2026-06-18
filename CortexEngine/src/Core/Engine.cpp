@@ -1000,12 +1000,15 @@ Result<void> Engine::Initialize(const EngineConfig& config) {
         dbg.fractalNoiseType = 0.0f;
 
         dbg = LoadDebugMenuStateOrDefault(dbg);
-        if ((m_currentScenePreset == ScenePreset::RTShowcase ||
-             m_currentScenePreset == ScenePreset::IBLGallery ||
-             m_currentScenePreset == ScenePreset::TemporalValidation) &&
-            rt.supported) {
-            // RTShowcase is the canonical feature-measurement scene. Do not let
-            // stale persisted UI values silently remove or retune the RT workload.
+        const bool protectRTWorkload =
+            m_currentScenePreset == ScenePreset::RTShowcase ||
+            m_currentScenePreset == ScenePreset::IBLGallery ||
+            m_currentScenePreset == ScenePreset::TemporalValidation ||
+            std::getenv("CORTEX_CAPTURE_VISUAL_VALIDATION") != nullptr ||
+            std::getenv("CORTEX_EXIT_AFTER_VISUAL_VALIDATION") != nullptr;
+        if (protectRTWorkload && rt.supported) {
+            // Measurement/headless capture paths must not let stale persisted UI
+            // values silently remove or retune the RT workload being verified.
             dbg.rayTracingEnabled = true;
             dbg.exposure = quality.exposure;
             dbg.bloomIntensity = quality.bloomIntensity;

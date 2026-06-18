@@ -445,6 +445,7 @@ bool ApplyDeferredLighting(const DeferredLightingContext& context) {
         context.envSpecularResource,
         context.envFormat,
         context.shadowMapSRV,
+        context.rtGIResource,
         context.params);
     context.renderer->SetTransitionSkipControls(previousControls);
     if (lightingResult.IsErr()) {
@@ -515,6 +516,7 @@ bool ApplyFullSceneLightingV3(const FullSceneLightingV3Context& context) {
         context.envSpecularResource,
         context.envFormat,
         context.shadowMapSRV,
+        context.rtGIResource,
         context.params);
     context.renderer->SetTransitionSkipControls(previousControls);
     if (lightingResult.IsErr()) {

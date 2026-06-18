@@ -517,6 +517,97 @@ float3 ApplyProceduralMicroNormal(float3 normalWS,
     return normalize(lerp(N, bumped, saturate(maskStrength * 0.85f)));
 }
 
+float3 ProceduralTriplanarWeights(float3 normalWS)
+{
+    float3 w = pow(abs(normalize(normalWS)), 4.0f);
+    return w / max(w.x + w.y + w.z, 1.0e-4f);
+}
+
+float FineWeavePlane(float2 p)
+{
+    float2 q = p * 12.0f;
+    float warp = (ValueNoise2D(q * 0.075f) * 2.0f - 1.0f) * 0.42f;
+    float weave = sin((q.x + warp) * 3.14159265f) * sin((q.y - warp) * 3.14159265f);
+    float speckle = (ValueNoise2D(q * 2.1f + float2(5.7f, 1.9f)) * 2.0f - 1.0f) * 0.50f +
+                    (ValueNoise2D(q * 6.3f + float2(17.3f, 9.1f)) * 2.0f - 1.0f) * 0.22f;
+    return weave * 0.080f + speckle * 0.125f;
+}
+
+float WoodGrainPlane(float2 p)
+{
+    float2 q = p * 1.65f;
+    float slowWarp = (ValueNoise2D(q * 0.55f + float2(3.1f, 8.7f)) * 2.0f - 1.0f) * 2.4f;
+    float fineWarp = (ValueNoise2D(float2(q.x * 2.8f, q.y * 0.45f) + float2(11.0f, 2.0f)) * 2.0f - 1.0f) * 0.75f;
+    float grain = sin(q.x * 23.0f + slowWarp + fineWarp);
+    float streak = (ValueNoise2D(float2(q.x * 10.0f + slowWarp, q.y * 0.75f)) * 2.0f - 1.0f) * 0.55f;
+    float broad = (ValueNoise2D(float2(q.x * 1.4f, q.y * 0.18f) + float2(21.0f, 4.0f)) * 2.0f - 1.0f) * 0.25f;
+    return grain * 0.22f + streak * 0.48f + broad;
+}
+
+float TriplanarFineWeave(float3 worldPos, float3 normalWS)
+{
+    float3 w = ProceduralTriplanarWeights(normalWS);
+    float x = FineWeavePlane(worldPos.yz);
+    float y = FineWeavePlane(worldPos.xz);
+    float z = FineWeavePlane(worldPos.xy);
+    return dot(float3(x, y, z), w);
+}
+
+float TriplanarWoodGrain(float3 worldPos, float3 normalWS)
+{
+    float3 w = ProceduralTriplanarWeights(normalWS);
+    float x = WoodGrainPlane(worldPos.zy);
+    float y = WoodGrainPlane(worldPos.xz);
+    float z = WoodGrainPlane(worldPos.xy);
+    return dot(float3(x, y, z), w);
+}
+
+void ApplyProceduralSurfaceDetailVB(float3 worldPos,
+                                    float3 tangentWS,
+                                    float tangentSign,
+                                    inout float3 normalWS,
+                                    inout float3 albedo,
+                                    inout float roughness,
+                                    float metallic,
+                                    uint materialClass)
+{
+    float nonMetal = 1.0f - smoothstep(0.08f, 0.28f, saturate(metallic));
+    float semanticWood = (materialClass == SURFACE_CLASS_WOOD) ? 1.0f : 0.0f;
+    float highRough = nonMetal * smoothstep(0.62f, 0.82f, saturate(roughness));
+    float midRough = nonMetal *
+                     smoothstep(0.34f, 0.48f, saturate(roughness)) *
+                     (1.0f - smoothstep(0.62f, 0.76f, saturate(roughness)));
+    midRough = saturate(max(midRough, semanticWood * nonMetal * 0.85f));
+    highRough *= (1.0f - semanticWood);
+
+    float fine = TriplanarFineWeave(worldPos, normalWS);
+    float wood = TriplanarWoodGrain(worldPos, normalWS);
+
+    float3 N = normalize(normalWS);
+    float3 T = tangentWS - N * dot(tangentWS, N);
+    if (!all(isfinite(T)) || dot(T, T) < 1.0e-6f) {
+        T = FallbackTangentFromNormal(N);
+    } else {
+        T = normalize(T);
+    }
+    float3 B = normalize(cross(N, T)) * ((tangentSign >= 0.0f) ? 1.0f : -1.0f);
+
+    const float worldEps = 0.035f;
+    float fineT = TriplanarFineWeave(worldPos + T * worldEps, N);
+    float fineB = TriplanarFineWeave(worldPos + B * worldEps, N);
+    float2 slope = float2(fineT - fine, fineB - fine);
+    float3 bumped = normalize(N - (T * slope.x + B * slope.y) * 0.32f);
+    normalWS = normalize(lerp(N, bumped, saturate(highRough * 0.45f)));
+
+    float3 woodTint = float3(1.0f + wood * 0.060f,
+                             1.0f + wood * 0.042f,
+                             1.0f + wood * 0.024f);
+    albedo = saturate(albedo * lerp(float3(1.0f, 1.0f, 1.0f), woodTint, midRough));
+
+    float roughDelta = highRough * fine * 0.018f + midRough * wood * 0.045f;
+    roughness = saturate(roughness + roughDelta);
+}
+
 // Compute shader: One thread per pixel
 [numthreads(8, 8, 1)]
 void CSMain(uint3 dispatchThreadID : SV_DispatchThreadID) {
@@ -853,6 +944,16 @@ void CSMain(uint3 dispatchThreadID : SV_DispatchThreadID) {
                 mat.materialClass,
                 proceduralMaskStrength);
         }
+
+        ApplyProceduralSurfaceDetailVB(
+            worldPos,
+            tangent.xyz,
+            tangent.w,
+            normalWS,
+            albedo,
+            roughness,
+            metallic,
+            mat.materialClass);
 
         // KHR_materials_transmission: transmissionTexture stored in R.
         if (mat.textureIndices3.x != INVALID_BINDLESS_INDEX) {

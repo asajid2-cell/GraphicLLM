@@ -477,6 +477,88 @@ float ProceduralMaterialMask(float2 uv, float3 worldPos)
     return saturate(0.5f + h / max(2.0f * amplitude, 1.0e-3f));
 }
 
+float3 ProceduralTriplanarWeights(float3 normal)
+{
+    float3 w = pow(abs(normalize(normal)), 4.0f);
+    return w / max(w.x + w.y + w.z, 1.0e-4f);
+}
+
+float FineWeavePlane(float2 p)
+{
+    float2 q = p * 12.0f;
+    float warp = Noise2D(q * 0.075f) * 0.42f;
+    float weave = sin((q.x + warp) * PI) * sin((q.y - warp) * PI);
+    float speckle = Noise2D(q * 2.1f + float2(5.7f, 1.9f)) * 0.50f +
+                    Noise2D(q * 6.3f + float2(17.3f, 9.1f)) * 0.22f;
+    return weave * 0.080f + speckle * 0.125f;
+}
+
+float WoodGrainPlane(float2 p)
+{
+    float2 q = p * 1.65f;
+    float slowWarp = Noise2D(q * 0.55f + float2(3.1f, 8.7f)) * 2.4f;
+    float fineWarp = Noise2D(float2(q.x * 2.8f, q.y * 0.45f) + float2(11.0f, 2.0f)) * 0.75f;
+    float grain = sin(q.x * 23.0f + slowWarp + fineWarp);
+    float streak = Noise2D(float2(q.x * 10.0f + slowWarp, q.y * 0.75f)) * 0.55f;
+    float broad = Noise2D(float2(q.x * 1.4f, q.y * 0.18f) + float2(21.0f, 4.0f)) * 0.25f;
+    return grain * 0.22f + streak * 0.48f + broad;
+}
+
+float TriplanarFineWeave(float3 worldPos, float3 normal)
+{
+    float3 w = ProceduralTriplanarWeights(normal);
+    float x = FineWeavePlane(worldPos.yz);
+    float y = FineWeavePlane(worldPos.xz);
+    float z = FineWeavePlane(worldPos.xy);
+    return dot(float3(x, y, z), w);
+}
+
+float TriplanarWoodGrain(float3 worldPos, float3 normal)
+{
+    float3 w = ProceduralTriplanarWeights(normal);
+    float x = WoodGrainPlane(worldPos.zy);
+    float y = WoodGrainPlane(worldPos.xz);
+    float z = WoodGrainPlane(worldPos.xy);
+    return dot(float3(x, y, z), w);
+}
+
+float3 PerturbNormalFromHeight(float3 normal, float3 worldPos, float height, float strength)
+{
+    float3 N = normalize(normal);
+    float3 dpdx = ddx(worldPos);
+    float3 dpdy = ddy(worldPos);
+    float dhdx = ddx(height);
+    float dhdy = ddy(height);
+    float3 r1 = cross(dpdy, N);
+    float3 r2 = cross(N, dpdx);
+    float det = dot(dpdx, r1);
+    float3 grad = (r1 * dhdx + r2 * dhdy) / max(abs(det), 1.0e-4f);
+    return normalize(N - grad * strength);
+}
+
+void ApplyProceduralSurfaceDetail(float3 worldPos, inout float3 normal, inout float3 albedo, inout float roughness, float metallic)
+{
+    float nonMetal = 1.0f - smoothstep(0.08f, 0.28f, saturate(metallic));
+    float highRough = nonMetal * smoothstep(0.62f, 0.82f, saturate(roughness));
+    float midRough = nonMetal *
+                     smoothstep(0.34f, 0.48f, saturate(roughness)) *
+                     (1.0f - smoothstep(0.62f, 0.76f, saturate(roughness)));
+
+    float fine = TriplanarFineWeave(worldPos, normal);
+    float wood = TriplanarWoodGrain(worldPos, normal);
+
+    float highHeight = fine * highRough;
+    normal = PerturbNormalFromHeight(normal, worldPos, highHeight, 0.0020f);
+
+    float3 woodTint = float3(1.0f + wood * 0.060f,
+                             1.0f + wood * 0.042f,
+                             1.0f + wood * 0.024f);
+    albedo = saturate(albedo * lerp(float3(1.0f, 1.0f, 1.0f), woodTint, midRough));
+
+    float roughDelta = highRough * fine * 0.018f + midRough * wood * 0.045f;
+    roughness = saturate(roughness + roughDelta);
+}
+
 float3 ApplyACESFilm(float3 x)
 {
     // ACES fitted curve (Narkowicz 2015)
@@ -1869,6 +1951,8 @@ PSOutput PSMainInternal(PSInput input, bool useClusteredLocalLights)
         float3 perturbed = normalize(N - dhdx * T - dhdz * B);
         normal = perturbed;
     }
+
+    ApplyProceduralSurfaceDetail(input.worldPos, normal, albedo, roughness, metallic);
 
     // Debug views
     uint debugView = (uint)g_DebugMode.x;

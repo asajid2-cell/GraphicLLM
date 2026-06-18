@@ -63,9 +63,18 @@ Footprint Measure(const Scene::AssetCatalog& catalog, FootprintCache& cache, con
 // all render flat white. Used when a recipe doesn't pass an explicit color.
 glm::vec4 ColorForKey(const std::string& k) {
     auto has = [&](const char* n) { return k.find(n) != std::string::npos; };
-    if (has("sofa") || has("couch") || has("chair") || has("cushion") || has("stool") || has("bed") ||
-        has("lounge")) {
-        return glm::vec4(0.43f, 0.46f, 0.52f, 1.0f); // upholstery blue-gray
+    if (has("pillow")) {
+        if (has("blue")) return glm::vec4(0.30f, 0.42f, 0.58f, 1.0f); // blue accent
+        return glm::vec4(0.74f, 0.42f, 0.33f, 1.0f);                  // terracotta accent
+    }
+    if (has("sofa") || has("couch")) {
+        return glm::vec4(0.36f, 0.45f, 0.43f, 1.0f); // muted sage-teal sofa
+    }
+    if (has("bed")) {
+        return glm::vec4(0.82f, 0.78f, 0.70f, 1.0f); // cream bedding
+    }
+    if (has("chair") || has("cushion") || has("stool") || has("lounge")) {
+        return glm::vec4(0.55f, 0.48f, 0.40f, 1.0f); // warm taupe upholstery
     }
     if (has("television") || has("computer") || has("screen") || has("speaker") || has("laptop") ||
         has("radio") || has("monitor")) {
@@ -264,8 +273,8 @@ void BuildLivingRoom(std::vector<std::shared_ptr<SceneCommand>>& out, const Scen
     Place(out, cat, c, "bookcaseOpen", 1.1f, -3.0f, 1.0f, 90.0f);       // side wall
     Place(out, cat, c, "cabinetTelevision", 1.6f, 0.0f, 2.7f, 180.0f);  // front wall (behind camera)
     Place(out, cat, c, "televisionModern", 1.2f, 0.0f, 2.5f, 180.0f);
-    Place(out, cat, c, "pottedPlant", 0.6f, 2.9f, 1.1f, 0.0f);          // corner greenery
-    Place(out, cat, c, "pottedPlant", 0.55f, -3.0f, -2.7f, 0.0f);
+    Place(out, cat, c, "pottedPlant", 0.6f, 2.9f, -2.6f, 0.0f);         // back-right corner greenery
+    Place(out, cat, c, "pottedPlant", 0.55f, -3.0f, -2.7f, 0.0f);       // back-left corner
 }
 
 void BuildBedroom(std::vector<std::shared_ptr<SceneCommand>>& out, const Scene::AssetCatalog& cat, FootprintCache& c) {

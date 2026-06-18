@@ -560,10 +560,11 @@ void BuildGarden(std::vector<std::shared_ptr<SceneCommand>>& out, const Scene::A
     }
     Place(out, cat, c, "rugSquare", 3.6f, 0.3f, -0.6f, 0.0f, glm::vec4(0.58f, 0.56f, 0.52f, 1.0f)); // stone patio
     // Patio seating set (known-good Kenney pieces that scale correctly).
-    Place(out, cat, c, "tableCoffee", 1.2f, 0.3f, -0.7f, 0.0f);
-    Place(out, cat, c, "loungeChair", 0.9f, -0.8f, -0.1f, 45.0f);
-    Place(out, cat, c, "loungeChair", 0.9f, 1.4f, -0.1f, -45.0f);
-    Place(out, cat, c, "bench", 1.5f, 0.3f, -2.0f, 0.0f);
+    Place(out, cat, c, "tableCloth", 1.4f, 0.3f, -0.7f, 0.0f);          // patio dining table
+    Place(out, cat, c, "chairCushion", 0.6f, -0.7f, -0.7f, -90.0f);     // upright chairs around it
+    Place(out, cat, c, "chairCushion", 0.6f, 1.3f, -0.7f, 90.0f);
+    Place(out, cat, c, "chairCushion", 0.6f, 0.3f, 0.5f, 180.0f);
+    Place(out, cat, c, "bench", 1.5f, 0.3f, -2.1f, 0.0f);               // bench behind
     Place(out, cat, c, "Barrel_01", 0.6f, 2.3f, -2.0f, 0.0f); // planter/decor (lantern blooms out in daylight)
     // Trees / greenery framing the garden.
     Place(out, cat, c, "dead_tree_trunk", 3.6f, -5.0f, -3.2f, 0.0f, glm::vec4(0.34f, 0.26f, 0.17f, 1.0f));

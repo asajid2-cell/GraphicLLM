@@ -133,6 +133,17 @@ bool Place(std::vector<std::shared_ptr<SceneCommand>>& out,
     cmd->scale = glm::vec3(scale);
     const std::string lk = ToLower(key);
     cmd->color = (color == glm::vec4(1.0f)) ? ColorForKey(lk) : color;
+    // Deterministic per-instance tint so repeated items (a row of dining chairs,
+    // stools, books) aren't identical clones. Hash of position -> small brightness
+    // jitter; stable across rebuilds, no RNG.
+    {
+        const int hx = static_cast<int>(x * 100.0f);
+        const int hz = static_cast<int>(z * 100.0f);
+        unsigned h = static_cast<unsigned>(hx * 374761393 + hz * 668265263);
+        h = (h ^ (h >> 13)) * 1274126177u;
+        const float jitter = 0.93f + (h & 0xFFFFu) / 65535.0f * 0.14f; // 0.93..1.07
+        cmd->color = glm::vec4(glm::clamp(glm::vec3(cmd->color) * jitter, 0.0f, 1.0f), cmd->color.a);
+    }
     // Light sources + screens glow when "on" — a cheap, automatic realism touch.
     if (lk.find("lamp") != std::string::npos && lk.find("ceiling") == std::string::npos) {
         cmd->setEmissiveStrength = true;

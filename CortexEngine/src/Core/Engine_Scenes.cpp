@@ -2687,6 +2687,14 @@ void Engine::BuildRecipeScene() {
         }
         renderer->SetShadowBias(0.0035f);
         renderer->SetShadowPCFRadius(2.5f);
+        // Run the recipe scenes through the FULL-quality path (scene presets
+        // otherwise default to 0.85 render scale + IBL off): full-res, TAA,
+        // screen-space reflections + AO. Re-asserted last so no profile undoes it.
+        renderer->SetRenderScale(1.0f);
+        renderer->SetTAAEnabled(true);
+        renderer->SetSSREnabled(true);
+        renderer->SetSSAOEnabled(true);
+        renderer->SetShadowsEnabled(true);
     }
 
     // Soft key light from above so the interior reads with shape + shadow.

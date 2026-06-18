@@ -60,8 +60,15 @@ if (-not $OutName) {
 $png = Join-Path $logs "$OutName.png"
 Add-Type -AssemblyName System.Drawing
 $img = [System.Drawing.Image]::FromFile($bmp)
-# Downscale by half to keep the PNG small enough to view quickly.
-$resized = New-Object System.Drawing.Bitmap($img, [int]($img.Width/2), [int]($img.Height/2))
-$resized.Save($png, [System.Drawing.Imaging.ImageFormat]::Png)
-$img.Dispose(); $resized.Dispose()
+# Save at NATIVE resolution (judging crispness from a half-scale thumbnail hides
+# pixelation / aliasing). Only downscale if the frame is very large (>1600 wide).
+if ($img.Width -gt 1600) {
+    $sc = 1600.0 / $img.Width
+    $resized = New-Object System.Drawing.Bitmap($img, [int]($img.Width*$sc), [int]($img.Height*$sc))
+    $resized.Save($png, [System.Drawing.Imaging.ImageFormat]::Png)
+    $resized.Dispose()
+} else {
+    $img.Save($png, [System.Drawing.Imaging.ImageFormat]::Png)
+}
+$img.Dispose()
 Write-Output $png

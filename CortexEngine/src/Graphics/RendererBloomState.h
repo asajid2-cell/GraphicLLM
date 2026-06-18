@@ -9,7 +9,7 @@
 
 namespace Cortex::Graphics {
 
-inline constexpr uint32_t kBloomLevels = 3;
+inline constexpr uint32_t kBloomLevels = 5;
 inline constexpr uint32_t kBloomDescriptorSlots =
     1u + (kBloomLevels - 1u) + (2u * kBloomLevels) + kBloomLevels;
 

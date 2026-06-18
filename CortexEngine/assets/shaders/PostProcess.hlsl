@@ -731,12 +731,18 @@ float4 BloomBlurHPS(VSOutput input) : SV_TARGET
 {
     float2 texel = float2(g_PostParams.x * 4.0f, 0.0f); // quarter-res approximation
     float3 sum = 0.0f;
-    float weights[5] = {0.204164f, 0.304005f, 0.093913f, 0.010381f, 0.000837f};
+    float weights[6] = {0.183480f, 0.165472f, 0.121375f, 0.072411f, 0.035136f, 0.013866f};
     sum += g_SceneColor.Sample(g_Sampler, input.uv).rgb * weights[0];
     sum += g_SceneColor.Sample(g_Sampler, input.uv + texel).rgb * weights[1];
     sum += g_SceneColor.Sample(g_Sampler, input.uv - texel).rgb * weights[1];
     sum += g_SceneColor.Sample(g_Sampler, input.uv + texel * 2.0f).rgb * weights[2];
     sum += g_SceneColor.Sample(g_Sampler, input.uv - texel * 2.0f).rgb * weights[2];
+    sum += g_SceneColor.Sample(g_Sampler, input.uv + texel * 3.0f).rgb * weights[3];
+    sum += g_SceneColor.Sample(g_Sampler, input.uv - texel * 3.0f).rgb * weights[3];
+    sum += g_SceneColor.Sample(g_Sampler, input.uv + texel * 4.0f).rgb * weights[4];
+    sum += g_SceneColor.Sample(g_Sampler, input.uv - texel * 4.0f).rgb * weights[4];
+    sum += g_SceneColor.Sample(g_Sampler, input.uv + texel * 5.0f).rgb * weights[5];
+    sum += g_SceneColor.Sample(g_Sampler, input.uv - texel * 5.0f).rgb * weights[5];
     return float4(sum, 1.0f);
 }
 
@@ -745,12 +751,18 @@ float4 BloomBlurVPS(VSOutput input) : SV_TARGET
 {
     float2 texel = float2(0.0f, g_PostParams.y * 4.0f); // quarter-res approximation
     float3 sum = 0.0f;
-    float weights[5] = {0.204164f, 0.304005f, 0.093913f, 0.010381f, 0.000837f};
+    float weights[6] = {0.183480f, 0.165472f, 0.121375f, 0.072411f, 0.035136f, 0.013866f};
     sum += g_SceneColor.Sample(g_Sampler, input.uv).rgb * weights[0];
     sum += g_SceneColor.Sample(g_Sampler, input.uv + texel).rgb * weights[1];
     sum += g_SceneColor.Sample(g_Sampler, input.uv - texel).rgb * weights[1];
     sum += g_SceneColor.Sample(g_Sampler, input.uv + texel * 2.0f).rgb * weights[2];
     sum += g_SceneColor.Sample(g_Sampler, input.uv - texel * 2.0f).rgb * weights[2];
+    sum += g_SceneColor.Sample(g_Sampler, input.uv + texel * 3.0f).rgb * weights[3];
+    sum += g_SceneColor.Sample(g_Sampler, input.uv - texel * 3.0f).rgb * weights[3];
+    sum += g_SceneColor.Sample(g_Sampler, input.uv + texel * 4.0f).rgb * weights[4];
+    sum += g_SceneColor.Sample(g_Sampler, input.uv - texel * 4.0f).rgb * weights[4];
+    sum += g_SceneColor.Sample(g_Sampler, input.uv + texel * 5.0f).rgb * weights[5];
+    sum += g_SceneColor.Sample(g_Sampler, input.uv - texel * 5.0f).rgb * weights[5];
     return float4(sum, 1.0f);
 }
 
@@ -1811,6 +1823,80 @@ float LensDirtMask(float2 uv)
     return saturate((speckle * 0.75f + fine * 0.25f) * radial);
 }
 
+float3 SampleHighlightStreakAxis(float2 uv, float2 axis, float radiusPixels, float strength)
+{
+    float2 safeAxis = axis;
+    float axisLen = length(safeAxis);
+    if (axisLen < 1e-4f)
+    {
+        safeAxis = float2(1.0f, 0.0f);
+    }
+    else
+    {
+        safeAxis /= axisLen;
+    }
+
+    float2 pixelStep = safeAxis * g_PostParams.xy;
+    float3 accum = 0.0f;
+    float weightSum = 0.0f;
+
+    [unroll]
+    for (int i = 1; i <= 9; ++i)
+    {
+        float t = (float)i * (1.0f / 9.0f);
+        float radius = lerp(4.0f, radiusPixels, t);
+        float weight = exp2(-t * 4.2f) * (1.0f - t * 0.28f);
+        float2 delta = pixelStep * radius;
+
+        float3 s0 = g_BloomSource.SampleLevel(g_Sampler, uv + delta, 0).rgb;
+        float3 s1 = g_BloomSource.SampleLevel(g_Sampler, uv - delta, 0).rgb;
+        float l0 = dot(s0, float3(0.2126f, 0.7152f, 0.0722f));
+        float l1 = dot(s1, float3(0.2126f, 0.7152f, 0.0722f));
+        float gate0 = smoothstep(0.015f, 0.35f, l0);
+        float gate1 = smoothstep(0.015f, 0.35f, l1);
+
+        accum += s0 * weight * gate0;
+        accum += s1 * weight * gate1;
+        weightSum += weight * (gate0 + gate1);
+    }
+
+    return (weightSum > 1e-4f) ? (accum / weightSum) * strength : 0.0f.xxx;
+}
+
+float3 SampleHighlightStreaks(float2 uv)
+{
+    float aspect = g_PostParams.y / max(g_PostParams.x, 1e-6f);
+    float3 horizontal = SampleHighlightStreakAxis(uv, float2(1.0f, 0.0f), 240.0f, 1.05f);
+    float3 vertical = SampleHighlightStreakAxis(uv, float2(0.0f, 1.0f), 48.0f, 0.035f);
+
+    float3 sunAxis = 0.0f.xxx;
+    if (g_LightCount.x > 0)
+    {
+        Light sun = g_Lights[0];
+        uint sunType = (uint)sun.position_type.w;
+        if (sunType == 0)
+        {
+            float3 sunDirWS = -normalize(sun.direction_cosInner.xyz);
+            float3 sunWorld = g_CameraPosition.xyz + sunDirWS * 1000.0f;
+            float4 sunClip = mul(g_ViewProjectionMatrix, float4(sunWorld, 1.0f));
+            if (sunClip.w > 0.0f)
+            {
+                float2 sunNdc = sunClip.xy / sunClip.w;
+                float2 sunUV = float2(sunNdc.x * 0.5f + 0.5f, 0.5f - sunNdc.y * 0.5f);
+                if (sunUV.x > -0.25f && sunUV.x < 1.25f &&
+                    sunUV.y > -0.25f && sunUV.y < 1.25f)
+                {
+                    float2 radial = uv - sunUV;
+                    radial.x *= aspect;
+                    sunAxis = SampleHighlightStreakAxis(uv, radial, 72.0f, 0.08f);
+                }
+            }
+        }
+    }
+
+    return horizontal + vertical + sunAxis;
+}
+
 float4 PSMain(VSOutput input) : SV_TARGET
 {
     float2 uv = input.uv;
@@ -2371,24 +2457,29 @@ float4 PSMain(VSOutput input) : SV_TARGET
     // Bloom: sample blurred bloom texture if available
     float bloomIntensity = max(g_TimeAndExposure.w, 0.0f);
     float3 bloom = 0.0f;
+    float3 highlightStreaks = 0.0f;
     if (bloomIntensity > 0.001f) {
         bloom = g_BloomSource.Sample(g_Sampler, uv).rgb * bloomIntensity;
+        float streakIntensity = max(bloomIntensity, sqrt(saturate(bloomIntensity)) * 0.65f);
+        highlightStreaks = SampleHighlightStreaks(uv) * streakIntensity;
 
         // Clamp bloom contribution to avoid overly blown-out highlights.
         float maxBloom = max(g_BloomParams.z, 0.0f);
         if (maxBloom > 0.0f)
         {
             bloom = min(bloom, maxBloom.xxx);
+            highlightStreaks = min(highlightStreaks, (maxBloom * 0.55f).xxx);
         }
 
         if (lensDirtAmount > 0.001f)
         {
             float dirt = LensDirtMask(uv);
             bloom += bloom * dirt * lensDirtAmount * 0.75f;
+            highlightStreaks += highlightStreaks * dirt * lensDirtAmount * 0.45f;
         }
     }
 
-    float bloomLuma = dot(bloom, float3(0.2126f, 0.7152f, 0.0722f));
+    float bloomLuma = dot(bloom + highlightStreaks * 0.45f, float3(0.2126f, 0.7152f, 0.0722f));
     float lookHalation = saturate(g_CinematicLookParams.w);
     float halation = saturate(bloomLuma * lerp(0.06f, 0.16f, lookHalation)) * saturate(bloomIntensity);
     float warmIntent = saturate(max(g_ColorGrade.x, 0.0f));
@@ -2615,7 +2706,7 @@ float4 PSMain(VSOutput input) : SV_TARGET
 
     // Compose bloom after any motion blur and fog so blurred highlights remain
     // physically plausible and color-stable.
-    float3 hdrCombined = hdrBlurred + bloom + halationColor;
+    float3 hdrCombined = hdrBlurred + bloom + highlightStreaks + halationColor;
 
     // Clamp HDR before tonemapping to avoid extreme spikes that can show up
     // as sudden RGB flashes when moving the camera across very bright areas.

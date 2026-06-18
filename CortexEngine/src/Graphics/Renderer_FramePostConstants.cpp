@@ -358,19 +358,19 @@ glm::vec4 Renderer::BuildCinematicLookParams() const {
     float toeLift = m_sceneVisualContract.enclosedScene ? 0.050f : 0.035f;
     float highlightRolloff = 0.22f;
     float colorSeparation = 0.18f;
-    float halationStrength = 0.16f;
+    float halationStrength = 0.20f;
 
     const std::string& toneMapper = m_sceneVisualContract.toneMapperPreset;
     if (toneMapper == "punchy") {
         toeLift = 0.035f;
         highlightRolloff = 0.30f;
         colorSeparation = 0.32f;
-        halationStrength = 0.34f;
+        halationStrength = 0.38f;
     } else if (toneMapper == "filmic_soft") {
         toeLift = 0.060f;
         highlightRolloff = 0.24f;
         colorSeparation = 0.20f;
-        halationStrength = 0.18f;
+        halationStrength = 0.23f;
     } else if (toneMapper == "reinhard") {
         toeLift = 0.040f;
         highlightRolloff = 0.16f;
@@ -381,7 +381,7 @@ glm::vec4 Renderer::BuildCinematicLookParams() const {
     const std::string& palette = m_sceneVisualContract.materialPaletteId;
     if (palette.find("kitchen") != std::string::npos) {
         colorSeparation += 0.06f;
-        halationStrength += 0.05f;
+        halationStrength += 0.06f;
     } else if (palette.find("office") != std::string::npos) {
         toeLift += 0.02f;
         colorSeparation += 0.04f;

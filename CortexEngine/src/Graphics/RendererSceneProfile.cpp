@@ -69,9 +69,9 @@ SceneCinematicProfile EnclosedInteriorBase(std::string_view family) {
     p.post.renderScale = 0.85f;
     p.post.policyId = "cinematic_interior_soft";
     p.post.exposure = 1.12f;
-    p.post.bloomIntensity = 0.14f;
-    p.post.bloomThreshold = 0.95f;
-    p.post.bloomSoftKnee = 0.52f;
+    p.post.bloomIntensity = 0.32f;
+    p.post.bloomThreshold = 0.80f;
+    p.post.bloomSoftKnee = 0.72f;
     p.post.bloomMaxContribution = 3.0f;
     p.post.cinematicEnabled = true;
     p.post.vignette = 0.08f;
@@ -273,7 +273,9 @@ SceneCinematicProfile BuildSceneLocalCinematicProfile(std::string_view sceneFami
         p.reflectionProbes[0].center = glm::vec3(0.0f, 1.25f, 0.0f);
         p.reflectionProbes[0].extents = glm::vec3(3.8f, 1.9f, 3.6f);
         p.post.exposure = 1.18f;
-        p.post.bloomIntensity = 0.16f;
+        p.post.bloomIntensity = 0.30f;
+        p.post.bloomThreshold = 0.82f;
+        p.post.bloomSoftKnee = 0.72f;
         p.post.warm = 0.18f;
         p.post.cool = 0.02f;
         p.post.saturation = 1.05f;

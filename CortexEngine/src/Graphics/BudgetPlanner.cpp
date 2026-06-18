@@ -65,7 +65,7 @@ void ApplyProfile(RendererBudgetPlan& plan, RendererBudgetProfile profile) {
         plan.targetRenderScale = 0.70f;
         plan.ssaoDivisor = 4;
         plan.shadowMapSize = 1024;
-        plan.bloomLevels = 2;
+        plan.bloomLevels = 3;
         plan.iblResidentEnvironmentLimit = 1;
         plan.materialTextureMaxDimension = 1024;
         plan.materialTextureBudgetFloorDimension = 512;
@@ -85,7 +85,7 @@ void ApplyProfile(RendererBudgetPlan& plan, RendererBudgetProfile profile) {
         plan.targetRenderScale = 0.85f;
         plan.ssaoDivisor = 2;
         plan.shadowMapSize = 1536;
-        plan.bloomLevels = 3;
+        plan.bloomLevels = 4;
         plan.iblResidentEnvironmentLimit = 1;
         plan.materialTextureMaxDimension = 2048;
         plan.materialTextureBudgetFloorDimension = 1024;
@@ -105,7 +105,7 @@ void ApplyProfile(RendererBudgetPlan& plan, RendererBudgetProfile profile) {
         plan.targetRenderScale = 1.0f;
         plan.ssaoDivisor = 2;
         plan.shadowMapSize = 2048;
-        plan.bloomLevels = 3;
+        plan.bloomLevels = 5;
         plan.iblResidentEnvironmentLimit = 1;
         plan.materialTextureMaxDimension = 4096;
         plan.materialTextureBudgetFloorDimension = 2048;
@@ -126,7 +126,7 @@ void ApplyProfile(RendererBudgetPlan& plan, RendererBudgetProfile profile) {
         plan.targetRenderScale = 1.0f;
         plan.ssaoDivisor = 2;
         plan.shadowMapSize = 4096;
-        plan.bloomLevels = 4;
+        plan.bloomLevels = 5;
         plan.iblResidentEnvironmentLimit = 4;
         plan.materialTextureMaxDimension = 8192;
         plan.materialTextureBudgetFloorDimension = 4096;

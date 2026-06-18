@@ -2415,7 +2415,8 @@ void Engine::BuildOutdoorSunsetBeachScene() {
         renderer->SetBackgroundPresentation(true, 0.94f, 0.0f);
         renderer->SetAmbientLighting(glm::vec3(0.20f, 0.135f, 0.10f), 1.0f); // warm golden-hour fill
         renderer->SetExposure(1.02f);
-        renderer->SetBloomIntensity(0.12f);
+        renderer->SetBloomIntensity(0.18f);
+        renderer->SetBloomShape(0.82f, 0.70f, 2.0f);
         renderer->SetColorGrade(0.46f, 0.06f); // push warm sunset temperature
         renderer->SetSunDirection(glm::normalize(glm::vec3(0.30f, 0.10f, 0.95f))); // low sun over the water
         renderer->SetSunColor(glm::vec3(1.0f, 0.56f, 0.30f));                        // golden-hour sun

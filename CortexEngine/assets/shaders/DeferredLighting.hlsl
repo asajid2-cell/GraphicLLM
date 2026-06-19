@@ -427,41 +427,6 @@ float3 ComputeSceneLocalProbeSpecular(float3 reflectionDir,
     return max(local, 0.0f.xxx);
 }
 
-float Pow5(float x)
-{
-    float x2 = x * x;
-    return x2 * x2 * x;
-}
-
-float BurleyDiffuseFactor(float NdotV, float NdotL, float LdotH, float roughness)
-{
-    // Disney/Burley diffuse: rough dielectrics gain a subtle grazing response
-    // instead of the flat Lambert look. Keep it as a factor over albedo / PI
-    // so existing lighting energy remains predictable.
-    float fd90 = 0.5f + 2.0f * roughness * LdotH * LdotH;
-    float lightScatter = 1.0f + (fd90 - 1.0f) * Pow5(1.0f - saturate(NdotL));
-    float viewScatter = 1.0f + (fd90 - 1.0f) * Pow5(1.0f - saturate(NdotV));
-    return lightScatter * viewScatter;
-}
-
-float3 RoughSpecularEnergyCompensation(float3 F0, float roughness)
-{
-    // Mild multiple-scattering compensation for rough GGX lobes. This avoids
-    // chalky, under-energized rough metals without pushing mirrors or glass.
-    float f0Avg = saturate(dot(F0, float3(0.333333f, 0.333333f, 0.333333f)));
-    float rough = saturate(roughness);
-    float boost = (1.0f - f0Avg) * rough * rough * 0.32f;
-    return (1.0f + boost).xxx;
-}
-
-float SpecularOcclusion(float NdotV, float ao, float roughness)
-{
-    // Common specular AO approximation: tight glossy lobes are occluded more
-    // strongly in creases, while rough lobes keep softer ambient reflection.
-    float exponent = exp2(-16.0f * saturate(roughness) - 1.0f);
-    return saturate(pow(saturate(NdotV + ao), exponent) - 1.0f + ao);
-}
-
 float SceneLocalGlobalSpecularOwnership(uint surfaceClass,
                                         uint sceneMaterialClass,
                                         float roughness,
@@ -1264,6 +1229,7 @@ float4 PSMain(VSOutput input) : SV_Target0 {
     float3 specular = (numerator / max(denominator, 0.001)) *
                       anisotropicLobeScale *
                       RoughSpecularEnergyCompensation(F0, specularRoughness);
+    specular *= HorizonSpecularOcclusion(normal, V, ao, specularRoughness);
 
     // Optional clearcoat layer: match Basic.hlsl behavior (second dielectric lobe).
     if (clearCoatWeight > 0.01f) {
@@ -1272,6 +1238,7 @@ float4 PSMain(VSOutput input) : SV_Target0 {
         float  D_coat = DistributionGGX(normal, H, clearCoatRoughness);
         float  G_coat = GeometrySmith(normal, V, L, clearCoatRoughness);
         float3 specCoat = (D_coat * G_coat * F_coat) / max(denominator, 0.001f);
+        specCoat *= HorizonSpecularOcclusion(normal, V, ao, clearCoatRoughness);
         specular = lerp(specular, specCoat, coatBlend);
     }
 
@@ -1386,19 +1353,30 @@ float4 PSMain(VSOutput input) : SV_Target0 {
             }
 
             float3 Ll = toLight / dist;
-            float NdotLl = max(dot(normal, Ll), 0.0f);
-            if (NdotLl <= 0.0f) {
-                continue;
-            }
-
+            RectAreaLightSample areaSample = MakeEmptyRectAreaLightSample();
+            bool hasAreaSample = false;
             float att = saturate(1.0f - dist / rangeMeters);
             att *= att;
             if (isAreaRect) {
-                // Match the forward path's softbox approximation: rectangular
-                // area lights are broad emitters, not pin lights. Keeping a
-                // minimum falloff preserves fill while the roughness adjustment
-                // below prevents razor-sharp wet-floor highlights.
-                att = max(att, fixtureClass == FIXTURE_CLASS_EMISSIVE ? 0.42f : 0.35f);
+                areaSample = EvaluateRectAreaLight(
+                    worldPos,
+                    normal,
+                    V,
+                    light.position_type.xyz,
+                    normalize(light.direction_cosInner.xyz),
+                    max(light.params.zw, 0.001f.xx),
+                    rangeMeters,
+                    roughness);
+                Ll = areaSample.diffuseDir;
+                att = areaSample.attenuation;
+                hasAreaSample = true;
+            }
+            float NdotLl = max(dot(normal, Ll), 0.0f);
+            if (hasAreaSample) {
+                NdotLl = areaSample.diffuseNdotL;
+            }
+            if (NdotLl <= 0.0f || att <= 1e-5f) {
+                continue;
             }
             // Spot cone attenuation (approx).
             if (isSpot) {
@@ -1421,25 +1399,36 @@ float4 PSMain(VSOutput input) : SV_Target0 {
 
             float3 Hl = normalize(V + Ll);
             float roughForLight = FixtureRoughnessForSpecular(roughness, fixtureClass, isAreaRect);
+            float3 specLl = hasAreaSample ? areaSample.specularDir : Ll;
+            float specNdotLl = hasAreaSample ? areaSample.specularNdotL : NdotLl;
+            Hl = normalize(V + specLl);
+            if (hasAreaSample) {
+                roughForLight = max(roughForLight, areaSample.perceptualRoughness);
+            }
             float localAnisotropicLobeScale = 1.0f;
             roughForLight = ApplyDeferredAnisotropy(roughForLight, anisotropy, normal, Hl, localAnisotropicLobeScale);
             float NDF_l = DistributionGGX(normal, Hl, roughForLight);
-            float G_l = GeometrySmith(normal, V, Ll, roughForLight);
+            float G_l = GeometrySmith(NdotV, specNdotLl, roughForLight);
             float3 F_l = FresnelSchlick(max(dot(Hl, V), 0.0f), F0);
 
             float3 numerator_l = NDF_l * G_l * F_l;
-            float denom_l = 4.0f * NdotV * NdotLl;
+            float denom_l = 4.0f * NdotV * specNdotLl;
             float3 spec_l = (numerator_l / max(denom_l, 0.001f)) *
                             localAnisotropicLobeScale *
                             RoughSpecularEnergyCompensation(F0, roughForLight);
+            spec_l *= HorizonSpecularOcclusion(normal, V, ao, roughForLight);
 
             if (clearCoatWeight > 0.01f) {
                 float coatBlend = clearCoatWeight * 0.8f;
                 float3 F_coat = FresnelSchlick(max(dot(Hl, V), 0.0f), float3(0.04f, 0.04f, 0.04f));
                 float coatRoughForLight = isAreaRect ? saturate(clearCoatRoughness * 1.5f + 0.05f) : clearCoatRoughness;
+                if (hasAreaSample) {
+                    coatRoughForLight = max(coatRoughForLight, areaSample.perceptualRoughness);
+                }
                 float  D_coat = DistributionGGX(normal, Hl, coatRoughForLight);
-                float  G_coat = GeometrySmith(normal, V, Ll, coatRoughForLight);
+                float  G_coat = GeometrySmith(NdotV, specNdotLl, coatRoughForLight);
                 float3 specCoat = (D_coat * G_coat * F_coat) / max(denom_l, 0.001f);
+                specCoat *= HorizonSpecularOcclusion(normal, V, ao, coatRoughForLight);
                 spec_l = lerp(spec_l, specCoat, coatBlend);
             }
             spec_l = min(spec_l, 4.0f.xxx);
@@ -1643,7 +1632,8 @@ float4 PSMain(VSOutput input) : SV_Target0 {
         float3 prefilteredColor =
             specGlobal * max(g_EnvParams.y, 0.0f) +
             specLocal * localProbeSpecularScale * probeWeight;
-        float3 iblSpecWeight = Fibl;
+        float2 brdf = g_BRDFLUT.SampleLevel(g_LinearSampler, float2(saturate(NdotV), saturate(roughness)), 0.0f);
+        float3 iblSpecWeight = max(F0 * brdf.x + brdf.y, 0.0f.xxx);
         if (surfaceClass != SURFACE_CLASS_GLASS &&
             surfaceClass != SURFACE_CLASS_WATER &&
             surfaceClass != SURFACE_CLASS_MIRROR &&
@@ -1686,7 +1676,7 @@ float4 PSMain(VSOutput input) : SV_Target0 {
 
     // Apply ambient occlusion to indirect lighting only (not direct sun).
     float aoDiffuse = ao;
-    float aoSpec = SpecularOcclusion(NdotV, ao, roughness);
+    float aoSpec = HorizonSpecularOcclusion(normal, V, ao, roughness);
     ambient *= aoDiffuse;
     ambient += diffuseIBL * (iblEnabled ? g_EnvParams.x : 1.0f) * aoDiffuse;
     ambient += specularIBL * aoSpec;
@@ -1845,6 +1835,7 @@ FullSceneLightingV3Output PSMainV3LightingSplit(VSOutput input) {
     float3 specular = (NDF * G * F / max(4.0f * NdotV * NdotL, 0.001f)) *
                       anisotropicLobeScale *
                       RoughSpecularEnergyCompensation(F0, specularRoughness);
+    specular *= HorizonSpecularOcclusion(normal, V, ao, specularRoughness);
 
     if (clearCoatWeight > 0.01f) {
         float coatBlend = clearCoatWeight * 0.8f;
@@ -1852,6 +1843,7 @@ FullSceneLightingV3Output PSMainV3LightingSplit(VSOutput input) {
         float D_coat = DistributionGGX(normal, H, clearCoatRoughness);
         float G_coat = GeometrySmith(normal, V, L, clearCoatRoughness);
         float3 specCoat = (D_coat * G_coat * F_coat) / max(4.0f * NdotV * NdotL, 0.001f);
+        specCoat *= HorizonSpecularOcclusion(normal, V, ao, clearCoatRoughness);
         specular = lerp(specular, specCoat, coatBlend);
     }
 
@@ -1945,15 +1937,30 @@ FullSceneLightingV3Output PSMainV3LightingSplit(VSOutput input) {
             }
 
             float3 Ll = toLight / dist;
-            float NdotLl = max(dot(normal, Ll), 0.0f);
-            if (NdotLl <= 0.0f) {
-                continue;
-            }
-
+            RectAreaLightSample areaSample = MakeEmptyRectAreaLightSample();
+            bool hasAreaSample = false;
             float att = saturate(1.0f - dist / rangeMeters);
             att *= att;
             if (isAreaRect) {
-                att = max(att, fixtureClass == FIXTURE_CLASS_EMISSIVE ? 0.42f : 0.35f);
+                areaSample = EvaluateRectAreaLight(
+                    worldPos,
+                    normal,
+                    V,
+                    light.position_type.xyz,
+                    normalize(light.direction_cosInner.xyz),
+                    max(light.params.zw, 0.001f.xx),
+                    rangeMeters,
+                    roughness);
+                Ll = areaSample.diffuseDir;
+                att = areaSample.attenuation;
+                hasAreaSample = true;
+            }
+            float NdotLl = max(dot(normal, Ll), 0.0f);
+            if (hasAreaSample) {
+                NdotLl = areaSample.diffuseNdotL;
+            }
+            if (NdotLl <= 0.0f || att <= 1e-5f) {
+                continue;
             }
             if (isSpot) {
                 float3 spotDir = normalize(light.direction_cosInner.xyz);
@@ -1965,16 +1972,22 @@ FullSceneLightingV3Output PSMainV3LightingSplit(VSOutput input) {
             }
 
             float3 radiance = light.color_range.rgb * att * FixtureRadianceScale(fixtureClass);
-            float3 Hl = normalize(V + Ll);
             float roughForLight = FixtureRoughnessForSpecular(roughness, fixtureClass, isAreaRect);
+            float3 specLl = hasAreaSample ? areaSample.specularDir : Ll;
+            float specNdotLl = hasAreaSample ? areaSample.specularNdotL : NdotLl;
+            float3 Hl = normalize(V + specLl);
+            if (hasAreaSample) {
+                roughForLight = max(roughForLight, areaSample.perceptualRoughness);
+            }
             float localAnisotropicLobeScale = 1.0f;
             roughForLight = ApplyDeferredAnisotropy(roughForLight, anisotropy, normal, Hl, localAnisotropicLobeScale);
             float NDF_l = DistributionGGX(normal, Hl, roughForLight);
-            float G_l = GeometrySmith(normal, V, Ll, roughForLight);
+            float G_l = GeometrySmith(NdotV, specNdotLl, roughForLight);
             float3 F_l = FresnelSchlick(max(dot(Hl, V), 0.0f), F0);
-            float3 spec_l = (NDF_l * G_l * F_l / max(4.0f * NdotV * NdotLl, 0.001f)) *
+            float3 spec_l = (NDF_l * G_l * F_l / max(4.0f * NdotV * specNdotLl, 0.001f)) *
                             localAnisotropicLobeScale *
                             RoughSpecularEnergyCompensation(F0, roughForLight);
+            spec_l *= HorizonSpecularOcclusion(normal, V, ao, roughForLight);
             spec_l = min(spec_l, 4.0f.xxx);
 
             float3 kS_l = F_l;
@@ -2127,7 +2140,7 @@ FullSceneLightingV3Output PSMainV3LightingSplit(VSOutput input) {
     }
 
     float aoDiffuse = ao;
-    float aoSpec = SpecularOcclusion(NdotV, ao, roughness);
+    float aoSpec = HorizonSpecularOcclusion(normal, V, ao, roughness);
     if ((iblEnabled && g_EnvParams.y > 0.0f) || localProbeSpecularScale > 0.0f) {
         float reflectionSafeMipFloor = saturate(g_AmbientColor.w) * specMaxMip;
         float globalFootprintMip = EnvReflectionFootprintMipFromDirection(specDirGlobal, (float)specWidth, (float)specHeight, specMaxMip);
@@ -2144,7 +2157,8 @@ FullSceneLightingV3Output PSMainV3LightingSplit(VSOutput input) {
         float3 prefilteredColor =
             specGlobal * max(g_EnvParams.y, 0.0f) +
             specLocal * localProbeSpecularScale * probeWeight;
-        float3 iblSpecWeight = Fibl;
+        float2 brdf = g_BRDFLUT.SampleLevel(g_LinearSampler, float2(saturate(NdotV), saturate(roughness)), 0.0f);
+        float3 iblSpecWeight = max(F0 * brdf.x + brdf.y, 0.0f.xxx);
         if (surfaceClass != SURFACE_CLASS_GLASS &&
             surfaceClass != SURFACE_CLASS_WATER &&
             surfaceClass != SURFACE_CLASS_MIRROR &&

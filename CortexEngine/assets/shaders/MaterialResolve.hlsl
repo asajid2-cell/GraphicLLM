@@ -1081,9 +1081,10 @@ void CSMain(uint3 dispatchThreadID : SV_DispatchThreadID) {
         }
     }
 
-    // Write to G-buffers
-    // Match the engine-wide G-buffer convention used by Basic.hlsl / post-process:
-    // normals encoded to 0..1, roughness in .w.
+    // Write to G-buffers. Albedo alpha carries material AO; deferred lighting
+    // uses the same channel for diffuse AO and horizon/specular occlusion.
+    // Match the engine-wide convention used by Basic.hlsl / post-process:
+    // normals are encoded to 0..1, roughness in .w.
     float3 nEnc = normalWS * 0.5f + 0.5f;
     g_AlbedoOut[pixelCoord] = float4(albedo, ao);
     g_NormalRoughnessOut[pixelCoord] = float4(nEnc, roughness);

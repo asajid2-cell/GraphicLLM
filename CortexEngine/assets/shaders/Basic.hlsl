@@ -1092,6 +1092,8 @@ float3 CalculateLighting(float3 normal, float3 worldPos, float3 albedo, float me
         float3 lightDir;
         float attenuation = 1.0f;
         float3 radiance = light.color_range.rgb * FixtureRadianceScale(fixtureClass);
+        RectAreaLightSample areaSample = MakeEmptyRectAreaLightSample();
+        bool hasAreaSample = false;
 
         const bool isPointLike = (type == LIGHT_TYPE_POINT ||
                                   type == LIGHT_TYPE_SPOT  ||
@@ -1122,11 +1124,18 @@ float3 CalculateLighting(float3 normal, float3 worldPos, float3 albedo, float me
             }
             else if (type == LIGHT_TYPE_AREA_RECT)
             {
-                // Rectangular area lights approximate a softbox: clamp the
-                // minimum attenuation so they do not fall off as aggressively
-                // as point lights and stay visually present across a larger
-                // portion of the scene.
-                attenuation = max(attenuation, fixtureClass == FIXTURE_CLASS_EMISSIVE ? 0.42f : 0.35f);
+                areaSample = EvaluateRectAreaLight(
+                    worldPos,
+                    normal,
+                    viewDir,
+                    light.position_type.xyz,
+                    normalize(light.direction_cosInner.xyz),
+                    max(light.params.zw, 0.001f.xx),
+                    range,
+                    roughness);
+                lightDir = areaSample.diffuseDir;
+                attenuation = areaSample.attenuation;
+                hasAreaSample = true;
             }
         }
         else
@@ -1135,14 +1144,16 @@ float3 CalculateLighting(float3 normal, float3 worldPos, float3 albedo, float me
             lightDir = normalize(light.direction_cosInner.xyz);
         }
 
-        float3 halfDir = normalize(viewDir + lightDir);
+        float3 specularLightDir = hasAreaSample ? areaSample.specularDir : lightDir;
+        float3 halfDir = normalize(viewDir + specularLightDir);
 
-        float NdotL = saturate(dot(normal, lightDir));
+        float NdotL = hasAreaSample ? areaSample.diffuseNdotL : saturate(dot(normal, lightDir));
+        float NdotLSpec = hasAreaSample ? areaSample.specularNdotL : NdotL;
         float NdotV = saturate(dot(normal, viewDir));
         float NdotH = saturate(dot(normal, halfDir));
         float VdotH = saturate(dot(viewDir, halfDir));
 
-        if (NdotL <= 0.0f || NdotV <= 0.0f)
+        if (NdotL <= 0.0f || NdotV <= 0.0f || attenuation <= 1e-5f)
         {
             continue;
         }
@@ -1150,6 +1161,10 @@ float3 CalculateLighting(float3 normal, float3 worldPos, float3 albedo, float me
         float3 F = FresnelSchlick(VdotH, F0);
         float  D;
         float  roughForLight = FixtureRoughnessForSpecular(roughness, fixtureClass, type == LIGHT_TYPE_AREA_RECT);
+        if (hasAreaSample)
+        {
+            roughForLight = max(roughForLight, areaSample.perceptualRoughness);
+        }
         if (anisotropy > 0.01f)
         {
             // Anisotropic GGX distribution using different roughness along
@@ -1173,11 +1188,12 @@ float3 CalculateLighting(float3 normal, float3 worldPos, float3 albedo, float me
         {
             D = DistributionGGX(NdotH, roughForLight);
         }
-        float G = GeometrySmith(NdotV, NdotL, roughForLight);
+        float G = GeometrySmith(NdotV, NdotLSpec, roughForLight);
 
         float3 numerator = D * G * F;
-        float  denom = max(4.0f * NdotV * NdotL, 1e-4f);
-        float3 specular = numerator / denom;
+        float  denom = max(4.0f * NdotV * NdotLSpec, 1e-4f);
+        float3 specular = (numerator / denom) * RoughSpecularEnergyCompensation(F0, roughForLight);
+        specular *= HorizonSpecularOcclusion(normal, viewDir, ao, roughForLight);
 
         // Optional clear-coat layer: a thin glossy dielectric top layer over
         // the base BRDF used for painted plastics and polished metals. This
@@ -1189,8 +1205,9 @@ float3 CalculateLighting(float3 normal, float3 worldPos, float3 albedo, float me
         {
             float3 F_coat = FresnelSchlick(VdotH, float3(0.04f, 0.04f, 0.04f));
             float  D_coat = DistributionGGX(NdotH, coatRough);
-            float  G_coat = GeometrySmith(NdotV, NdotL, coatRough);
+            float  G_coat = GeometrySmith(NdotV, NdotLSpec, coatRough);
             float3 specCoat = (D_coat * G_coat * F_coat) / denom;
+            specCoat *= HorizonSpecularOcclusion(normal, viewDir, ao, coatRough);
 
             // Blend base and coat lobes; keep the coat slightly energy-
             // limited so we do not double-count all incoming light.
@@ -1391,6 +1408,8 @@ float3 CalculateLighting(float3 normal, float3 worldPos, float3 albedo, float me
             float3 lightDir;
             float attenuation = 1.0f;
             float3 radiance = light.color_range.rgb;
+            RectAreaLightSample areaSample = MakeEmptyRectAreaLightSample();
+            bool hasAreaSample = false;
 
             const bool isPointLike = (type == LIGHT_TYPE_POINT ||
                                       type == LIGHT_TYPE_SPOT  ||
@@ -1421,7 +1440,18 @@ float3 CalculateLighting(float3 normal, float3 worldPos, float3 albedo, float me
                 }
                 else if (type == LIGHT_TYPE_AREA_RECT)
                 {
-                    attenuation = max(attenuation, 0.35f);
+                    areaSample = EvaluateRectAreaLight(
+                        worldPos,
+                        normal,
+                        viewDir,
+                        light.position_type.xyz,
+                        normalize(light.direction_cosInner.xyz),
+                        max(light.params.zw, 0.001f.xx),
+                        rangeMeters,
+                        roughness);
+                    lightDir = areaSample.diffuseDir;
+                    attenuation = areaSample.attenuation;
+                    hasAreaSample = true;
                 }
             }
             else
@@ -1429,14 +1459,16 @@ float3 CalculateLighting(float3 normal, float3 worldPos, float3 albedo, float me
                 lightDir = normalize(light.direction_cosInner.xyz);
             }
 
-            float3 halfDir = normalize(viewDir + lightDir);
+            float3 specularLightDir = hasAreaSample ? areaSample.specularDir : lightDir;
+            float3 halfDir = normalize(viewDir + specularLightDir);
 
-            float NdotL = saturate(dot(normal, lightDir));
+            float NdotL = hasAreaSample ? areaSample.diffuseNdotL : saturate(dot(normal, lightDir));
+            float NdotLSpec = hasAreaSample ? areaSample.specularNdotL : NdotL;
             float NdotV = saturate(dot(normal, viewDir));
             float NdotH = saturate(dot(normal, halfDir));
             float VdotH = saturate(dot(viewDir, halfDir));
 
-            if (NdotL <= 0.0f || NdotV <= 0.0f)
+            if (NdotL <= 0.0f || NdotV <= 0.0f || attenuation <= 1e-5f)
             {
                 continue;
             }
@@ -1447,6 +1479,10 @@ float3 CalculateLighting(float3 normal, float3 worldPos, float3 albedo, float me
             if (type == LIGHT_TYPE_AREA_RECT)
             {
                 roughForLight = saturate(roughness * 1.5f + 0.05f);
+            }
+            if (hasAreaSample)
+            {
+                roughForLight = max(roughForLight, areaSample.perceptualRoughness);
             }
             if (anisotropy > 0.01f)
             {
@@ -1468,11 +1504,12 @@ float3 CalculateLighting(float3 normal, float3 worldPos, float3 albedo, float me
             {
                 D = DistributionGGX(NdotH, roughForLight);
             }
-            float G = GeometrySmith(NdotV, NdotL, roughForLight);
+            float G = GeometrySmith(NdotV, NdotLSpec, roughForLight);
 
             float3 numerator = D * G * F;
-            float  denom = max(4.0f * NdotV * NdotL, 1e-4f);
-            float3 specular = numerator / denom;
+            float  denom = max(4.0f * NdotV * NdotLSpec, 1e-4f);
+            float3 specular = (numerator / denom) * RoughSpecularEnergyCompensation(F0, roughForLight);
+            specular *= HorizonSpecularOcclusion(normal, viewDir, ao, roughForLight);
 
             float coatWeight = clearCoatWeight;
             if (coatWeight > 0.001f)
@@ -1480,9 +1517,10 @@ float3 CalculateLighting(float3 normal, float3 worldPos, float3 albedo, float me
                 float coatRough = saturate(clearCoatRoughness);
                 float3 F_coat = FresnelSchlick(VdotH, float3(0.04f, 0.04f, 0.04f));
                 float  D_coat = DistributionGGX(NdotH, coatRough);
-                float  G_coat = GeometrySmith(NdotV, NdotL, coatRough);
+                float  G_coat = GeometrySmith(NdotV, NdotLSpec, coatRough);
 
-                float3 coatSpec = (D_coat * G_coat * F_coat) / max(4.0f * NdotV * NdotL, 1e-4f);
+                float3 coatSpec = (D_coat * G_coat * F_coat) / max(4.0f * NdotV * NdotLSpec, 1e-4f);
+                coatSpec *= HorizonSpecularOcclusion(normal, viewDir, ao, coatRough);
                 coatSpec = min(coatSpec, 4.0f.xxx);
 
                 specular = lerp(specular, specular * (1.0f - coatWeight) + coatSpec * coatWeight, coatWeight);
@@ -1585,7 +1623,7 @@ float3 CalculateLighting(float3 normal, float3 worldPos, float3 albedo, float me
         float3 prefiltered = g_EnvSpecular.SampleLevel(g_Sampler, specUV, specMip).rgb;
 
         float3 Fibl = FresnelSchlickRoughness(NdotV, F0, roughness);
-        specularIBL = prefiltered * Fibl;
+        specularIBL = prefiltered * Fibl * RoughSpecularEnergyCompensation(F0, roughness);
         if (isGlass)
         {
             // Glass should carry most of its readability through reflection
@@ -1604,8 +1642,9 @@ float3 CalculateLighting(float3 normal, float3 worldPos, float3 albedo, float me
 
         float diffuseIntensity = g_EnvParams.x;
         float specularIntensity = g_EnvParams.y;
+        float aoSpec = HorizonSpecularOcclusion(N, V, ao, roughness);
 
-        ambient = (diffuseIBL * diffuseIntensity + specularIBL * specularIntensity) * ao;
+        ambient = diffuseIBL * diffuseIntensity * ao + specularIBL * specularIntensity * aoSpec;
 
         // IBL-only debug modes
         if (debugView == 8)
@@ -1618,7 +1657,7 @@ float3 CalculateLighting(float3 normal, float3 worldPos, float3 albedo, float me
         else if (debugView == 9)
         {
             // Specular IBL-only debug: clamp to avoid extreme flashes.
-            float3 dbg = specularIBL * specularIntensity * ao;
+            float3 dbg = specularIBL * specularIntensity * aoSpec;
             dbg = min(dbg, 32.0f.xxx);
             return dbg;
         }

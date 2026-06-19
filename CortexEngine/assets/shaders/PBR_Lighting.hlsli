@@ -84,6 +84,158 @@ float3 FresnelSchlickRoughness(float cosTheta, float3 F0, float roughness)
     return F0 + (F90 - F0) * pow(saturate(1.0f - cosTheta), 5.0f);
 }
 
+float Pow5(float x)
+{
+    float x2 = x * x;
+    return x2 * x2 * x;
+}
+
+float3 GGXMultiscatterEnergyCompensation(float3 F0, float roughness)
+{
+    // Fdez-Aguera style analytic multiple-scatter compensation. It restores
+    // the energy that Smith-masked single-scatter GGX loses on rough lobes
+    // without needing another runtime texture in the forward path.
+    float r = saturate(roughness);
+    float r2 = r * r;
+    float3 Favg = F0 + (1.0f - F0) * (1.0f / 21.0f);
+    float singleScatterLoss = saturate(r2 * (0.52f + 0.16f * r));
+    float3 denom = max(1.0f.xxx - Favg * singleScatterLoss, 0.35f.xxx);
+    return 1.0f.xxx + (Favg * singleScatterLoss) / denom;
+}
+
+float3 RoughSpecularEnergyCompensation(float3 F0, float roughness)
+{
+    return GGXMultiscatterEnergyCompensation(F0, roughness);
+}
+
+float SpecularOcclusion(float NdotV, float ao, float roughness)
+{
+    // Frostbite/UE-style specular AO: cavities attenuate glossy reflection
+    // harder than broad rough reflection, preventing over-bright corners.
+    float exponent = exp2(-16.0f * saturate(roughness) - 1.0f);
+    return saturate(pow(saturate(NdotV + ao), exponent) - 1.0f + ao);
+}
+
+float HorizonSpecularOcclusion(float3 N, float3 V, float ao, float roughness)
+{
+    float NdotV = saturate(dot(N, V));
+    float3 R = reflect(-V, N);
+    float horizon = saturate(1.0f + dot(R, N));
+    return SpecularOcclusion(NdotV, ao, roughness) * horizon * horizon;
+}
+
+float BurleyDiffuseFactor(float NdotV, float NdotL, float LdotH, float roughness)
+{
+    float fd90 = 0.5f + 2.0f * roughness * LdotH * LdotH;
+    float lightScatter = 1.0f + (fd90 - 1.0f) * Pow5(1.0f - saturate(NdotL));
+    float viewScatter = 1.0f + (fd90 - 1.0f) * Pow5(1.0f - saturate(NdotV));
+    return lightScatter * viewScatter;
+}
+
+struct RectAreaLightSample
+{
+    float3 diffuseDir;
+    float3 specularDir;
+    float diffuseNdotL;
+    float specularNdotL;
+    float attenuation;
+    float solidAngle;
+    float perceptualRoughness;
+};
+
+RectAreaLightSample MakeEmptyRectAreaLightSample()
+{
+    RectAreaLightSample s;
+    s.diffuseDir = 0.0f.xxx;
+    s.specularDir = 0.0f.xxx;
+    s.diffuseNdotL = 0.0f;
+    s.specularNdotL = 0.0f;
+    s.attenuation = 0.0f;
+    s.solidAngle = 0.0f;
+    s.perceptualRoughness = 0.0f;
+    return s;
+}
+
+void BuildRectAreaBasis(float3 lightNormal, out float3 axisX, out float3 axisY)
+{
+    lightNormal = normalize(lightNormal);
+    float3 up = (abs(lightNormal.y) < 0.96f) ? float3(0.0f, 1.0f, 0.0f) : float3(1.0f, 0.0f, 0.0f);
+    axisX = normalize(cross(up, lightNormal));
+    axisY = normalize(cross(lightNormal, axisX));
+}
+
+float3 ClosestPointOnRect(float3 p, float3 center, float3 axisX, float3 axisY, float2 halfSize)
+{
+    float3 local = p - center;
+    float x = clamp(dot(local, axisX), -halfSize.x, halfSize.x);
+    float y = clamp(dot(local, axisY), -halfSize.y, halfSize.y);
+    return center + axisX * x + axisY * y;
+}
+
+float3 RepresentativeSpecularPointOnRect(float3 worldPos,
+                                         float3 N,
+                                         float3 V,
+                                         float3 center,
+                                         float3 lightNormal,
+                                         float3 axisX,
+                                         float3 axisY,
+                                         float2 halfSize)
+{
+    float3 R = reflect(-V, N);
+    float denom = dot(R, -lightNormal);
+    if (abs(denom) > 1e-4f)
+    {
+        float t = dot(center - worldPos, -lightNormal) / denom;
+        if (t > 0.0f)
+        {
+            return ClosestPointOnRect(worldPos + R * t, center, axisX, axisY, halfSize);
+        }
+    }
+    return ClosestPointOnRect(worldPos, center, axisX, axisY, halfSize);
+}
+
+RectAreaLightSample EvaluateRectAreaLight(float3 worldPos,
+                                          float3 N,
+                                          float3 V,
+                                          float3 center,
+                                          float3 lightNormal,
+                                          float2 halfSize,
+                                          float rangeMeters,
+                                          float roughness)
+{
+    RectAreaLightSample s;
+    halfSize = max(halfSize, 0.001f.xx);
+    rangeMeters = max(rangeMeters, 0.001f);
+
+    float3 axisX;
+    float3 axisY;
+    BuildRectAreaBasis(lightNormal, axisX, axisY);
+
+    float3 diffusePoint = ClosestPointOnRect(worldPos, center, axisX, axisY, halfSize);
+    float3 specularPoint = RepresentativeSpecularPointOnRect(worldPos, N, V, center, lightNormal, axisX, axisY, halfSize);
+
+    float3 diffuseVec = diffusePoint - worldPos;
+    float3 specularVec = specularPoint - worldPos;
+    float diffuseDist = max(length(diffuseVec), 1e-4f);
+    float specularDist = max(length(specularVec), 1e-4f);
+    s.diffuseDir = diffuseVec / diffuseDist;
+    s.specularDir = specularVec / specularDist;
+    s.diffuseNdotL = saturate(dot(N, s.diffuseDir));
+    s.specularNdotL = saturate(dot(N, s.specularDir));
+
+    float facing = saturate(dot(-s.diffuseDir, normalize(lightNormal)));
+    float area = max((halfSize.x * 2.0f) * (halfSize.y * 2.0f), 1e-4f);
+    float solidAngle = area * facing / max(diffuseDist * diffuseDist + area, 1e-4f);
+    s.solidAngle = saturate(solidAngle);
+
+    float rangeFalloff = saturate(1.0f - diffuseDist / rangeMeters);
+    rangeFalloff *= rangeFalloff;
+    float angularSize = sqrt(s.solidAngle);
+    s.attenuation = rangeFalloff * saturate(0.25f + angularSize * 2.75f);
+    s.perceptualRoughness = saturate(sqrt(roughness * roughness + angularSize * angularSize));
+    return s;
+}
+
 float3 ComputeF0(float3 albedo, float metallic)
 {
     return lerp(float3(0.04f, 0.04f, 0.04f), albedo, metallic);

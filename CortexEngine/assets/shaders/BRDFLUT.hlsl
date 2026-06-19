@@ -1,6 +1,9 @@
 // BRDFLUT.hlsl
 // Generates a split-sum GGX BRDF integration LUT (RG16F).
-// Output: .x = scale, .y = bias
+// Output: .x = single-scatter scale, .y = single-scatter bias.
+// Deferred lighting combines this with the shared analytic GGX
+// multiscatter compensation from PBR_Lighting.hlsli so rough metals and
+// dielectrics keep their lost Smith-masked energy without another bound LUT.
 
 cbuffer BRDFLUTConstants : register(b0)
 {

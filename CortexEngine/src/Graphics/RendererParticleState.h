@@ -15,6 +15,8 @@ struct ParticleInstance {
     glm::vec3 position;
     float size;
     glm::vec4 color;
+    // x = normalized age, y = emitter type, z = life curve, w = light/spark seed
+    glm::vec4 params;
 };
 
 struct ParticleGpuSource {

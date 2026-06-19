@@ -16,6 +16,7 @@ struct ParticleInstance
     float3 position;
     float size;
     float4 color;
+    float4 params;
 };
 
 cbuffer ParticlePrepareCB : register(b1)
@@ -86,6 +87,8 @@ void CSMain(uint3 dispatchID : SV_DispatchThreadID)
     output.color = source.color;
     output.color.rgb *= g_BloomContribution;
     output.color.a *= clamp(1.0f - g_SoftDepthFade * 0.18f, 0.55f, 1.0f);
+    const float lifetime = max(source.params.x, 0.001f);
+    output.params = float4(saturate(source.velocity_age.w / lifetime), 0.0f, output.color.a, 0.0f);
 
     g_Output[rank] = output;
 }

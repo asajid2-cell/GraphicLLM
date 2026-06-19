@@ -47,12 +47,12 @@ namespace {
         camera.farPlane = farPlane;
     }
 
-    void AddParticleEffect(Scene::ECS_Registry& registry,
-                           const char* tag,
-                           std::string_view effectId,
-                           const glm::vec3& position) {
+    entt::entity AddParticleEffect(Scene::ECS_Registry& registry,
+                                   const char* tag,
+                                   std::string_view effectId,
+                                   const glm::vec3& position) {
         if (std::getenv("CORTEX_DISABLE_SCENE_PARTICLES")) {
-            return;
+            return entt::null;
         }
         entt::entity e = registry.CreateEntity();
         registry.AddComponent<Scene::TagComponent>(e, tag);
@@ -62,10 +62,28 @@ namespace {
         Scene::ParticleEmitterComponent emitter;
         if (!Scene::ApplyParticleEffectDescriptor(effectId, emitter) &&
             !Scene::ApplyParticleEffectDescriptor("smoke", emitter)) {
-            return;
+            return entt::null;
         }
         emitter.defaultEffectPresetId = emitter.effectPresetId;
         registry.AddComponent<Scene::ParticleEmitterComponent>(e, emitter);
+        return e;
+    }
+
+    void ScaleParticleEffect(Scene::ECS_Registry& registry,
+                             entt::entity entity,
+                             float rateScale,
+                             float sizeScale,
+                             float alphaScale) {
+        if (entity == entt::null || !registry.HasComponent<Scene::ParticleEmitterComponent>(entity)) {
+            return;
+        }
+
+        auto& emitter = registry.GetComponent<Scene::ParticleEmitterComponent>(entity);
+        emitter.rate *= rateScale;
+        emitter.sizeStart *= sizeScale;
+        emitter.sizeEnd *= sizeScale;
+        emitter.colorStart.a *= alphaScale;
+        emitter.colorEnd.a *= alphaScale;
     }
 
     std::shared_ptr<Scene::MeshData> LoadNaturalisticShowcaseMesh(const char* relativeGltf) {
@@ -2490,6 +2508,9 @@ void Engine::BuildOutdoorSunsetBeachScene() {
         renderer->SetGodRayIntensity(0.34f);
         renderer->SetShadowBias(0.0035f);
         renderer->SetShadowPCFRadius(3.25f);
+        renderer->SetParticlesEnabled(true);
+        renderer->SetParticleDensityScale(0.90f);
+        renderer->SetParticleTuning(1.05f, 1.65f, 0.64f, 0.46f);
     }
 
     auto sandPlane = Utils::MeshGenerator::CreatePlane(26.0f, 18.0f);
@@ -2711,6 +2732,13 @@ void Engine::BuildOutdoorSunsetBeachScene() {
         placeNature("Beach_Fern_A", scannedFernMesh, 1.0f, -4.5f, -2.6f, 25.0f, leafCol, 0.65f);
         placeNature("Beach_Fern_B", scannedFernMesh, 0.9f, 4.4f, -2.6f, -40.0f, leafCol, 0.65f);
     }
+
+    const entt::entity waterDust =
+        AddParticleEffect(*m_registry, "Beach_Sunset_WaterDust", "dust", glm::vec3(0.25f, 1.28f, -2.55f));
+    ScaleParticleEffect(*m_registry, waterDust, 0.62f, 1.00f, 0.92f);
+    const entt::entity skyDust =
+        AddParticleEffect(*m_registry, "Beach_Sunset_SkyDust", "dust", glm::vec3(3.35f, 2.70f, 0.60f));
+    ScaleParticleEffect(*m_registry, skyDust, 0.42f, 0.92f, 0.82f);
 }
 
 void Engine::BuildRecipeScene() {
@@ -2781,6 +2809,12 @@ void Engine::BuildRecipeScene() {
         renderer->SetFogParams(outdoor ? 0.0075f : 0.016f, outdoor ? 0.05f : 0.15f, outdoor ? 0.34f : 0.42f, outdoor ? 4.0f : 0.0f);
         renderer->SetGodRayIntensity(outdoor ? 0.0f : 0.40f);
         renderer->SetBloomShape(outdoor ? 1.05f : 1.02f, outdoor ? 0.45f : 0.50f, outdoor ? 2.0f : 0.82f);
+        renderer->SetParticlesEnabled(true);
+        renderer->SetParticleDensityScale(outdoor ? 0.90f : 1.05f);
+        renderer->SetParticleTuning(outdoor ? 1.05f : 1.22f,
+                                    outdoor ? 1.55f : 1.70f,
+                                    outdoor ? 0.66f : 0.58f,
+                                    outdoor ? 0.46f : 0.68f);
     }
 
     // Soft key light: outdoor stays high like sun fill; interiors use a
@@ -2854,6 +2888,10 @@ void Engine::BuildRecipeScene() {
         recipeQueue.PushBatch(cmds);
         recipeQueue.ExecuteAll(m_registry.get(), m_renderer.get());
     }
+    AddParticleEffect(*m_registry,
+                      outdoor ? "Recipe_Garden_SunDust" : "Recipe_Room_ShaftDust",
+                      "dust",
+                      outdoor ? glm::vec3(0.10f, 1.20f, -1.35f) : glm::vec3(-0.12f, 1.34f, -1.18f));
     spdlog::info("Recipe scene '{}' built ({} commands)", recipe, cmds.size());
 }
 

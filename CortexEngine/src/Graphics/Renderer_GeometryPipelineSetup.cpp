@@ -252,10 +252,19 @@ Result<void> Renderer::CreateGeometryPipelineStates(const RendererCompiledShader
         instColor.InputSlotClass = D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA;
         instColor.InstanceDataStepRate = 1;
 
+        D3D12_INPUT_ELEMENT_DESC instParams{};
+        instParams.SemanticName = "TEXCOORD";
+        instParams.SemanticIndex = 3;
+        instParams.Format = DXGI_FORMAT_R32G32B32A32_FLOAT;
+        instParams.InputSlot = 1;
+        instParams.AlignedByteOffset = 32;
+        instParams.InputSlotClass = D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA;
+        instParams.InstanceDataStepRate = 1;
+
         PipelineDesc particleDesc = {};
         particleDesc.vertexShader = particleVsResult.Value();
         particleDesc.pixelShader = particlePsResult.Value();
-        particleDesc.inputLayout = { posElem, uvElem, instPos, instSize, instColor };
+        particleDesc.inputLayout = { posElem, uvElem, instPos, instSize, instColor, instParams };
         particleDesc.rtvFormat = DXGI_FORMAT_R16G16B16A16_FLOAT;
         particleDesc.dsvFormat = DXGI_FORMAT_D32_FLOAT;
         particleDesc.numRenderTargets = 1;

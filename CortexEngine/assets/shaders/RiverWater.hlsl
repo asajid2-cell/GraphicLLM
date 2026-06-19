@@ -13,6 +13,17 @@ cbuffer FrameConstants : register(b0) {
     float4x4 g_InvProjectionMatrix;
     float4 g_CameraPosition;
     float4 g_TimeAndExposure;  // x = time, y = deltaTime, z = exposure
+    float4 g_AmbientColor;
+    uint4 g_LightCount;
+    struct Light
+    {
+        float4 position_type;
+        float4 direction_cosInner;
+        float4 color_range;
+        float4 params;
+    };
+    static const uint LIGHT_MAX = 16;
+    Light g_Lights[LIGHT_MAX];
 };
 
 cbuffer ObjectConstants : register(b1) {
@@ -129,6 +140,28 @@ float2 RefractionOffset(float3 normal, float strength) {
     return normal.xz * strength;
 }
 
+float3 RiverSunDirection() {
+    if (g_LightCount.x > 0 && (uint)g_Lights[0].position_type.w == 0u) {
+        return normalize(g_Lights[0].direction_cosInner.xyz);
+    }
+    return normalize(float3(0.35, 0.70, 0.55));
+}
+
+float3 RiverSunColor() {
+    if (g_LightCount.x > 0 && (uint)g_Lights[0].position_type.w == 0u) {
+        return max(g_Lights[0].color_range.rgb, 0.0.xxx);
+    }
+    return float3(1.0, 0.86, 0.62);
+}
+
+float RiverSparkleMask(float2 worldXZ, float time) {
+    float2 p0 = worldXZ * 0.91 + float2(time * 0.21, -time * 0.13);
+    float2 p1 = worldXZ * 2.37 + float2(-time * 0.37, time * 0.19);
+    float n0 = frac(sin(dot(floor(p0), float2(12.9898, 78.233))) * 43758.5453);
+    float n1 = frac(sin(dot(floor(p1), float2(39.3468, 11.135))) * 24634.6345);
+    return smoothstep(0.66, 0.96, n0) * smoothstep(0.58, 0.92, n1);
+}
+
 // ============================================================================
 // VERTEX SHADER
 // ============================================================================
@@ -211,7 +244,8 @@ float4 PSMain(VSOutput input) : SV_TARGET {
     float fresnel = Fresnel(viewDir, worldNormal, 5.0);
 
     // Water color based on depth
-    float depthFactor = saturate(waterDepth / 5.0);  // Normalize to 0-1 over 5 units
+    float viewDepth = saturate(length(g_CameraPosition.xyz - input.worldPos) / 120.0);
+    float depthFactor = saturate(waterDepth / 5.0 + viewDepth * 0.18);  // Normalize to 0-1 over 5 units
     float3 waterColor = lerp(g_ShallowColor.rgb, g_DeepColor.rgb, depthFactor);
 
     // Foam at rapids and near banks
@@ -223,16 +257,16 @@ float4 PSMain(VSOutput input) : SV_TARGET {
     float foamSample = g_FoamTexture.Sample(g_WrapSampler, foamFlow).r;
 
     // More foam in turbulent areas
-    foamFactor += step(g_FoamParams.x, turbulence) * foamSample * g_FoamParams.y;
+    foamFactor += step(g_FoamParams.x, turbulence) * foamSample * g_FoamParams.y * 0.45;
 
     // Foam at banks (shore foam)
-    float bankFoam = (1.0 - smoothstep(0.0, 0.2, distFromBank)) * 0.5;
+    float bankFoam = (1.0 - smoothstep(0.0, 0.13, distFromBank)) * 0.24;
     float2 bankFoamUV = uv * 2.0 + time * 0.3;
     float bankFoamSample = g_FoamTexture.Sample(g_WrapSampler, bankFoamUV).r;
-    foamFactor += bankFoam * bankFoamSample;
+    foamFactor += bankFoam * bankFoamSample * smoothstep(0.54, 0.88, foamSample);
 
     // Speed-based foam (fast water creates whitecaps)
-    float speedFoam = smoothstep(1.5, 3.0, flowSpeed) * foamSample * 0.7;
+    float speedFoam = smoothstep(2.1, 3.4, flowSpeed) * foamSample * 0.28;
     foamFactor += speedFoam;
 
     foamFactor = saturate(foamFactor);
@@ -240,6 +274,9 @@ float4 PSMain(VSOutput input) : SV_TARGET {
     // Reflection
     float3 reflectionDir = reflect(-viewDir, worldNormal);
     float3 reflectionColor = g_EnvironmentMap.Sample(g_LinearSampler, reflectionDir).rgb;
+    float sunMirror = pow(saturate(dot(reflectionDir, RiverSunDirection())), 420.0) *
+                      RiverSparkleMask(input.worldPos.xz, time);
+    reflectionColor += RiverSunColor() * sunMirror * 1.4;
 
     // Refraction (screen-space)
     float2 screenUV = input.projCoord.xy / input.projCoord.w * 0.5 + 0.5;
@@ -263,10 +300,10 @@ float4 PSMain(VSOutput input) : SV_TARGET {
     baseColor = lerp(baseColor, foamColor, foamFactor);
 
     // Simple specular highlight
-    float3 lightDir = normalize(float3(0.5, 1.0, 0.3));
+    float3 lightDir = RiverSunDirection();
     float3 halfVec = normalize(lightDir + viewDir);
     float spec = pow(saturate(dot(worldNormal, halfVec)), 256.0);
-    baseColor += spec * float3(1.0, 0.95, 0.9) * 0.5;
+    baseColor += spec * RiverSunColor() * 0.42;
 
     // Transparency based on depth and foam
     float alpha = lerp(g_ShallowColor.a, 1.0, depthFactor * 0.3 + foamFactor);
@@ -301,11 +338,12 @@ float4 PSForward(VSOutput input) : SV_TARGET {
     float fresnel = Fresnel(viewDir, worldNormal, 4.0);
 
     // Depth-based color
-    float depthFactor = saturate(waterDepth / 5.0);
+    float viewDepth = saturate(length(g_CameraPosition.xyz - input.worldPos) / 120.0);
+    float depthFactor = saturate(waterDepth / 5.0 + viewDepth * 0.16);
     float3 waterColor = lerp(g_ShallowColor.rgb, g_DeepColor.rgb, depthFactor);
 
     // Simple lighting
-    float3 lightDir = normalize(float3(0.5, 1.0, 0.3));
+    float3 lightDir = RiverSunDirection();
     float NdotL = saturate(dot(worldNormal, lightDir));
 
     float3 ambient = waterColor * 0.3;
@@ -316,14 +354,17 @@ float4 PSForward(VSOutput input) : SV_TARGET {
     // Specular
     float3 halfVec = normalize(lightDir + viewDir);
     float spec = pow(saturate(dot(worldNormal, halfVec)), 64.0);
-    finalColor += spec * 0.3;
+    float3 reflectionDir = reflect(-viewDir, worldNormal);
+    float sunMirror = pow(saturate(dot(reflectionDir, lightDir)), 240.0) *
+                      RiverSparkleMask(input.worldPos.xz, time);
+    finalColor += (spec * 0.22 + sunMirror * 0.55) * RiverSunColor();
 
     // Simple foam
     float2 foamUV = uv * g_FoamParams.w;
     float2 foamFlow = FlowUV(foamUV, flowDir * flowSpeed, time, g_FoamParams.z);
     float foam = g_FoamTexture.Sample(g_WrapSampler, foamFlow).r;
-    foam *= (1.0 - smoothstep(0.0, 0.3, distFromBank)) + smoothstep(2.0, 3.0, flowSpeed);
-    foam = saturate(foam * 0.5);
+    foam *= (1.0 - smoothstep(0.0, 0.14, distFromBank)) * 0.35 + smoothstep(2.2, 3.4, flowSpeed) * 0.22;
+    foam = saturate(foam * 0.45);
 
     finalColor = lerp(finalColor, float3(1, 1, 1), foam);
 
@@ -365,12 +406,16 @@ float4 PSLake(VSOutput input) : SV_TARGET {
     float distFromBank = input.waterData.z;
 
     // Depth-based color (deeper for lakes)
-    float depthFactor = saturate(waterDepth / 10.0);
+    float viewDepth = saturate(length(g_CameraPosition.xyz - input.worldPos) / 160.0);
+    float depthFactor = saturate(waterDepth / 10.0 + viewDepth * 0.14);
     float3 waterColor = lerp(g_ShallowColor.rgb, g_DeepColor.rgb, depthFactor);
 
     // Reflection
     float3 reflectionDir = reflect(-viewDir, worldNormal);
     float3 reflectionColor = g_EnvironmentMap.Sample(g_LinearSampler, reflectionDir).rgb;
+    float sunMirror = pow(saturate(dot(reflectionDir, RiverSunDirection())), 520.0) *
+                      RiverSparkleMask(input.worldPos.xz, time);
+    reflectionColor += RiverSunColor() * sunMirror * 1.15;
 
     // Screen-space refraction
     float2 screenUV = input.projCoord.xy / input.projCoord.w * 0.5 + 0.5;
@@ -385,16 +430,16 @@ float4 PSLake(VSOutput input) : SV_TARGET {
     baseColor *= waterColor;
 
     // Shore foam
-    float shoreFoam = (1.0 - smoothstep(0.0, 0.15, distFromBank));
+    float shoreFoam = (1.0 - smoothstep(0.0, 0.10, distFromBank));
     float2 shoreUV = uv * 3.0 + time * 0.1;
     float shoreFoamSample = g_FoamTexture.Sample(g_WrapSampler, shoreUV).r;
-    baseColor = lerp(baseColor, float3(0.95, 0.98, 1.0), shoreFoam * shoreFoamSample * 0.6);
+    baseColor = lerp(baseColor, float3(0.95, 0.98, 1.0), shoreFoam * shoreFoamSample * 0.22);
 
     // Specular
-    float3 lightDir = normalize(float3(0.5, 1.0, 0.3));
+    float3 lightDir = RiverSunDirection();
     float3 halfVec = normalize(lightDir + viewDir);
     float spec = pow(saturate(dot(worldNormal, halfVec)), 512.0);
-    baseColor += spec * float3(1.0, 0.95, 0.9) * 0.4;
+    baseColor += spec * RiverSunColor() * 0.32;
 
     float alpha = lerp(g_ShallowColor.a * 0.9, 1.0, depthFactor * 0.4);
 

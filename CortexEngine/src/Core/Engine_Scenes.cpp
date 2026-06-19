@@ -2888,10 +2888,16 @@ void Engine::BuildRecipeScene() {
         recipeQueue.PushBatch(cmds);
         recipeQueue.ExecuteAll(m_registry.get(), m_renderer.get());
     }
-    AddParticleEffect(*m_registry,
+    auto recipeDust = AddParticleEffect(*m_registry,
                       outdoor ? "Recipe_Garden_SunDust" : "Recipe_Room_ShaftDust",
                       "dust",
                       outdoor ? glm::vec3(0.10f, 1.20f, -1.35f) : glm::vec3(-0.12f, 1.34f, -1.18f));
+    if (!outdoor) {
+        // Interior dust should be a few subtle motes catching the light, not a field of
+        // speckle across the walls — thin the rate and soften the opacity (a no-context
+        // reviewer mistook the dense version for a reflection firefly artifact).
+        ScaleParticleEffect(*m_registry, recipeDust, 0.30f, 1.0f, 0.55f);
+    }
     spdlog::info("Recipe scene '{}' built ({} commands)", recipe, cmds.size());
 }
 

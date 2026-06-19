@@ -30,6 +30,8 @@ bool PrepareShadowInputs(const ShadowInputContext& context) {
         return false;
     }
 
+    // RaytracedShadows.hlsl writes the raw soft/contact shadow signal here;
+    // RTDenoiser owns temporal + bilateral filtering into the history target.
     TransitionResource(context.commandList, context.depth, kDepthSampleState);
     TransitionResource(context.commandList,
                        context.shadowMask,

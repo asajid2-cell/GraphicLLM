@@ -348,4 +348,10 @@ float3 EvaluateSpecularIBL_SplitSum(float3 prefiltered,
     return prefiltered * (F0 * brdf.x + brdf.y);
 }
 
+float ApplyContactShadowVisibility(float visibility, float contactOcclusion, float strength)
+{
+    float contactVisibility = 1.0f - saturate(contactOcclusion) * saturate(strength);
+    return saturate(min(visibility, contactVisibility));
+}
+
 #endif // CORTEX_PBR_LIGHTING_HLSLI

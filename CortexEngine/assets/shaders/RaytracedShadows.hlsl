@@ -54,7 +54,77 @@ cbuffer FrameConstants : register(b0, space0)
 struct ShadowPayload
 {
     float visibility;
+    float hitT;
 };
+
+uint Hash(uint v)
+{
+    v ^= v >> 16u;
+    v *= 0x7feb352du;
+    v ^= v >> 15u;
+    v *= 0x846ca68bu;
+    v ^= v >> 16u;
+    return v;
+}
+
+float2 BlueNoiseUnit(uint2 pixel, uint sampleIndex)
+{
+    uint frame = (uint)(g_TimeAndExposure.x * 60.0f + 0.5f);
+    uint seed = Hash(pixel.x * 1973u ^ pixel.y * 9277u ^ sampleIndex * 26699u ^ frame * 31847u);
+    uint seed2 = Hash(seed ^ 0x68bc21ebu);
+    return float2(seed & 0xffffu, seed2 & 0xffffu) * (1.0f / 65535.0f);
+}
+
+void BuildOrthonormalBasis(float3 n, out float3 t, out float3 b)
+{
+    float3 up = (abs(n.y) < 0.999f) ? float3(0.0f, 1.0f, 0.0f) : float3(1.0f, 0.0f, 0.0f);
+    t = normalize(cross(up, n));
+    b = cross(n, t);
+}
+
+float3 SampleSunDiskDirection(float3 sunDir, uint2 pixel, uint sampleIndex)
+{
+    float2 xi = BlueNoiseUnit(pixel, sampleIndex);
+    float r = sqrt(xi.x);
+    float phi = xi.y * 6.28318530718f;
+    float s;
+    float c;
+    sincos(phi, s, c);
+
+    float3 tangent;
+    float3 bitangent;
+    BuildOrthonormalBasis(sunDir, tangent, bitangent);
+
+    const float sunAngularRadius = 0.0131f; // ~0.75 degrees, between real sun and cinematic area sun.
+    float2 disk = float2(c, s) * (r * sunAngularRadius);
+    return normalize(sunDir + tangent * disk.x + bitangent * disk.y);
+}
+
+float TraceVisibility(float3 origin, float3 direction, float tMax, out float hitT)
+{
+    ShadowPayload payload;
+    payload.visibility = 1.0f;
+    payload.hitT = tMax;
+
+    RayDesc ray;
+    ray.Origin = origin;
+    ray.Direction = direction;
+    ray.TMin = 0.0f;
+    ray.TMax = tMax;
+
+    TraceRay(
+        g_TopLevel,
+        RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH,
+        /*InstanceInclusionMask*/ 0xFF,
+        /*RayContributionToHitGroupIndex*/ 0,
+        /*MultiplierForGeometryContributionToHitGroupIndex*/ 0,
+        /*MissShaderIndex*/ 0,
+        ray,
+        payload);
+
+    hitT = payload.hitT;
+    return saturate(payload.visibility);
+}
 
 void StoreShadowBlock(uint2 launchIndex, uint2 launchDims, float value)
 {
@@ -77,6 +147,7 @@ void StoreShadowBlock(uint2 launchIndex, uint2 launchDims, float value)
 void Miss_Shadow(inout ShadowPayload payload)
 {
     payload.visibility = 1.0f;
+    payload.hitT = 10000.0f;
 }
 
 [shader("closesthit")]
@@ -84,6 +155,7 @@ void ClosestHit_Shadow(inout ShadowPayload payload, in BuiltInTriangleIntersecti
 {
     RTMaterial material = g_RTMaterials[InstanceID()];
     payload.visibility = RTMaterialSunVisibility(material);
+    payload.hitT = RayTCurrent();
 }
 
 [shader("raygeneration")]
@@ -136,28 +208,24 @@ void RayGen_Shadow()
         sunDir = normalize(g_Lights[0].direction_cosInner.xyz);
     }
 
-    // Small bias along light direction to reduce self-shadowing.
-    const float bias = 0.01f;
+    const float bias = 0.012f;
     float3 origin = worldPos + sunDir * bias;
 
-    ShadowPayload payload;
-    payload.visibility = 1.0f;
+    float hitT0;
+    float hitT1;
+    float visibility = 0.0f;
+    visibility += TraceVisibility(origin, SampleSunDiskDirection(sunDir, launchIndex, 0u), 10000.0f, hitT0);
+    visibility += TraceVisibility(origin, SampleSunDiskDirection(sunDir, launchIndex, 1u), 10000.0f, hitT1);
+    visibility *= 0.5f;
 
-    RayDesc ray;
-    ray.Origin = origin;
-    ray.Direction = sunDir;
-    ray.TMin = 0.0f;
-    ray.TMax = 10000.0f;
+    // A short center ray adds tight grounding near object bases without making
+    // broad sun penumbrae uniformly darker.
+    float contactHitT;
+    float contactVisibility = TraceVisibility(origin, sunDir, 1.35f, contactHitT);
+    float contact = (contactVisibility < 0.98f)
+        ? (1.0f - smoothstep(0.08f, 1.35f, contactHitT))
+        : 0.0f;
+    visibility = min(visibility, lerp(visibility, contactVisibility, contact * 0.65f));
 
-    TraceRay(
-        g_TopLevel,
-        RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH,
-        /*InstanceInclusionMask*/ 0xFF,
-        /*RayContributionToHitGroupIndex*/ 0,
-        /*MultiplierForGeometryContributionToHitGroupIndex*/ 0,
-        /*MissShaderIndex*/ 0,
-        ray,
-        payload);
-
-    StoreShadowBlock(launchIndex, launchDims, saturate(payload.visibility));
+    StoreShadowBlock(launchIndex, launchDims, saturate(max(visibility, 0.08f)));
 }

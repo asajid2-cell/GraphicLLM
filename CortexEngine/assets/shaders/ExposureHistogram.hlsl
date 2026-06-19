@@ -64,31 +64,25 @@ void CSMain(uint3 groupThreadId : SV_GroupThreadID)
 
     if (tid == 0u)
     {
-        const uint lowCut = sampleCount / 20u;       // 5% shadow trim
-        const uint highCut = sampleCount - lowCut;  // 5% highlight trim
+        const uint lowCut = sampleCount / 50u;             // 2% black trim
+        const uint highCut = sampleCount - sampleCount / 8u; // 12.5% highlight/window trim
+        const uint targetRank = lowCut + ((highCut - lowCut) * 45u) / 100u;
         uint cumulative = 0u;
-        float weightedBins = 0.0f;
-        uint weightedCount = 0u;
+        uint meteredBin = 28u;
 
         [unroll]
         for (uint bin = 0u; bin < 64u; ++bin)
         {
             uint count = g_Histogram[bin];
             uint next = cumulative + count;
-            uint start = max(cumulative, lowCut);
-            uint end = min(next, highCut);
-            if (end > start)
+            if (targetRank >= cumulative && targetRank < next)
             {
-                uint kept = end - start;
-                weightedBins += (float)bin * (float)kept;
-                weightedCount += kept;
+                meteredBin = bin;
             }
             cumulative = next;
         }
 
-        float meteredLum = (weightedCount > 0u)
-            ? BinToLuminance(weightedBins / (float)weightedCount)
-            : 0.18f;
+        float meteredLum = (cumulative > lowCut) ? BinToLuminance((float)meteredBin) : 0.18f;
 
         float compensation = clamp(g_ManualExposureCompensation, 0.05f, 8.0f);
         float targetExposure = clamp((0.18f / max(meteredLum, 1e-4f)) * compensation, 0.08f, 8.0f);

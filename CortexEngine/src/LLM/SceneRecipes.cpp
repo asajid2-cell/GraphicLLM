@@ -347,14 +347,17 @@ void BuildRoomShell(std::vector<std::shared_ptr<SceneCommand>>& out, const Scene
     // Solid box walls (one colored unit-cube per side, scaled) read far better
     // than tiled, gapped, untextured Kenney wall panels. The front (+Z) wall is
     // split around a central doorway so the room reads as enterable, and the
-    // camera looks in over the tops.
+    // camera looks in through the front opening.
     const glm::vec4 wallColor(0.84f, 0.81f, 0.76f, 1.0f);     // warm off-white
     const glm::vec4 backWallColor(0.52f, 0.53f, 0.58f, 1.0f); // muted feature wall for depth
     const glm::vec4 baseColor(0.24f, 0.20f, 0.17f, 1.0f);     // dark-wood baseboard + trim
     const float wallH = 2.8f;
     const float wallTh = 0.16f;
+    const float ceilingTh = 0.12f;
     const float baseH = 0.16f;  // baseboard height
     const float baseTh = 0.24f; // sits slightly proud of the wall plane
+    const float crownH = 0.08f;
+    const float crownTh = 0.10f;
     const float hw = width * 0.5f;
     const float hd = depth * 0.5f;
 
@@ -394,11 +397,29 @@ void BuildRoomShell(std::vector<std::shared_ptr<SceneCommand>>& out, const Scene
         wall("Wall_FrontR", off, hd, segW, wallTh, wallColor);
     }
 
-    // Baseboards along the foot of the walls — a small detail that makes the
-    // floor/wall junction read as finished rather than a bare box.
+    // A real plaster ceiling hides the procedural sky and completes the room box.
+    // It slightly overlaps the wall thickness so there are no blue edge leaks.
+    box("Ceiling", 0.0f, wallH + ceilingTh * 0.5f, 0.0f,
+        width + wallTh * 4.0f, ceilingTh, depth + wallTh * 4.0f, wallColor, &PlasterWallMaterial(),
+        glm::vec2(std::max(width / 1.55f, 1.0f), std::max(depth / 1.55f, 1.0f)));
+
+    // Baseboards along the foot of the walls make the floor/wall junction read
+    // as finished rather than a bare box.
     box("Base_Back", 0.0f, baseH * 0.5f, -hd, width, baseH, baseTh, baseColor);
     box("Base_Left", -hw, baseH * 0.5f, 0.0f, baseTh, baseH, depth, baseColor);
     box("Base_Right", hw, baseH * 0.5f, 0.0f, baseTh, baseH, depth, baseColor);
+
+    // Thin crown/cove strips finish the ceiling-wall junction and make the cap
+    // read as intentional architecture instead of a flat lid.
+    const float crownY = wallH - crownH * 0.5f;
+    box("Crown_Back", 0.0f, crownY, -hd + wallTh * 0.5f + crownTh * 0.5f, width, crownH, crownTh, baseColor);
+    box("Crown_Left", -hw + wallTh * 0.5f + crownTh * 0.5f, crownY, 0.0f, crownTh, crownH, depth, baseColor);
+    box("Crown_Right", hw - wallTh * 0.5f - crownTh * 0.5f, crownY, 0.0f, crownTh, crownH, depth, baseColor);
+    if (segW > 0.1f) {
+        const float off = doorW * 0.5f + segW * 0.5f;
+        box("Crown_FrontL", -off, crownY, hd - wallTh * 0.5f - crownTh * 0.5f, segW, crownH, crownTh, baseColor);
+        box("Crown_FrontR", off, crownY, hd - wallTh * 0.5f - crownTh * 0.5f, segW, crownH, crownTh, baseColor);
+    }
 
     // A glowing daylight window on the feature wall: a dark frame + an emissive
     // sky-blue pane. Breaks the blank plane, reads as a real window, and (via GI)

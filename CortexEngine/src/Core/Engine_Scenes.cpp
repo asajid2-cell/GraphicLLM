@@ -2738,19 +2738,23 @@ void Engine::BuildRecipeScene() {
         renderer->SetIBLEnabled(true);
         // Outdoor: the SUN is the key light; keep the (gray neutral) IBL modest so
         // it doesn't flood the scene flat-gray, and use a gentle sky-blue fill.
-        const float iblBase = outdoor ? 0.45f : 0.18f;
+        const float iblBase = outdoor ? 0.45f : 0.26f;
         const float ibl = outdoor
             ? std::clamp(iblBase + style.brightness * 0.25f, 0.2f, 1.3f)
             : std::clamp(iblBase + style.brightness * 0.10f, 0.08f, 0.42f);
         renderer->SetIBLIntensity(ibl, outdoor ? ibl : ibl * 0.72f);
-        renderer->SetBackgroundPresentation(true, 0.95f, 0.0f);
+        if (outdoor) {
+            renderer->SetBackgroundPresentation(true, 0.95f, 0.0f);
+        } else {
+            renderer->SetBackgroundPresentation(false, 0.0f, 0.0f);
+        }
         // Warmth shifts the ambient toward warm/cool; brightness scales the fill.
-        glm::vec3 amb = outdoor ? glm::vec3(0.24f, 0.27f, 0.31f) : glm::vec3(0.13f, 0.12f, 0.115f);
+        glm::vec3 amb = outdoor ? glm::vec3(0.24f, 0.27f, 0.31f) : glm::vec3(0.18f, 0.17f, 0.16f);
         amb.r += style.warmth * 0.06f;
         amb.b -= style.warmth * 0.06f;
         amb *= (1.0f + style.brightness * (outdoor ? 0.35f : 0.16f));
         renderer->SetAmbientLighting(glm::max(amb, glm::vec3(outdoor ? 0.05f : 0.035f)), outdoor ? 1.0f : 0.72f);
-        renderer->SetExposure(std::clamp((outdoor ? 0.68f : 0.62f) + style.brightness * 0.06f, 0.52f, outdoor ? 1.0f : 0.78f));
+        renderer->SetExposure(std::clamp((outdoor ? 0.68f : 0.66f) + style.brightness * 0.06f, 0.52f, outdoor ? 1.0f : 0.82f));
         // Global warm/cool grade makes the modern <-> rustic difference clear.
         renderer->SetColorGrade(std::max(0.0f, style.warmth) * 0.38f,
                                 std::max(0.0f, -style.warmth) * 0.32f);
@@ -2779,27 +2783,28 @@ void Engine::BuildRecipeScene() {
         renderer->SetBloomShape(outdoor ? 1.05f : 1.02f, outdoor ? 0.45f : 0.50f, outdoor ? 2.0f : 0.82f);
     }
 
-    // Soft key light from above so the interior reads with shape + shadow.
+    // Soft key light: outdoor stays high like sun fill; interiors use a
+    // ceiling-mounted spot just below the capped room shell.
     {
         entt::entity e = m_registry->CreateEntity();
         m_registry->AddComponent<Scene::TagComponent>(e, "Recipe_KeyLight");
         auto& t = m_registry->AddComponent<TransformComponent>(e);
-        t.position = outdoor ? glm::vec3(2.5f, 6.5f, -2.0f) : glm::vec3(2.6f, 4.7f, 1.7f);
-        const glm::vec3 keyTarget = outdoor ? glm::vec3(0.55f, 0.0f, 0.6f) : glm::vec3(-0.45f, 0.45f, -1.25f);
+        t.position = outdoor ? glm::vec3(2.5f, 6.5f, -2.0f) : glm::vec3(0.55f, 2.58f, 0.25f);
+        const glm::vec3 keyTarget = outdoor ? glm::vec3(0.55f, 0.0f, 0.6f) : glm::vec3(-0.30f, 0.55f, -1.35f);
         t.rotation = glm::quatLookAtLH(glm::normalize(keyTarget - t.position), glm::vec3(0.0f, 1.0f, 0.0f));
         auto& l = m_registry->AddComponent<Scene::LightComponent>(e);
         l.type = Scene::LightType::Spot;
         // Warm or cool key light by style (cool modern <-> warm rustic).
         l.color = glm::mix(glm::vec3(0.92f, 0.96f, 1.0f), glm::vec3(1.0f, 0.90f, 0.78f),
                            glm::clamp(style.warmth * 0.5f + 0.5f, 0.0f, 1.0f));
-        l.intensity = outdoor ? (10.0f + style.brightness * 2.5f) : (8.8f + style.brightness * 1.25f);
-        l.range = outdoor ? 24.0f : 18.0f;
-        l.innerConeDegrees = outdoor ? 48.0f : 30.0f;
-        l.outerConeDegrees = outdoor ? 80.0f : 62.0f;
+        l.intensity = outdoor ? (10.0f + style.brightness * 2.5f) : (12.8f + style.brightness * 1.6f);
+        l.range = outdoor ? 24.0f : 8.5f;
+        l.innerConeDegrees = outdoor ? 48.0f : 46.0f;
+        l.outerConeDegrees = outdoor ? 80.0f : 86.0f;
         l.castsShadows = true;
     }
 
-    // Elevated 3/4 camera that sees over the ~2m walls into the room.
+    // Interior 3/4 camera looks into the room from below the capped ceiling.
     {
         entt::entity cam = m_registry->CreateEntity();
         m_registry->AddComponent<Scene::TagComponent>(cam, "MainCamera");

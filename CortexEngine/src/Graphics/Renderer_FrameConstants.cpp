@@ -34,6 +34,8 @@ float Halton(uint32_t index, uint32_t base) {
 
 } // namespace
 void Renderer::UpdateFrameConstants(float deltaTime, Scene::ECS_Registry* registry) {
+    UpdateAutoExposureFromReadback();
+
     FrameConstants frameData = {};
     glm::vec3 cameraPos(0.0f);
     glm::vec3 cameraForward(0.0f, 0.0f, 1.0f);
@@ -206,4 +208,3 @@ void Renderer::UpdateFrameConstants(float deltaTime, Scene::ECS_Registry* regist
 }
 
 } // namespace Cortex::Graphics
-

@@ -17,7 +17,11 @@ void Renderer::SetExposure(float exposure) {
         return;
     }
     m_qualityRuntimeState.exposure = clamped;
-    spdlog::info("Renderer exposure set to {}", m_qualityRuntimeState.exposure);
+    if (!m_exposureState.hasReadback) {
+        m_exposureState.adaptedExposure = clamped;
+        m_exposureState.targetExposure = clamped;
+    }
+    spdlog::info("Renderer exposure compensation set to {}", m_qualityRuntimeState.exposure);
 }
 
 float Renderer::GetBloomIntensity() const {

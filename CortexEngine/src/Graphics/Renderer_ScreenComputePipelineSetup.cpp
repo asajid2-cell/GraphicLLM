@@ -390,6 +390,25 @@ void CSMain(uint3 dispatchThreadId : SV_DispatchThreadID)
         } else {
             spdlog::warn("Failed to compile HZB downsample compute shader: {}", hzbDownResult.Error());
         }
+
+        auto exposureResult =
+            ShaderCompiler::CompileFromFile("assets/shaders/ExposureHistogram.hlsl", "CSMain", "cs_5_1");
+        if (exposureResult.IsOk()) {
+            m_pipelineState.exposureHistogram = std::make_unique<DX12ComputePipeline>();
+            auto exposurePipelineResult = m_pipelineState.exposureHistogram->Initialize(
+                m_services.device->GetDevice(),
+                m_pipelineState.computeRootSignature->GetRootSignature(),
+                exposureResult.Value());
+            if (exposurePipelineResult.IsErr()) {
+                spdlog::warn("Failed to create exposure histogram compute pipeline: {}",
+                             exposurePipelineResult.Error());
+                m_pipelineState.exposureHistogram.reset();
+            } else {
+                spdlog::info("Exposure histogram/adaptation compute pipeline created successfully");
+            }
+        } else {
+            spdlog::warn("Failed to compile exposure histogram compute shader: {}", exposureResult.Error());
+        }
     }
 
     if (shaders.ssrVS && shaders.ssrPS) {

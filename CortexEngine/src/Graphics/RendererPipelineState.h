@@ -41,6 +41,7 @@ struct RendererPipelineReadiness {
     bool volumetricCompositeCompute = false;
     bool hzbInit = false;
     bool hzbDownsample = false;
+    bool exposureHistogram = false;
     bool motionVectors = false;
     bool bloomDownsample = false;
     bool bloomBlurH = false;
@@ -93,6 +94,7 @@ struct RendererPipelineState {
     std::unique_ptr<DX12ComputePipeline> volumetricCompositeCompute;
     std::unique_ptr<DX12ComputePipeline> hzbInit;
     std::unique_ptr<DX12ComputePipeline> hzbDownsample;
+    std::unique_ptr<DX12ComputePipeline> exposureHistogram;
     std::unique_ptr<DX12Pipeline> motionVectors;
     std::unique_ptr<DX12Pipeline> bloomDownsample;
     std::unique_ptr<DX12Pipeline> bloomBlurH;
@@ -141,6 +143,7 @@ struct RendererPipelineState {
         readiness.volumetricCompositeCompute = volumetricCompositeCompute != nullptr;
         readiness.hzbInit = hzbInit != nullptr;
         readiness.hzbDownsample = hzbDownsample != nullptr;
+        readiness.exposureHistogram = exposureHistogram != nullptr;
         readiness.motionVectors = motionVectors != nullptr;
         readiness.bloomDownsample = bloomDownsample != nullptr;
         readiness.bloomBlurH = bloomBlurH != nullptr;
@@ -186,6 +189,7 @@ struct RendererPipelineState {
         volumetricCompositeCompute.reset();
         hzbInit.reset();
         hzbDownsample.reset();
+        exposureHistogram.reset();
         motionVectors.reset();
         bloomDownsample.reset();
         bloomBlurH.reset();

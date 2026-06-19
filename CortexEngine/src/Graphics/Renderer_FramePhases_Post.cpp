@@ -78,6 +78,14 @@ void Renderer::ExecutePostProcessingFramePhase(const FrameExecutionContext& fram
             std::chrono::duration_cast<std::chrono::microseconds>(tSsaoEnd - tSsaoStart).count() / 1000.0f;
     }
 
+    DispatchAutoExposure();
+    RecordFramePass("AutoExposure",
+                    true,
+                    m_exposureState.hasReadback || m_exposureState.initializedOnGpu,
+                    1,
+                    {"hdr_color"},
+                    {"exposure_state"});
+
     const bool runBloomInEndFrameGraph =
         featurePlan.runBloom &&
         featurePlan.runPostProcess &&

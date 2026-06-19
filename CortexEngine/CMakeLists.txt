@@ -303,6 +303,7 @@ set(CORTEX_SOURCES
     src/Graphics/Renderer_VisibilityBufferOrchestration.cpp
     src/Graphics/Renderer_VisibilityBufferStages.cpp
     src/Graphics/Renderer_Volumetrics.cpp
+    src/Graphics/Renderer_Exposure.cpp
     src/Graphics/Renderer_Voxel.cpp
     src/Graphics/Renderer_Vegetation.cpp
     src/Graphics/Renderer_WaterSurfaces.cpp

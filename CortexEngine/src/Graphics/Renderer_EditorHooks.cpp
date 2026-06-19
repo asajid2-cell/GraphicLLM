@@ -37,6 +37,7 @@ void Renderer::RenderSSAOForEditor() {
 }
 
 void Renderer::RenderBloomForEditor() {
+    DispatchAutoExposure();
     RenderBloom();
 }
 

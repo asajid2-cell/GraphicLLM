@@ -44,6 +44,7 @@
 #include "Graphics/Subsystems/DebugLineSubsystem.h"
 #include "Graphics/RendererDepthState.h"
 #include "Graphics/RendererEnvironmentState.h"
+#include "Graphics/RendererExposureState.h"
 #include "Graphics/RendererGPUCullingState.h"
 #include "Graphics/RendererHZBState.h"
 #include "Graphics/Subsystems/HZBSubsystem.h"
@@ -654,6 +655,7 @@ private:
     Result<void> CreateHDRTarget();
     Result<void> CreateVisibilityBuffer();
     Result<void> CreateBloomResources();
+    Result<void> CreateExposureResources();
     Result<void> CreateSSAOResources();
     Result<void> CreateVolumetricResources();
     Result<void> CreateTemporalRejectionMaskResources();
@@ -737,6 +739,8 @@ private:
     void CaptureRTReflectionHistorySignalStats();
     void UpdateRTReflectionSignalStatsFromReadback();
     void BuildHZBFromDepth();
+    void UpdateAutoExposureFromReadback();
+    void DispatchAutoExposure();
     void AddHZBFromDepthPasses_RG(RenderGraph& graph, RGResourceHandle depthHandle, RGResourceHandle hzbHandle);
     HZBContext MakeHZBContext();
     Result<void> InitializeTAAResolveDescriptorTable();
@@ -869,6 +873,7 @@ public:
     RendererLightingState m_lightingState;
     FrameContract::SceneVisualInfo m_sceneVisualContract;
     RendererQualityRuntimeState m_qualityRuntimeState;
+    RendererExposureState m_exposureState;
     // Cached camera parameters and history used by culling, RT, and temporal passes.
     RendererCameraFrameState m_cameraState;
 

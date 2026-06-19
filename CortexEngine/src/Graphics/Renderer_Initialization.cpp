@@ -504,6 +504,12 @@ Result<void> Renderer::Initialize(DX12Device* device, Window* window) {
                      postTableResult.Error());
     }
 
+    auto exposureResult = CreateExposureResources();
+    if (exposureResult.IsErr()) {
+        spdlog::warn("Exposure histogram resources unavailable; renderer will keep authored exposure scalar: {}",
+                     exposureResult.Error());
+    }
+
     spdlog::info("Renderer initialized successfully");
     return Result<void>::Ok();
 }

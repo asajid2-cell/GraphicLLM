@@ -500,13 +500,21 @@ static const float PI = 3.14159265f;
 
 float3 ApplyACESFilm(float3 x)
 {
-    // ACES fitted curve (Narkowicz 2015)
-    const float a = 2.51f;
-    const float b = 0.03f;
-    const float c = 2.43f;
-    const float d = 0.59f;
-    const float e = 0.14f;
-    return saturate((x * (a * x + b)) / (x * (c * x + d) + e));
+    // ACES fitted RRT + ODT, using the common Stephen Hill matrix fit.
+    const float3x3 acesIn = float3x3(
+        0.59719f, 0.35458f, 0.04823f,
+        0.07600f, 0.90834f, 0.01566f,
+        0.02840f, 0.13383f, 0.83777f);
+    const float3x3 acesOut = float3x3(
+         1.60475f, -0.53108f, -0.07367f,
+        -0.10208f,  1.10813f, -0.00605f,
+        -0.00327f, -0.07276f,  1.07602f);
+
+    x = mul(acesIn, max(x, 0.0f.xxx));
+    float3 a = x * (x + 0.0245786f.xxx) - 0.000090537f.xxx;
+    float3 b = x * (0.983729f * x + 0.4329510f.xxx) + 0.238081f.xxx;
+    x = a / max(b, 1e-5f.xxx);
+    return saturate(mul(acesOut, x));
 }
 
 float3 ApplyToneMapper(float3 color, uint mode)
@@ -763,12 +771,43 @@ float3 ApplyPreBloomSpecularContainment(float3 hdr,
     return hdr * (limitedLuma / max(luma, 1e-4f));
 }
 
+float3 SampleBloomSourceTent(float2 uv, float2 texel)
+{
+    float3 c = g_SceneColor.SampleLevel(g_Sampler, uv, 0).rgb * 4.0f;
+    c += g_SceneColor.SampleLevel(g_Sampler, uv + texel * float2( 1.0f,  0.0f), 0).rgb * 2.0f;
+    c += g_SceneColor.SampleLevel(g_Sampler, uv + texel * float2(-1.0f,  0.0f), 0).rgb * 2.0f;
+    c += g_SceneColor.SampleLevel(g_Sampler, uv + texel * float2( 0.0f,  1.0f), 0).rgb * 2.0f;
+    c += g_SceneColor.SampleLevel(g_Sampler, uv + texel * float2( 0.0f, -1.0f), 0).rgb * 2.0f;
+    c += g_SceneColor.SampleLevel(g_Sampler, uv + texel * float2( 1.0f,  1.0f), 0).rgb;
+    c += g_SceneColor.SampleLevel(g_Sampler, uv + texel * float2(-1.0f,  1.0f), 0).rgb;
+    c += g_SceneColor.SampleLevel(g_Sampler, uv + texel * float2( 1.0f, -1.0f), 0).rgb;
+    c += g_SceneColor.SampleLevel(g_Sampler, uv + texel * float2(-1.0f, -1.0f), 0).rgb;
+    return c * (1.0f / 16.0f);
+}
+
+float3 ApplyBloomSoftKnee(float3 hdr)
+{
+    const float exposure = max(g_TimeAndExposure.z, 0.08f);
+    const float threshold = max(g_BloomParams.x / exposure, 1e-3f);
+    const float knee = max(threshold * g_BloomParams.y, 1e-4f);
+    const float luma = dot(hdr, float3(0.2126f, 0.7152f, 0.0722f));
+    const float soft = saturate((luma - threshold + knee) / (2.0f * knee));
+    const float contribution = max(luma - threshold, 0.0f) + soft * soft * knee;
+    const float weight = saturate(contribution / max(luma, 1e-4f));
+    return hdr * weight;
+}
+
 float4 BloomDownsamplePS(VSOutput input) : SV_TARGET
 {
-    float3 hdr = g_SceneColor.Sample(g_Sampler, input.uv).rgb;
+    uint sourceWidth = 1u;
+    uint sourceHeight = 1u;
+    g_SceneColor.GetDimensions(sourceWidth, sourceHeight);
+    float2 texel = 1.0f / float2(max(sourceWidth, 1u), max(sourceHeight, 1u));
+    float3 hdr = SampleBloomSourceTent(input.uv, texel);
     float4 nrSample = g_NormalRoughness.SampleLevel(g_Sampler, input.uv, 0);
     float roughness = nrSample.w;
-    if (dot(abs(nrSample), float4(1.0f, 1.0f, 1.0f, 1.0f)) <= 1e-5f)
+    const bool materialAwareBasePass = dot(abs(nrSample), float4(1.0f, 1.0f, 1.0f, 1.0f)) > 1e-5f;
+    if (!materialAwareBasePass)
     {
         roughness = 0.72f;
     }
@@ -780,63 +819,54 @@ float4 BloomDownsamplePS(VSOutput input) : SV_TARGET
         sceneMaterialClass,
         saturate(g_CinematicStabilityParams.w));
 
-    float threshold = g_BloomParams.x;
-    float softKnee  = g_BloomParams.y;
+    if (materialAwareBasePass)
+    {
+        hdr = ApplyBloomSoftKnee(hdr);
+    }
 
-    // Soft-threshold bloom based on Unity-style formulation.
-    float knee = threshold * softKnee + 1e-4f;
-    float3 delta = max(hdr - threshold.xxx, 0.0f);
-    float3 soft = delta * delta / (delta + knee);
-
-    return float4(soft, 1.0f);
+    return float4(max(hdr, 0.0f.xxx), 1.0f);
 }
 
 // Horizontal blur of the bloom texture (source bound at t0)
 float4 BloomBlurHPS(VSOutput input) : SV_TARGET
 {
-    float2 texel = float2(g_PostParams.x * 4.0f, 0.0f); // quarter-res approximation
-    float3 sum = 0.0f;
-    float weights[6] = {0.183480f, 0.165472f, 0.121375f, 0.072411f, 0.035136f, 0.013866f};
-    sum += g_SceneColor.Sample(g_Sampler, input.uv).rgb * weights[0];
-    sum += g_SceneColor.Sample(g_Sampler, input.uv + texel).rgb * weights[1];
-    sum += g_SceneColor.Sample(g_Sampler, input.uv - texel).rgb * weights[1];
-    sum += g_SceneColor.Sample(g_Sampler, input.uv + texel * 2.0f).rgb * weights[2];
-    sum += g_SceneColor.Sample(g_Sampler, input.uv - texel * 2.0f).rgb * weights[2];
-    sum += g_SceneColor.Sample(g_Sampler, input.uv + texel * 3.0f).rgb * weights[3];
-    sum += g_SceneColor.Sample(g_Sampler, input.uv - texel * 3.0f).rgb * weights[3];
-    sum += g_SceneColor.Sample(g_Sampler, input.uv + texel * 4.0f).rgb * weights[4];
-    sum += g_SceneColor.Sample(g_Sampler, input.uv - texel * 4.0f).rgb * weights[4];
-    sum += g_SceneColor.Sample(g_Sampler, input.uv + texel * 5.0f).rgb * weights[5];
-    sum += g_SceneColor.Sample(g_Sampler, input.uv - texel * 5.0f).rgb * weights[5];
-    return float4(sum, 1.0f);
+    uint sourceWidth = 1u;
+    uint sourceHeight = 1u;
+    g_SceneColor.GetDimensions(sourceWidth, sourceHeight);
+    float2 texel = float2(1.0f / max(sourceWidth, 1u), 0.0f);
+    float3 sum = g_SceneColor.SampleLevel(g_Sampler, input.uv, 0).rgb * 0.40f;
+    sum += g_SceneColor.SampleLevel(g_Sampler, input.uv + texel * 1.0f, 0).rgb * 0.24f;
+    sum += g_SceneColor.SampleLevel(g_Sampler, input.uv - texel * 1.0f, 0).rgb * 0.24f;
+    sum += g_SceneColor.SampleLevel(g_Sampler, input.uv + texel * 2.0f, 0).rgb * 0.06f;
+    sum += g_SceneColor.SampleLevel(g_Sampler, input.uv - texel * 2.0f, 0).rgb * 0.06f;
+    return float4(max(sum, 0.0f.xxx), 1.0f);
 }
 
 // Vertical blur of the bloom texture (source bound at t0)
 float4 BloomBlurVPS(VSOutput input) : SV_TARGET
 {
-    float2 texel = float2(0.0f, g_PostParams.y * 4.0f); // quarter-res approximation
-    float3 sum = 0.0f;
-    float weights[6] = {0.183480f, 0.165472f, 0.121375f, 0.072411f, 0.035136f, 0.013866f};
-    sum += g_SceneColor.Sample(g_Sampler, input.uv).rgb * weights[0];
-    sum += g_SceneColor.Sample(g_Sampler, input.uv + texel).rgb * weights[1];
-    sum += g_SceneColor.Sample(g_Sampler, input.uv - texel).rgb * weights[1];
-    sum += g_SceneColor.Sample(g_Sampler, input.uv + texel * 2.0f).rgb * weights[2];
-    sum += g_SceneColor.Sample(g_Sampler, input.uv - texel * 2.0f).rgb * weights[2];
-    sum += g_SceneColor.Sample(g_Sampler, input.uv + texel * 3.0f).rgb * weights[3];
-    sum += g_SceneColor.Sample(g_Sampler, input.uv - texel * 3.0f).rgb * weights[3];
-    sum += g_SceneColor.Sample(g_Sampler, input.uv + texel * 4.0f).rgb * weights[4];
-    sum += g_SceneColor.Sample(g_Sampler, input.uv - texel * 4.0f).rgb * weights[4];
-    sum += g_SceneColor.Sample(g_Sampler, input.uv + texel * 5.0f).rgb * weights[5];
-    sum += g_SceneColor.Sample(g_Sampler, input.uv - texel * 5.0f).rgb * weights[5];
-    return float4(sum, 1.0f);
+    uint sourceWidth = 1u;
+    uint sourceHeight = 1u;
+    g_SceneColor.GetDimensions(sourceWidth, sourceHeight);
+    float2 texel = float2(0.0f, 1.0f / max(sourceHeight, 1u));
+    float3 sum = g_SceneColor.SampleLevel(g_Sampler, input.uv, 0).rgb * 0.40f;
+    sum += g_SceneColor.SampleLevel(g_Sampler, input.uv + texel * 1.0f, 0).rgb * 0.24f;
+    sum += g_SceneColor.SampleLevel(g_Sampler, input.uv - texel * 1.0f, 0).rgb * 0.24f;
+    sum += g_SceneColor.SampleLevel(g_Sampler, input.uv + texel * 2.0f, 0).rgb * 0.06f;
+    sum += g_SceneColor.SampleLevel(g_Sampler, input.uv - texel * 2.0f, 0).rgb * 0.06f;
+    return float4(max(sum, 0.0f.xxx), 1.0f);
 }
 
 // Simple upsample/composite pass: reads from g_BloomSource and writes color
 // directly. The pipeline uses additive blending when accumulating levels.
 float4 BloomUpsamplePS(VSOutput input) : SV_TARGET
 {
-    float3 src = g_SceneColor.Sample(g_Sampler, input.uv).rgb;
-    return float4(src, 1.0f);
+    uint sourceWidth = 1u;
+    uint sourceHeight = 1u;
+    g_SceneColor.GetDimensions(sourceWidth, sourceHeight);
+    float2 texel = 1.0f / float2(max(sourceWidth, 1u), max(sourceHeight, 1u));
+    float3 src = SampleBloomSourceTent(input.uv, texel) * 0.62f;
+    return float4(max(src, 0.0f.xxx), 1.0f);
 }
 
 // Reconstruct world-space position from depth and UV using the inverse of the
@@ -1962,6 +1992,91 @@ float3 SampleHighlightStreaks(float2 uv)
     return horizontal + vertical + sunAxis;
 }
 
+bool TryProjectSunUV(out float2 sunUV)
+{
+    sunUV = float2(0.5f, 0.5f);
+    if (g_LightCount.x == 0)
+    {
+        return false;
+    }
+
+    Light sun = g_Lights[0];
+    if ((uint)sun.position_type.w != 0u)
+    {
+        return false;
+    }
+
+    float3 sunDirWS = -normalize(sun.direction_cosInner.xyz);
+    float3 sunWorld = g_CameraPosition.xyz + sunDirWS * 1000.0f;
+    float4 sunClip = mul(g_ViewProjectionMatrix, float4(sunWorld, 1.0f));
+    if (sunClip.w <= 0.0f)
+    {
+        return false;
+    }
+
+    float2 sunNdc = sunClip.xy / sunClip.w;
+    sunUV = float2(sunNdc.x * 0.5f + 0.5f, 0.5f - sunNdc.y * 0.5f);
+    return sunUV.x > -0.35f && sunUV.x < 1.35f && sunUV.y > -0.35f && sunUV.y < 1.35f;
+}
+
+float3 SampleLensGhostsAndHalo(float2 uv, float bloomIntensity)
+{
+    if (bloomIntensity <= 0.001f)
+    {
+        return 0.0f.xxx;
+    }
+
+    float2 center = float2(0.5f, 0.5f);
+    float2 fromCenter = uv - center;
+    float vignette = saturate(1.0f - dot(fromCenter, fromCenter) * 1.65f);
+    float3 ghosts = 0.0f.xxx;
+
+    const float ghostScale[4] = { -0.72f, -0.38f, 0.28f, 0.62f };
+    const float ghostWeight[4] = { 0.18f, 0.12f, 0.08f, 0.055f };
+    [unroll]
+    for (int i = 0; i < 4; ++i)
+    {
+        float2 sourceUv = center + (center - uv) * ghostScale[i];
+        if (sourceUv.x >= 0.0f && sourceUv.x <= 1.0f && sourceUv.y >= 0.0f && sourceUv.y <= 1.0f)
+        {
+            float2 chromaShift = normalize(fromCenter + 1e-4f.xx) * g_PostParams.xy * (2.0f + (float)i * 1.5f);
+            float r = g_BloomSource.SampleLevel(g_Sampler, sourceUv + chromaShift, 0).r;
+            float g = g_BloomSource.SampleLevel(g_Sampler, sourceUv, 0).g;
+            float b = g_BloomSource.SampleLevel(g_Sampler, sourceUv - chromaShift, 0).b;
+            float3 sampleGhost = float3(r, g, b);
+            float luma = dot(sampleGhost, float3(0.2126f, 0.7152f, 0.0722f));
+            ghosts += sampleGhost * smoothstep(0.02f, 0.80f, luma) * ghostWeight[i] * vignette;
+        }
+    }
+
+    float2 sunUV;
+    if (TryProjectSunUV(sunUV))
+    {
+        float2 axis = center - sunUV;
+        float sunVisibility = saturate(1.0f - length(sunUV - center) * 0.55f);
+        float3 lightColor = max(g_Lights[0].color_range.rgb, 0.0f.xxx);
+        float lightLuma = max(dot(lightColor, float3(0.2126f, 0.7152f, 0.0722f)), 0.01f);
+        float3 sunTint = lightColor / lightLuma;
+        [unroll]
+        for (int j = 0; j < 3; ++j)
+        {
+            float t = (float)j / 2.0f;
+            float2 ghostPos = center + axis * lerp(0.42f, 1.25f, t);
+            float radius = lerp(0.050f, 0.105f, t);
+            float d = length(uv - ghostPos);
+            float mask = exp2(-d * d / max(radius * radius, 1e-4f));
+            float3 dispersion = lerp(float3(1.0f, 0.76f, 0.55f), float3(0.55f, 0.82f, 1.0f), t);
+            ghosts += sunTint * dispersion * mask * sunVisibility * lerp(0.070f, 0.025f, t);
+        }
+
+        float haloRadius = length(axis) + 0.18f;
+        float halo = exp2(-abs(length(uv - center) - haloRadius) * 18.0f);
+        ghosts += sunTint * halo * sunVisibility * 0.028f;
+    }
+
+    return ghosts * saturate(bloomIntensity) * 0.80f;
+}
+
 float DofViewDistanceFromDepth(float2 uv, float depth)
 {
     if (depth >= 1.0f - 1e-4f)
@@ -2872,7 +2987,12 @@ float4 PSMain(VSOutput input) : SV_TARGET
 
     // Compose bloom after any motion blur and fog so blurred highlights remain
     // physically plausible and color-stable.
-    float3 hdrCombined = hdrBlurred + bloom + highlightStreaks + halationColor;
+    float3 lensFlare = SampleLensGhostsAndHalo(uv, bloomIntensity);
+    if (max(g_BloomParams.z, 0.0f) > 0.0f)
+    {
+        lensFlare = min(lensFlare, (max(g_BloomParams.z, 0.0f) * 0.35f).xxx);
+    }
+    float3 hdrCombined = hdrBlurred + bloom + highlightStreaks + halationColor + lensFlare;
     hdrCombined = ApplyCinematicDepthOfField(
         uv,
         hdrCombined,

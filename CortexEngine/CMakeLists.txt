@@ -629,11 +629,10 @@ endif()
 # therefore won't run when the executable is already up-to-date, and the app
 # ends up running stale shaders from build/bin/assets.
 #
-# Use a stamp-based custom target so known asset changes are picked up on every
-# build invocation (including when only shaders are edited). New asset files
-# require a normal CMake reconfigure; avoiding CONFIGURE_DEPENDS keeps Ninja
-# from running CMake's generated glob verifier before every build.
-file(GLOB_RECURSE CORTEX_ASSET_FILES
+# Use a stamp-based custom target so asset changes are picked up on every
+# build invocation (including when only shaders are edited). CONFIGURE_DEPENDS
+# keeps newly added asset files in the dependency graph on subsequent builds.
+file(GLOB_RECURSE CORTEX_ASSET_FILES CONFIGURE_DEPENDS
     "${CMAKE_SOURCE_DIR}/assets/*"
 )
 list(APPEND CORTEX_ASSET_FILES

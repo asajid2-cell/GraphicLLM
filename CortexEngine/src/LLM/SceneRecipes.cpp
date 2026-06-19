@@ -376,12 +376,13 @@ void BuildLivingRoom(std::vector<std::shared_ptr<SceneCommand>>& out, const Scen
     // Cozier footprint so the seating group fills the room instead of floating.
     BuildRoomShell(out, cat, c, 6.8f, 6.6f, glm::vec4(0.50f, 0.43f, 0.36f, 1.0f)); // warm wood floor
     Place(out, cat, c, "rugRectangle", 2.9f, 0.0f, -0.3f, 0.0f, glm::vec4(0.47f, 0.30f, 0.26f, 1.0f));
-    Place(out, cat, c, "loungeSofa", 2.3f, 0.0f, -2.0f, 0.0f);          // back wall, faces +Z
-    PlaceOn(out, cat, c, "pillowBlue", 0.45f, -0.55f, 0.48f, -2.15f, 8.0f);  // throw pillows on the sofa
-    PlaceOn(out, cat, c, "pillow", 0.42f, 0.55f, 0.48f, -2.15f, -10.0f);
-    Place(out, cat, c, "loungeChair", 0.85f, -2.05f, -0.3f, 50.0f);     // angled into the group
-    Place(out, cat, c, "loungeChair", 0.85f, 2.05f, -0.3f, -50.0f);
-    Place(out, cat, c, "tableCoffee", 1.2f, 0.0f, -0.7f, 0.0f);         // centre of the seating
+    // High-poly PBR-textured furniture (Poly Haven CC0) — near-white color so the
+    // real albedo/normal/roughness textures drive the look (not a flat tint).
+    const glm::vec4 tex(0.97f, 0.97f, 0.97f, 1.0f);
+    Place(out, cat, c, "Sofa_01", 2.3f, 0.0f, -2.0f, 0.0f, tex);        // back wall
+    Place(out, cat, c, "ArmChair_01", 0.95f, -2.05f, -0.3f, 50.0f, tex); // angled into the group
+    Place(out, cat, c, "ArmChair_01", 0.95f, 2.05f, -0.3f, -50.0f, tex);
+    Place(out, cat, c, "CoffeeTable_01", 1.2f, 0.0f, -0.7f, 0.0f, tex);  // centre of the seating
     PlaceOn(out, cat, c, "books", 0.35f, 0.15f, 0.42f, -0.7f, 20.0f);   // on the coffee table
     Place(out, cat, c, "lampRoundFloor", 0.4f, -2.7f, -2.1f, 0.0f);     // floor lamp beside the sofa
     AddPointLight(out, -2.55f, 1.45f, -2.1f, glm::vec3(1.0f, 0.78f, 0.48f), 5.4f, 4.3f);

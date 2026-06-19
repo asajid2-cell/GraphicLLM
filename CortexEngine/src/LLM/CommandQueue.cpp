@@ -40,6 +40,14 @@ glm::vec4 SanitizeColor(const glm::vec4& color) {
     return result;
 }
 
+bool LooksLikePackedArmTexture(const std::string& path) {
+    std::string lower = path;
+    std::transform(lower.begin(), lower.end(), lower.begin(),
+                   [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    return lower.find("_arm") != std::string::npos || lower.find("-arm") != std::string::npos ||
+           lower.find("arm_") != std::string::npos || lower.find("arm.") != std::string::npos;
+}
+
 glm::vec3 ClampToWorld(const glm::vec3& v) {
     glm::vec3 out = v;
     out.x = std::clamp(out.x, -kWorldExtent, kWorldExtent);
@@ -576,7 +584,12 @@ void CommandQueue::ExecuteAddEntity(AddEntityCommand* cmd, Scene::ECS_Registry* 
     // Add renderable
     auto& renderable = registry->AddComponent<Scene::RenderableComponent>(entity);
     renderable.mesh = mesh;
-    renderable.albedoColor = SanitizeColor(cmd->color);
+    const auto* embeddedMaterial =
+        (cmd->entityType == AddEntityCommand::EntityType::Model && mesh && mesh->embeddedMaterial.HasTexture())
+            ? &mesh->embeddedMaterial
+            : nullptr;
+    renderable.albedoColor = embeddedMaterial ? SanitizeColor(embeddedMaterial->baseColorFactor)
+                                              : SanitizeColor(cmd->color);
 
     auto sanitizeChannel = [](float value, float defValue, const char* fieldName) {
         if (!std::isfinite(value) || value < 0.0f || value > 1.0f) {
@@ -586,9 +599,14 @@ void CommandQueue::ExecuteAddEntity(AddEntityCommand* cmd, Scene::ECS_Registry* 
         return value;
     };
 
-    float metallic = sanitizeChannel(cmd->metallic, 0.0f, "metallic");
-    float roughness = sanitizeChannel(cmd->roughness, 0.5f, "roughness");
+    float metallic = embeddedMaterial ? embeddedMaterial->metallicFactor
+                                      : sanitizeChannel(cmd->metallic, 0.0f, "metallic");
+    float roughness = embeddedMaterial ? embeddedMaterial->roughnessFactor
+                                      : sanitizeChannel(cmd->roughness, 0.5f, "roughness");
     float ao = sanitizeChannel(cmd->ao, 1.0f, "ao");
+    if (embeddedMaterial && !embeddedMaterial->occlusionPath.empty()) {
+        ao = embeddedMaterial->occlusionStrength;
+    }
 
     renderable.metallic = SaturateScalar(metallic);
     renderable.roughness = SaturateScalar(roughness);
@@ -608,6 +626,23 @@ void CommandQueue::ExecuteAddEntity(AddEntityCommand* cmd, Scene::ECS_Registry* 
     }
     if (cmd->setEmissiveBloom) {
         renderable.emissiveBloomFactor = SaturateScalar(cmd->emissiveBloom);
+    }
+    if (embeddedMaterial) {
+        renderable.normalScale = embeddedMaterial->normalScale;
+        renderable.doubleSided = embeddedMaterial->doubleSided;
+        if (glm::length2(embeddedMaterial->emissiveFactor) > 1.0e-6f) {
+            renderable.emissiveColor = embeddedMaterial->emissiveFactor;
+        }
+        renderable.textures.albedoPath = embeddedMaterial->albedoPath;
+        renderable.textures.normalPath = embeddedMaterial->normalPath;
+        renderable.textures.metallicPath = embeddedMaterial->metallicRoughnessPath;
+        renderable.textures.roughnessPath = embeddedMaterial->metallicRoughnessPath;
+        renderable.textures.occlusionPath = embeddedMaterial->occlusionPath;
+        if (renderable.textures.occlusionPath.empty() &&
+            LooksLikePackedArmTexture(embeddedMaterial->metallicRoughnessPath)) {
+            renderable.textures.occlusionPath = embeddedMaterial->metallicRoughnessPath;
+        }
+        renderable.textures.emissivePath = embeddedMaterial->emissivePath;
     }
     renderable.textures.albedo = renderer->GetPlaceholderTexture();
     renderable.textures.normal = renderer->GetPlaceholderNormal();

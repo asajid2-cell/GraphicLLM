@@ -61,6 +61,26 @@ enum class MeshKind : uint32_t {
 
 // Mesh data
 struct MeshData {
+    struct EmbeddedPbrMaterial {
+        std::string albedoPath;
+        std::string normalPath;
+        std::string metallicRoughnessPath;
+        std::string occlusionPath;
+        std::string emissivePath;
+        glm::vec4 baseColorFactor{1.0f};
+        glm::vec3 emissiveFactor{0.0f};
+        float metallicFactor = 1.0f;
+        float roughnessFactor = 1.0f;
+        float normalScale = 1.0f;
+        float occlusionStrength = 1.0f;
+        bool doubleSided = false;
+
+        [[nodiscard]] bool HasTexture() const {
+            return !albedoPath.empty() || !normalPath.empty() || !metallicRoughnessPath.empty() ||
+                   !occlusionPath.empty() || !emissivePath.empty();
+        }
+    };
+
     MeshKind kind = MeshKind::StaticTriangle;
     std::vector<glm::vec3> positions;
     std::vector<glm::vec3> normals;
@@ -79,6 +99,8 @@ struct MeshData {
     glm::vec3 boundsCenter{0.0f};
     float     boundsRadius = 0.0f;
     bool      hasBounds = false;
+
+    EmbeddedPbrMaterial embeddedMaterial;
 
     // GPU buffer handles (renderer-owned)
     std::shared_ptr<Cortex::Graphics::MeshBuffers> gpuBuffers;
@@ -114,6 +136,7 @@ struct MeshData {
             boundsCenter = other.boundsCenter;
             boundsRadius = other.boundsRadius;
             hasBounds = other.hasBounds;
+            embeddedMaterial = std::move(other.embeddedMaterial);
             gpuBuffers = std::move(other.gpuBuffers);
         }
         return *this;

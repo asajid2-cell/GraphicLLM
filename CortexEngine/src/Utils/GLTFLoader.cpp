@@ -184,6 +184,94 @@ Result<void> ReadIndices(const AccessorInfo& acc,
     return Result<void>::Ok();
 }
 
+glm::vec4 ReadVec4(const nlohmann::json& jv, const glm::vec4& fallback) {
+    if (!jv.is_array() || jv.size() < 4) {
+        return fallback;
+    }
+    return glm::vec4(jv[0].get<float>(), jv[1].get<float>(), jv[2].get<float>(), jv[3].get<float>());
+}
+
+glm::vec3 ReadVec3(const nlohmann::json& jv, const glm::vec3& fallback) {
+    if (!jv.is_array() || jv.size() < 3) {
+        return fallback;
+    }
+    return glm::vec3(jv[0].get<float>(), jv[1].get<float>(), jv[2].get<float>());
+}
+
+std::string TexturePathForIndex(const nlohmann::json& j, const fs::path& baseDir, int textureIndex) {
+    if (textureIndex < 0 || !j.contains("textures") || !j["textures"].is_array() ||
+        textureIndex >= static_cast<int>(j["textures"].size())) {
+        return {};
+    }
+    const auto& texture = j["textures"][textureIndex];
+    const int imageIndex = texture.value("source", -1);
+    if (imageIndex < 0 || !j.contains("images") || !j["images"].is_array() ||
+        imageIndex >= static_cast<int>(j["images"].size())) {
+        return {};
+    }
+    const auto& image = j["images"][imageIndex];
+    if (!image.contains("uri") || !image["uri"].is_string()) {
+        return {};
+    }
+
+    const std::string uri = image["uri"].get<std::string>();
+    if (uri.empty() || uri.rfind("data:", 0) == 0) {
+        return {};
+    }
+    return (baseDir / fs::u8path(uri)).lexically_normal().string();
+}
+
+std::string TexturePathForSlot(const nlohmann::json& j,
+                               const fs::path& baseDir,
+                               const nlohmann::json& material,
+                               const char* slotName) {
+    if (!material.contains(slotName) || !material[slotName].is_object()) {
+        return {};
+    }
+    return TexturePathForIndex(j, baseDir, material[slotName].value("index", -1));
+}
+
+Scene::MeshData::EmbeddedPbrMaterial ReadEmbeddedMaterial(const nlohmann::json& j,
+                                                          const fs::path& baseDir,
+                                                          const nlohmann::json& prim) {
+    Scene::MeshData::EmbeddedPbrMaterial out;
+    const int materialIndex = prim.value("material", -1);
+    if (materialIndex < 0 || !j.contains("materials") || !j["materials"].is_array() ||
+        materialIndex >= static_cast<int>(j["materials"].size())) {
+        return out;
+    }
+
+    const auto& material = j["materials"][materialIndex];
+    out.doubleSided = material.value("doubleSided", false);
+
+    if (material.contains("pbrMetallicRoughness") && material["pbrMetallicRoughness"].is_object()) {
+        const auto& pbr = material["pbrMetallicRoughness"];
+        if (pbr.contains("baseColorFactor")) {
+            out.baseColorFactor = ReadVec4(pbr["baseColorFactor"], out.baseColorFactor);
+        }
+        out.metallicFactor = pbr.value("metallicFactor", out.metallicFactor);
+        out.roughnessFactor = pbr.value("roughnessFactor", out.roughnessFactor);
+        out.albedoPath = TexturePathForSlot(j, baseDir, pbr, "baseColorTexture");
+        out.metallicRoughnessPath = TexturePathForSlot(j, baseDir, pbr, "metallicRoughnessTexture");
+    }
+
+    out.normalPath = TexturePathForSlot(j, baseDir, material, "normalTexture");
+    if (material.contains("normalTexture") && material["normalTexture"].is_object()) {
+        out.normalScale = material["normalTexture"].value("scale", out.normalScale);
+    }
+
+    out.occlusionPath = TexturePathForSlot(j, baseDir, material, "occlusionTexture");
+    if (material.contains("occlusionTexture") && material["occlusionTexture"].is_object()) {
+        out.occlusionStrength = material["occlusionTexture"].value("strength", out.occlusionStrength);
+    }
+
+    out.emissivePath = TexturePathForSlot(j, baseDir, material, "emissiveTexture");
+    if (material.contains("emissiveFactor")) {
+        out.emissiveFactor = ReadVec3(material["emissiveFactor"], out.emissiveFactor);
+    }
+    return out;
+}
+
 } // namespace
 
 Result<std::shared_ptr<Scene::MeshData>> LoadGLTFMesh(const std::string& pathStr) {
@@ -361,12 +449,14 @@ Result<std::shared_ptr<Scene::MeshData>> LoadGLTFMesh(const std::string& pathStr
     mesh->normals   = std::move(normals);
     mesh->texCoords = std::move(uvs);
     mesh->indices   = std::move(indices);
+    mesh->embeddedMaterial = ReadEmbeddedMaterial(j, baseDir, prim);
     mesh->UpdateBounds();
 
-    spdlog::info("Loaded glTF mesh '{}' (verts={}, indices={})",
+    spdlog::info("Loaded glTF mesh '{}' (verts={}, indices={}, pbrTextures={})",
                  path.string(),
                  mesh->positions.size(),
-                 mesh->indices.size());
+                 mesh->indices.size(),
+                 mesh->embeddedMaterial.HasTexture() ? "yes" : "no");
 
     return Result<std::shared_ptr<Scene::MeshData>>::Ok(mesh);
 }

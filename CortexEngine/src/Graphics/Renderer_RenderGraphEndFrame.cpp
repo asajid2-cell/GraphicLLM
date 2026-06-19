@@ -290,6 +290,31 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
 
     if (wantsRgPostThisFrame) {
         hdrHandle = m_services.renderGraph->ImportResource(m_mainTargets.hdr.resources.color.Get(), m_mainTargets.hdr.resources.state, "HDR");
+        if (!hasVBPostStates && m_vb.State().renderedThisFrame && m_services.visibilityBuffer) {
+            vbPostInitialStates = m_services.visibilityBuffer->GetResourceStateSnapshot();
+            hasVBPostStates = true;
+        }
+        {
+            ID3D12Resource* normalRes = m_mainTargets.normalRoughness.resources.texture.Get();
+            D3D12_RESOURCE_STATES normalState = m_mainTargets.normalRoughness.resources.state;
+            if (m_vb.State().renderedThisFrame && m_services.visibilityBuffer && m_services.visibilityBuffer->GetNormalRoughnessBuffer()) {
+                normalRes = m_services.visibilityBuffer->GetNormalRoughnessBuffer();
+                normalState = vbPostInitialStates.normalRoughness;
+            }
+            postNormalResource = normalRes;
+            if (normalRes && !normalHandle.IsValid()) {
+                normalHandle = m_services.renderGraph->ImportResource(normalRes, normalState, "NormalRoughness");
+            }
+        }
+        if (m_vb.State().renderedThisFrame && m_services.visibilityBuffer &&
+            m_services.visibilityBuffer->GetMaterialExt2Buffer() &&
+            !materialExt2Handle.IsValid()) {
+            postMaterialExt2Resource = m_services.visibilityBuffer->GetMaterialExt2Buffer();
+            materialExt2Handle = m_services.renderGraph->ImportResource(
+                postMaterialExt2Resource,
+                vbPostInitialStates.materialExt2,
+                "MaterialExt2_SurfaceClass");
+        }
         if (m_temporal.ScreenState().historyColor) {
             historyHandle = m_services.renderGraph->ImportResource(m_temporal.ScreenState().historyColor.Get(), m_temporal.ScreenState().historyState, "TAAHistory");
         }
@@ -332,6 +357,8 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
 
             BloomGraphPass::FusedBloomContext bloomContext{};
             bloomContext.hdr = hdrHandle;
+            bloomContext.materialAwareNormalRoughness = normalHandle;
+            bloomContext.materialAwareMaterialExt2 = materialExt2Handle;
             bloomContext.bloomA = std::span<RGResourceHandle>(bloomA.data(), bloomA.size());
             bloomContext.bloomB = std::span<RGResourceHandle>(bloomB.data(), bloomB.size());
             bloomContext.bloomATemplates =

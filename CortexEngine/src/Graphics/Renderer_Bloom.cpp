@@ -24,6 +24,13 @@ BloomContext Renderer::MakeBloomContext() {
     ctx.hdrColor = m_mainTargets.hdr.resources.color.Get();
     ctx.hdrState = &m_mainTargets.hdr.resources.state;
     ctx.hdrSrvValid = m_mainTargets.hdr.descriptors.srv.IsValid();
+    ctx.materialAwareNormalRoughness = m_mainTargets.normalRoughness.resources.texture.Get();
+    if (m_vb.State().renderedThisFrame && m_services.visibilityBuffer) {
+        if (m_services.visibilityBuffer->GetNormalRoughnessBuffer()) {
+            ctx.materialAwareNormalRoughness = m_services.visibilityBuffer->GetNormalRoughnessBuffer();
+        }
+        ctx.materialAwareMaterialExt2 = m_services.visibilityBuffer->GetMaterialExt2Buffer();
+    }
     return ctx;
 }
 

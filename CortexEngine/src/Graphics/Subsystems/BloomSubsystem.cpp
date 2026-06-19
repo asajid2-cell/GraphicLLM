@@ -88,6 +88,8 @@ bool BloomSubsystem::BindTexture(ID3D12Resource* source, DXGI_FORMAT format, con
     context.srvTable = m_state.descriptors.srvTables[m_ctx->frameIndex % kFrameCount].data();
     context.srvTableCount = kBloomDescriptorSlots;
     context.srvTableValid = m_state.descriptors.srvTableValid;
+    context.materialAwareNormalRoughness = m_ctx->materialAwareNormalRoughness;
+    context.materialAwareMaterialExt2 = m_ctx->materialAwareMaterialExt2;
     return BloomPass::BindTexture(context, source, format, label, tableSlot);
 }
 
@@ -109,7 +111,21 @@ bool BloomSubsystem::DownsampleBase(bool skipTransitions) {
     if (!BloomPass::BindPipelineState(m_ctx->commandList, m_ctx->downsample)) {
         return false;
     }
-    if (!BindTexture(m_ctx->hdrColor, DXGI_FORMAT_UNKNOWN, "downsample hdr", BloomPass::BaseDownsampleSlot())) {
+    BloomPass::FullscreenContext context{};
+    context.device = m_ctx->device ? m_ctx->device->GetDevice() : nullptr;
+    context.commandList = m_ctx->commandList;
+    context.descriptorManager = m_ctx->descriptorManager;
+    context.rootSignature = m_ctx->rootSignature;
+    context.frameConstants = m_ctx->frameConstants;
+    context.srvTable = m_state.descriptors.srvTables[m_ctx->frameIndex % kFrameCount].data();
+    context.srvTableCount = kBloomDescriptorSlots;
+    context.srvTableValid = m_state.descriptors.srvTableValid;
+    context.materialAwareNormalRoughness = m_ctx->materialAwareNormalRoughness;
+    context.materialAwareMaterialExt2 = m_ctx->materialAwareMaterialExt2;
+    if (!BloomPass::BindMaterialAwareDownsampleSources(context,
+                                                       m_ctx->hdrColor,
+                                                       m_ctx->materialAwareNormalRoughness,
+                                                       m_ctx->materialAwareMaterialExt2)) {
         return false;
     }
     FullscreenPass::DrawTriangle(m_ctx->commandList);

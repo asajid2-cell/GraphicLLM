@@ -336,11 +336,23 @@ glm::vec4 Renderer::BuildCinematicStabilityParams() const {
         m_sceneVisualContract.shadowPolicyId == "scene_local_soft_stable_shadows_v1";
     const bool manualExposurePolicy =
         m_sceneVisualContract.exposurePolicyId == "scene_local_manual_exposure_v1";
+    const std::string& profile = m_sceneVisualContract.profileId;
+    const std::string& family = m_sceneVisualContract.family;
+    const std::string& palette = m_sceneVisualContract.materialPaletteId;
+    const bool containedRoom =
+        enclosed &&
+        (family == "recipe_enclosed_room" ||
+         profile.find("recipe_room") != std::string::npos ||
+         palette.find("kitchen") != std::string::npos ||
+         palette.find("bathroom") != std::string::npos ||
+         palette.find("living") != std::string::npos ||
+         palette.find("office") != std::string::npos);
 
     const float motionSpecularDamping = enclosed ? 0.24f : 0.14f;
     const float reflectionDebugStability = enclosed ? 0.30f : 0.18f;
     const float shadowSoftnessScale = stableShadowPolicy ? (enclosed ? 1.18f : 1.10f) : 1.0f;
-    const float highlightProtection = manualExposurePolicy ? (enclosed ? 0.24f : 0.14f) : 0.0f;
+    const float highlightProtection =
+        manualExposurePolicy ? (containedRoom ? 0.46f : (enclosed ? 0.34f : 0.14f)) : 0.0f;
 
     return glm::vec4(motionSpecularDamping,
                      reflectionDebugStability,
@@ -381,10 +393,19 @@ glm::vec4 Renderer::BuildCinematicLookParams() const {
     const std::string& palette = m_sceneVisualContract.materialPaletteId;
     if (palette.find("kitchen") != std::string::npos) {
         colorSeparation += 0.06f;
-        halationStrength += 0.06f;
+        highlightRolloff += 0.08f;
+        halationStrength -= 0.06f;
     } else if (palette.find("office") != std::string::npos) {
         toeLift += 0.02f;
         colorSeparation += 0.04f;
+        highlightRolloff += 0.08f;
+        halationStrength -= 0.08f;
+    } else if (palette.find("bathroom") != std::string::npos) {
+        highlightRolloff += 0.10f;
+        halationStrength -= 0.10f;
+    } else if (palette.find("living") != std::string::npos) {
+        highlightRolloff += 0.06f;
+        halationStrength -= 0.05f;
     } else if (palette.find("gym") != std::string::npos ||
                palette.find("classroom") != std::string::npos) {
         highlightRolloff += 0.04f;
@@ -396,6 +417,13 @@ glm::vec4 Renderer::BuildCinematicLookParams() const {
     } else if (palette.find("stadium") != std::string::npos) {
         highlightRolloff += 0.08f;
         colorSeparation += 0.08f;
+    }
+
+    if (m_sceneVisualContract.enclosedScene &&
+        (m_sceneVisualContract.family == "recipe_enclosed_room" ||
+         m_sceneVisualContract.profileId.find("recipe_room") != std::string::npos)) {
+        highlightRolloff = std::max(highlightRolloff, 0.36f);
+        halationStrength = std::min(halationStrength, 0.14f);
     }
 
     return glm::vec4(glm::clamp(toeLift, 0.0f, 0.18f),
@@ -479,9 +507,15 @@ glm::vec4 Renderer::BuildCinematicExposureParams() const {
         postWhiteCompression = 0.70f;
     } else if (family == "recipe_enclosed_room" || profile.find("recipe_room") != std::string::npos) {
         exposureTrim = 0.98f;
-        hdrShoulderStart = 1.90f;
-        hdrShoulderStrength = 0.66f;
-        postWhiteCompression = 0.56f;
+        hdrShoulderStart = 1.55f;
+        hdrShoulderStrength = 0.78f;
+        postWhiteCompression = 0.68f;
+        if (palette.find("kitchen") != std::string::npos ||
+            palette.find("bathroom") != std::string::npos ||
+            palette.find("office") != std::string::npos) {
+            hdrShoulderStart = 1.42f;
+            postWhiteCompression = 0.70f;
+        }
     }
 
     return glm::vec4(glm::clamp(exposureTrim, 0.42f, 1.10f),
@@ -848,10 +882,38 @@ void Renderer::PopulateFrameDebugAndPostConstants(FrameConstants& frameData,
     if (m_postProcessState.v2ReflectionCandidateEnabled) {
         postFxFlags |= 1u << 24u;
     }
+    float bloomThreshold = m_bloom.State().controls.threshold;
+    float bloomSoftKnee = m_bloom.State().controls.softKnee;
+    float bloomMaxContribution = m_bloom.State().controls.maxContribution;
+    if (m_sceneVisualContract.active &&
+        m_sceneVisualContract.postQualitySetId == "scene_local_cinematic_post_quality_v1" &&
+        m_sceneVisualContract.enclosedScene) {
+        const std::string& profile = m_sceneVisualContract.profileId;
+        const std::string& family = m_sceneVisualContract.family;
+        const std::string& palette = m_sceneVisualContract.materialPaletteId;
+        const bool containedRoom =
+            family == "recipe_enclosed_room" ||
+            profile.find("recipe_room") != std::string::npos ||
+            palette.find("kitchen") != std::string::npos ||
+            palette.find("bathroom") != std::string::npos ||
+            palette.find("living") != std::string::npos ||
+            palette.find("office") != std::string::npos;
+        if (containedRoom) {
+            bloomThreshold = std::max(bloomThreshold, 1.16f);
+            bloomSoftKnee = std::min(bloomSoftKnee, 0.42f);
+            bloomMaxContribution = std::min(bloomMaxContribution, 0.58f);
+            if (palette.find("kitchen") != std::string::npos ||
+                palette.find("bathroom") != std::string::npos ||
+                palette.find("office") != std::string::npos) {
+                bloomThreshold = std::max(bloomThreshold, 1.24f);
+                bloomMaxContribution = std::min(bloomMaxContribution, 0.50f);
+            }
+        }
+    }
     frameData.bloomParams = glm::vec4(
-        m_bloom.State().controls.threshold,
-        m_bloom.State().controls.softKnee,
-        m_bloom.State().controls.maxContribution,
+        bloomThreshold,
+        bloomSoftKnee,
+        bloomMaxContribution,
         static_cast<float>(postFxFlags));
 
     // TAA parameters: history UV offset from jitter delta and blend factor / enable flag.

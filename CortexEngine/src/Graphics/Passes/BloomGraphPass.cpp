@@ -137,14 +137,27 @@ RGResourceHandle AddFusedBloom(RenderGraph& graph, const FusedBloomContext& cont
             DeclareTransients(builder, context);
             builder.SetType(RGPassType::Graphics);
             builder.Read(context.hdr, RGResourceUsage::ShaderResource);
+            if (context.materialAwareNormalRoughness.IsValid()) {
+                builder.Read(context.materialAwareNormalRoughness, RGResourceUsage::ShaderResource);
+            }
+            if (context.materialAwareMaterialExt2.IsValid()) {
+                builder.Read(context.materialAwareMaterialExt2, RGResourceUsage::ShaderResource);
+            }
             builder.Write(context.bloomA[0], RGResourceUsage::RenderTarget);
         },
         [context](ID3D12GraphicsCommandList*, const RenderGraph& graph) {
             MarkHdrShaderResource(context);
-            if (!BloomPass::RenderFullscreen(context.fullscreen,
-                                             graph.GetResource(context.bloomA[0]),
-                                             context.downsamplePipeline,
-                                             graph.GetResource(context.hdr),
+            BloomPass::FullscreenContext fullscreen = context.fullscreen;
+            fullscreen.materialAwareNormalRoughness = context.materialAwareNormalRoughness.IsValid()
+                ? graph.GetResource(context.materialAwareNormalRoughness)
+                : nullptr;
+            fullscreen.materialAwareMaterialExt2 = context.materialAwareMaterialExt2.IsValid()
+                ? graph.GetResource(context.materialAwareMaterialExt2)
+                : nullptr;
+            if (!BloomPass::RenderFullscreen(fullscreen,
+                                              graph.GetResource(context.bloomA[0]),
+                                              context.downsamplePipeline,
+                                              graph.GetResource(context.hdr),
                                              BloomPass::BaseDownsampleSlot(),
                                              "downsample hdr",
                                              context.graphRtv[0][0])) {
@@ -255,14 +268,27 @@ RGResourceHandle AddStandaloneBloom(RenderGraph& graph, const StandaloneBloomCon
             DeclareTransients(builder, context);
             builder.SetType(RGPassType::Graphics);
             builder.Read(context.hdr, RGResourceUsage::ShaderResource);
+            if (context.materialAwareNormalRoughness.IsValid()) {
+                builder.Read(context.materialAwareNormalRoughness, RGResourceUsage::ShaderResource);
+            }
+            if (context.materialAwareMaterialExt2.IsValid()) {
+                builder.Read(context.materialAwareMaterialExt2, RGResourceUsage::ShaderResource);
+            }
             builder.Write(context.bloomA[0], RGResourceUsage::RenderTarget);
         },
         [context](ID3D12GraphicsCommandList*, const RenderGraph& graph) {
             MarkHdrShaderResource(context);
-            if (!BloomPass::RenderFullscreen(context.fullscreen,
-                                             graph.GetResource(context.bloomA[0]),
-                                             context.downsamplePipeline,
-                                             graph.GetResource(context.hdr),
+            BloomPass::FullscreenContext fullscreen = context.fullscreen;
+            fullscreen.materialAwareNormalRoughness = context.materialAwareNormalRoughness.IsValid()
+                ? graph.GetResource(context.materialAwareNormalRoughness)
+                : nullptr;
+            fullscreen.materialAwareMaterialExt2 = context.materialAwareMaterialExt2.IsValid()
+                ? graph.GetResource(context.materialAwareMaterialExt2)
+                : nullptr;
+            if (!BloomPass::RenderFullscreen(fullscreen,
+                                              graph.GetResource(context.bloomA[0]),
+                                              context.downsamplePipeline,
+                                              graph.GetResource(context.hdr),
                                              BloomPass::BaseDownsampleSlot(),
                                              "downsample hdr",
                                              context.targetRtv[0][0])) {

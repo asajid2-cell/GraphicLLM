@@ -44,7 +44,18 @@ PSOutput PSMain(VSOutput input) {
     // an explicit ownership input and to keep a bounded rescue path for early
     // split-lighting bring-up.
     float3 composite = direct + indirect;
-    float3 reflectionContribution = reflection * (0.10f * reflectionConfidence);
+    float compositeLumaBeforeReflection = Luma(composite);
+    float reflectionLuma = Luma(reflection);
+    float confidenceGate = smoothstep(0.12f, 0.82f, reflectionConfidence);
+    float hotReflection = smoothstep(0.85f, 5.0f, reflectionLuma);
+    float relativeReflection =
+        reflectionLuma / max(compositeLumaBeforeReflection + 0.08f, 0.08f);
+    float overReflective = smoothstep(0.70f, 2.60f, relativeReflection);
+    float lumaRolloff = lerp(1.0f, 0.30f, hotReflection);
+    float confidenceRolloff = lerp(0.42f, 1.0f, confidenceGate);
+    float plasticGuard = lerp(1.0f, 0.46f, overReflective * (1.0f - confidenceGate * 0.35f));
+    float reflectionWeight = 0.10f * confidenceGate * lumaRolloff * confidenceRolloff * plasticGuard;
+    float3 reflectionContribution = reflection * reflectionWeight;
     composite += reflectionContribution;
 
     float3 materialContribution = 0.0f.xxx;

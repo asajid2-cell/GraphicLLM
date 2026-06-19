@@ -718,9 +718,67 @@ float3 ApplySceneLocalCinematicLookPolish(float3 color,
 }
 
 // Downsample + bright-pass for bloom (runs at reduced resolution, sampling g_SceneColor)
+float3 ApplyPreBloomSpecularContainment(float3 hdr,
+                                        float roughness,
+                                        uint sceneMaterialClass,
+                                        float highlightProtection)
+{
+    const float luma = dot(hdr, float3(0.2126f, 0.7152f, 0.0722f));
+    if (luma <= 1e-4f || highlightProtection <= 0.001f)
+    {
+        return hdr;
+    }
+
+    const bool emissiveSource =
+        sceneMaterialClass == SCENE_MATERIAL_EMISSIVE_NEON ||
+        sceneMaterialClass == SCENE_MATERIAL_SCREEN_PANEL;
+    const bool explicitReflector =
+        sceneMaterialClass == SCENE_MATERIAL_GLASS_PANE ||
+        sceneMaterialClass == SCENE_MATERIAL_MIRROR ||
+        sceneMaterialClass == SCENE_MATERIAL_WET_SURFACE ||
+        sceneMaterialClass == SCENE_MATERIAL_WATER ||
+        sceneMaterialClass == SCENE_MATERIAL_POLISHED_METAL ||
+        sceneMaterialClass == SCENE_MATERIAL_POLISHED_WOOD ||
+        sceneMaterialClass == SCENE_MATERIAL_CERAMIC_TILE;
+
+    const float gloss = saturate(1.0f - roughness);
+    float specularRisk = smoothstep(0.18f, 0.92f, gloss);
+    specularRisk = max(specularRisk, explicitReflector ? 0.70f : 0.0f);
+    specularRisk *= emissiveSource ? 0.18f : 1.0f;
+
+    const float containment = saturate(highlightProtection * specularRisk);
+    const float shoulderStart = lerp(7.0f, 2.8f, containment);
+    if (luma <= shoulderStart)
+    {
+        return hdr;
+    }
+
+    const float range = lerp(9.0f, 3.2f, containment);
+    const float over = luma - shoulderStart;
+    float limitedLuma = shoulderStart + range * (over / (over + range));
+    limitedLuma = lerp(luma, limitedLuma, containment);
+
+    const float fireflyCeiling = lerp(18.0f, 5.8f, containment);
+    limitedLuma = min(limitedLuma, emissiveSource ? max(fireflyCeiling, 12.0f) : fireflyCeiling);
+    return hdr * (limitedLuma / max(luma, 1e-4f));
+}
+
 float4 BloomDownsamplePS(VSOutput input) : SV_TARGET
 {
     float3 hdr = g_SceneColor.Sample(g_Sampler, input.uv).rgb;
+    float4 nrSample = g_NormalRoughness.SampleLevel(g_Sampler, input.uv, 0);
+    float roughness = nrSample.w;
+    if (dot(abs(nrSample), float4(1.0f, 1.0f, 1.0f, 1.0f)) <= 1e-5f)
+    {
+        roughness = 0.72f;
+    }
+    uint sceneMaterialClass =
+        DecodeSceneMaterialClass(g_MaterialExt2.SampleLevel(g_Sampler, input.uv, 0).a);
+    hdr = ApplyPreBloomSpecularContainment(
+        hdr,
+        saturate(roughness),
+        sceneMaterialClass,
+        saturate(g_CinematicStabilityParams.w));
 
     float threshold = g_BloomParams.x;
     float softKnee  = g_BloomParams.y;

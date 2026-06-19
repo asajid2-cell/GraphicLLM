@@ -19,6 +19,8 @@ struct FullscreenContext {
     const DescriptorHandle* srvTable = nullptr;
     uint32_t srvTableCount = 0;
     bool srvTableValid = false;
+    ID3D12Resource* materialAwareNormalRoughness = nullptr;
+    ID3D12Resource* materialAwareMaterialExt2 = nullptr;
 };
 
 struct TargetContext {
@@ -86,6 +88,10 @@ void SetFullscreenViewport(ID3D12GraphicsCommandList* commandList, ID3D12Resourc
                                DXGI_FORMAT format,
                                const char* label,
                                uint32_t tableSlot);
+[[nodiscard]] bool BindMaterialAwareDownsampleSources(const FullscreenContext& context,
+                                                      ID3D12Resource* hdr,
+                                                      ID3D12Resource* normalRoughness,
+                                                      ID3D12Resource* materialExt2);
 [[nodiscard]] bool EnsureGraphRTV(const FullscreenContext& context,
                                   ID3D12Resource* target,
                                   DescriptorHandle& cachedRtv);

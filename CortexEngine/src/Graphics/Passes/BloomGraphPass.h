@@ -17,6 +17,8 @@ struct GraphStatus {
 
 struct FusedBloomContext {
     RGResourceHandle hdr;
+    RGResourceHandle materialAwareNormalRoughness;
+    RGResourceHandle materialAwareMaterialExt2;
     std::span<RGResourceHandle> bloomA;
     std::span<RGResourceHandle> bloomB;
     std::span<ID3D12Resource* const> bloomATemplates;
@@ -40,6 +42,8 @@ struct FusedBloomContext {
 
 struct StandaloneBloomContext {
     RGResourceHandle hdr;
+    RGResourceHandle materialAwareNormalRoughness;
+    RGResourceHandle materialAwareMaterialExt2;
     std::span<RGResourceHandle> bloomA;
     std::span<RGResourceHandle> bloomB;
     std::span<ID3D12Resource* const> bloomATemplates;

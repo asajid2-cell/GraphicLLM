@@ -47,6 +47,31 @@ Renderer::ExecuteBloomInRenderGraph() {
     m_services.renderGraph->BeginFrame();
     const RGResourceHandle hdrHandle =
         m_services.renderGraph->ImportResource(m_mainTargets.hdr.resources.color.Get(), m_mainTargets.hdr.resources.state, "HDR_Bloom");
+    ID3D12Resource* bloomNormalResource = m_mainTargets.normalRoughness.resources.texture.Get();
+    D3D12_RESOURCE_STATES bloomNormalState = m_mainTargets.normalRoughness.resources.state;
+    ID3D12Resource* bloomMaterialExt2Resource = nullptr;
+    D3D12_RESOURCE_STATES bloomMaterialExt2State = D3D12_RESOURCE_STATE_COMMON;
+    if (m_vb.State().renderedThisFrame && m_services.visibilityBuffer) {
+        const auto vbStates = m_services.visibilityBuffer->GetResourceStateSnapshot();
+        if (m_services.visibilityBuffer->GetNormalRoughnessBuffer()) {
+            bloomNormalResource = m_services.visibilityBuffer->GetNormalRoughnessBuffer();
+            bloomNormalState = vbStates.normalRoughness;
+        }
+        if (m_services.visibilityBuffer->GetMaterialExt2Buffer()) {
+            bloomMaterialExt2Resource = m_services.visibilityBuffer->GetMaterialExt2Buffer();
+            bloomMaterialExt2State = vbStates.materialExt2;
+        }
+    }
+    RGResourceHandle bloomNormalHandle{};
+    RGResourceHandle bloomMaterialExt2Handle{};
+    if (bloomNormalResource) {
+        bloomNormalHandle = m_services.renderGraph->ImportResource(
+            bloomNormalResource, bloomNormalState, "Bloom_NormalRoughness");
+    }
+    if (bloomMaterialExt2Resource) {
+        bloomMaterialExt2Handle = m_services.renderGraph->ImportResource(
+            bloomMaterialExt2Resource, bloomMaterialExt2State, "Bloom_MaterialExt2");
+    }
     const uint32_t baseLevel = (m_bloom.State().resources.activeLevels > 1) ? 1u : 0u;
     const bool useTransientBloom = (std::getenv("CORTEX_DISABLE_BLOOM_TRANSIENTS") == nullptr);
     static bool s_loggedBloomTransientDefault = false;
@@ -68,6 +93,8 @@ Renderer::ExecuteBloomInRenderGraph() {
 
     BloomGraphPass::StandaloneBloomContext bloomContext{};
     bloomContext.hdr = hdrHandle;
+    bloomContext.materialAwareNormalRoughness = bloomNormalHandle;
+    bloomContext.materialAwareMaterialExt2 = bloomMaterialExt2Handle;
     bloomContext.bloomA = std::span<RGResourceHandle>(bloomA.data(), bloomA.size());
     bloomContext.bloomB = std::span<RGResourceHandle>(bloomB.data(), bloomB.size());
     bloomContext.bloomATemplates = std::span<ID3D12Resource* const>(bloomATemplates.data(), bloomATemplates.size());

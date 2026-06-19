@@ -28,6 +28,8 @@ struct BloomContext {
     ID3D12Resource* hdrColor = nullptr;
     D3D12_RESOURCE_STATES* hdrState = nullptr;
     bool hdrSrvValid = false;
+    ID3D12Resource* materialAwareNormalRoughness = nullptr;
+    ID3D12Resource* materialAwareMaterialExt2 = nullptr;
 };
 
 // Owns the bloom pyramid resources and the immediate downsample/blur/composite

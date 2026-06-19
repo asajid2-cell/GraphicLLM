@@ -283,6 +283,51 @@ bool BindTexture(const FullscreenContext& context,
     return true;
 }
 
+bool BindMaterialAwareDownsampleSources(const FullscreenContext& context,
+                                        ID3D12Resource* hdr,
+                                        ID3D12Resource* normalRoughness,
+                                        ID3D12Resource* materialExt2) {
+    if (!context.srvTableValid || !context.srvTable || context.srvTableCount <= 12u) {
+        return BindTexture(context, hdr, DXGI_FORMAT_UNKNOWN, "downsample hdr", BaseDownsampleSlot());
+    }
+    if (!context.device || !context.commandList || !hdr) {
+        spdlog::warn("Bloom: invalid material-aware downsample sources");
+        return false;
+    }
+
+    auto writeTexture = [&](ID3D12Resource* source,
+                            DXGI_FORMAT format,
+                            const char* label,
+                            uint32_t tableSlot) -> bool {
+        if (!source) {
+            return true;
+        }
+        const DescriptorHandle dst = context.srvTable[tableSlot];
+        if (!dst.IsValid()) {
+            spdlog::warn("Bloom: invalid descriptor slot for {}", label ? label : "pass");
+            return false;
+        }
+
+        const D3D12_RESOURCE_DESC resourceDesc = source->GetDesc();
+        D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc{};
+        srvDesc.Format = (format == DXGI_FORMAT_UNKNOWN) ? resourceDesc.Format : format;
+        srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+        srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+        srvDesc.Texture2D.MipLevels = 1;
+        context.device->CreateShaderResourceView(source, &srvDesc, dst.cpu);
+        return true;
+    };
+
+    if (!writeTexture(hdr, DXGI_FORMAT_UNKNOWN, "downsample hdr", 0u) ||
+        !writeTexture(normalRoughness, DXGI_FORMAT_R16G16B16A16_FLOAT, "downsample normal roughness", 5u) ||
+        !writeTexture(materialExt2, DXGI_FORMAT_R8G8B8A8_UNORM, "downsample material ext2", 12u)) {
+        return false;
+    }
+
+    context.commandList->SetGraphicsRootDescriptorTable(3, context.srvTable[0].gpu);
+    return true;
+}
+
 bool BindGraphTexture(const FullscreenContext& context,
                       ID3D12Resource* source,
                       const char* label,
@@ -338,7 +383,14 @@ bool RenderFullscreen(const FullscreenContext& context,
         return false;
     }
 
-    if (!BindGraphTexture(context, source, label, sourceSlot)) {
+    if (sourceSlot == BaseDownsampleSlot()) {
+        if (!BindMaterialAwareDownsampleSources(context,
+                                                source,
+                                                context.materialAwareNormalRoughness,
+                                                context.materialAwareMaterialExt2)) {
+            return false;
+        }
+    } else if (!BindGraphTexture(context, source, label, sourceSlot)) {
         return false;
     }
 

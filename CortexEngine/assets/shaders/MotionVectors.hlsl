@@ -79,6 +79,11 @@ float3 ReconstructWorldPosition(float2 uv, float depth)
     return world.xyz / max(world.w, 1e-4f);
 }
 
+float2 ClampTemporalVelocity(float2 velocity)
+{
+    return clamp(velocity, float2(-1.5f, -1.5f), float2(1.5f, 1.5f));
+}
+
 float4 PSMain(VSOutput input) : SV_TARGET
 {
     float2 uv = input.uv;
@@ -113,6 +118,6 @@ float4 PSMain(VSOutput input) : SV_TARGET
     prevUV.x = prevNdc.x * 0.5f + 0.5f;
     prevUV.y = 0.5f - prevNdc.y * 0.5f;
 
-    float2 velocity = prevUV - currUV;
+    float2 velocity = ClampTemporalVelocity(prevUV - currUV);
     return float4(velocity, 0.0f, 0.0f);
 }

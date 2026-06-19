@@ -145,6 +145,9 @@ RGResourceHandle AddToGraph(RenderGraph& graph, const GraphContext& context) {
             if (context.normalRoughness.IsValid()) {
                 builder.Read(context.normalRoughness, RGResourceUsage::ShaderResource);
             }
+            if (context.temporalMask.IsValid()) {
+                builder.Read(context.temporalMask, RGResourceUsage::ShaderResource);
+            }
             builder.Write(context.intermediate, RGResourceUsage::RenderTarget);
         },
         [context](ID3D12GraphicsCommandList*, const RenderGraph&) {

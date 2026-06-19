@@ -1598,6 +1598,91 @@ float3 ApplySceneMaterialCinematicContactAo(float3 color,
 // ----------------------------------------------------------------------------
 // HDR TAA resolve pass
 // ----------------------------------------------------------------------------
+float3 RGBToYCoCg(float3 c)
+{
+    float y  = dot(c, float3(0.25f, 0.5f, 0.25f));
+    float co = c.r - c.b;
+    float cg = c.g - y;
+    return float3(y, co, cg);
+}
+
+float3 YCoCgToRGB(float3 c)
+{
+    float tmp = c.x - c.z;
+    return float3(tmp + c.y * 0.5f, c.x + c.z, tmp - c.y * 0.5f);
+}
+
+float4 CatmullRomWeights(float x)
+{
+    float x2 = x * x;
+    float x3 = x2 * x;
+    return float4(
+        -0.5f * x + x2 - 0.5f * x3,
+         1.0f - 2.5f * x2 + 1.5f * x3,
+         0.5f * x + 2.0f * x2 - 1.5f * x3,
+        -0.5f * x2 + 0.5f * x3);
+}
+
+float3 SampleHistoryCatmullRom(float2 uv)
+{
+    uint width;
+    uint height;
+    g_HistoryColor.GetDimensions(width, height);
+    float2 dim = max(float2(width, height), 1.0f.xx);
+    float2 samplePos = saturate(uv) * dim - 0.5f.xx;
+    float2 base = floor(samplePos);
+    float2 f = samplePos - base;
+    float4 wx = CatmullRomWeights(f.x);
+    float4 wy = CatmullRomWeights(f.y);
+
+    float3 sum = 0.0f.xxx;
+    [unroll]
+    for (int y = 0; y < 4; ++y)
+    {
+        [unroll]
+        for (int x = 0; x < 4; ++x)
+        {
+            float2 p = clamp(base + float2(x - 1, y - 1), 0.0f.xx, dim - 1.0f.xx);
+            float2 tapUv = (p + 0.5f.xx) / dim;
+            sum += g_HistoryColor.SampleLevel(g_Sampler, tapUv, 0).rgb * wx[x] * wy[y];
+        }
+    }
+    return max(sum, 0.0f.xxx);
+}
+
+float2 SampleDilatedVelocity(float2 uv, float centerDepth, float2 texel)
+{
+    float2 bestVelocity = g_Velocity.SampleLevel(g_Sampler, uv, 0).xy;
+    float bestScore = dot(bestVelocity / max(texel, 1e-6f.xx), bestVelocity / max(texel, 1e-6f.xx));
+    float closestDepth = centerDepth;
+
+    [unroll]
+    for (int ny = -1; ny <= 1; ++ny)
+    {
+        [unroll]
+        for (int nx = -1; nx <= 1; ++nx)
+        {
+            float2 sampleUV = saturate(uv + float2(nx, ny) * texel);
+            float sampleDepth = g_Depth.SampleLevel(g_Sampler, sampleUV, 0).r;
+            float2 sampleVelocity = g_Velocity.SampleLevel(g_Sampler, sampleUV, 0).xy;
+            float2 sampleVelocityPx = sampleVelocity / max(texel, 1e-6f.xx);
+            float speedScore = dot(sampleVelocityPx, sampleVelocityPx);
+
+            // Prefer foreground/moving samples at discontinuities; the mask and
+            // depth test below will reject history where the dilation crosses an edge.
+            bool closer = sampleDepth < closestDepth - max(0.0004f, centerDepth * 0.0012f);
+            if (closer || speedScore > bestScore)
+            {
+                closestDepth = closer ? sampleDepth : closestDepth;
+                bestScore = speedScore;
+                bestVelocity = sampleVelocity;
+            }
+        }
+    }
+
+    return bestVelocity;
+}
+
 float4 TAAResolvePS(VSOutput input) : SV_TARGET
 {
     float2 uv = input.uv;
@@ -1619,7 +1704,14 @@ float4 TAAResolvePS(VSOutput input) : SV_TARGET
     }
 
     float2 texel = g_PostParams.xy;
-    float2 vel = g_Velocity.Sample(g_Sampler, uv).xy;
+
+    // Center depth/normal for surface-aware neighbourhood selection.
+    float  centerDepth = g_Depth.SampleLevel(g_Sampler, uv, 0).r;
+    float4 centerNR    = g_NormalRoughness.SampleLevel(g_Sampler, uv, 0);
+    float3 centerNormal = normalize(centerNR.xyz * 2.0f - 1.0f);
+    float  surfaceRoughness = centerNR.w;
+
+    float2 vel = SampleDilatedVelocity(uv, centerDepth, texel);
 
     // Velocity is stored in UV units. Convert to pixel units for thresholds
     // so behaviour stays consistent across resolutions and distances.
@@ -1639,12 +1731,6 @@ float4 TAAResolvePS(VSOutput input) : SV_TARGET
         return float4(curr, 1.0f);
     }
 
-    // Center depth/normal for surface-aware neighbourhood selection.
-    float  centerDepth = g_Depth.SampleLevel(g_Sampler, uv, 0).r;
-    float4 centerNR    = g_NormalRoughness.SampleLevel(g_Sampler, uv, 0);
-    float3 centerNormal = normalize(centerNR.xyz * 2.0f - 1.0f);
-    float  surfaceRoughness = centerNR.w;
-
     // Keep the depth window very tight so silhouettes do not mix surfaces,
     // with a small relaxation in the far distance to account for depth-buffer
     // precision. A separate edge factor derived from depth variance further
@@ -1652,10 +1738,14 @@ float4 TAAResolvePS(VSOutput input) : SV_TARGET
     float depthThreshold = max(0.0008f, centerDepth * 0.0025f);
     const float normalThreshold = 0.9f; // ~25 degrees
 
-    float3 cMin = curr;
-    float3 cMax = curr;
+    float3 currYCoCg = RGBToYCoCg(curr);
+    float3 clipMinYCoCg = currYCoCg;
+    float3 clipMaxYCoCg = currYCoCg;
+    float3 sumYCoCg = currYCoCg;
+    float3 sumSqYCoCg = currYCoCg * currYCoCg;
     bool   anyNeighborAccepted = false;
     float  maxDepthDelta = 0.0f;
+    float  surfaceSampleCount = 1.0f;
 
     // For a simple reactive mask we also track local luminance statistics
     // for accepted neighbours so we can identify very bright specular
@@ -1689,8 +1779,12 @@ float4 TAAResolvePS(VSOutput input) : SV_TARGET
             if (depthOk && normalOk)
             {
                 float3 cN = g_SceneColor.Sample(g_Sampler, sampleUV).rgb;
-                cMin = min(cMin, cN);
-                cMax = max(cMax, cN);
+                float3 cNYCoCg = RGBToYCoCg(cN);
+                clipMinYCoCg = min(clipMinYCoCg, cNYCoCg);
+                clipMaxYCoCg = max(clipMaxYCoCg, cNYCoCg);
+                sumYCoCg += cNYCoCg;
+                sumSqYCoCg += cNYCoCg * cNYCoCg;
+                surfaceSampleCount += 1.0f;
                 anyNeighborAccepted = true;
 
                 float lumN = dot(cN, lumaWeights);
@@ -1705,16 +1799,30 @@ float4 TAAResolvePS(VSOutput input) : SV_TARGET
     // cannot pull us away from it.
     if (!anyNeighborAccepted)
     {
-        cMin = curr;
-        cMax = curr;
+        clipMinYCoCg = currYCoCg;
+        clipMaxYCoCg = currYCoCg;
+        sumYCoCg = currYCoCg;
+        sumSqYCoCg = currYCoCg * currYCoCg;
+        surfaceSampleCount = 1.0f;
     }
 
     // Motion vectors are computed in non-jittered space, so add the jitter
     // delta to align history with the current jittered projection.
-    float2 historyUV = saturate(uv + vel + g_TAAParams.xy);
-    float3 history   = g_HistoryColor.Sample(g_Sampler, historyUV).rgb;
-    float3 historyClamped = clamp(history, cMin, cMax);
-    float3 currClamped    = clamp(curr,    cMin, cMax);
+    float2 historyUVUnclamped = uv + vel + g_TAAParams.xy;
+    float2 historyUV = saturate(historyUVUnclamped);
+    float3 history = SampleHistoryCatmullRom(historyUV);
+
+    float3 meanYCoCg = sumYCoCg / surfaceSampleCount;
+    float3 varianceYCoCg = max(sumSqYCoCg / surfaceSampleCount - meanYCoCg * meanYCoCg, 0.0f.xxx);
+    float3 sigmaYCoCg = sqrt(varianceYCoCg);
+    float3 varianceExtent = sigmaYCoCg * float3(1.65f, 1.25f, 1.25f) + float3(0.012f, 0.010f, 0.010f);
+    float3 aabbMinYCoCg = max(clipMinYCoCg - float3(0.010f, 0.014f, 0.014f), meanYCoCg - varianceExtent);
+    float3 aabbMaxYCoCg = min(clipMaxYCoCg + float3(0.010f, 0.014f, 0.014f), meanYCoCg + varianceExtent);
+    aabbMinYCoCg = min(aabbMinYCoCg, currYCoCg);
+    aabbMaxYCoCg = max(aabbMaxYCoCg, currYCoCg);
+
+    float3 historyClamped = max(YCoCgToRGB(clamp(RGBToYCoCg(history), aabbMinYCoCg, aabbMaxYCoCg)), 0.0f.xxx);
+    float3 currClamped = curr;
 
     // Conservative history blending using three regimes per pixel:
     //   - Static: low speed, small color delta -> strong history.
@@ -1723,38 +1831,8 @@ float4 TAAResolvePS(VSOutput input) : SV_TARGET
     float3 diff = abs(currClamped - historyClamped);
     float  maxDiff = max(max(diff.r, diff.g), diff.b);
 
-    // Roughness gating: glossy surfaces still need bounded temporal history
-    // for sharp IBL/highlight stability. Reprojection, edge rejection, and
-    // reactive masking below already remove history when a specular feature
-    // diverges, so do not starve smooth metals/glass by default.
-    float roughHistoryScale = lerp(0.45f, 1.0f, saturate(surfaceRoughness / 0.6f));
-
-    float finalBlend = 0.0f;
-
-    // Static: essentially locked pixels.
-    if (speedPx < 0.75f && maxDiff < 0.03f)
-    {
-        finalBlend = taaBlendBase;
-    }
-    // Transitional: small motion or moderate color changes.
-    else if (speedPx < 6.0f && maxDiff < 0.20f)
-    {
-        finalBlend = taaBlendBase * 0.45f;
-    }
-    // High-frequency but still somewhat stable (e.g., glossy highlights):
-    else if (speedPx < 10.0f && maxDiff < 0.35f)
-    {
-        finalBlend = taaBlendBase * 0.35f;
-    }
-    // Camera-look motion on static scene geometry: keep a small amount of
-    // history so IBL/specular detail does not collapse to single-frame shimmer.
-    else if (speedPx < 32.0f && maxDiff < 0.45f)
-    {
-        finalBlend = taaBlendBase * 0.22f;
-    }
-    // Otherwise treat as dynamic / disoccluded and rely on the current
-    // frame only; history stays in the clamp range but does not influence
-    // the final color this frame.
+    float colorStability = 1.0f - smoothstep(0.08f, 0.58f, maxDiff);
+    float motionStability = 1.0f - smoothstep(3.0f, 42.0f, speedPx);
 
     // At hard geometric edges (large depth variance in the 3x3 stencil) we
     // aggressively suppress history so silhouettes remain crisp instead of
@@ -1810,24 +1888,32 @@ float4 TAAResolvePS(VSOutput input) : SV_TARGET
         (historyDepthDelta > reprojDepthThreshold) ||
         (historyNormalDot < (normalThreshold - 0.05f));
 
+    // In the TAA descriptor table, t12 carries the shared temporal rejection
+    // mask instead of material ext2. x is accepted-history weight, y is
+    // disocclusion rejection, z is reactive/high-motion rejection, w is in-bounds.
+    float4 sharedTemporalMask = g_MaterialExt2.SampleLevel(g_Sampler, uv, 0);
+    float maskAcceptance = saturate(sharedTemporalMask.x * sharedTemporalMask.w);
+    float maskDisocclusion = saturate(sharedTemporalMask.y);
+    float maskReactive = saturate(sharedTemporalMask.z);
+    float combinedReactive = saturate(max(reactiveMask, maskReactive));
+
+    float baseHistory = saturate(taaBlendBase * 3.0f);
+    float opaqueHistory = min(baseHistory, 0.24f);
+    float specularHistory = min(baseHistory * 0.82f, 0.19f);
+    float reactiveHistory = min(baseHistory * 0.22f, 0.055f);
+    float materialHistory = lerp(opaqueHistory, specularHistory, specFactor);
+    materialHistory = lerp(materialHistory, reactiveHistory, combinedReactive);
+
+    float edgeStability = lerp(1.0f, 0.42f, edgeFactor);
+    float stability = lerp(0.38f, 1.0f, colorStability) *
+                      lerp(0.42f, 1.0f, motionStability) *
+                      edgeStability *
+                      (1.0f - maskDisocclusion);
+    float finalBlend = materialHistory * maskAcceptance * saturate(stability);
     if (reprojectionMismatch)
     {
         finalBlend = 0.0f;
     }
-
-    // In the TAA descriptor table, t12 carries the shared temporal rejection
-    // mask instead of material ext2. x is accepted-history weight, y/z are
-    // disocclusion/high-motion rejection debug channels, w is in-bounds.
-    float4 sharedTemporalMask = g_MaterialExt2.SampleLevel(g_Sampler, uv, 0);
-    finalBlend *= sharedTemporalMask.x * sharedTemporalMask.w;
-    finalBlend *= roughHistoryScale * (1.0f - edgeFactor) * (1.0f - reactiveMask);
-
-    // Clamp maximum history contribution per frame. Use a tighter cap on
-    // glossy surfaces where specular reflections move non-linearly and
-    // camera-only motion vectors cannot reproject perfectly.
-    float roughnessClamp = lerp(0.08f, 0.25f, saturate(surfaceRoughness / 0.6f));
-    finalBlend = min(finalBlend, roughnessClamp);
-
     finalBlend = saturate(finalBlend);
 
     float3 result = lerp(currClamped, historyClamped, finalBlend);

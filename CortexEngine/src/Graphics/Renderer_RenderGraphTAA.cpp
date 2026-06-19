@@ -64,6 +64,14 @@ Renderer::ExecuteTAAInRenderGraph() {
         depthHandle = m_services.renderGraph->ImportResource(m_depthResources.resources.buffer.Get(), m_depthResources.resources.resourceState, "Depth_TAA");
     }
 
+    RGResourceHandle temporalMaskHandle{};
+    if (m_temporalMaskState.texture) {
+        temporalMaskHandle = m_services.renderGraph->ImportResource(
+            m_temporalMaskState.texture.Get(),
+            m_temporalMaskState.resourceState,
+            "TemporalMask_TAA");
+    }
+
     bool usesVBNormal = false;
     RGResourceHandle normalHandle{};
     VisibilityBufferRenderer::ResourceStateSnapshot vbStates{};
@@ -95,6 +103,7 @@ Renderer::ExecuteTAAInRenderGraph() {
     taaContext.velocity = velocityHandle;
     taaContext.depth = depthHandle;
     taaContext.normalRoughness = normalHandle;
+    taaContext.temporalMask = temporalMaskHandle;
     taaContext.seedOnly = seedOnly;
     taaContext.status.failed = &stageFailed;
     taaContext.status.stage = &stageError;
@@ -182,6 +191,9 @@ Renderer::ExecuteTAAInRenderGraph() {
             } else {
                 m_mainTargets.normalRoughness.resources.state = m_services.renderGraph->GetResourceState(normalHandle);
             }
+        }
+        if (temporalMaskHandle.IsValid()) {
+            m_temporalMaskState.resourceState = m_services.renderGraph->GetResourceState(temporalMaskHandle);
         }
         MarkTAAHistoryValid();
         result.executed = true;

@@ -53,6 +53,45 @@ static float3 LoadNormal(uint2 p)
     return normalize(n + 1e-5f);
 }
 
+static float2 LoadDilatedVelocity(uint2 p, uint width, uint height, out float maxDepthDelta, out float closestDepth)
+{
+    const float centerDepth = g_Depth.Load(int3(p, 0));
+    float2 bestVelocity = g_Velocity.Load(int3(p, 0));
+    float bestSpeedSq = dot(bestVelocity * float2(width, height), bestVelocity * float2(width, height));
+    maxDepthDelta = 0.0f;
+    closestDepth = centerDepth;
+
+    [unroll]
+    for (int oy = -1; oy <= 1; ++oy)
+    {
+        [unroll]
+        for (int ox = -1; ox <= 1; ++ox)
+        {
+            const uint2 q = uint2(
+                clamp((int)p.x + ox, 0, (int)width - 1),
+                clamp((int)p.y + oy, 0, (int)height - 1));
+            const float sampleDepth = g_Depth.Load(int3(q, 0));
+            const float2 sampleVelocity = g_Velocity.Load(int3(q, 0));
+            const float2 sampleVelocityPx = sampleVelocity * float2(width, height);
+            const float speedSq = dot(sampleVelocityPx, sampleVelocityPx);
+            const float depthDelta = abs(sampleDepth - centerDepth);
+
+            maxDepthDelta = max(maxDepthDelta, depthDelta);
+            if (sampleDepth < closestDepth)
+            {
+                closestDepth = sampleDepth;
+            }
+            if (speedSq > bestSpeedSq)
+            {
+                bestSpeedSq = speedSq;
+                bestVelocity = sampleVelocity;
+            }
+        }
+    }
+
+    return bestVelocity;
+}
+
 [numthreads(8, 8, 1)]
 void BuildTemporalRejectionMaskCS(uint3 id : SV_DispatchThreadID)
 {
@@ -67,7 +106,9 @@ void BuildTemporalRejectionMaskCS(uint3 id : SV_DispatchThreadID)
     const uint2 p = id.xy;
     const float2 dim = max(float2(width, height), 1.0f);
     const float2 uv = (float2(p) + 0.5f) / dim;
-    const float2 velocity = g_Velocity.Load(int3(p, 0));
+    float maxDepthDelta = 0.0f;
+    float closestDepth = 1.0f;
+    const float2 velocity = LoadDilatedVelocity(p, width, height, maxDepthDelta, closestDepth);
     const float2 historyUv = uv + velocity + g_TAAParams.xy;
     const bool inBounds =
         historyUv.x >= 0.0f && historyUv.x <= 1.0f &&
@@ -80,23 +121,36 @@ void BuildTemporalRejectionMaskCS(uint3 id : SV_DispatchThreadID)
     const float3 historyNormal = LoadNormal(hp);
     const float speedPixels = length(velocity * dim);
 
-    const float depthAcceptance = exp2(-abs(centerDepth - historyDepth) * 160.0f);
-    const float normalAcceptance = saturate((dot(centerNormal, historyNormal) - 0.78f) / 0.22f);
+    const float depthDelta = abs(centerDepth - historyDepth);
+    const float nearFactor = saturate((0.16f - centerDepth) / 0.16f);
+    const float edgeFactor = saturate((maxDepthDelta - 0.0012f) / 0.0075f);
+    const float widenedDepthScale = lerp(220.0f, 520.0f, saturate(edgeFactor + nearFactor));
+    const float depthAcceptance = exp2(-depthDelta * widenedDepthScale);
+    const float normalAcceptance = saturate((dot(centerNormal, historyNormal) - lerp(0.74f, 0.86f, edgeFactor)) / 0.18f);
     // Camera rotation can move static, correctly reprojectable surfaces by many
     // pixels per frame. Let depth/normal/bounds own disocclusion rejection and
     // taper motion more gently so the TAA pass can stabilize IBL/specular detail.
-    const float motionAcceptance = saturate(1.0f - max(speedPixels - 4.0f, 0.0f) / 56.0f);
+    const float motionAcceptance = saturate(1.0f - max(speedPixels - 8.0f, 0.0f) / 72.0f);
     const float boundsAcceptance = inBounds ? 1.0f : 0.0f;
-    const float acceptance = depthAcceptance * normalAcceptance * motionAcceptance * boundsAcceptance;
+    const bool invalidGeometry = centerDepth >= 1.0f - 1e-4f;
+    const float movingEdge = edgeFactor * saturate(speedPixels / 14.0f);
+    const float disocclusion = saturate(max(movingEdge, 1.0f - depthAcceptance * normalAcceptance * boundsAcceptance));
+    const float highMotion = 1.0f - motionAcceptance;
+    const float reactive = saturate(max(highMotion, edgeFactor * saturate(speedPixels / 12.0f)) + (invalidGeometry ? 0.65f : 0.0f));
+    const float acceptance = depthAcceptance *
+                             normalAcceptance *
+                             motionAcceptance *
+                             boundsAcceptance *
+                             (1.0f - reactive * 0.72f);
 
     // x = accepted-history weight multiplier.
     // y = disocclusion rejection strength.
-    // z = high-motion rejection strength.
+    // z = reactive/high-motion rejection strength.
     // w = reprojection in-bounds flag.
     g_TemporalRejectionMask[p] = float4(
         acceptance,
-        1.0f - saturate(depthAcceptance * normalAcceptance * boundsAcceptance),
-        1.0f - motionAcceptance,
+        disocclusion,
+        reactive,
         boundsAcceptance);
 }
 

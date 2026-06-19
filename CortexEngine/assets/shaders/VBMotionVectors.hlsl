@@ -146,6 +146,11 @@ bool IsInvalidMeshTableEntry(VBMeshTableEntry mesh)
     return false;
 }
 
+float2 ClampTemporalVelocity(float2 velocity)
+{
+    return clamp(velocity, float2(-1.5f, -1.5f), float2(1.5f, 1.5f));
+}
+
 // Compute screen-space barycentrics using edge functions.
 // This matches the GPU rasterizer's approach for determining triangle coverage.
 // Edge functions are more numerically stable for thin triangles.
@@ -295,5 +300,5 @@ void CSMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     prevUV.x = prevNdc.x * 0.5f + 0.5f;
     prevUV.y = 0.5f - prevNdc.y * 0.5f;
 
-    g_VelocityOut[pixelCoord] = prevUV - currUV;
+    g_VelocityOut[pixelCoord] = ClampTemporalVelocity(prevUV - currUV);
 }

@@ -50,6 +50,7 @@ struct GraphContext {
     RGResourceHandle velocity;
     RGResourceHandle depth;
     RGResourceHandle normalRoughness;
+    RGResourceHandle temporalMask;
     bool seedOnly = false;
     TAACopyPass::HistoryCopyContext seedHistory;
     TAACopyPass::ResolveInputsContext resolveInputs;

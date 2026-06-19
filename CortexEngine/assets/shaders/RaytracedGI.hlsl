@@ -3,6 +3,7 @@
 // that binds:
 //   - TLAS and depth in SRV space2 (t0, t1)
 //   - Compact RT material buffer in SRV space2 (t3), keyed by TLAS InstanceID()
+//   - Previous-frame lit color in SRV space2 (t4), copied from TAA history
 //   - GI color UAV in space2 (u0)
 //   - FrameConstants in space0 (b0), matching ShaderTypes.h / Basic.hlsl.
 
@@ -10,7 +11,9 @@
 
 RaytracingAccelerationStructure g_TopLevel     : register(t0, space2);
 Texture2D<float>               g_Depth         : register(t1, space2);
+Texture2D<float4>              g_PrevFrameLit  : register(t4, space2);
 RWTexture2D<float4>            g_GIOut         : register(u0, space2);
+SamplerState                   g_LinearSampler : register(s0, space0);
 
 cbuffer FrameConstants : register(b0, space0)
 {
@@ -174,6 +177,58 @@ float3 CosineHemisphereDirection(float2 u, float3 N, float3 T, float3 B)
     return normalize(T * x + B * y + N * z);
 }
 
+float LumaGI(float3 color)
+{
+    return dot(color, float3(0.2126f, 0.7152f, 0.0722f));
+}
+
+float3 ClampRadianceGI(float3 color, float maxLuma)
+{
+    color = max(color, 0.0f.xxx);
+    if (!all(isfinite(color)))
+    {
+        return 0.0f.xxx;
+    }
+
+    float luma = LumaGI(color);
+    if (luma > maxLuma)
+    {
+        color *= maxLuma / max(luma, 1.0e-4f);
+    }
+    return min(color, 24.0f.xxx);
+}
+
+float3 AmbientFallbackIncident()
+{
+    return max(g_AmbientColor.rgb, 0.0f.xxx) * 0.65f;
+}
+
+float3 SamplePreviousFrameIncident(float3 hitPos, out bool valid)
+{
+    valid = false;
+
+    float4 prevClip = mul(g_PrevViewProjMatrix, float4(hitPos, 1.0f));
+    if (prevClip.w <= 1.0e-4f || !all(isfinite(prevClip)))
+    {
+        return AmbientFallbackIncident();
+    }
+
+    float2 ndc = prevClip.xy / prevClip.w;
+    float2 uv = float2(ndc.x * 0.5f + 0.5f, 0.5f - ndc.y * 0.5f);
+    if (uv.x <= 0.0f || uv.x >= 1.0f || uv.y <= 0.0f || uv.y >= 1.0f)
+    {
+        return AmbientFallbackIncident();
+    }
+
+    float3 previousLit = g_PrevFrameLit.SampleLevel(g_LinearSampler, uv, 0.0f).rgb;
+    previousLit = ClampRadianceGI(previousLit, 10.0f);
+
+    // Null/unseeded history reads as black. Treat that as invalid so the first
+    // few frames converge from ambient instead of extinguishing GI.
+    valid = LumaGI(previousLit) > 1.0e-5f;
+    return valid ? previousLit : AmbientFallbackIncident();
+}
+
 float3 EstimateHitRadiance(RTMaterial material, float3 hitPos)
 {
     float3 albedo = saturate(material.albedoMetallic.rgb);
@@ -181,47 +236,11 @@ float3 EstimateHitRadiance(RTMaterial material, float3 hitPos)
     float diffuseWeight = RTMaterialDiffuseGIVisibility(material) * (1.0f - metallic);
     float3 emissive = max(material.emissiveRoughness.rgb, 0.0f.xxx);
 
-    float3 incident = max(g_AmbientColor.rgb, 0.0f.xxx) * 0.65f;
-    uint lightCount = min(g_LightCount.x, 16u);
-    [loop]
-    for (uint i = 0u; i < lightCount; ++i)
-    {
-        Light light = g_Lights[i];
-        uint type = (uint)round(light.position_type.w);
-        float3 lightRadiance = max(light.color_range.rgb, 0.0f.xxx);
-        if (type == LIGHT_TYPE_DIRECTIONAL)
-        {
-            incident += lightRadiance * 0.035f;
-            continue;
-        }
-
-        float3 toLight = light.position_type.xyz - hitPos;
-        float distSq = max(dot(toLight, toLight), 1e-4f);
-        float range = max(light.color_range.w, 0.01f);
-        float dist = sqrt(distSq);
-        float rangeAtten = saturate(1.0f - dist / range);
-        rangeAtten *= rangeAtten;
-
-        float coneAtten = 1.0f;
-        if (type == LIGHT_TYPE_SPOT)
-        {
-            float3 L = toLight / dist;
-            float spotCos = dot(normalize(-light.direction_cosInner.xyz), L);
-            float outerCos = light.params.x;
-            float innerCos = light.direction_cosInner.w;
-            coneAtten = saturate((spotCos - outerCos) / max(innerCos - outerCos, 1e-3f));
-            coneAtten *= coneAtten;
-        }
-        else if (type == LIGHT_TYPE_AREA_RECT)
-        {
-            rangeAtten *= 0.8f;
-        }
-
-        incident += lightRadiance * rangeAtten * coneAtten * 0.18f;
-    }
+    bool previousValid = false;
+    float3 incident = SamplePreviousFrameIncident(hitPos, previousValid);
 
     float3 bounced = albedo * incident * diffuseWeight;
-    return min(emissive + bounced, 32.0f.xxx);
+    return ClampRadianceGI(emissive + bounced, previousValid ? 12.0f : 4.0f);
 }
 
 [shader("miss")]
@@ -286,12 +305,12 @@ void RayGen_GI()
 
     float3 radianceSum = 0.0f.xxx;
     float visibilitySum = 0.0f;
-    const int kRayCount = 4;
+    const int kRayCount = 5;
     uint rng = HashGI(launchIndex.x * 1973u ^
                       launchIndex.y * 9277u ^
                       (uint)(g_TimeAndExposure.x * 60.0f) * 26699u);
 
-    [unroll]
+    [loop]
     for (int i = 0; i < kRayCount; ++i)
     {
         float2 u = float2(RandomGI(rng), RandomGI(rng));

@@ -390,6 +390,7 @@ void RTSubsystem::RenderRayTracing(Scene::ECS_Registry* registry, const RTContex
         const bool rtGIOutputReady = RTShadowsGIPass::PrepareGIOutput({
             rtCmdList.Get(),
             {m_giTargets.color.Get(), &m_giTargets.colorState},
+            {ctx.previousLitColor, ctx.previousLitColorState},
         });
 
         if (rtGIOutputReady &&
@@ -409,6 +410,8 @@ void RTSubsystem::RenderRayTracing(Scene::ECS_Registry* registry, const RTContex
                 m_giTargets.uav,
                 ctx.frameConstants,
                 envTable,
+                ctx.previousLitColorSrv,
+                ctx.previousLitColor,
                 giW,
                 giH);
         }

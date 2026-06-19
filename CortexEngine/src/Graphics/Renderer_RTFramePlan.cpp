@@ -32,6 +32,9 @@ RTContext Renderer::MakeRTContext() {
     ctx.normalRoughness = m_mainTargets.normalRoughness.resources.texture.Get();
     ctx.normalRoughnessState = &m_mainTargets.normalRoughness.resources.state;
     ctx.normalRoughnessSrv = m_mainTargets.normalRoughness.descriptors.srv;
+    ctx.previousLitColor = m_temporal.ScreenState().historyColor.Get();
+    ctx.previousLitColorState = &m_temporal.ScreenState().historyState;
+    ctx.previousLitColorSrv = m_temporal.ScreenState().historySRV;
 
     ctx.maskTexture = m_temporalMaskState.texture.Get();
     ctx.maskState = &m_temporalMaskState.resourceState;

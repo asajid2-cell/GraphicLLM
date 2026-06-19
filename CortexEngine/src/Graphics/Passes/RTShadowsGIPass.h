@@ -18,6 +18,7 @@ struct ShadowInputContext {
 struct GIOutputContext {
     ID3D12GraphicsCommandList* commandList = nullptr;
     ResourceStateRef color;
+    ResourceStateRef previousLitColor;
 };
 
 [[nodiscard]] bool PrepareShadowInputs(const ShadowInputContext& context);

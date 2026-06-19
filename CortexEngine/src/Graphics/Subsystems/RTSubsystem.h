@@ -61,6 +61,13 @@ struct RTContext {
     D3D12_RESOURCE_STATES* normalRoughnessState = nullptr;
     DescriptorHandle normalRoughnessSrv{};
 
+    // Previous-frame lit scene color from the TAA history buffer. RT GI runs
+    // before current-frame deferred lighting, so bounced radiance must come
+    // from this history texture.
+    ID3D12Resource* previousLitColor = nullptr;
+    D3D12_RESOURCE_STATES* previousLitColorState = nullptr;
+    DescriptorHandle previousLitColorSrv{};
+
     // Temporal rejection mask (owned by Renderer).
     ID3D12Resource* maskTexture = nullptr;
     D3D12_RESOURCE_STATES* maskState = nullptr;

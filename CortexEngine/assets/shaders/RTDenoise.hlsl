@@ -169,32 +169,43 @@ static float4 SpatialReflectionColor(uint2 p, uint2 outDim)
     return max(mean, 0.0f);
 }
 
-static float4 SpatialGIColor(uint2 p, uint2 outDim)
+static float4 SpatialGIColor(uint2 p, uint2 outDim, out float3 variance)
 {
     uint w;
     uint h;
     g_GICurrent.GetDimensions(w, h);
     const uint2 centerDepthPixel = MapToDepthPixel(p, outDim);
 
-    float4 sum = g_GICurrent.Load(int3(p, 0));
+    const float4 center = max(g_GICurrent.Load(int3(p, 0)), 0.0f);
+    const float centerLuma = Luma(center.rgb);
+    const float sampleLimit = max(1.4f, 5.0f * (centerLuma + 0.04f));
+    float4 sum = center;
+    float3 moment2 = center.rgb * center.rgb;
     float weightSum = 1.0f;
 
     [unroll]
-    for (int y = -1; y <= 1; ++y)
+    for (int y = -2; y <= 2; ++y)
     {
         [unroll]
-        for (int x = -1; x <= 1; ++x)
+        for (int x = -2; x <= 2; ++x)
         {
             if (x == 0 && y == 0) continue;
             const uint2 q = uint2(clamp(int2(p) + int2(x, y), int2(0, 0), int2(int(w) - 1, int(h) - 1)));
             const uint2 sampleDepthPixel = MapToDepthPixel(q, outDim);
-            const float weight = EdgeWeight(centerDepthPixel, sampleDepthPixel);
-            sum += g_GICurrent.Load(int3(q, 0)) * weight;
+            const float spatial = exp2(-dot(float2((float)x, (float)y), float2((float)x, (float)y)) * 0.32f);
+            const float weight = EdgeWeight(centerDepthPixel, sampleDepthPixel) * spatial;
+            float4 sampleColor = max(g_GICurrent.Load(int3(q, 0)), 0.0f);
+            const float sampleLuma = Luma(sampleColor.rgb);
+            sampleColor.rgb *= min(1.0f, sampleLimit / max(sampleLuma, 1.0e-4f));
+            sum += sampleColor * weight;
+            moment2 += sampleColor.rgb * sampleColor.rgb * weight;
             weightSum += weight;
         }
     }
 
-    return max(sum / max(weightSum, 1e-4f), 0.0f);
+    float4 mean = max(sum / max(weightSum, 1e-4f), 0.0f);
+    variance = max(moment2 / max(weightSum, 1e-4f) - mean.rgb * mean.rgb, 0.0f.xxx);
+    return mean;
 }
 
 static uint2 ReprojectHistoryPixel(uint2 p, uint2 outDim, out float reprojectionValid)
@@ -304,7 +315,8 @@ static void StoreGI(uint3 id, bool useHistory, float alpha)
 
     const uint2 p = id.xy;
     const uint2 outDim = uint2(w, h);
-    const float4 current = SpatialGIColor(p, outDim);
+    float3 localVariance = 0.0f.xxx;
+    const float4 current = SpatialGIColor(p, outDim, localVariance);
     if (!useHistory)
     {
         g_GIOut[p] = current;
@@ -313,7 +325,13 @@ static void StoreGI(uint3 id, bool useHistory, float alpha)
 
     float reprojectionValid = 0.0f;
     const uint2 hp = ReprojectHistoryPixel(p, outDim, reprojectionValid);
-    const float4 history = g_GIHistory.Load(int3(hp, 0));
+    float4 history = max(g_GIHistory.Load(int3(hp, 0)), 0.0f);
+    const float3 sigma = sqrt(localVariance + 1.0e-5f.xxx) * 1.20f + 0.035f.xxx;
+    history.rgb = clamp(history.rgb, max(current.rgb - sigma, 0.0f.xxx), current.rgb + sigma);
+    history.a = clamp(history.a, current.a - 0.30f, current.a + 0.30f);
+    const float historyLuma = Luma(history.rgb);
+    const float historyLimit = max(1.2f, 2.4f * (Luma(current.rgb) + 0.05f));
+    history.rgb *= min(1.0f, historyLimit / max(historyLuma, 1.0e-4f));
     const float historyWeight = saturate(1.0f - alpha) *
         reprojectionValid *
         HistoryAcceptance(p, hp, outDim) *
@@ -354,5 +372,5 @@ void GISeedCS(uint3 id : SV_DispatchThreadID)
 [numthreads(8, 8, 1)]
 void GITemporalCS(uint3 id : SV_DispatchThreadID)
 {
-    StoreGI(id, true, 0.12f);
+    StoreGI(id, true, 0.08f);
 }

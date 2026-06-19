@@ -114,6 +114,8 @@ public:
         const DescriptorHandle& giUav,
         D3D12_GPU_VIRTUAL_ADDRESS frameCBAddress,
         const DescriptorHandle& shadowEnvTable,
+        const DescriptorHandle& previousLitSrv,
+        ID3D12Resource* previousLitResource,
         uint32_t dispatchWidth,
         uint32_t dispatchHeight);
 
@@ -269,7 +271,7 @@ private:
     static constexpr uint32_t kRTFrameCount = 3;
     static constexpr uint32_t kShadowDescriptorCount = 3;
     static constexpr uint32_t kReflectionDescriptorCount = 5;
-    static constexpr uint32_t kGIDescriptorCount = 3;
+    static constexpr uint32_t kGIDescriptorCount = 5;
 
     ComPtr<ID3D12Device5> m_device5;
     DescriptorHeapManager* m_descriptors = nullptr;

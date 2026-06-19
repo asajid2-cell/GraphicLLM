@@ -45,6 +45,9 @@ bool PrepareGIOutput(const GIOutputContext& context) {
     TransitionResource(context.commandList,
                        context.color,
                        D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+    TransitionResource(context.commandList,
+                       context.previousLitColor,
+                       D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
     return true;
 }
 

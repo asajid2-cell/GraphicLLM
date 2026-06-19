@@ -278,6 +278,8 @@ void DX12RaytracingContext::DispatchGI(
     const DescriptorHandle& giUav, 
     D3D12_GPU_VIRTUAL_ADDRESS frameCBAddress, 
     const DescriptorHandle& shadowEnvTable, 
+    const DescriptorHandle& previousLitSrv,
+    ID3D12Resource* previousLitResource,
     uint32_t dispatchWidth, 
     uint32_t dispatchHeight) { 
     if (!m_device5 || !cmdList || !m_tlas || !m_rtGIStateObject || 
@@ -302,13 +304,16 @@ void DX12RaytracingContext::DispatchGI(
         return;
     }
     DescriptorHandle* table = m_giDispatchDescriptors[GetDescriptorFrameIndex()];
-    if (!table[0].IsValid() || !table[1].IsValid() || !table[2].IsValid()) {
+    if (!table[0].IsValid() || !table[1].IsValid() || !table[2].IsValid() ||
+        !table[3].IsValid() || !table[4].IsValid()) {
         return;
     }
 
     const DescriptorHandle& rtTlasSrv = table[0];
     const DescriptorHandle& rtDepthSrv = table[1];
     const DescriptorHandle& rtOutUav = table[2];
+    const DescriptorHandle& rtUnusedT2Srv = table[3];
+    const DescriptorHandle& rtPreviousLitSrv = table[4];
 
     { 
         D3D12_SHADER_RESOURCE_VIEW_DESC asSrvDesc{}; 
@@ -335,6 +340,32 @@ void DX12RaytracingContext::DispatchGI(
         giUav.cpu, 
         D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV); 
 
+    D3D12_SHADER_RESOURCE_VIEW_DESC nullTextureSrv{};
+    nullTextureSrv.Format = DXGI_FORMAT_R16G16B16A16_FLOAT;
+    nullTextureSrv.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+    nullTextureSrv.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+    nullTextureSrv.Texture2D.MipLevels = 1;
+    device->CreateShaderResourceView(nullptr, &nullTextureSrv, rtUnusedT2Srv.cpu);
+
+    if (previousLitSrv.IsValid()) {
+        if (previousLitResource) {
+            D3D12_SHADER_RESOURCE_VIEW_DESC prevLitDesc{};
+            prevLitDesc.Format = SrvFormatForResource(previousLitResource);
+            prevLitDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+            prevLitDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+            prevLitDesc.Texture2D.MipLevels = 1;
+            device->CreateShaderResourceView(previousLitResource, &prevLitDesc, rtPreviousLitSrv.cpu);
+        } else {
+            device->CopyDescriptorsSimple(
+                1,
+                rtPreviousLitSrv.cpu,
+                previousLitSrv.cpu,
+                D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+        }
+    } else {
+        device->CreateShaderResourceView(nullptr, &nullTextureSrv, rtPreviousLitSrv.cpu);
+    }
+
     ID3D12DescriptorHeap* heaps[] = { m_descriptors->GetCBV_SRV_UAV_Heap() }; 
     cmdList->SetDescriptorHeaps(1, heaps); 
 
@@ -348,6 +379,7 @@ void DX12RaytracingContext::DispatchGI(
     if (shadowEnvTable.IsValid()) { 
         cmdList->SetComputeRootDescriptorTable(4, shadowEnvTable.gpu); 
     } 
+    cmdList->SetComputeRootDescriptorTable(5, rtUnusedT2Srv.gpu);
     if (m_rtMaterialBuffer) {
         cmdList->SetComputeRootShaderResourceView(6, m_rtMaterialBuffer->GetGPUVirtualAddress());
     }

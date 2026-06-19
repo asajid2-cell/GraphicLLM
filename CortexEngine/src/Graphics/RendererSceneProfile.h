@@ -132,8 +132,8 @@ struct ScenePostProfile {
     float lensDirt = 0.04f;
     float motionBlur = 0.0f;
     float depthOfField = 0.0f;
-    float dofFocusDistance = 18.0f;
-    float dofAperture = 2.2f;
+    float dofFocusDistance = 3.6f;
+    float dofAperture = 1.65f; // Stored as focal range for the post DOF shader.
     bool motionBlurEnabled = false;
     bool depthOfFieldEnabled = false;
     std::string toneMapperPreset = "filmic_soft";

@@ -139,7 +139,7 @@ void Renderer::SetCinematicPostEffects(float motionBlur,
     const float clampedMotionBlur = glm::clamp(motionBlur, 0.0f, 1.0f);
     const float clampedDepthOfField = glm::clamp(depthOfField, 0.0f, 1.0f);
     const float clampedFocusDistance = glm::clamp(dofFocusDistance, 0.1f, 100.0f);
-    const float clampedAperture = glm::clamp(dofAperture, 0.0f, 8.0f);
+    const float clampedAperture = glm::clamp(dofAperture, 0.45f, 18.0f);
     if (std::abs(clampedMotionBlur - m_postProcessState.motionBlur) < 1e-3f &&
         std::abs(clampedDepthOfField - m_postProcessState.depthOfField) < 1e-3f &&
         std::abs(clampedFocusDistance - m_postProcessState.dofFocusDistance) < 1e-3f &&
@@ -155,7 +155,7 @@ void Renderer::SetCinematicPostEffects(float motionBlur,
     m_postProcessState.depthOfFieldEnabled = depthOfFieldEnabled;
     m_postProcessState.dofFocusDistance = clampedFocusDistance;
     m_postProcessState.dofAperture = clampedAperture;
-    spdlog::info("Cinematic post effects set to motion_blur={} motion_blur_enabled={} depth_of_field={} depth_of_field_enabled={} focus_distance={} aperture={}",
+    spdlog::info("Cinematic post effects set to motion_blur={} motion_blur_enabled={} depth_of_field={} depth_of_field_enabled={} focus_distance={} focus_range={}",
                  m_postProcessState.motionBlur,
                  m_postProcessState.motionBlurEnabled,
                  m_postProcessState.depthOfField,

@@ -76,6 +76,10 @@ SceneCinematicProfile EnclosedInteriorBase(std::string_view family) {
     p.post.cinematicEnabled = true;
     p.post.vignette = 0.08f;
     p.post.lensDirt = 0.04f;
+    p.post.depthOfField = 0.40f;
+    p.post.dofFocusDistance = 3.6f;
+    p.post.dofAperture = 1.65f;
+    p.post.depthOfFieldEnabled = true;
     p.post.toneMapperPreset = "filmic_soft";
     p.post.contrast = 1.02f;
     p.post.saturation = 1.04f;
@@ -551,6 +555,10 @@ SceneCinematicProfile BuildGalleryCinematicProfile(bool conservativeMode) {
     p.post.cool = conservativeMode ? 0.0f : 0.04f;
     p.post.contrast = conservativeMode ? 1.02f : 1.10f;
     p.post.saturation = conservativeMode ? 1.02f : 1.24f;
+    p.post.depthOfField = conservativeMode ? 0.22f : 0.30f;
+    p.post.dofFocusDistance = 11.0f;
+    p.post.dofAperture = 5.5f;
+    p.post.depthOfFieldEnabled = true;
 
     SceneReflectionProbeProfile leftProbe{};
     leftProbe.id = "RTGallery_LocalProbe_Left";

@@ -76,7 +76,7 @@ cbuffer FrameConstants : register(b1)
     float4   g_ProjectionParams;
     // x = tone-mapper mode (0=ACES, 1=Reinhard, 2=soft filmic, 3=punchy)
     float4   g_CinematicParams;
-    // x = authored DOF focus distance, y = authored aperture, z/w reserved
+    // x = authored DOF focus distance, y = authored focal range, z/w reserved
     float4   g_CinematicDofParams;
     // x = material/specular motion damping, y = reflection debug stability,
     // z = shadow softness scale, w = highlight/exposure protection
@@ -1897,6 +1897,150 @@ float3 SampleHighlightStreaks(float2 uv)
     return horizontal + vertical + sunAxis;
 }
 
+float DofViewDistanceFromDepth(float2 uv, float depth)
+{
+    if (depth >= 1.0f - 1e-4f)
+    {
+        return max(g_ProjectionParams.w, 100.0f);
+    }
+
+    float2 clipXY = float2(uv.x * 2.0f - 1.0f, 1.0f - 2.0f * uv.y);
+    float4 viewH = mul(g_InvProjectionMatrix, float4(clipXY, depth, 1.0f));
+    float3 viewPos = viewH.xyz / max(viewH.w, 1e-4f);
+    return length(viewPos);
+}
+
+float DofCircleOfConfusion(float viewDistance, float focusDistance, float focalRange, float dofAmount)
+{
+    float nearStart = max(focusDistance - focalRange * 0.70f, 0.05f);
+    float farStart = focusDistance + focalRange;
+    float nearFalloff = max(focalRange * 0.55f, 0.55f);
+    float farFalloff = max(focalRange * 2.40f, 2.75f);
+
+    // Keep near-field almost sharp for interior staging; use DOF mainly to
+    // soften the rear wall / outdoor distance without a toy tilt-shift look.
+    float nearCoc = saturate((nearStart - viewDistance) / nearFalloff) * 0.18f;
+    float farCoc = saturate((viewDistance - farStart) / farFalloff);
+    farCoc = farCoc * farCoc * (3.0f - 2.0f * farCoc);
+
+    return saturate(max(nearCoc, farCoc) * dofAmount);
+}
+
+float3 SampleDofHdrSource(float2 uv,
+                          float bloomIntensity,
+                          float lensDirtAmount,
+                          float maxBloom,
+                          float lookHalation,
+                          float3 halationTint)
+{
+    float3 sampleHdr = g_SceneColor.SampleLevel(g_Sampler, uv, 0).rgb;
+
+    if (bloomIntensity > 0.001f)
+    {
+        float3 sampleBloom = g_BloomSource.SampleLevel(g_Sampler, uv, 0).rgb * bloomIntensity;
+        float streakIntensity = max(bloomIntensity, sqrt(saturate(bloomIntensity)) * 0.65f);
+        float3 sampleStreaks = SampleHighlightStreaks(uv) * streakIntensity;
+
+        if (maxBloom > 0.0f)
+        {
+            sampleBloom = min(sampleBloom, maxBloom.xxx);
+            sampleStreaks = min(sampleStreaks, (maxBloom * 0.55f).xxx);
+        }
+
+        if (lensDirtAmount > 0.001f)
+        {
+            float dirt = LensDirtMask(uv);
+            sampleBloom += sampleBloom * dirt * lensDirtAmount * 0.75f;
+            sampleStreaks += sampleStreaks * dirt * lensDirtAmount * 0.45f;
+        }
+
+        float bloomLuma = dot(sampleBloom + sampleStreaks * 0.45f, float3(0.2126f, 0.7152f, 0.0722f));
+        float halation = saturate(bloomLuma * lerp(0.06f, 0.16f, lookHalation)) * saturate(bloomIntensity);
+        sampleHdr += sampleBloom + sampleStreaks + halationTint * halation * lerp(0.08f, 0.36f, lookHalation);
+    }
+
+    return sampleHdr;
+}
+
+float3 ApplyCinematicDepthOfField(float2 uv,
+                                  float3 centerHdr,
+                                  float bloomIntensity,
+                                  float lensDirtAmount,
+                                  float maxBloom,
+                                  float lookHalation,
+                                  float3 halationTint)
+{
+    const float dofAmount = saturate(g_PostGradeParams.w);
+    if (dofAmount <= 0.001f)
+    {
+        return centerHdr;
+    }
+
+    float centerDepth = g_Depth.SampleLevel(g_Sampler, uv, 0).r;
+    if (centerDepth >= 1.0f - 1e-4f)
+    {
+        return centerHdr;
+    }
+
+    float focusDistance = clamp(g_CinematicDofParams.x, 0.25f, 100.0f);
+    float focalRange = clamp(g_CinematicDofParams.y, 0.45f, 18.0f);
+    float centerDistance = DofViewDistanceFromDepth(uv, centerDepth);
+    float centerCoc = DofCircleOfConfusion(centerDistance, focusDistance, focalRange, dofAmount);
+    if (centerCoc <= 0.003f)
+    {
+        return centerHdr;
+    }
+
+    float2 texel = g_PostParams.xy;
+    float radiusPx = lerp(0.75f, 6.0f, centerCoc);
+
+    static const float2 kDofTaps[12] =
+    {
+        float2( 0.000f,  1.000f),
+        float2( 0.866f,  0.500f),
+        float2( 0.866f, -0.500f),
+        float2( 0.000f, -1.000f),
+        float2(-0.866f, -0.500f),
+        float2(-0.866f,  0.500f),
+        float2( 0.382f,  0.322f),
+        float2(-0.118f,  0.486f),
+        float2(-0.456f,  0.204f),
+        float2(-0.447f, -0.224f),
+        float2(-0.098f, -0.490f),
+        float2( 0.397f, -0.304f)
+    };
+
+    float3 accum = centerHdr;
+    float weightSum = 1.0f;
+    [unroll]
+    for (int i = 0; i < 12; ++i)
+    {
+        float ringScale = (i < 6) ? 1.0f : 0.55f;
+        float2 sampleUV = saturate(uv + kDofTaps[i] * texel * radiusPx * ringScale);
+        float sampleDepth = g_Depth.SampleLevel(g_Sampler, sampleUV, 0).r;
+        if (sampleDepth >= 1.0f - 1e-4f)
+        {
+            continue;
+        }
+
+        float sampleDistance = DofViewDistanceFromDepth(sampleUV, sampleDepth);
+        float sampleCoc = DofCircleOfConfusion(sampleDistance, focusDistance, focalRange, dofAmount);
+
+        // When resolving a blurred background pixel, discard much-nearer taps.
+        // This keeps sharp furniture silhouettes from bleeding into soft walls.
+        float foregroundReject = smoothstep(-0.10f, 0.65f, sampleDistance - centerDistance);
+        float cocMatch = saturate(sampleCoc / max(centerCoc, 0.06f));
+        float w = foregroundReject * lerp(0.25f, 1.0f, cocMatch);
+        w *= (i < 6) ? 0.72f : 0.55f;
+
+        accum += SampleDofHdrSource(sampleUV, bloomIntensity, lensDirtAmount, maxBloom, lookHalation, halationTint) * w;
+        weightSum += w;
+    }
+
+    float3 blurred = accum / max(weightSum, 1e-4f);
+    return lerp(centerHdr, blurred, saturate(centerCoc * 1.12f));
+}
+
 float4 PSMain(VSOutput input) : SV_TARGET
 {
     float2 uv = input.uv;
@@ -2536,50 +2680,6 @@ float4 PSMain(VSOutput input) : SV_TARGET
         }
     }
 
-    // Lightweight depth of field. Authored focus/aperture controls override the
-    // center auto-focus fallback used by older showcase profiles.
-    float depthOfFieldAmount = saturate(g_PostGradeParams.w);
-    if (depthOfFieldAmount > 0.001f)
-    {
-        float centerFocusDepth = g_Depth.SampleLevel(g_Sampler, float2(0.5f, 0.5f), 0).r;
-        float pixelDepth = g_Depth.SampleLevel(g_Sampler, uv, 0).r;
-        if (pixelDepth < 1.0f - 1e-4f)
-        {
-            float focusDistance = clamp(g_CinematicDofParams.x, 0.1f, 100.0f);
-            if (focusDistance <= 0.11f)
-            {
-                float3 focusWorld = ReconstructWorldPosition(float2(0.5f, 0.5f), min(centerFocusDepth, 0.995f));
-                focusDistance = length(focusWorld - g_CameraPosition.xyz);
-                if (centerFocusDepth >= 1.0f - 1e-4f)
-                {
-                    focusDistance = 18.0f;
-                }
-            }
-
-            float3 pixelWorld = ReconstructWorldPosition(uv, pixelDepth);
-            float pixelDistance = length(pixelWorld - g_CameraPosition.xyz);
-            float aperture = saturate(g_CinematicDofParams.y / 8.0f);
-            float focusBand = max(focusDistance * lerp(0.45f, 0.14f, aperture), 0.35f);
-            float coc = saturate(abs(pixelDistance - focusDistance) / focusBand) * depthOfFieldAmount;
-
-            if (coc > 0.001f)
-            {
-                float2 texel = float2(g_PostParams.x, g_PostParams.y);
-                float radius = lerp(1.0f, 4.0f, coc);
-                float3 accum = hdrBlurred * 0.28f;
-                accum += g_SceneColor.SampleLevel(g_Sampler, uv + texel * float2( radius,  0.0f), 0).rgb * 0.12f;
-                accum += g_SceneColor.SampleLevel(g_Sampler, uv + texel * float2(-radius,  0.0f), 0).rgb * 0.12f;
-                accum += g_SceneColor.SampleLevel(g_Sampler, uv + texel * float2( 0.0f,  radius), 0).rgb * 0.12f;
-                accum += g_SceneColor.SampleLevel(g_Sampler, uv + texel * float2( 0.0f, -radius), 0).rgb * 0.12f;
-                accum += g_SceneColor.SampleLevel(g_Sampler, uv + texel * float2( radius,  radius), 0).rgb * 0.08f;
-                accum += g_SceneColor.SampleLevel(g_Sampler, uv + texel * float2(-radius,  radius), 0).rgb * 0.08f;
-                accum += g_SceneColor.SampleLevel(g_Sampler, uv + texel * float2( radius, -radius), 0).rgb * 0.08f;
-                accum += g_SceneColor.SampleLevel(g_Sampler, uv + texel * float2(-radius, -radius), 0).rgb * 0.08f;
-                hdrBlurred = lerp(hdrBlurred, accum, coc);
-            }
-        }
-    }
-
     // Localized single-scatter interior haze. Applied before bloom/tonemap so
     // bright windows and practical lamps create subtle air volume instead of
     // hard white rectangles.
@@ -2707,6 +2807,14 @@ float4 PSMain(VSOutput input) : SV_TARGET
     // Compose bloom after any motion blur and fog so blurred highlights remain
     // physically plausible and color-stable.
     float3 hdrCombined = hdrBlurred + bloom + highlightStreaks + halationColor;
+    hdrCombined = ApplyCinematicDepthOfField(
+        uv,
+        hdrCombined,
+        bloomIntensity,
+        lensDirtAmount,
+        max(g_BloomParams.z, 0.0f),
+        lookHalation,
+        halationTint);
 
     // Clamp HDR before tonemapping to avoid extreme spikes that can show up
     // as sudden RGB flashes when moving the camera across very bright areas.

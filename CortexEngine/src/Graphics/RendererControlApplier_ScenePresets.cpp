@@ -443,6 +443,9 @@ void ApplyOutdoorWorldSceneControls(Renderer& renderer,
     renderer.SetFogEnabled(true);
     renderer.SetFogParams(0.010f, 0.0f, 0.34f, 4.0f);
     renderer.SetExposure(1.0f);
+    renderer.SetCinematicPostEnabled(true);
+    renderer.SetCinematicPost(0.06f, 0.0f);
+    renderer.SetCinematicPostEffects(0.0f, 0.24f, 11.0f, 6.0f, false, true);
     renderer.SetShadowsEnabled(true);
     renderer.SetSSAOEnabled(true);
     renderer.SetSunDirection(sunDirection);

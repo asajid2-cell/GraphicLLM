@@ -232,8 +232,8 @@ public:
     void SetCinematicPost(float vignette, float lensDirt);
     void SetCinematicPostEffects(float motionBlur,
                                  float depthOfField,
-                                 float dofFocusDistance = 18.0f,
-                                 float dofAperture = 0.0f,
+                                 float dofFocusDistance = 3.6f,
+                                 float dofAperture = 1.65f,
                                  bool motionBlurEnabled = true,
                                  bool depthOfFieldEnabled = true);
     void SetSSAOEnabled(bool enabled);

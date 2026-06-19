@@ -164,7 +164,7 @@ struct FrameConstants {
     glm::vec4 projectionParams;                // x=proj11, y=proj22, z=nearZ, w=farZ (for cluster Z slicing)
       // x = tone-mapper mode, y = environment rotation radians, z = RT GI strength, w = RT GI ray distance
       glm::vec4 cinematicParams;
-      // x = authored DOF focus distance, y = authored aperture,
+      // x = authored DOF focus distance, y = authored focal range,
       // z = SceneLocalEnvironmentV3 profile mode, w = local background strength.
       glm::vec4 cinematicDofParams;
       // x = material/specular motion damping, y = reflection debug stability,

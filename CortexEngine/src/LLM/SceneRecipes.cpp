@@ -276,6 +276,30 @@ inline void AddPointLight(std::vector<std::shared_ptr<SceneCommand>>& out, float
     out.push_back(std::move(cmd));
 }
 
+inline void AddAreaLight(std::vector<std::shared_ptr<SceneCommand>>& out,
+                         const std::string& name,
+                         const glm::vec3& position,
+                         float width,
+                         float height,
+                         const glm::vec3& facingNormal,
+                         const glm::vec3& up,
+                         const glm::vec3& color,
+                         float intensity,
+                         float range) {
+    auto cmd = std::make_shared<AddLightCommand>();
+    cmd->lightType = AddLightCommand::LightType::AreaRect;
+    cmd->name = name;
+    cmd->position = position;
+    cmd->areaWidth = std::max(width, 0.01f);
+    cmd->areaHeight = std::max(height, 0.01f);
+    cmd->areaFacingNormal = facingNormal;
+    cmd->areaUp = up;
+    cmd->color = color;
+    cmd->intensity = std::max(intensity, 0.0f);
+    cmd->range = std::max(range, 0.01f);
+    out.push_back(std::move(cmd));
+}
+
 // Style-aware furniture: classic -> high-poly Poly Haven asset (textured, via kTex);
 // modern -> clean Kenney mesh (flat ColorForKey). Self-calibrating Place() scales
 // either to the same target footprint, so the layout is unchanged.
@@ -447,6 +471,16 @@ void BuildRoomShell(std::vector<std::shared_ptr<SceneCommand>>& out, const Scene
         pane->disableCollisionAvoidance = true;
         out.push_back(std::move(pane));
     }
+    AddAreaLight(out,
+                 "Window_Daylight_Area",
+                 glm::vec3(0.0f, winY, wallFace + 0.11f),
+                 winW * 0.92f,
+                 winH * 0.86f,
+                 glm::vec3(0.0f, 0.0f, 1.0f),
+                 glm::vec3(0.0f, 1.0f, 0.0f),
+                 glm::vec3(0.74f, 0.86f, 1.0f),
+                 3.2f,
+                 std::max(depth + 1.2f, 5.8f));
 
     // Framed wall art on the left wall — fills the blank side wall the camera sees
     // (interiors only; the small bathroom's side walls hold fixtures).
@@ -496,6 +530,16 @@ void BuildLivingRoom(std::vector<std::shared_ptr<SceneCommand>>& out, const Scen
     Place(out, cat, c, "televisionModern", 1.2f, 0.0f, 2.5f, 180.0f);
     Place(out, cat, c, "calathea_orbifolia_01", 0.6f, 2.9f, -2.6f, 0.0f, kTex);  // high-poly corner plant
     Place(out, cat, c, "calathea_orbifolia_01", 0.55f, -3.0f, -2.7f, 0.0f, kTex);
+    AddAreaLight(out,
+                 "LivingRoom_Ceiling_Area",
+                 glm::vec3(0.0f, 2.62f, -0.25f),
+                 1.75f,
+                 0.72f,
+                 glm::vec3(0.0f, -1.0f, 0.0f),
+                 glm::vec3(0.0f, 0.0f, -1.0f),
+                 glm::vec3(1.0f, 0.92f, 0.80f),
+                 2.4f,
+                 5.4f);
 }
 
 void BuildBedroom(std::vector<std::shared_ptr<SceneCommand>>& out, const Scene::AssetCatalog& cat, FootprintCache& c, const SceneStyle& style) {

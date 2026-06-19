@@ -775,10 +775,13 @@ void CommandQueue::ExecuteAddLight(AddLightCommand* cmd, Scene::ECS_Registry* re
 
     transform.position = SanitizeVec3(lightPos, 0.0f, false);
 
-    // Build rotation from direction for spot/directional lights. If no explicit
+    // Build rotation from direction for spot/directional lights, or from the
+    // authored facing normal/up vector for rectangular area lights. If no explicit
     // direction was provided and we auto-anchored along camera forward, align
     // the light with that forward vector for intuitive spotlights.
-    glm::vec3 forward = cmd->direction;
+    glm::vec3 forward = (cmd->lightType == AddLightCommand::LightType::AreaRect)
+        ? cmd->areaFacingNormal
+        : cmd->direction;
     if (useAuto && anchorMode == AddLightCommand::AnchorMode::CameraForward) {
         auto camView = registry->View<Scene::CameraComponent, Scene::TransformComponent>();
         for (auto entity : camView) {
@@ -794,7 +797,14 @@ void CommandQueue::ExecuteAddLight(AddLightCommand* cmd, Scene::ECS_Registry* re
         forward = glm::vec3(0.0f, -1.0f, 0.0f);
     }
     forward = glm::normalize(forward);
-    glm::vec3 up(0.0f, 1.0f, 0.0f);
+    glm::vec3 up = (cmd->lightType == AddLightCommand::LightType::AreaRect)
+        ? cmd->areaUp
+        : glm::vec3(0.0f, 1.0f, 0.0f);
+    if (!std::isfinite(up.x) || !std::isfinite(up.y) || !std::isfinite(up.z) ||
+        glm::length2(up) < 1e-4f) {
+        up = glm::vec3(0.0f, 1.0f, 0.0f);
+    }
+    up = glm::normalize(up);
     if (std::abs(glm::dot(up, forward)) > 0.99f) {
         up = glm::vec3(0.0f, 0.0f, 1.0f);
     }
@@ -808,6 +818,9 @@ void CommandQueue::ExecuteAddLight(AddLightCommand* cmd, Scene::ECS_Registry* re
         case AddLightCommand::LightType::Spot:
             light.type = Scene::LightType::Spot;
             break;
+        case AddLightCommand::LightType::AreaRect:
+            light.type = Scene::LightType::AreaRect;
+            break;
         case AddLightCommand::LightType::Point:
         default:
             light.type = Scene::LightType::Point;
@@ -820,6 +833,10 @@ void CommandQueue::ExecuteAddLight(AddLightCommand* cmd, Scene::ECS_Registry* re
     light.innerConeDegrees = cmd->innerConeDegrees;
     light.outerConeDegrees = cmd->outerConeDegrees;
     light.castsShadows = cmd->castsShadows;
+    if (cmd->lightType == AddLightCommand::LightType::AreaRect) {
+        light.areaSize = glm::vec2(std::max(cmd->areaWidth, 0.01f),
+                                   std::max(cmd->areaHeight, 0.01f));
+    }
 
     std::ostringstream ss;
     ss << "spawned light " << name << " at (" << std::fixed << std::setprecision(2)
@@ -1255,6 +1272,8 @@ void CommandQueue::ExecuteModifyLight(ModifyLightCommand* cmd, Scene::ECS_Regist
                 light.type = Scene::LightType::Directional; break;
             case AddLightCommand::LightType::Spot:
                 light.type = Scene::LightType::Spot; break;
+            case AddLightCommand::LightType::AreaRect:
+                light.type = Scene::LightType::AreaRect; break;
             case AddLightCommand::LightType::Point:
             default:
                 light.type = Scene::LightType::Point; break;

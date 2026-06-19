@@ -249,7 +249,7 @@ struct ModifyCameraCommand : public SceneCommand {
 
 // Add a new light to the scene
 struct AddLightCommand : public SceneCommand {
-    enum class LightType { Directional, Point, Spot };
+    enum class LightType { Directional, Point, Spot, AreaRect };
 
     LightType lightType = LightType::Point;
     glm::vec3 position = glm::vec3(0.0f);
@@ -261,6 +261,13 @@ struct AddLightCommand : public SceneCommand {
     float outerConeDegrees = 30.0f;
     bool castsShadows = false;
     std::string name;
+
+    // Rectangular area lights use the transform's local X/Y as the emitting
+    // surface. areaFacingNormal is the local +Z direction in world space.
+    float areaWidth = 1.0f;
+    float areaHeight = 1.0f;
+    glm::vec3 areaFacingNormal = glm::vec3(0.0f, 0.0f, 1.0f);
+    glm::vec3 areaUp = glm::vec3(0.0f, 1.0f, 0.0f);
 
     // Optional auto-placement helpers. When autoPlace is true and position is
     // omitted or near zero, the executor will position the light relative to

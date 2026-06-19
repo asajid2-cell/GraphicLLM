@@ -2,6 +2,7 @@
 #include <nlohmann/json.hpp>
 #include <spdlog/spdlog.h>
 #include <algorithm>
+#include <cctype>
 #include <cmath>
 #include <limits>
 
@@ -622,8 +623,14 @@ std::vector<std::shared_ptr<SceneCommand>> CommandParser::ParseJSON(const std::s
                 if (cmdJson.contains("light_type") && cmdJson["light_type"].is_string()) {
                     std::string lt = cmdJson["light_type"];
                     cmd->setType = true;
+                    std::transform(lt.begin(), lt.end(), lt.begin(),
+                                   [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
                     if (lt == "directional") cmd->lightType = AddLightCommand::LightType::Directional;
                     else if (lt == "spot")   cmd->lightType = AddLightCommand::LightType::Spot;
+                    else if (lt == "area_rect" || lt == "arearect" || lt == "rect_area" ||
+                             lt == "rect" || lt == "area") {
+                        cmd->lightType = AddLightCommand::LightType::AreaRect;
+                    }
                     else                     cmd->lightType = AddLightCommand::LightType::Point;
                 }
                 if (cmdJson.contains("casts_shadows") && cmdJson["casts_shadows"].is_boolean()) {
@@ -804,8 +811,14 @@ std::vector<std::shared_ptr<SceneCommand>> CommandParser::ParseJSON(const std::s
 
                 if (cmdJson.contains("light_type") && cmdJson["light_type"].is_string()) {
                     std::string lt = cmdJson["light_type"];
+                    std::transform(lt.begin(), lt.end(), lt.begin(),
+                                   [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
                     if (lt == "directional") cmd->lightType = AddLightCommand::LightType::Directional;
                     else if (lt == "spot")   cmd->lightType = AddLightCommand::LightType::Spot;
+                    else if (lt == "area_rect" || lt == "arearect" || lt == "rect_area" ||
+                             lt == "rect" || lt == "area") {
+                        cmd->lightType = AddLightCommand::LightType::AreaRect;
+                    }
                     else                     cmd->lightType = AddLightCommand::LightType::Point;
                 }
 
@@ -818,6 +831,26 @@ std::vector<std::shared_ptr<SceneCommand>> CommandParser::ParseJSON(const std::s
                 }
                 if (cmdJson.contains("direction")) {
                     ReadVec3(cmdJson["direction"], "direction", cmd->direction);
+                }
+                if (cmdJson.contains("area_width")) {
+                    cmd->areaWidth = std::max(ReadNumber(cmdJson["area_width"], "area_width", 1.0f), 0.01f);
+                } else if (cmdJson.contains("width")) {
+                    cmd->areaWidth = std::max(ReadNumber(cmdJson["width"], "width", 1.0f), 0.01f);
+                }
+                if (cmdJson.contains("area_height")) {
+                    cmd->areaHeight = std::max(ReadNumber(cmdJson["area_height"], "area_height", 1.0f), 0.01f);
+                } else if (cmdJson.contains("height")) {
+                    cmd->areaHeight = std::max(ReadNumber(cmdJson["height"], "height", 1.0f), 0.01f);
+                }
+                if (cmdJson.contains("facing_normal")) {
+                    ReadVec3(cmdJson["facing_normal"], "facing_normal", cmd->areaFacingNormal);
+                } else if (cmdJson.contains("normal")) {
+                    ReadVec3(cmdJson["normal"], "normal", cmd->areaFacingNormal);
+                }
+                if (cmdJson.contains("up")) {
+                    ReadVec3(cmdJson["up"], "up", cmd->areaUp);
+                } else if (cmdJson.contains("up_vector")) {
+                    ReadVec3(cmdJson["up_vector"], "up_vector", cmd->areaUp);
                 }
                 if (cmdJson.contains("color")) {
                     glm::vec4 color4;

@@ -32,6 +32,59 @@ bool Contains(const std::string& hay, const char* needle) {
 // roughness textures drive the look.
 const glm::vec4 kTex(0.97f, 0.97f, 0.97f, 1.0f);
 
+Scene::MeshData::EmbeddedPbrMaterial MakeSurfaceMaterial(const char* id,
+                                                         const glm::vec4& tint,
+                                                         float roughness,
+                                                         float normalScale = 0.85f) {
+    Scene::MeshData::EmbeddedPbrMaterial mat;
+    const std::string root = std::string("assets/textures/polyhaven/") + id + "/" + id;
+    mat.albedoPath = root + "_diff_1k.jpg";
+    mat.normalPath = root + "_nor_gl_1k.jpg";
+    mat.metallicRoughnessPath = root + "_rough_1k.jpg";
+    mat.baseColorFactor = tint;
+    mat.metallicFactor = 0.0f;
+    mat.roughnessFactor = roughness;
+    mat.normalScale = normalScale;
+    mat.occlusionStrength = 1.0f;
+    return mat;
+}
+
+const Scene::MeshData::EmbeddedPbrMaterial& WoodFloorMaterial() {
+    static const Scene::MeshData::EmbeddedPbrMaterial mat =
+        MakeSurfaceMaterial("wood_floor_deck", glm::vec4(0.98f, 0.94f, 0.88f, 1.0f), 1.0f, 0.68f);
+    return mat;
+}
+
+const Scene::MeshData::EmbeddedPbrMaterial& TileFloorMaterial() {
+    static const Scene::MeshData::EmbeddedPbrMaterial mat =
+        MakeSurfaceMaterial("herringbone_concrete_tile", glm::vec4(0.96f, 0.95f, 0.92f, 1.0f), 0.94f, 0.72f);
+    return mat;
+}
+
+const Scene::MeshData::EmbeddedPbrMaterial& PlasterWallMaterial() {
+    static const Scene::MeshData::EmbeddedPbrMaterial mat =
+        MakeSurfaceMaterial("plastered_wall", glm::vec4(0.98f, 0.96f, 0.92f, 1.0f), 0.96f, 0.50f);
+    return mat;
+}
+
+const Scene::MeshData::EmbeddedPbrMaterial& GrassGroundMaterial() {
+    static const Scene::MeshData::EmbeddedPbrMaterial mat =
+        MakeSurfaceMaterial("aerial_grass_rock", glm::vec4(0.86f, 0.94f, 0.76f, 1.0f), 1.0f, 0.68f);
+    return mat;
+}
+
+void ApplyPrimitiveMaterial(AddEntityCommand& cmd,
+                            const Scene::MeshData::EmbeddedPbrMaterial& material,
+                            const glm::vec2& uvScale) {
+    cmd.hasMaterialTextureSet = true;
+    cmd.materialTextureSet = material;
+    cmd.materialTextureSet.baseColorFactor = glm::vec4(
+        glm::mix(glm::vec3(material.baseColorFactor), glm::vec3(cmd.color), 0.25f),
+        cmd.color.a);
+    cmd.materialTextureSet.baseColorFactor.a = cmd.color.a;
+    cmd.uvScale = uvScale;
+}
+
 // Measured object-space footprint of a catalogued asset (cached per build).
 struct Footprint {
     glm::vec3 size{1.0f};
@@ -234,17 +287,24 @@ inline bool PlaceFurn(std::vector<std::shared_ptr<SceneCommand>>& out, const Sce
 }
 
 // A simple ground plane sized to the room (primitive, sits at y=0).
-void PlaceFloor(std::vector<std::shared_ptr<SceneCommand>>& out, float width, float depth, const glm::vec4& color) {
+void PlaceFloor(std::vector<std::shared_ptr<SceneCommand>>& out,
+                float width,
+                float depth,
+                const glm::vec4& color,
+                const Scene::MeshData::EmbeddedPbrMaterial& material,
+                float tileMeters) {
     auto cmd = std::make_shared<AddEntityCommand>();
     cmd->entityType = AddEntityCommand::EntityType::Plane; // CreatePlane is 2x2 in XZ
     cmd->name = "Floor";
-    cmd->position = glm::vec3(0.0f, 0.0f, 0.0f);
+    cmd->position = glm::vec3(0.0f, 0.012f, 0.0f);
     cmd->scale = glm::vec3(width * 0.5f, 1.0f, depth * 0.5f);
     cmd->color = color;
     cmd->roughness = 0.52f; // satin floor: catches soft reflections of the room (SSR) instead of dead-matte
     cmd->metallic = 0.0f;
     cmd->allowPlacementJitter = false;
     cmd->disableCollisionAvoidance = true;
+    const float metersPerTile = std::max(tileMeters, 0.1f);
+    ApplyPrimitiveMaterial(*cmd, material, glm::vec2(width / metersPerTile, depth / metersPerTile));
     out.push_back(std::move(cmd));
 }
 
@@ -277,8 +337,10 @@ void PlaceExplicit(std::vector<std::shared_ptr<SceneCommand>>& out, const Scene:
 // segments tile cleanly; a center gap is left on the +Z (front) side as a
 // doorway. Falls back to a bare floor if no wall asset is available.
 void BuildRoomShell(std::vector<std::shared_ptr<SceneCommand>>& out, const Scene::AssetCatalog& cat,
-                    FootprintCache& c, float width, float depth, const glm::vec4& floorColor) {
-    PlaceFloor(out, width, depth, floorColor);
+                    FootprintCache& c, float width, float depth, const glm::vec4& floorColor,
+                    bool tileFloor = false) {
+    PlaceFloor(out, width, depth, floorColor, tileFloor ? TileFloorMaterial() : WoodFloorMaterial(),
+               tileFloor ? 0.82f : 1.15f);
     (void)cat;
     (void)c;
 
@@ -297,7 +359,8 @@ void BuildRoomShell(std::vector<std::shared_ptr<SceneCommand>>& out, const Scene
     const float hd = depth * 0.5f;
 
     auto box = [&](const std::string& tag, float cx, float cy, float cz, float sx, float sy, float sz,
-                   const glm::vec4& col) {
+                   const glm::vec4& col, const Scene::MeshData::EmbeddedPbrMaterial* material = nullptr,
+                   glm::vec2 uvScale = glm::vec2(1.0f)) {
         auto cmd = std::make_shared<AddEntityCommand>();
         cmd->entityType = AddEntityCommand::EntityType::Cube; // unit cube (+/-0.5)
         cmd->name = tag;
@@ -308,10 +371,15 @@ void BuildRoomShell(std::vector<std::shared_ptr<SceneCommand>>& out, const Scene
         cmd->roughness = 0.92f;
         cmd->allowPlacementJitter = false;
         cmd->disableCollisionAvoidance = true;
+        if (material) {
+            ApplyPrimitiveMaterial(*cmd, *material, uvScale);
+        }
         out.push_back(std::move(cmd));
     };
     auto wall = [&](const std::string& tag, float cx, float cz, float sx, float sz, const glm::vec4& col) {
-        box(tag, cx, wallH * 0.5f, cz, sx, wallH, sz, col); // base on the floor
+        const float run = std::max(sx, sz);
+        box(tag, cx, wallH * 0.5f, cz, sx, wallH, sz, col, &PlasterWallMaterial(),
+            glm::vec2(std::max(run / 1.35f, 1.0f), std::max(wallH / 1.35f, 1.0f))); // base on the floor
     };
 
     wall("Wall_Back", 0.0f, -hd, width, wallTh, backWallColor);
@@ -439,7 +507,7 @@ void BuildOffice(std::vector<std::shared_ptr<SceneCommand>>& out, const Scene::A
 }
 
 void BuildKitchen(std::vector<std::shared_ptr<SceneCommand>>& out, const Scene::AssetCatalog& cat, FootprintCache& c) {
-    BuildRoomShell(out, cat, c, 6.6f, 6.4f, glm::vec4(0.34f, 0.30f, 0.25f, 1.0f)); // warm floor
+    BuildRoomShell(out, cat, c, 6.6f, 6.4f, glm::vec4(0.70f, 0.68f, 0.63f, 1.0f), true); // herringbone tile floor
     const float backZ = -2.7f;
     const float counterTop = 0.92f; // lower-cabinet height after scaling
     // Lower counter run along the back wall.
@@ -609,7 +677,7 @@ void BuildDiningRoom(std::vector<std::shared_ptr<SceneCommand>>& out, const Scen
 }
 
 void BuildBathroom(std::vector<std::shared_ptr<SceneCommand>>& out, const Scene::AssetCatalog& cat, FootprintCache& c) {
-    BuildRoomShell(out, cat, c, 5.0f, 4.8f, glm::vec4(0.60f, 0.62f, 0.64f, 1.0f)); // tile floor
+    BuildRoomShell(out, cat, c, 5.0f, 4.8f, glm::vec4(0.78f, 0.80f, 0.80f, 1.0f), true); // tile floor
     Place(out, cat, c, "bathtub", 2.3f, 0.0f, -1.6f, 0.0f);                  // focal: tub on the back wall
     Place(out, cat, c, "toilet", 0.7f, -1.7f, -1.2f, 90.0f);                 // left wall
     Place(out, cat, c, "bathroomSink", 0.8f, 1.7f, -1.2f, -90.0f);           // right wall
@@ -635,6 +703,7 @@ void BuildGarden(std::vector<std::shared_ptr<SceneCommand>>& out, const Scene::A
         ground->metallic = 0.0f;
         ground->allowPlacementJitter = false;
         ground->disableCollisionAvoidance = true;
+        ApplyPrimitiveMaterial(*ground, GrassGroundMaterial(), glm::vec2(10.5f, 9.5f));
         out.push_back(std::move(ground));
     }
     Place(out, cat, c, "rugSquare", 3.6f, 0.3f, -0.6f, 0.0f, glm::vec4(0.58f, 0.56f, 0.52f, 1.0f)); // stone patio

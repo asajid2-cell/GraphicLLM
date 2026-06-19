@@ -40,6 +40,39 @@ glm::vec4 SanitizeColor(const glm::vec4& color) {
     return result;
 }
 
+glm::vec2 SanitizeUvScale(const glm::vec2& scale) {
+    glm::vec2 out(1.0f);
+    out.x = (std::isfinite(scale.x) && scale.x > 0.0f) ? std::clamp(scale.x, 0.01f, 256.0f) : 1.0f;
+    out.y = (std::isfinite(scale.y) && scale.y > 0.0f) ? std::clamp(scale.y, 0.01f, 256.0f) : 1.0f;
+    return out;
+}
+
+std::shared_ptr<Scene::MeshData> CloneMeshWithUvScale(const std::shared_ptr<Scene::MeshData>& source,
+                                                      const glm::vec2& uvScale,
+                                                      const Scene::MeshData::EmbeddedPbrMaterial& material) {
+    if (!source) {
+        return nullptr;
+    }
+
+    auto mesh = std::make_shared<Scene::MeshData>();
+    mesh->kind = source->kind;
+    mesh->positions = source->positions;
+    mesh->normals = source->normals;
+    mesh->texCoords = source->texCoords;
+    for (auto& uv : mesh->texCoords) {
+        uv *= uvScale;
+    }
+    mesh->indices = source->indices;
+    mesh->colors = source->colors;
+    mesh->boundsMin = source->boundsMin;
+    mesh->boundsMax = source->boundsMax;
+    mesh->boundsCenter = source->boundsCenter;
+    mesh->boundsRadius = source->boundsRadius;
+    mesh->hasBounds = source->hasBounds;
+    mesh->embeddedMaterial = material;
+    return mesh;
+}
+
 bool LooksLikePackedArmTexture(const std::string& path) {
     std::string lower = path;
     std::transform(lower.begin(), lower.end(), lower.begin(),
@@ -509,6 +542,24 @@ void CommandQueue::ExecuteAddEntity(AddEntityCommand* cmd, Scene::ECS_Registry* 
         }
     }
 
+    const bool primitiveTextureSet =
+        cmd->entityType != AddEntityCommand::EntityType::Model &&
+        cmd->hasMaterialTextureSet &&
+        cmd->materialTextureSet.HasTexture();
+    if (primitiveTextureSet) {
+        mesh = CloneMeshWithUvScale(mesh, SanitizeUvScale(cmd->uvScale), cmd->materialTextureSet);
+        if (!mesh) {
+            PushStatus(false, "Failed to prepare textured primitive mesh");
+            return;
+        }
+        auto uploadResult = renderer->UploadMesh(mesh);
+        if (uploadResult.IsErr()) {
+            spdlog::error("Failed to upload textured primitive mesh: {}", uploadResult.Error());
+            PushStatus(false, "Failed to upload textured primitive mesh");
+            return;
+        }
+    }
+
     // Create entity
     entt::entity entity = registry->CreateEntity();
 
@@ -585,7 +636,8 @@ void CommandQueue::ExecuteAddEntity(AddEntityCommand* cmd, Scene::ECS_Registry* 
     auto& renderable = registry->AddComponent<Scene::RenderableComponent>(entity);
     renderable.mesh = mesh;
     const auto* embeddedMaterial =
-        (cmd->entityType == AddEntityCommand::EntityType::Model && mesh && mesh->embeddedMaterial.HasTexture())
+        (((cmd->entityType == AddEntityCommand::EntityType::Model) || primitiveTextureSet) &&
+         mesh && mesh->embeddedMaterial.HasTexture())
             ? &mesh->embeddedMaterial
             : nullptr;
     renderable.albedoColor = embeddedMaterial ? SanitizeColor(embeddedMaterial->baseColorFactor)
@@ -637,6 +689,9 @@ void CommandQueue::ExecuteAddEntity(AddEntityCommand* cmd, Scene::ECS_Registry* 
         renderable.textures.normalPath = embeddedMaterial->normalPath;
         renderable.textures.metallicPath = embeddedMaterial->metallicRoughnessPath;
         renderable.textures.roughnessPath = embeddedMaterial->metallicRoughnessPath;
+        if (primitiveTextureSet) {
+            renderable.textures.metallicPath.clear();
+        }
         renderable.textures.occlusionPath = embeddedMaterial->occlusionPath;
         if (renderable.textures.occlusionPath.empty() &&
             LooksLikePackedArmTexture(embeddedMaterial->metallicRoughnessPath)) {

@@ -4,6 +4,7 @@
 #include <vector>
 #include <memory>
 #include <glm/glm.hpp>
+#include "Scene/Components.h"
 
 namespace Cortex::LLM {
 
@@ -107,6 +108,12 @@ struct AddEntityCommand : public SceneCommand {
     // This is used internally by helpers (e.g., road/lane markings) and does
     // not require the JSON command schema to expose it.
     bool isDecal = false;
+
+    // Optional PBR texture set for generated primitives. Models usually get
+    // this from their embedded glTF material; recipe planes/cubes can opt in.
+    bool hasMaterialTextureSet = false;
+    Scene::MeshData::EmbeddedPbrMaterial materialTextureSet;
+    glm::vec2 uvScale = glm::vec2(1.0f);
 
     AddEntityCommand() { type = CommandType::AddEntity; }
     std::string ToString() const override;

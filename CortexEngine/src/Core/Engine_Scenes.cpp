@@ -2493,6 +2493,9 @@ void Engine::BuildOutdoorSunsetBeachScene() {
     }
 
     auto sandPlane = Utils::MeshGenerator::CreatePlane(26.0f, 18.0f);
+    for (auto& uv : sandPlane->texCoords) {
+        uv *= glm::vec2(18.0f, 12.0f);
+    }
     auto waterPlane = Utils::MeshGenerator::CreatePlane(26.0f, 12.0f);
     auto cubeMesh = Utils::MeshGenerator::CreateCube();
     auto sphereMesh = Utils::MeshGenerator::CreateSphere(0.5f, 32);
@@ -2612,7 +2615,11 @@ void Engine::BuildOutdoorSunsetBeachScene() {
                                   0.0f, 0.88f, "sand");
         auto& r = m_registry->GetComponent<Scene::RenderableComponent>(sand);
         r.doubleSided = true;
-        r.normalScale = 0.0f;
+        r.textures.albedoPath = "assets/textures/polyhaven/coast_sand_05/coast_sand_05_diff_1k.jpg";
+        r.textures.normalPath = "assets/textures/polyhaven/coast_sand_05/coast_sand_05_nor_gl_1k.jpg";
+        r.textures.roughnessPath = "assets/textures/polyhaven/coast_sand_05/coast_sand_05_rough_1k.jpg";
+        r.metallic = 0.0f;
+        r.normalScale = 0.65f;
         r.wetnessFactor = 0.10f;
         r.proceduralMaskStrength = 0.0f;
     }

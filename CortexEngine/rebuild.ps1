@@ -56,8 +56,16 @@ if ($Clean) {
 
 Write-Host "Compiling..." -ForegroundColor Gray
 $start = Get-Date
-& cmake --build . --config $Config --parallel
+# Assets use CONFIGURE_DEPENDS globs: when files are added/removed the build emits a
+# "-- GLOB mismatch!" reconfigure status on stderr, which trips ErrorAction=Stop and
+# aborts before the build runs. Reconfigure first to settle the glob, and tolerate the
+# native stderr during build (judge success by the exit code, not the stderr).
+$eapPrev = $ErrorActionPreference
+$ErrorActionPreference = "Continue"
+& cmake . 2>&1 | Out-Null
+& cmake --build . --config $Config --parallel 2>&1 | Out-Host
 $result = $LASTEXITCODE
+$ErrorActionPreference = $eapPrev
 $elapsed = (Get-Date) - $start
 
 Pop-Location

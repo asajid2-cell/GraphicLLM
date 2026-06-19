@@ -27,6 +27,11 @@ bool Contains(const std::string& hay, const char* needle) {
     return hay.find(needle) != std::string::npos;
 }
 
+// Near-white tint for high-poly PBR-textured assets: not pure white (so Place()
+// doesn't substitute a flat ColorForKey), so the asset's own glTF albedo/normal/
+// roughness textures drive the look.
+const glm::vec4 kTex(0.97f, 0.97f, 0.97f, 1.0f);
+
 // Measured object-space footprint of a catalogued asset (cached per build).
 struct Footprint {
     glm::vec3 size{1.0f};
@@ -376,20 +381,19 @@ void BuildLivingRoom(std::vector<std::shared_ptr<SceneCommand>>& out, const Scen
     // Cozier footprint so the seating group fills the room instead of floating.
     BuildRoomShell(out, cat, c, 6.8f, 6.6f, glm::vec4(0.50f, 0.43f, 0.36f, 1.0f)); // warm wood floor
     Place(out, cat, c, "rugRectangle", 2.9f, 0.0f, -0.3f, 0.0f, glm::vec4(0.47f, 0.30f, 0.26f, 1.0f));
-    // High-poly PBR-textured furniture (Poly Haven CC0) — near-white color so the
-    // real albedo/normal/roughness textures drive the look (not a flat tint).
-    const glm::vec4 tex(0.97f, 0.97f, 0.97f, 1.0f);
-    Place(out, cat, c, "Sofa_01", 2.3f, 0.0f, -2.0f, 0.0f, tex);        // back wall
-    Place(out, cat, c, "ArmChair_01", 0.95f, -2.05f, -0.3f, 50.0f, tex); // angled into the group
-    Place(out, cat, c, "ArmChair_01", 0.95f, 2.05f, -0.3f, -50.0f, tex);
-    Place(out, cat, c, "CoffeeTable_01", 1.2f, 0.0f, -0.7f, 0.0f, tex);  // centre of the seating
+    // High-poly PBR-textured furniture (Poly Haven CC0) — kTex lets the asset's own
+    // albedo/normal/roughness textures drive the look (not a flat tint).
+    Place(out, cat, c, "Sofa_01", 2.3f, 0.0f, -2.0f, 0.0f, kTex);        // back wall
+    Place(out, cat, c, "ArmChair_01", 0.95f, -2.05f, -0.3f, 50.0f, kTex); // angled into the group
+    Place(out, cat, c, "ArmChair_01", 0.95f, 2.05f, -0.3f, -50.0f, kTex);
+    Place(out, cat, c, "CoffeeTable_01", 1.2f, 0.0f, -0.7f, 0.0f, kTex);  // centre of the seating
     PlaceOn(out, cat, c, "books", 0.35f, 0.15f, 0.42f, -0.7f, 20.0f);   // on the coffee table
     Place(out, cat, c, "lampRoundFloor", 0.4f, -2.7f, -2.1f, 0.0f);     // floor lamp beside the sofa
     AddPointLight(out, -2.55f, 1.45f, -2.1f, glm::vec3(1.0f, 0.78f, 0.48f), 5.4f, 4.3f);
     Place(out, cat, c, "sideTable", 0.5f, 2.7f, -2.1f, 0.0f);           // side table other end
     PlaceOn(out, cat, c, "lampRoundTable", 0.28f, 2.7f, 0.46f, -2.1f, 0.0f); // table lamp on it
     AddPointLight(out, 2.55f, 0.82f, -2.1f, glm::vec3(1.0f, 0.78f, 0.48f), 3.8f, 3.3f);
-    Place(out, cat, c, "bookcaseOpen", 1.1f, -3.0f, 1.0f, 90.0f);       // side wall
+    Place(out, cat, c, "Shelf_01", 1.1f, -3.0f, 1.0f, 90.0f, kTex);     // side wall (high-poly)
     Place(out, cat, c, "cabinetTelevision", 1.6f, 0.0f, 2.7f, 180.0f);  // front wall (behind camera)
     Place(out, cat, c, "televisionModern", 1.2f, 0.0f, 2.5f, 180.0f);
     Place(out, cat, c, "pottedPlant", 0.6f, 2.9f, -2.6f, 0.0f);         // back-right corner greenery
@@ -399,15 +403,13 @@ void BuildLivingRoom(std::vector<std::shared_ptr<SceneCommand>>& out, const Scen
 void BuildBedroom(std::vector<std::shared_ptr<SceneCommand>>& out, const Scene::AssetCatalog& cat, FootprintCache& c) {
     BuildRoomShell(out, cat, c, 6.4f, 6.2f, glm::vec4(0.48f, 0.44f, 0.46f, 1.0f));
     Place(out, cat, c, "rugRound", 2.7f, -0.1f, 0.2f, 0.0f, glm::vec4(0.46f, 0.40f, 0.48f, 1.0f));
-    Place(out, cat, c, "bedDouble", 2.7f, -0.2f, -1.5f, 0.0f);          // focal: big, back-centre, faces camera
-    PlaceOn(out, cat, c, "pillowLong", 0.75f, -0.6f, 0.54f, -2.35f, 0.0f);   // pillows at the head
-    PlaceOn(out, cat, c, "pillowBlue", 0.4f, 0.35f, 0.58f, -2.3f, 6.0f);
-    Place(out, cat, c, "sideTable", 0.5f, -1.9f, -2.3f, 0.0f);
-    Place(out, cat, c, "sideTable", 0.5f, 1.5f, -2.3f, 0.0f);
-    PlaceOn(out, cat, c, "lampSquareTable", 0.3f, 1.5f, 0.46f, -2.3f, 0.0f);  // lamp on nightstand
-    AddPointLight(out, 1.5f, 0.82f, -2.3f, glm::vec3(1.0f, 0.77f, 0.46f), 3.8f, 3.3f);
-    PlaceOn(out, cat, c, "books", 0.26f, -1.9f, 0.46f, -2.3f, 15.0f);          // books on the other
-    Place(out, cat, c, "bookcaseClosed", 1.1f, -2.85f, 1.1f, 90.0f);    // left wall, away from camera
+    Place(out, cat, c, "GothicBed_01", 2.7f, -0.2f, -1.5f, 0.0f, kTex);  // focal: high-poly bed, faces camera
+    Place(out, cat, c, "ClassicNightstand_01", 0.5f, -1.9f, -2.3f, 0.0f, kTex);
+    Place(out, cat, c, "ClassicNightstand_01", 0.5f, 1.5f, -2.3f, 0.0f, kTex);
+    PlaceOn(out, cat, c, "lampSquareTable", 0.3f, 1.5f, 0.52f, -2.3f, 0.0f);  // lamp on nightstand
+    AddPointLight(out, 1.5f, 0.9f, -2.3f, glm::vec3(1.0f, 0.77f, 0.46f), 3.8f, 3.3f);
+    PlaceOn(out, cat, c, "books", 0.26f, -1.9f, 0.52f, -2.3f, 15.0f);          // books on the other
+    Place(out, cat, c, "Shelf_01", 1.1f, -2.85f, 1.1f, 90.0f, kTex);    // left wall (high-poly)
     Place(out, cat, c, "coatRackStanding", 0.45f, -2.7f, -2.5f, 0.0f);
     Place(out, cat, c, "pottedPlant", 0.5f, 2.6f, -2.4f, 0.0f);         // back-right corner accent
 }
@@ -578,14 +580,14 @@ void BuildDiningRoom(std::vector<std::shared_ptr<SceneCommand>>& out, const Scen
     BuildRoomShell(out, cat, c, 6.6f, 6.4f, glm::vec4(0.46f, 0.40f, 0.34f, 1.0f)); // warm wood floor
     const float tz = -1.1f; // table centre
     Place(out, cat, c, "rugRounded", 3.0f, 0.0f, tz, 0.0f, glm::vec4(0.40f, 0.30f, 0.26f, 1.0f));
-    Place(out, cat, c, "tableCloth", 1.7f, 0.0f, tz, 0.0f);                     // focal: dining table
-    // Six chairs pulled up to the table, each facing in.
-    Place(out, cat, c, "chairCushion", 0.55f, -0.95f, tz - 0.5f, -90.0f);       // left side
-    Place(out, cat, c, "chairCushion", 0.55f, -0.95f, tz + 0.5f, -90.0f);
-    Place(out, cat, c, "chairCushion", 0.55f, 0.95f, tz - 0.5f, 90.0f);         // right side
-    Place(out, cat, c, "chairCushion", 0.55f, 0.95f, tz + 0.5f, 90.0f);
-    Place(out, cat, c, "chairCushion", 0.55f, 0.0f, tz - 1.05f, 0.0f);          // head
-    Place(out, cat, c, "chairCushion", 0.55f, 0.0f, tz + 1.05f, 180.0f);        // foot
+    Place(out, cat, c, "WoodenTable_02", 1.7f, 0.0f, tz, 0.0f, kTex);           // focal: high-poly dining table
+    // Six high-poly chairs pulled up to the table, each facing in.
+    Place(out, cat, c, "WoodenChair_01", 0.55f, -0.95f, tz - 0.5f, -90.0f, kTex);  // left side
+    Place(out, cat, c, "WoodenChair_01", 0.55f, -0.95f, tz + 0.5f, -90.0f, kTex);
+    Place(out, cat, c, "WoodenChair_01", 0.55f, 0.95f, tz - 0.5f, 90.0f, kTex);    // right side
+    Place(out, cat, c, "WoodenChair_01", 0.55f, 0.95f, tz + 0.5f, 90.0f, kTex);
+    Place(out, cat, c, "WoodenChair_01", 0.55f, 0.0f, tz - 1.05f, 0.0f, kTex);     // head
+    Place(out, cat, c, "WoodenChair_01", 0.55f, 0.0f, tz + 1.05f, 180.0f, kTex);   // foot
     // Sideboard against the left wall with decor on top.
     Place(out, cat, c, "cabinetTelevisionDoors", 1.4f, -2.7f, 1.3f, 90.0f);
     PlaceOn(out, cat, c, "books", 0.3f, -2.7f, 0.62f, 1.3f, 12.0f);

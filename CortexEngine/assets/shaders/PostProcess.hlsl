@@ -600,13 +600,20 @@ float3 ApplyPostWhiteCompression(float3 color, float strength)
 
     float luma = dot(color, float3(0.299f, 0.587f, 0.114f));
     float knee = lerp(0.92f, 0.76f, strength);
-    if (luma <= knee)
+    if (luma > knee)
     {
-        return color;
+        float compressed = knee + (luma - knee) * lerp(0.86f, 0.42f, strength);
+        color *= compressed / max(luma, 1e-4f);
     }
 
-    float compressed = knee + (luma - knee) * lerp(0.86f, 0.42f, strength);
-    return color * (compressed / max(luma, 1e-4f));
+    // Some recipe highlights clip in a single RGB channel before the luma gets
+    // high enough to trip the white knee. Roll those channels off directly so
+    // saturated lawns, lamps, and window patches keep texture.
+    float channelKnee = lerp(0.96f, 0.84f, strength);
+    float channelSlope = lerp(0.82f, 0.38f, strength);
+    float3 channelCompressed = channelKnee.xxx + (color - channelKnee.xxx) * channelSlope;
+    color = min(color, lerp(color, channelCompressed, step(channelKnee.xxx, color)));
+    return color;
 }
 
 float3 ApplySceneLocalCinematicMidtoneCurve(float3 color, float strength)
@@ -2855,6 +2862,7 @@ float4 PSMain(VSOutput input) : SV_TARGET
         g_CinematicLookParams,
         profileWhiteCompression,
         highlightProtection);
+    color = ApplyPostWhiteCompression(color, profileWhiteCompression);
     color = pow(color, 1.0f / 2.2f);
 
     // GPU-driven settings overlay. When g_DebugMode.y > 0.5 the engine is

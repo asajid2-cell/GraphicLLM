@@ -435,6 +435,7 @@ glm::vec4 Renderer::BuildCinematicExposureParams() const {
     }
 
     const std::string& profile = m_sceneVisualContract.profileId;
+    const std::string& family = m_sceneVisualContract.family;
     const std::string& palette = m_sceneVisualContract.materialPaletteId;
     if (profile.find("gallery") != std::string::npos) {
         exposureTrim = std::min(exposureTrim, 0.76f);
@@ -469,6 +470,18 @@ glm::vec4 Renderer::BuildCinematicExposureParams() const {
         hdrShoulderStart = std::min(hdrShoulderStart, 3.0f);
         hdrShoulderStrength = std::max(hdrShoulderStrength, 0.56f);
         postWhiteCompression = std::max(postWhiteCompression, 0.48f);
+    }
+
+    if (family == "recipe_garden" || profile.find("recipe_garden") != std::string::npos) {
+        exposureTrim = 0.94f;
+        hdrShoulderStart = 1.35f;
+        hdrShoulderStrength = 0.80f;
+        postWhiteCompression = 0.70f;
+    } else if (family == "recipe_enclosed_room" || profile.find("recipe_room") != std::string::npos) {
+        exposureTrim = 0.98f;
+        hdrShoulderStart = 1.90f;
+        hdrShoulderStrength = 0.66f;
+        postWhiteCompression = 0.56f;
     }
 
     return glm::vec4(glm::clamp(exposureTrim, 0.42f, 1.10f),

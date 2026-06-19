@@ -757,6 +757,68 @@ namespace {
         }
     }
 
+    std::string RecipeVisualFamily(const std::string& recipe) {
+        return recipe == "garden" ? "recipe_garden" : "recipe_enclosed_room";
+    }
+
+    std::string RecipeMaterialPalette(const std::string& recipe) {
+        if (recipe == "garden") {
+            return "recipe_garden_patio";
+        }
+        if (recipe == "kitchen") {
+            return "recipe_kitchen_enclosed";
+        }
+        if (recipe == "office") {
+            return "recipe_office_enclosed";
+        }
+        if (recipe == "bathroom") {
+            return "recipe_bathroom_enclosed";
+        }
+        if (recipe == "bedroom") {
+            return "recipe_bedroom_enclosed";
+        }
+        return "recipe_living_room_enclosed";
+    }
+
+    void ApplyRecipeVisualContract(Renderer* renderer, const std::string& recipe) {
+        if (!renderer) {
+            return;
+        }
+
+        const bool outdoor = recipe == "garden";
+        const std::string palette = RecipeMaterialPalette(recipe);
+
+        Graphics::FrameContract::SceneVisualInfo visualContract{};
+        visualContract.active = true;
+        visualContract.profileId = outdoor ? "recipe_garden_rolloff_v1" : "recipe_room_rolloff_v1";
+        visualContract.family = RecipeVisualFamily(recipe);
+        visualContract.source = "recipe_scene_visual_contract";
+        visualContract.enclosedScene = !outdoor;
+        visualContract.visibleExternalHDRIAllowed = outdoor;
+        visualContract.externalHDRIVisible = false;
+        visualContract.environmentOwner = "recipe_neutral_procedural";
+        visualContract.reflectionOwner = outdoor ? "recipe_garden_local_probe" : "recipe_room_local_probe";
+        visualContract.localReflectionProbeRigId = outdoor ? "recipe_garden_probe" : "recipe_room_probe";
+        visualContract.lightRigId = outdoor ? "recipe_garden_daylight" : "recipe_enclosed_room_motivated";
+        visualContract.shadowPolicyId = "scene_local_soft_stable_shadows_v1";
+        visualContract.exposurePolicyId = "scene_local_manual_exposure_v1";
+        visualContract.materialPaletteId = palette;
+        visualContract.lightingScriptId = outdoor ? "recipe_garden_daylight" : "recipe_enclosed_practicals";
+        visualContract.materialClassSetId = "scene_local_named_material_classes_v1";
+        visualContract.materialLayerSetId = "scene_local_cinematic_material_layers_v1";
+        visualContract.temporalPolicyId = "stable_recipe_reprojection";
+        visualContract.postPolicyId = outdoor ? "recipe_garden_highlight_rolloff" : "recipe_room_highlight_rolloff";
+        visualContract.postQualitySetId = "scene_local_cinematic_post_quality_v1";
+        visualContract.toneMapperPreset = "filmic_soft";
+        renderer->SetSceneVisualContract(std::move(visualContract));
+        renderer->SetToneMapperPreset("filmic_soft");
+        renderer->SetLightingRigContract(outdoor ? "recipe_garden_daylight" : "recipe_enclosed_room_motivated",
+                                         "recipe_scene_visual_contract",
+                                         false);
+        renderer->SetWorldShaderPaletteContract(palette,
+                                                outdoor ? "recipe_garden_daylight" : "recipe_enclosed_practicals");
+    }
+
     void AddAssetLedPointLight(Scene::ECS_Registry& registry,
                                const char* tag,
                                const glm::vec3& position,
@@ -2664,6 +2726,7 @@ void Engine::BuildRecipeScene() {
 
     const bool outdoor = (recipe == "garden");
     if (auto* renderer = m_renderer.get()) {
+        ApplyRecipeVisualContract(renderer, recipe);
         renderer->SetEnvironmentPreset("neutral_procedural");
         renderer->SetIBLEnabled(true);
         // Outdoor: the SUN is the key light; keep the (gray neutral) IBL modest so
@@ -2680,7 +2743,7 @@ void Engine::BuildRecipeScene() {
         amb.b -= style.warmth * 0.06f;
         amb *= (1.0f + style.brightness * (outdoor ? 0.35f : 0.16f));
         renderer->SetAmbientLighting(glm::max(amb, glm::vec3(outdoor ? 0.05f : 0.035f)), outdoor ? 1.0f : 0.72f);
-        renderer->SetExposure(std::clamp((outdoor ? 0.80f : 0.62f) + style.brightness * 0.06f, 0.52f, outdoor ? 1.4f : 0.78f));
+        renderer->SetExposure(std::clamp((outdoor ? 0.68f : 0.62f) + style.brightness * 0.06f, 0.52f, outdoor ? 1.0f : 0.78f));
         // Global warm/cool grade makes the modern <-> rustic difference clear.
         renderer->SetColorGrade(std::max(0.0f, style.warmth) * 0.38f,
                                 std::max(0.0f, -style.warmth) * 0.32f);
@@ -2722,7 +2785,7 @@ void Engine::BuildRecipeScene() {
         // Warm or cool key light by style (cool modern <-> warm rustic).
         l.color = glm::mix(glm::vec3(0.92f, 0.96f, 1.0f), glm::vec3(1.0f, 0.90f, 0.78f),
                            glm::clamp(style.warmth * 0.5f + 0.5f, 0.0f, 1.0f));
-        l.intensity = outdoor ? (16.0f + style.brightness * 4.0f) : (8.8f + style.brightness * 1.25f);
+        l.intensity = outdoor ? (10.0f + style.brightness * 2.5f) : (8.8f + style.brightness * 1.25f);
         l.range = outdoor ? 24.0f : 18.0f;
         l.innerConeDegrees = outdoor ? 48.0f : 30.0f;
         l.outerConeDegrees = outdoor ? 80.0f : 62.0f;

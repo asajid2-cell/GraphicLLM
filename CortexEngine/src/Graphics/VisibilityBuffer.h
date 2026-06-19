@@ -240,6 +240,7 @@ public:
         D3D12_CPU_DESCRIPTOR_HANDLE depthSRV,
         const std::vector<VBMeshDrawInfo>& meshDraws,
         const glm::mat4& viewProj,
+        const glm::vec3& cameraPosition,
         D3D12_GPU_VIRTUAL_ADDRESS biomeMaterialsAddress = 0
     );
 

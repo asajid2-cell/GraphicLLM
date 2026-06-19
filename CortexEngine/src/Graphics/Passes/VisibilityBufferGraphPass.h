@@ -71,6 +71,7 @@ struct MaterialResolveContext {
     ID3D12Resource* depthBuffer = nullptr;
     D3D12_CPU_DESCRIPTOR_HANDLE depthSRV{};
     const glm::mat4* viewProjection = nullptr;
+    const glm::vec4* cameraPosition = nullptr;
     const std::vector<VisibilityBufferRenderer::VBMeshDrawInfo>* meshDraws = nullptr;
     D3D12_GPU_VIRTUAL_ADDRESS biomeMaterialsAddress = 0;
     D3D12_RESOURCE_STATES* depthState = nullptr;

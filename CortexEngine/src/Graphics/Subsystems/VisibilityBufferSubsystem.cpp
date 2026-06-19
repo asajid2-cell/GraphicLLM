@@ -842,6 +842,7 @@ bool VisibilityBufferSubsystem::RenderVisibilityBufferMaterialResolveStage(uint3
         ctx.depthResources->descriptors.srv.cpu,
         m_state.meshDraws,
         ctx.constantBuffers->frameCPU.viewProjectionMatrix,
+        glm::vec3(ctx.constantBuffers->frameCPU.cameraPosition),
         ctx.constantBuffers->biomeMaterials.gpuAddress);
 
     if (resolveResult.IsErr()) {

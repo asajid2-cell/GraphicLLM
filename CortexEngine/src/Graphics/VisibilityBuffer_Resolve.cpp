@@ -9,6 +9,7 @@ Result<void> VisibilityBufferRenderer::ResolveMaterials(
     D3D12_CPU_DESCRIPTOR_HANDLE depthSRV,
     const std::vector<VBMeshDrawInfo>& meshDraws,
     const glm::mat4& viewProj,
+    const glm::vec3& cameraPosition,
     D3D12_GPU_VIRTUAL_ADDRESS biomeMaterialsAddress
 ) {
     if (meshDraws.empty()) {
@@ -114,6 +115,7 @@ Result<void> VisibilityBufferRenderer::ResolveMaterials(
         float rcpWidth;
         float rcpHeight;
         glm::mat4 viewProj;  // 16 floats
+        glm::vec4 cameraPosition;
         uint32_t materialCount;
         uint32_t meshCount;
         uint32_t instanceCount;  // For bounds checking in shader
@@ -224,7 +226,8 @@ Result<void> VisibilityBufferRenderer::ResolveMaterials(
     resConsts.rcpWidth = 1.0f / static_cast<float>(m_width);
     resConsts.rcpHeight = 1.0f / static_cast<float>(m_height);
     resConsts.viewProj = viewProj;
-    cmdList->SetComputeRoot32BitConstants(0, 24, &resConsts, 0);  // 4 + 16 + 4 = 24 dwords
+    resConsts.cameraPosition = glm::vec4(cameraPosition, 1.0f);
+    cmdList->SetComputeRoot32BitConstants(0, 28, &resConsts, 0);  // 4 + 16 + 4 + 4 = 28 dwords
 
     // Single fullscreen dispatch; per-pixel mesh selection is driven by instance.meshIndex.
     cmdList->Dispatch(dispatchX, dispatchY, 1);
@@ -318,4 +321,3 @@ Result<void> VisibilityBufferRenderer::ComputeMotionVectors(
 }
 
 } // namespace Cortex::Graphics
-

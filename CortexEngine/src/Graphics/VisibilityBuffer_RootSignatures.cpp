@@ -184,11 +184,11 @@ Result<void> VisibilityBufferRenderer::CreateRootSignatures() {
 
         D3D12_ROOT_PARAMETER1 params[7] = {};
 
-        // b0: Resolution constants + view-projection matrix + mesh index (4 + 16 + 4 = 24 dwords)
+        // b0: resolution + view-projection + camera + material/mesh counts (28 dwords)
         params[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS;
         params[0].Constants.ShaderRegister = 0;
         params[0].Constants.RegisterSpace = 0;
-        params[0].Constants.Num32BitValues = 24;  // 4 for resolution + 16 for mat4x4 + 4 for mesh index + padding
+        params[0].Constants.Num32BitValues = 28;
         params[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
 
         // t1: Instance data SRV (StructuredBuffer - can use root descriptor)

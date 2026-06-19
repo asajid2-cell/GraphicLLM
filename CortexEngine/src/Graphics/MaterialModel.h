@@ -93,12 +93,16 @@ struct MaterialClassPolicyEvidence {
     bool reflectionStabilityApplied = false;
     bool albedoLuminanceClamped = false;
     bool albedoChromaClamped = false;
+    bool heightDetailBoostApplied = false;
+    bool thinTransmissionApplied = false;
     float roughnessFloor = 0.0f;
     float normalScaleCeiling = 1.0f;
     float proceduralMaskCeiling = 1.0f;
     float reflectionStabilityScale = 1.0f;
     float albedoLuminanceCeiling = 1.0f;
     float albedoChromaCeiling = 1.0f;
+    float heightDetailStrength = 0.0f;
+    float thinTransmission = 0.0f;
 };
 
 enum class MaterialAlphaMode : uint32_t {
@@ -128,6 +132,8 @@ struct MaterialModel {
     float wetnessFactor = 0.0f;
     float emissiveBloomFactor = 0.0f;
     float proceduralMaskStrength = 0.0f;
+    float heightDetailStrength = 0.0f;
+    float thinTransmissionFactor = 0.0f;
     float materialType = 0.0f;
     MaterialAlphaMode alphaMode = MaterialAlphaMode::Opaque;
     float alphaCutoff = 0.5f;

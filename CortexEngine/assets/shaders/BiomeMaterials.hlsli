@@ -296,6 +296,22 @@ struct BiomeSurfaceData {
     float metallic;
 };
 
+float BiomeHeightDetail(float3 worldPos, float3 worldNormal)
+{
+    float slope = ComputeSlopeFactor(worldNormal);
+    float2 p = worldPos.xz * lerp(0.35, 0.85, slope);
+    float broad = FBM(p * 1.7 + float2(3.1, 8.4), 3);
+    float grit = FBM(p * 8.5 + float2(19.0, 2.7), 4);
+    return saturate(broad * 0.58 + grit * 0.42);
+}
+
+float BiomeRoughnessBreakup(float3 worldPos, float3 worldNormal)
+{
+    float heightDetail = BiomeHeightDetail(worldPos, worldNormal);
+    float fine = FBM(worldPos.xz * 18.0 + worldNormal.xz * 2.0, 3);
+    return (heightDetail * 0.70 + fine * 0.30) - 0.5;
+}
+
 // Compute material properties for a single biome at given position
 BiomeSurfaceData ComputeSingleBiomeSurface(uint biomeIndex, float3 worldPos, float3 worldNormal) {
     BiomeSurfaceData result;
@@ -311,8 +327,12 @@ BiomeSurfaceData ComputeSingleBiomeSurface(uint biomeIndex, float3 worldPos, flo
     float slopeBlend = Smoothstep(0.5, 0.8, slope);
     color = lerp(color, mat.slopeColor, slopeBlend);
 
+    float heightDetail = BiomeHeightDetail(worldPos, worldNormal);
+    float exposedGrain = smoothstep(0.34, 0.88, slope) * (1.0 - smoothstep(0.82, 0.98, heightDetail));
+    color.rgb = saturate(color.rgb * lerp(0.94, 1.06, heightDetail) * (1.0 - exposedGrain * 0.08));
+
     result.albedo = color;
-    result.roughness = mat.roughness;
+    result.roughness = saturate(mat.roughness + BiomeRoughnessBreakup(worldPos, worldNormal) * 0.10);
     result.metallic = mat.metallic;
 
     return result;

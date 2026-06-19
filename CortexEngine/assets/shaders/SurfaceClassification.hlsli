@@ -330,7 +330,7 @@ float SceneMaterialReflectionStabilityScale(uint sceneMaterialClass,
 float SceneMaterialSubsurfaceWrap(uint sceneMaterialClass)
 {
     if (sceneMaterialClass == SCENE_MATERIAL_FABRIC) {
-        return 0.18f;
+        return 0.30f;
     }
     return 0.0f;
 }

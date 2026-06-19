@@ -29,6 +29,7 @@ cbuffer ResolutionConstants : register(b0) {
     float g_RcpWidth;
     float g_RcpHeight;
     float4x4 g_ViewProj;  // View-projection matrix for computing clip-space barycentrics
+    float4 g_CameraPosition; // xyz = camera world position
     uint g_MaterialCount;
     uint g_MeshCount;
     uint g_InstanceCount;  // For bounds checking
@@ -476,6 +477,10 @@ float3 FallbackTangentFromNormal(float3 normalWS) {
     return normalize(cross(helper, normalWS));
 }
 
+float3 ProceduralTriplanarWeights(float3 normalWS);
+float FineWeavePlane(float2 p);
+float WoodGrainPlane(float2 p);
+
 float3 ApplyProceduralMicroNormal(float3 normalWS,
                                   float3 tangentWS,
                                   float tangentSign,
@@ -516,6 +521,245 @@ float3 ApplyProceduralMicroNormal(float3 normalWS,
     float bump = lerp(0.30f, 1.10f, maskStrength) * classGain;
     float3 bumped = normalize(N - (T * slope.x + B * slope.y) * bump);
     return normalize(lerp(N, bumped, saturate(maskStrength * 0.85f)));
+}
+
+float MaterialHeightDetailStrength(uint materialClass,
+                                   uint sceneMaterialClass,
+                                   float proceduralMaskStrength,
+                                   float roughness,
+                                   float metallic)
+{
+    float nonMetal = 1.0f - smoothstep(0.08f, 0.35f, saturate(metallic));
+    float classStrength = 0.0f;
+    if (sceneMaterialClass == SCENE_MATERIAL_CERAMIC_TILE) {
+        classStrength = 0.30f;
+    } else if (sceneMaterialClass == SCENE_MATERIAL_POLISHED_WOOD) {
+        classStrength = 0.28f;
+    } else if (sceneMaterialClass == SCENE_MATERIAL_CONCRETE ||
+               sceneMaterialClass == SCENE_MATERIAL_PAINTED_WALL) {
+        classStrength = 0.22f;
+    } else if (sceneMaterialClass == SCENE_MATERIAL_FABRIC) {
+        classStrength = 0.18f;
+    } else if (materialClass == SURFACE_CLASS_MASONRY) {
+        classStrength = 0.25f;
+    } else if (materialClass == SURFACE_CLASS_WOOD) {
+        classStrength = 0.24f;
+    } else if (materialClass == SURFACE_CLASS_DEFAULT) {
+        classStrength = 0.10f;
+    }
+
+    float roughEligible = 1.0f - smoothstep(0.02f, 0.16f, saturate(roughness));
+    roughEligible = max(roughEligible, smoothstep(0.18f, 0.86f, saturate(roughness)));
+    return saturate(max(classStrength, proceduralMaskStrength * 0.65f) * nonMetal * roughEligible);
+}
+
+float TileGroutHeightPlane(float2 p)
+{
+    float2 cell = frac(p * float2(2.85f, 2.85f));
+    float edge = min(min(cell.x, 1.0f - cell.x), min(cell.y, 1.0f - cell.y));
+    float grout = 1.0f - smoothstep(0.018f, 0.060f, edge);
+    float chip = ValueNoise2D(p * 11.0f + 4.7f) * 0.11f;
+    return saturate(0.62f + chip - grout * 0.52f);
+}
+
+float WoodPlankHeightPlane(float2 p)
+{
+    float plank = frac(p.x * 1.55f + ValueNoise2D(p * 0.42f) * 0.18f);
+    float seam = 1.0f - smoothstep(0.020f, 0.065f, min(plank, 1.0f - plank));
+    float grain = WoodGrainPlane(p * 0.72f) * 0.22f + ValueNoise2D(p * 7.5f + 9.1f) * 0.10f;
+    return saturate(0.58f + grain - seam * 0.46f);
+}
+
+float FabricPileHeightPlane(float2 p)
+{
+    float weave = FineWeavePlane(p * 1.35f);
+    float pile = ValueNoise2D(p * 18.0f + 2.3f) * 0.18f + ValueNoise2D(p * 41.0f - 7.1f) * 0.08f;
+    return saturate(0.50f + weave * 0.80f + pile);
+}
+
+float TriplanarHeightProxy(float3 worldPos, float3 normalWS, uint materialClass, uint sceneMaterialClass)
+{
+    float3 w = ProceduralTriplanarWeights(normalWS);
+    float hx;
+    float hy;
+    float hz;
+
+    if (sceneMaterialClass == SCENE_MATERIAL_CERAMIC_TILE ||
+        sceneMaterialClass == SCENE_MATERIAL_CONCRETE ||
+        sceneMaterialClass == SCENE_MATERIAL_PAINTED_WALL ||
+        materialClass == SURFACE_CLASS_MASONRY) {
+        hx = TileGroutHeightPlane(worldPos.zy);
+        hy = TileGroutHeightPlane(worldPos.xz);
+        hz = TileGroutHeightPlane(worldPos.xy);
+    } else if (sceneMaterialClass == SCENE_MATERIAL_POLISHED_WOOD ||
+               materialClass == SURFACE_CLASS_WOOD) {
+        hx = WoodPlankHeightPlane(worldPos.zy);
+        hy = WoodPlankHeightPlane(worldPos.xz);
+        hz = WoodPlankHeightPlane(worldPos.xy);
+    } else if (sceneMaterialClass == SCENE_MATERIAL_FABRIC) {
+        hx = FabricPileHeightPlane(worldPos.zy);
+        hy = FabricPileHeightPlane(worldPos.xz);
+        hz = FabricPileHeightPlane(worldPos.xy);
+    } else {
+        hx = ProceduralMaterialMask(worldPos.zy, worldPos, materialClass);
+        hy = ProceduralMaterialMask(worldPos.xz, worldPos, materialClass);
+        hz = ProceduralMaterialMask(worldPos.xy, worldPos, materialClass);
+    }
+
+    return saturate(dot(float3(hx, hy, hz), w));
+}
+
+float TextureHeightProxy(float3 albedoSample,
+                         float4 normalSample,
+                         bool hasAlbedo,
+                         bool hasNormal)
+{
+    float height = 0.5f;
+    if (hasNormal) {
+        float2 nxy = normalSample.xy * 2.0f - 1.0f;
+        float nz = sqrt(saturate(1.0f - dot(nxy, nxy)));
+        float blueOrReconstructed = max(normalSample.b, nz);
+        height = lerp(height, saturate(blueOrReconstructed), 0.62f);
+    }
+    if (hasAlbedo) {
+        float luma = dot(saturate(albedoSample), float3(0.2126f, 0.7152f, 0.0722f));
+        height = lerp(height, luma, hasNormal ? 0.22f : 0.52f);
+    }
+    return saturate(height);
+}
+
+float2 ApplyBoundedParallaxOffset(float2 uv,
+                                  float3 worldPos,
+                                  float3 normalWS,
+                                  float3 tangentWS,
+                                  float tangentSign,
+                                  uint materialClass,
+                                  uint sceneMaterialClass,
+                                  float strength,
+                                  float3 albedoForHeight,
+                                  float4 normalForHeight,
+                                  bool hasAlbedo,
+                                  bool hasNormal)
+{
+    strength = saturate(strength);
+    if (strength <= 0.001f) {
+        return uv;
+    }
+
+    float3 N = normalize(normalWS);
+    float3 T = tangentWS - N * dot(tangentWS, N);
+    if (!all(isfinite(T)) || dot(T, T) < 1.0e-6f) {
+        T = FallbackTangentFromNormal(N);
+    } else {
+        T = normalize(T);
+    }
+    float3 B = normalize(cross(N, T)) * ((tangentSign >= 0.0f) ? 1.0f : -1.0f);
+
+    float3 V = normalize(g_CameraPosition.xyz - worldPos);
+    float3 viewTS = float3(dot(V, T), dot(V, B), max(dot(V, N), 0.0f));
+    float grazingFade = smoothstep(0.10f, 0.32f, viewTS.z);
+    float distanceFade = 1.0f - smoothstep(7.0f, 19.0f, distance(g_CameraPosition.xyz, worldPos));
+    float detailFade = saturate(grazingFade * distanceFade);
+    if (detailFade <= 0.001f) {
+        return uv;
+    }
+
+    float textureHeight = TextureHeightProxy(albedoForHeight, normalForHeight, hasAlbedo, hasNormal);
+    float2 parallaxDir = -viewTS.xy / max(viewTS.z, 0.34f);
+    float maxOffset = lerp(0.006f, 0.038f, strength) * detailFade;
+    float2 offset = float2(0.0f, 0.0f);
+    uint stepCount = (strength > 0.24f) ? 5u : 4u;
+
+    [unroll]
+    for (uint i = 0u; i < 5u; ++i) {
+        if (i < stepCount) {
+            float proceduralHeight = TriplanarHeightProxy(worldPos + T * offset.x + B * offset.y,
+                                                          N,
+                                                          materialClass,
+                                                          sceneMaterialClass);
+            float height = lerp(proceduralHeight, textureHeight, hasNormal ? 0.42f : (hasAlbedo ? 0.24f : 0.0f));
+            float centered = height - 0.5f;
+            float2 target = parallaxDir * centered * maxOffset;
+            offset = lerp(offset, target, 0.65f);
+            offset = clamp(offset, -float2(maxOffset, maxOffset), float2(maxOffset, maxOffset));
+        }
+    }
+
+    return uv + offset;
+}
+
+float DetailNormalLayerStrength(uint materialClass,
+                                uint sceneMaterialClass,
+                                float proceduralMaskStrength,
+                                float metallic)
+{
+    float nonMetal = 1.0f - smoothstep(0.06f, 0.30f, saturate(metallic));
+    float semantic = 0.0f;
+    if (sceneMaterialClass == SCENE_MATERIAL_CERAMIC_TILE ||
+        sceneMaterialClass == SCENE_MATERIAL_CONCRETE ||
+        materialClass == SURFACE_CLASS_MASONRY) {
+        semantic = 0.24f;
+    } else if (sceneMaterialClass == SCENE_MATERIAL_POLISHED_WOOD ||
+               materialClass == SURFACE_CLASS_WOOD) {
+        semantic = 0.30f;
+    } else if (sceneMaterialClass == SCENE_MATERIAL_FABRIC) {
+        semantic = 0.26f;
+    } else if (sceneMaterialClass == SCENE_MATERIAL_PAINTED_WALL) {
+        semantic = 0.18f;
+    }
+    return saturate(max(semantic, proceduralMaskStrength * 0.72f) * nonMetal);
+}
+
+float3 ApplyDetailNormalLayer(float3 normalWS,
+                              float3 tangentWS,
+                              float tangentSign,
+                              float2 uv,
+                              float3 worldPos,
+                              uint materialClass,
+                              uint sceneMaterialClass,
+                              float strength)
+{
+    strength = saturate(strength);
+    if (strength <= 0.001f) {
+        return normalWS;
+    }
+
+    float3 N = normalize(normalWS);
+    float3 T = tangentWS - N * dot(tangentWS, N);
+    if (!all(isfinite(T)) || dot(T, T) < 1.0e-6f) {
+        T = FallbackTangentFromNormal(N);
+    } else {
+        T = normalize(T);
+    }
+    float3 B = normalize(cross(N, T)) * ((tangentSign >= 0.0f) ? 1.0f : -1.0f);
+
+    float eps = 0.018f;
+    float h = TriplanarHeightProxy(worldPos, N, materialClass, sceneMaterialClass);
+    float hx = TriplanarHeightProxy(worldPos + T * eps, N, materialClass, sceneMaterialClass);
+    float hy = TriplanarHeightProxy(worldPos + B * eps, N, materialClass, sceneMaterialClass);
+    float2 slope = float2(hx - h, hy - h);
+    float3 bumped = normalize(N - (T * slope.x + B * slope.y) * lerp(0.42f, 1.22f, strength));
+    return normalize(lerp(N, bumped, saturate(strength * 0.62f)));
+}
+
+float RoughnessBreakupStrength(uint materialClass,
+                               uint sceneMaterialClass,
+                               float proceduralMaskStrength,
+                               float metallic)
+{
+    float nonMetal = 1.0f - smoothstep(0.08f, 0.35f, saturate(metallic));
+    float semantic = 0.0f;
+    if (sceneMaterialClass == SCENE_MATERIAL_CERAMIC_TILE ||
+        sceneMaterialClass == SCENE_MATERIAL_POLISHED_WOOD ||
+        sceneMaterialClass == SCENE_MATERIAL_CONCRETE ||
+        sceneMaterialClass == SCENE_MATERIAL_FABRIC ||
+        materialClass == SURFACE_CLASS_MASONRY ||
+        materialClass == SURFACE_CLASS_WOOD) {
+        semantic = 0.16f;
+    } else if (sceneMaterialClass == SCENE_MATERIAL_PAINTED_WALL) {
+        semantic = 0.10f;
+    }
+    return saturate(max(semantic, proceduralMaskStrength * 0.38f) * nonMetal);
 }
 
 float3 ProceduralTriplanarWeights(float3 normalWS)
@@ -890,10 +1134,46 @@ void CSMain(uint3 dispatchThreadID : SV_DispatchThreadID) {
             ddyWorld = worldGrad.ddy;
         }
 
+        float2 materialUV = texCoord;
+        const bool hasAlbedoTexture = mat.textureIndices.x != INVALID_BINDLESS_INDEX;
+        const bool hasNormalTexture = mat.textureIndices.y != INVALID_BINDLESS_INDEX;
+        float3 albedoForHeight = albedo;
+        float4 normalForHeight = float4(0.5f, 0.5f, 1.0f, 1.0f);
+        if (hasAlbedoTexture) {
+            Texture2D albedoHeightTex = ResourceDescriptorHeap[mat.textureIndices.x];
+            albedoForHeight = albedoHeightTex.SampleGrad(g_Sampler, texCoord, ddxUV, ddyUV).rgb;
+        }
+        if (hasNormalTexture) {
+            Texture2D normalHeightTex = ResourceDescriptorHeap[mat.textureIndices.y];
+            normalForHeight = normalHeightTex.SampleGrad(g_Sampler, texCoord, ddxUV, ddyUV);
+        }
+
+        float parallaxStrength = MaterialHeightDetailStrength(
+            mat.materialClass,
+            sceneMaterialClass,
+            proceduralMaskStrength,
+            roughness,
+            metallic);
+        if (parallaxStrength > 0.001f) {
+            materialUV = ApplyBoundedParallaxOffset(
+                texCoord,
+                worldPos,
+                normalWS,
+                tangent.xyz,
+                tangent.w,
+                mat.materialClass,
+                sceneMaterialClass,
+                parallaxStrength,
+                albedoForHeight,
+                normalForHeight,
+                hasAlbedoTexture,
+                hasNormalTexture);
+        }
+
         if (mat.textureIndices.x != INVALID_BINDLESS_INDEX) {
             Texture2D albedoTex = ResourceDescriptorHeap[mat.textureIndices.x];
             // glTF/PBR: finalAlbedo = baseColorFactor * textureColor
-            albedo *= albedoTex.SampleGrad(g_Sampler, texCoord, ddxUV, ddyUV).rgb;
+            albedo *= albedoTex.SampleGrad(g_Sampler, materialUV, ddxUV, ddyUV).rgb;
         }
 
         // Biome terrain handling: vertex color encodes biome indices and blend weights
@@ -916,7 +1196,7 @@ void CSMain(uint3 dispatchThreadID : SV_DispatchThreadID) {
             // Most authored showcase normal maps are BC5: XY are stored and Z
             // must be reconstructed. Treat all tangent-space normal maps this
             // way so BC5 assets do not decode with a bogus blue channel.
-            float4 normalSample = normalTex.SampleGrad(g_Sampler, texCoord, ddxUV, ddyUV);
+            float4 normalSample = normalTex.SampleGrad(g_Sampler, materialUV, ddxUV, ddyUV);
             float2 nXY = normalSample.xy * 2.0f - 1.0f;
             nXY *= normalScale;
             float3 sampledNormalTS = normalSample.xyz * 2.0f - 1.0f;
@@ -937,14 +1217,14 @@ void CSMain(uint3 dispatchThreadID : SV_DispatchThreadID) {
         // Occlusion texture (glTF): stored in R, applied only to indirect (AO).
         if (mat.textureIndices2.x != INVALID_BINDLESS_INDEX && occlusionStrength > 0.0f) {
             Texture2D occTex = ResourceDescriptorHeap[mat.textureIndices2.x];
-            float occ = occTex.SampleGrad(g_Sampler, texCoord, ddxUV, ddyUV).r;
+            float occ = occTex.SampleGrad(g_Sampler, materialUV, ddxUV, ddyUV).r;
             ao *= lerp(1.0f, occ, occlusionStrength);
         }
 
         // Emissive texture (glTF): emissiveFactor * emissiveStrength * emissiveTexture.
         if (mat.textureIndices2.y != INVALID_BINDLESS_INDEX) {
             Texture2D emissiveTex = ResourceDescriptorHeap[mat.textureIndices2.y];
-            emissive *= emissiveTex.SampleGrad(g_Sampler, texCoord, ddxUV, ddyUV).rgb;
+            emissive *= emissiveTex.SampleGrad(g_Sampler, materialUV, ddxUV, ddyUV).rgb;
         }
 
         // Metallic/roughness sampling:
@@ -962,17 +1242,17 @@ void CSMain(uint3 dispatchThreadID : SV_DispatchThreadID) {
 
             if (packedMR) {
                 Texture2D mrTex = ResourceDescriptorHeap[metalIdx];
-                float4 mr = mrTex.SampleGrad(g_Sampler, texCoord, ddxUV, ddyUV);
+                float4 mr = mrTex.SampleGrad(g_Sampler, materialUV, ddxUV, ddyUV);
                 roughness = mr.g;
                 metallic = mr.b;
             } else {
                 if (metalIdx != INVALID_BINDLESS_INDEX) {
                     Texture2D metalTex = ResourceDescriptorHeap[metalIdx];
-                    metallic = metalTex.SampleGrad(g_Sampler, texCoord, ddxUV, ddyUV).r;
+                    metallic = metalTex.SampleGrad(g_Sampler, materialUV, ddxUV, ddyUV).r;
                 }
                 if (roughIdx != INVALID_BINDLESS_INDEX) {
                     Texture2D roughTex = ResourceDescriptorHeap[roughIdx];
-                    roughness = roughTex.SampleGrad(g_Sampler, texCoord, ddxUV, ddyUV).r;
+                    roughness = roughTex.SampleGrad(g_Sampler, materialUV, ddxUV, ddyUV).r;
                 }
             }
         }
@@ -989,7 +1269,7 @@ void CSMain(uint3 dispatchThreadID : SV_DispatchThreadID) {
                 ddxUV, ddyUV, ddxWorld, ddyWorld, mat.materialClass);
         }
         if (proceduralMaskStrength > 0.001f) {
-            float mask = ProceduralMaterialMask(texCoord, worldPos, mat.materialClass);
+            float mask = ProceduralMaterialMask(materialUV, worldPos, mat.materialClass);
             float albedoVariation = lerp(0.78f, 1.16f, mask);
             albedo = saturate(albedo * lerp(1.0f, albedoVariation, proceduralMaskStrength));
             albedo = ApplySceneMaterialCinematicColorLayer(
@@ -1003,10 +1283,44 @@ void CSMain(uint3 dispatchThreadID : SV_DispatchThreadID) {
                 normalWS,
                 tangent.xyz,
                 tangent.w,
-                texCoord,
+                materialUV,
                 worldPos,
                 mat.materialClass,
                 proceduralMaskStrength);
+        }
+
+        float detailNormalStrength = DetailNormalLayerStrength(
+            mat.materialClass,
+            sceneMaterialClass,
+            proceduralMaskStrength,
+            metallic);
+        detailNormalStrength *= 1.0f - smoothstep(5.5f, 16.0f, distance(g_CameraPosition.xyz, worldPos));
+        if (detailNormalStrength > 0.001f) {
+            normalWS = ApplyDetailNormalLayer(
+                normalWS,
+                tangent.xyz,
+                tangent.w,
+                materialUV,
+                worldPos,
+                mat.materialClass,
+                sceneMaterialClass,
+                detailNormalStrength);
+        }
+
+        float roughnessBreakup = RoughnessBreakupStrength(
+            mat.materialClass,
+            sceneMaterialClass,
+            proceduralMaskStrength,
+            metallic);
+        if (roughnessBreakup > 0.001f) {
+            float wear = TriplanarWearField(worldPos * 1.37f + normalWS * 0.19f, normalWS);
+            float fineWear = ValueNoise2D(materialUV * 37.0f + worldPos.xz * 0.11f);
+            roughness = saturate(roughness + ((wear * 0.68f + fineWear * 0.32f) - 0.5f) * roughnessBreakup);
+        }
+
+        if (sceneMaterialClass == SCENE_MATERIAL_FABRIC) {
+            subsurfaceWrap = max(subsurfaceWrap, 0.30f);
+            transmission = max(transmission, 0.045f);
         }
 
         ApplyProceduralSurfaceDetailVB(
@@ -1023,19 +1337,19 @@ void CSMain(uint3 dispatchThreadID : SV_DispatchThreadID) {
         // KHR_materials_transmission: transmissionTexture stored in R.
         if (mat.textureIndices3.x != INVALID_BINDLESS_INDEX) {
             Texture2D transTex = ResourceDescriptorHeap[mat.textureIndices3.x];
-            transmission *= transTex.SampleGrad(g_Sampler, texCoord, ddxUV, ddyUV).r;
+            transmission *= transTex.SampleGrad(g_Sampler, materialUV, ddxUV, ddyUV).r;
         }
 
         // KHR_materials_clearcoat: clearcoatTexture stored in R.
         if (mat.textureIndices3.y != INVALID_BINDLESS_INDEX) {
             Texture2D ccTex = ResourceDescriptorHeap[mat.textureIndices3.y];
-            clearCoatWeight *= ccTex.SampleGrad(g_Sampler, texCoord, ddxUV, ddyUV).r;
+            clearCoatWeight *= ccTex.SampleGrad(g_Sampler, materialUV, ddxUV, ddyUV).r;
         }
 
         // KHR_materials_clearcoat: clearcoatRoughnessTexture stored in G (fallback to R if G is zero).
         if (mat.textureIndices3.z != INVALID_BINDLESS_INDEX) {
             Texture2D ccrTex = ResourceDescriptorHeap[mat.textureIndices3.z];
-            float4 sample = ccrTex.SampleGrad(g_Sampler, texCoord, ddxUV, ddyUV);
+            float4 sample = ccrTex.SampleGrad(g_Sampler, materialUV, ddxUV, ddyUV);
             float ccr = sample.g;
             if (ccr == 0.0f && sample.r != 0.0f) {
                 ccr = sample.r;
@@ -1046,13 +1360,13 @@ void CSMain(uint3 dispatchThreadID : SV_DispatchThreadID) {
         // KHR_materials_specular: specularTexture stored in A.
         if (mat.textureIndices3.w != INVALID_BINDLESS_INDEX) {
             Texture2D specTex = ResourceDescriptorHeap[mat.textureIndices3.w];
-            specularFactor *= specTex.SampleGrad(g_Sampler, texCoord, ddxUV, ddyUV).a;
+            specularFactor *= specTex.SampleGrad(g_Sampler, materialUV, ddxUV, ddyUV).a;
         }
 
         // KHR_materials_specular: specularColorTexture stored in RGB.
         if (mat.textureIndices4.x != INVALID_BINDLESS_INDEX) {
             Texture2D specColorTex = ResourceDescriptorHeap[mat.textureIndices4.x];
-            specularColor *= specColorTex.SampleGrad(g_Sampler, texCoord, ddxUV, ddyUV).rgb;
+            specularColor *= specColorTex.SampleGrad(g_Sampler, materialUV, ddxUV, ddyUV).rgb;
         }
 
         clearCoatWeight = max(clearCoatWeight, cinematicClearcoatBoost);
@@ -1060,7 +1374,7 @@ void CSMain(uint3 dispatchThreadID : SV_DispatchThreadID) {
         clearCoatWeight = saturate(clearCoatWeight);
         clearCoatRoughness = saturate(clearCoatRoughness);
         if (wetnessFactor > 0.001f) {
-            float wetPatch = ProceduralMaterialMask(texCoord * 0.65f + worldPos.xz * 0.035f,
+            float wetPatch = ProceduralMaterialMask(materialUV * 0.65f + worldPos.xz * 0.035f,
                                                     worldPos,
                                                     mat.materialClass);
             float wetStreak = smoothstep(0.18f, 0.82f, wetPatch);

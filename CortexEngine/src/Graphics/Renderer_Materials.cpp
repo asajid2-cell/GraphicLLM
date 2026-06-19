@@ -88,6 +88,9 @@ void Renderer::EnsureMaterialTextures(Scene::RenderableComponent& renderable) {
     tryLoad(renderable.textures.specularPath, renderable.textures.specular, false, std::shared_ptr<DX12Texture>{});
     tryLoad(renderable.textures.specularColorPath, renderable.textures.specularColor, true, std::shared_ptr<DX12Texture>{});
 
+    // Height/detail is shader-derived from admitted albedo/normal/procedural material data;
+    // do not allocate a new descriptor slot unless the material ABI is deliberately extended.
+
     if (!renderable.textures.albedo) {
         renderable.textures.albedo = m_materialFallbacks.albedo;
     }

@@ -77,6 +77,7 @@ void RecordFailure(const StageFailureContext& failure, const char* stage, const 
            context.commandList &&
            context.depthBuffer &&
            context.viewProjection &&
+           context.cameraPosition &&
            context.meshDraws;
 }
 
@@ -233,6 +234,7 @@ bool ResolveMaterials(const MaterialResolveContext& context) {
         context.depthSRV,
         *context.meshDraws,
         *context.viewProjection,
+        glm::vec3(*context.cameraPosition),
         context.biomeMaterialsAddress);
     context.renderer->SetTransitionSkipControls(previousControls);
     if (resolveResult.IsErr()) {

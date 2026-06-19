@@ -113,7 +113,13 @@ std::string MaterialPresetRegistry::Canonicalize(std::string_view presetName) {
         {"porcelain", "ceramic_tile"},
         {"matte_ceramic", "matte"},
         {"cloth", "fabric"},
+        {"curtain", "fabric"},
+        {"curtains", "fabric"},
+        {"drape", "fabric"},
+        {"drapery", "fabric"},
         {"upholstery", "fabric"},
+        {"carpet", "fabric"},
+        {"rug", "fabric"},
         {"paper", "fabric"},
         {"fiber", "fabric"},
         {"organic", "fabric"},
@@ -353,6 +359,7 @@ MaterialPresetInfo MaterialPresetRegistry::Resolve(std::string_view presetName) 
         info.clearcoat = false;
         info.clearcoatFactor = 0.0f;
         info.sheenWeight = 1.0f;
+        info.subsurfaceWrap = std::max(info.subsurfaceWrap, contains("velvet") ? 0.18f : 0.24f);
         info.hasDefaultMetallic = true;
         info.defaultMetallic = 0.0f;
         info.hasDefaultRoughness = true;
@@ -386,7 +393,7 @@ MaterialPresetInfo MaterialPresetRegistry::Resolve(std::string_view presetName) 
     }
 
     if (contains("foliage")) {
-        info.subsurfaceWrap = std::max(info.subsurfaceWrap, 0.28f);
+        info.subsurfaceWrap = std::max(info.subsurfaceWrap, 0.42f);
     } else if (contains("skin_ish")) {
         info.subsurfaceWrap = 0.25f;
     } else if (contains("skin")) {

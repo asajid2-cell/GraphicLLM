@@ -201,6 +201,7 @@ Renderer::ExecuteVisibilityBufferInRenderGraph(Scene::ECS_Registry* registry) {
         vbGraphContext.materialResolve.depthBuffer = m_depthResources.resources.buffer.Get();
         vbGraphContext.materialResolve.depthSRV = m_depthResources.descriptors.srv.cpu;
         vbGraphContext.materialResolve.viewProjection = &m_constantBuffers.frameCPU.viewProjectionMatrix;
+        vbGraphContext.materialResolve.cameraPosition = &m_constantBuffers.frameCPU.cameraPosition;
         vbGraphContext.materialResolve.meshDraws = &m_vb.State().meshDraws;
         vbGraphContext.materialResolve.biomeMaterialsAddress =
             m_constantBuffers.biomeMaterials.gpuAddress;

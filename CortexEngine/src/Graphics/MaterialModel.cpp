@@ -218,6 +218,8 @@ struct MaterialClassPolicy {
     float reflectionStabilityScale = 0.44f;
     float albedoLuminanceCeiling = 0.78f;
     float albedoChromaCeiling = 0.75f;
+    float heightDetailStrength = 0.0f;
+    float thinTransmission = 0.0f;
     MaterialReflectionPreferenceId reflectionPreference = MaterialReflectionPreferenceId::NeutralFallback;
     MaterialTemporalPolicyId temporalPolicy = MaterialTemporalPolicyId::StableDiffuse;
     MaterialPostSensitivityId postSensitivity = MaterialPostSensitivityId::Normal;
@@ -278,6 +280,7 @@ struct MaterialClassPolicy {
             policy.roughnessFloor = 0.20f;
             policy.normalScaleCeiling = 0.42f;
             policy.proceduralMaskCeiling = 0.38f;
+            policy.heightDetailStrength = 0.20f;
             policy.reflectionStabilityScale = 0.28f;
             policy.albedoLuminanceCeiling = 0.56f;
             policy.albedoChromaCeiling = 0.62f;
@@ -287,6 +290,7 @@ struct MaterialClassPolicy {
             policy.roughnessFloor = 0.18f;
             policy.normalScaleCeiling = 0.22f;
             policy.proceduralMaskCeiling = 0.30f;
+            policy.heightDetailStrength = 0.30f;
             policy.reflectionStabilityScale = 0.58f;
             policy.albedoLuminanceCeiling = 0.68f;
             policy.albedoChromaCeiling = 0.66f;
@@ -298,6 +302,7 @@ struct MaterialClassPolicy {
             policy.roughnessFloor = 0.42f;
             policy.normalScaleCeiling = 0.68f;
             policy.proceduralMaskCeiling = 0.78f;
+            policy.heightDetailStrength = 0.36f;
             policy.reflectionStabilityScale = 0.36f;
             policy.albedoLuminanceCeiling = 0.58f;
             policy.albedoChromaCeiling = 0.48f;
@@ -353,6 +358,7 @@ struct MaterialClassPolicy {
             policy.roughnessFloor = 0.30f;
             policy.normalScaleCeiling = 0.68f;
             policy.proceduralMaskCeiling = 0.78f;
+            policy.heightDetailStrength = 0.34f;
             policy.reflectionStabilityScale = 0.36f;
             policy.albedoLuminanceCeiling = 0.58f;
             policy.albedoChromaCeiling = 0.65f;
@@ -362,6 +368,8 @@ struct MaterialClassPolicy {
             policy.roughnessFloor = 0.58f;
             policy.normalScaleCeiling = 0.42f;
             policy.proceduralMaskCeiling = 0.58f;
+            policy.heightDetailStrength = 0.22f;
+            policy.thinTransmission = 0.055f;
             policy.reflectionStabilityScale = 0.24f;
             policy.albedoLuminanceCeiling = 0.54f;
             policy.albedoChromaCeiling = 0.68f;
@@ -451,16 +459,24 @@ void ApplyMaterialClassPolicy(MaterialModel& model) {
     evidence.reflectionStabilityScale = policy.reflectionStabilityScale;
     evidence.albedoLuminanceCeiling = policy.albedoLuminanceCeiling;
     evidence.albedoChromaCeiling = policy.albedoChromaCeiling;
+    evidence.heightDetailStrength = policy.heightDetailStrength;
+    evidence.thinTransmission = policy.thinTransmission;
     evidence.reflectionStabilityApplied = policy.reflectionStabilityApplied;
 
     const float originalRoughness = model.roughness;
     const float originalNormalScale = model.normalScale;
     const float originalProceduralMask = model.proceduralMaskStrength;
+    const float originalTransmission = model.transmissionFactor;
     const glm::vec3 originalAlbedo = glm::vec3(model.albedo);
 
     model.roughness = std::max(model.roughness, policy.roughnessFloor);
     model.normalScale = std::min(model.normalScale, policy.normalScaleCeiling);
-    model.proceduralMaskStrength = std::min(model.proceduralMaskStrength, policy.proceduralMaskCeiling);
+    model.heightDetailStrength = std::max(model.heightDetailStrength, policy.heightDetailStrength);
+    model.proceduralMaskStrength =
+        std::min(std::max(model.proceduralMaskStrength, model.heightDetailStrength),
+                 policy.proceduralMaskCeiling);
+    model.thinTransmissionFactor = std::max(model.thinTransmissionFactor, policy.thinTransmission);
+    model.transmissionFactor = std::max(model.transmissionFactor, model.thinTransmissionFactor);
     bool albedoLuminanceClamped = false;
     bool albedoChromaClamped = false;
     if (sceneClassId != SceneMaterialClassId::EmissiveNeon &&
@@ -480,6 +496,11 @@ void ApplyMaterialClassPolicy(MaterialModel& model) {
     evidence.normalScaleClamped = model.normalScale + kDefaultEpsilon < originalNormalScale;
     evidence.proceduralMaskClamped =
         model.proceduralMaskStrength + kDefaultEpsilon < originalProceduralMask;
+    evidence.heightDetailBoostApplied =
+        model.heightDetailStrength > kDefaultEpsilon ||
+        model.proceduralMaskStrength > originalProceduralMask + kDefaultEpsilon;
+    evidence.thinTransmissionApplied =
+        model.transmissionFactor > originalTransmission + kDefaultEpsilon;
     evidence.albedoLuminanceClamped = albedoLuminanceClamped;
     evidence.albedoChromaClamped = albedoChromaClamped;
     model.classPolicy = evidence;

@@ -53,6 +53,7 @@ void SSAOSubsystem::RenderImmediate(const SSAORenderContext& ctx) {
             m_state.resources.texture.Get(),
             m_state.resources.rtv,
             ctx.depthBuffer,
+            ctx.normalRoughness,
             std::span<DescriptorHandle>(depthTable.data(), depthTable.size()),
         })) {
         spdlog::warn("RenderSSAO: pass execution failed");
@@ -75,7 +76,7 @@ void SSAOSubsystem::RenderAsync(const SSAORenderContext& ctx) {
         return;
     }
 
-    const bool compactRoot = ctx.compactComputeRootSignature != nullptr;
+    const bool compactRoot = false;
     ID3D12RootSignature* ssaoRootSignature =
         compactRoot ? ctx.compactComputeRootSignature
                     : (ctx.computeRootSignature ? ctx.computeRootSignature->GetRootSignature() : nullptr);
@@ -104,6 +105,7 @@ void SSAOSubsystem::RenderAsync(const SSAORenderContext& ctx) {
             uavTableRoot,
             m_state.resources.texture.Get(),
             ctx.depthBuffer,
+            ctx.normalRoughness,
             std::span<DescriptorHandle>(depthTable.data(), srvTableSize),
             std::span<DescriptorHandle>(uavTable.data(), uavTableSize),
         })) {

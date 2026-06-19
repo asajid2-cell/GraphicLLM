@@ -190,6 +190,7 @@ Result<void> VisibilityBufferRenderer::ApplyDeferredLighting(
     DXGI_FORMAT envFormat,
     const DescriptorHandle& shadowMapSRV,
     ID3D12Resource* rtGIResource,
+    ID3D12Resource* ssaoResource,
     const DeferredLightingParams& params
 ) {
     if (!m_deferredLightingPipeline) {
@@ -362,6 +363,7 @@ Result<void> VisibilityBufferRenderer::ApplyDeferredLighting(
     D3D12_CPU_DESCRIPTOR_HANDLE dst4 = gbufferTable[4].cpu;
     D3D12_CPU_DESCRIPTOR_HANDLE dst5 = gbufferTable[5].cpu;
     D3D12_CPU_DESCRIPTOR_HANDLE dst6 = gbufferTable[6].cpu;
+    D3D12_CPU_DESCRIPTOR_HANDLE dst7 = gbufferTable[7].cpu;
 
     // Avoid CopyDescriptorsSimple from shader-visible heaps; write the descriptors directly.
     D3D12_SHADER_RESOURCE_VIEW_DESC albedoSrvDesc{};
@@ -412,6 +414,13 @@ Result<void> VisibilityBufferRenderer::ApplyDeferredLighting(
     ext2SrvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
     ext2SrvDesc.Texture2D.MipLevels = 1;
     m_device->GetDevice()->CreateShaderResourceView(m_gbufferMaterialExt2.Get(), &ext2SrvDesc, dst6);
+
+    D3D12_SHADER_RESOURCE_VIEW_DESC gtaoSrvDesc{};
+    gtaoSrvDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+    gtaoSrvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+    gtaoSrvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+    gtaoSrvDesc.Texture2D.MipLevels = 1;
+    m_device->GetDevice()->CreateShaderResourceView(ssaoResource, &gtaoSrvDesc, dst7);
 
     cmdList->SetGraphicsRootDescriptorTable(1, gbufferTable[0].gpu);
 
@@ -485,6 +494,7 @@ Result<void> VisibilityBufferRenderer::ApplyFullSceneLightingV3(
     DXGI_FORMAT envFormat,
     const DescriptorHandle& shadowMapSRV,
     ID3D12Resource* rtGIResource,
+    ID3D12Resource* ssaoResource,
     const DeferredLightingParams& params
 ) {
     if (!m_fullSceneLightingV3Pipeline) {
@@ -690,6 +700,13 @@ Result<void> VisibilityBufferRenderer::ApplyFullSceneLightingV3(
     ext2SrvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
     ext2SrvDesc.Texture2D.MipLevels = 1;
     m_device->GetDevice()->CreateShaderResourceView(m_gbufferMaterialExt2.Get(), &ext2SrvDesc, gbufferTable[6].cpu);
+
+    D3D12_SHADER_RESOURCE_VIEW_DESC gtaoSrvDesc{};
+    gtaoSrvDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+    gtaoSrvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+    gtaoSrvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+    gtaoSrvDesc.Texture2D.MipLevels = 1;
+    m_device->GetDevice()->CreateShaderResourceView(ssaoResource, &gtaoSrvDesc, gbufferTable[7].cpu);
 
     cmdList->SetGraphicsRootDescriptorTable(1, gbufferTable[0].gpu);
 

@@ -120,6 +120,11 @@ bool DrawGraphics(const GraphicsContext& context) {
             context.device, context.srvTable[0], context.depth, DXGI_FORMAT_R32_FLOAT)) {
         return false;
     }
+    if (context.srvTable.size() > 1 &&
+        !DescriptorTable::WriteTexture2DSRV(
+            context.device, context.srvTable[1], context.normalRoughness, DXGI_FORMAT_R16G16B16A16_FLOAT)) {
+        return false;
+    }
 
     context.commandList->SetGraphicsRootDescriptorTable(3, context.srvTable[0].gpu);
     FullscreenPass::DrawTriangle(context.commandList);
@@ -141,14 +146,17 @@ bool DispatchCompute(const ComputeContext& context) {
     context.commandList->SetDescriptorHeaps(1, heaps);
     context.commandList->SetComputeRootConstantBufferView(context.frameConstantsRoot, context.frameConstants);
 
-    for (DescriptorHandle handle : context.srvTable) {
-        if (!DescriptorTable::WriteTexture2DSRV(context.device, handle, context.depth, DXGI_FORMAT_R32_FLOAT)) {
-            return false;
-        }
+    if (!DescriptorTable::WriteTexture2DSRV(context.device, context.srvTable[0], context.depth, DXGI_FORMAT_R32_FLOAT)) {
+        return false;
+    }
+    if (context.srvTable.size() > 1 &&
+        !DescriptorTable::WriteTexture2DSRV(
+            context.device, context.srvTable[1], context.normalRoughness, DXGI_FORMAT_R16G16B16A16_FLOAT)) {
+        return false;
     }
 
     for (DescriptorHandle handle : context.uavTable) {
-        if (!DescriptorTable::WriteTexture2DUAV(context.device, handle, context.target, DXGI_FORMAT_R8_UNORM)) {
+        if (!DescriptorTable::WriteTexture2DUAV(context.device, handle, context.target, DXGI_FORMAT_R8G8B8A8_UNORM)) {
             return false;
         }
     }
@@ -174,6 +182,9 @@ RGResourceHandle AddToGraph(RenderGraph& graph, const GraphContext& context) {
         [context](RGPassBuilder& builder) {
             builder.SetType(context.useCompute ? RGPassType::Compute : RGPassType::Graphics);
             builder.Read(context.depth, RGResourceUsage::ShaderResource | RGResourceUsage::DepthStencilRead);
+            if (context.normalRoughness.IsValid()) {
+                builder.Read(context.normalRoughness, RGResourceUsage::ShaderResource);
+            }
             builder.Write(context.ssao,
                           context.useCompute ? RGResourceUsage::UnorderedAccess : RGResourceUsage::RenderTarget);
         },

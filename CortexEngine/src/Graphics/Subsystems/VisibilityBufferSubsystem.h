@@ -69,6 +69,7 @@ struct VisibilityBufferContext {
     HZBSubsystem* hzb = nullptr;
     ShadowSubsystem* shadows = nullptr;
     ID3D12Resource* rtGIResource = nullptr;
+    ID3D12Resource* ssaoResource = nullptr;
 
     std::function<void(Scene::RenderableComponent&)> prepareMaterialResources;
     std::function<Result<void>(const std::shared_ptr<Scene::MeshData>&, const char*)> enqueueMeshUpload;
@@ -89,6 +90,7 @@ public:
         ID3D12Resource* envDiffuseResource = nullptr;
         ID3D12Resource* envSpecularResource = nullptr;
         ID3D12Resource* rtGIResource = nullptr;
+        ID3D12Resource* ssaoResource = nullptr;
         DXGI_FORMAT envFormat = DXGI_FORMAT_R8G8B8A8_UNORM;
     };
 

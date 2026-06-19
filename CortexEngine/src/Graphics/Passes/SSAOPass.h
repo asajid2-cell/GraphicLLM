@@ -25,6 +25,7 @@ struct GraphicsContext {
     ID3D12Resource* target = nullptr;
     DescriptorHandle targetRtv{};
     ID3D12Resource* depth = nullptr;
+    ID3D12Resource* normalRoughness = nullptr;
     std::span<DescriptorHandle> srvTable{};
 };
 
@@ -42,6 +43,7 @@ struct ComputeContext {
 
     ID3D12Resource* target = nullptr;
     ID3D12Resource* depth = nullptr;
+    ID3D12Resource* normalRoughness = nullptr;
     std::span<DescriptorHandle> srvTable{};
     std::span<DescriptorHandle> uavTable{};
 };
@@ -61,6 +63,7 @@ struct PrepareContext {
 
 struct GraphContext {
     RGResourceHandle depth;
+    RGResourceHandle normalRoughness;
     RGResourceHandle ssao;
     bool useCompute = false;
     PrepareContext prepare;

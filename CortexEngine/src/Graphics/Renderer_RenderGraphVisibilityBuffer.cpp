@@ -114,6 +114,8 @@ Renderer::ExecuteVisibilityBufferInRenderGraph(Scene::ECS_Registry* registry) {
             m_rt.ShadowTargets().maskState,
             m_rt.GITargets().color.Get(),
             m_rt.GITargets().colorState,
+            m_ssao.State().resources.texture.Get(),
+            m_ssao.State().resources.resourceState,
             m_mainTargets.lightingV3.resources.directLighting.Get(),
             m_mainTargets.lightingV3.resources.directLightingUnshadowed.Get(),
             m_mainTargets.lightingV3.resources.shadowVisibility.Get(),
@@ -150,6 +152,7 @@ Renderer::ExecuteVisibilityBufferInRenderGraph(Scene::ECS_Registry* registry) {
         vbPassResources.shadow = vbResources.shadow;
         vbPassResources.rtShadow = vbResources.rtShadow;
         vbPassResources.rtGI = vbResources.rtGI;
+        vbPassResources.ssao = vbResources.ssao;
         vbPassResources.directLighting = vbResources.directLighting;
         vbPassResources.directLightingUnshadowed = vbResources.directLightingUnshadowed;
         vbPassResources.shadowVisibility = vbResources.shadowVisibility;
@@ -237,6 +240,7 @@ Renderer::ExecuteVisibilityBufferInRenderGraph(Scene::ECS_Registry* registry) {
         vbGraphContext.deferredLighting.envDiffuseResource = deferredInputs.envDiffuseResource;
         vbGraphContext.deferredLighting.envSpecularResource = deferredInputs.envSpecularResource;
         vbGraphContext.deferredLighting.rtGIResource = deferredInputs.rtGIResource;
+        vbGraphContext.deferredLighting.ssaoResource = deferredInputs.ssaoResource;
         vbGraphContext.deferredLighting.envFormat = deferredInputs.envFormat;
         vbGraphContext.deferredLighting.shadowMapSRV = m_shadows.Resources().resources.srv;
         vbGraphContext.deferredLighting.params = deferredInputs.params;
@@ -245,9 +249,11 @@ Renderer::ExecuteVisibilityBufferInRenderGraph(Scene::ECS_Registry* registry) {
         vbGraphContext.deferredLighting.shadowState = &m_shadows.Resources().resources.resourceState;
         vbGraphContext.deferredLighting.rtShadowState = &m_rt.ShadowTargets().maskState;
         vbGraphContext.deferredLighting.rtGIState = &m_rt.GITargets().colorState;
+        vbGraphContext.deferredLighting.ssaoState = &m_ssao.State().resources.resourceState;
         vbGraphContext.deferredLighting.shadowValid = vbResources.shadow.IsValid();
         vbGraphContext.deferredLighting.rtShadowValid = vbResources.rtShadow.IsValid();
         vbGraphContext.deferredLighting.rtGIValid = vbResources.rtGI.IsValid();
+        vbGraphContext.deferredLighting.ssaoValid = vbResources.ssao.IsValid();
         vbGraphContext.deferredLighting.brdfLutValid = vbResources.brdfLut.IsValid();
         vbGraphContext.deferredLighting.clusterGraphOwned = clusterGraphOwned;
         vbGraphContext.deferredLighting.renderedThisFrame = &m_vb.State().renderedThisFrame;
@@ -283,6 +289,7 @@ Renderer::ExecuteVisibilityBufferInRenderGraph(Scene::ECS_Registry* registry) {
         vbGraphContext.fullSceneLightingV3.envDiffuseResource = deferredInputs.envDiffuseResource;
         vbGraphContext.fullSceneLightingV3.envSpecularResource = deferredInputs.envSpecularResource;
         vbGraphContext.fullSceneLightingV3.rtGIResource = deferredInputs.rtGIResource;
+        vbGraphContext.fullSceneLightingV3.ssaoResource = deferredInputs.ssaoResource;
         vbGraphContext.fullSceneLightingV3.envFormat = deferredInputs.envFormat;
         vbGraphContext.fullSceneLightingV3.shadowMapSRV = m_shadows.Resources().resources.srv;
         vbGraphContext.fullSceneLightingV3.params = deferredInputs.params;
@@ -291,10 +298,12 @@ Renderer::ExecuteVisibilityBufferInRenderGraph(Scene::ECS_Registry* registry) {
         vbGraphContext.fullSceneLightingV3.shadowState = &m_shadows.Resources().resources.resourceState;
         vbGraphContext.fullSceneLightingV3.rtShadowState = &m_rt.ShadowTargets().maskState;
         vbGraphContext.fullSceneLightingV3.rtGIState = &m_rt.GITargets().colorState;
+        vbGraphContext.fullSceneLightingV3.ssaoState = &m_ssao.State().resources.resourceState;
         vbGraphContext.fullSceneLightingV3.enabled = fullSceneLightingV3Enabled;
         vbGraphContext.fullSceneLightingV3.shadowValid = vbResources.shadow.IsValid();
         vbGraphContext.fullSceneLightingV3.rtShadowValid = vbResources.rtShadow.IsValid();
         vbGraphContext.fullSceneLightingV3.rtGIValid = vbResources.rtGI.IsValid();
+        vbGraphContext.fullSceneLightingV3.ssaoValid = vbResources.ssao.IsValid();
         vbGraphContext.fullSceneLightingV3.brdfLutValid = vbResources.brdfLut.IsValid();
         vbGraphContext.fullSceneLightingV3.clusterGraphOwned = clusterGraphOwned;
         vbGraphContext.fullSceneLightingV3.failure = vbFailure;
@@ -320,6 +329,7 @@ Renderer::ExecuteVisibilityBufferInRenderGraph(Scene::ECS_Registry* registry) {
             if (vbResources.shadow.IsValid()) m_shadows.Resources().resources.resourceState = m_services.renderGraph->GetResourceState(vbResources.shadow);
             if (vbResources.rtShadow.IsValid()) m_rt.ShadowTargets().maskState = m_services.renderGraph->GetResourceState(vbResources.rtShadow);
             if (vbResources.rtGI.IsValid()) m_rt.GITargets().colorState = m_services.renderGraph->GetResourceState(vbResources.rtGI);
+            if (vbResources.ssao.IsValid()) m_ssao.State().resources.resourceState = m_services.renderGraph->GetResourceState(vbResources.ssao);
             if (vbResources.directLighting.IsValid()) {
                 m_mainTargets.lightingV3.resources.state = m_services.renderGraph->GetResourceState(vbResources.directLighting);
             }

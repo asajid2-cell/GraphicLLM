@@ -25,6 +25,7 @@ struct ResourceHandles {
     RGResourceHandle shadow;
     RGResourceHandle rtShadow;
     RGResourceHandle rtGI;
+    RGResourceHandle ssao;
     RGResourceHandle directLighting;
     RGResourceHandle directLightingUnshadowed;
     RGResourceHandle shadowVisibility;
@@ -121,6 +122,7 @@ struct DeferredLightingContext {
     ID3D12Resource* envDiffuseResource = nullptr;
     ID3D12Resource* envSpecularResource = nullptr;
     ID3D12Resource* rtGIResource = nullptr;
+    ID3D12Resource* ssaoResource = nullptr;
     DXGI_FORMAT envFormat = DXGI_FORMAT_R8G8B8A8_UNORM;
     DescriptorHandle shadowMapSRV{};
     VisibilityBufferRenderer::DeferredLightingParams params{};
@@ -129,9 +131,11 @@ struct DeferredLightingContext {
     D3D12_RESOURCE_STATES* shadowState = nullptr;
     D3D12_RESOURCE_STATES* rtShadowState = nullptr;
     D3D12_RESOURCE_STATES* rtGIState = nullptr;
+    D3D12_RESOURCE_STATES* ssaoState = nullptr;
     bool shadowValid = false;
     bool rtShadowValid = false;
     bool rtGIValid = false;
+    bool ssaoValid = false;
     bool brdfLutValid = false;
     bool clusterGraphOwned = false;
     bool* renderedThisFrame = nullptr;
@@ -147,6 +151,7 @@ struct FullSceneLightingV3Context {
     ID3D12Resource* envDiffuseResource = nullptr;
     ID3D12Resource* envSpecularResource = nullptr;
     ID3D12Resource* rtGIResource = nullptr;
+    ID3D12Resource* ssaoResource = nullptr;
     DXGI_FORMAT envFormat = DXGI_FORMAT_R8G8B8A8_UNORM;
     DescriptorHandle shadowMapSRV{};
     VisibilityBufferRenderer::DeferredLightingParams params{};
@@ -155,10 +160,12 @@ struct FullSceneLightingV3Context {
     D3D12_RESOURCE_STATES* shadowState = nullptr;
     D3D12_RESOURCE_STATES* rtShadowState = nullptr;
     D3D12_RESOURCE_STATES* rtGIState = nullptr;
+    D3D12_RESOURCE_STATES* ssaoState = nullptr;
     bool enabled = false;
     bool shadowValid = false;
     bool rtShadowValid = false;
     bool rtGIValid = false;
+    bool ssaoValid = false;
     bool brdfLutValid = false;
     bool clusterGraphOwned = false;
     StageFailureContext failure;

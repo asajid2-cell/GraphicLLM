@@ -194,7 +194,7 @@ Result<void> Renderer::CreateScreenSpacePipelineStates(const RendererCompiledSha
         ssaoDesc.vertexShader = *shaders.ssaoVS;
         ssaoDesc.pixelShader = *shaders.ssaoPS;
         ssaoDesc.inputLayout = {};
-        ssaoDesc.rtvFormat = DXGI_FORMAT_R8_UNORM;
+        ssaoDesc.rtvFormat = kSSAOTextureFormat;
         ssaoDesc.dsvFormat = DXGI_FORMAT_UNKNOWN;
         ssaoDesc.numRenderTargets = 1;
         ssaoDesc.depthTestEnabled = false;

@@ -8,6 +8,8 @@
 
 namespace Cortex::Graphics {
 
+inline constexpr DXGI_FORMAT kSSAOTextureFormat = DXGI_FORMAT_R8G8B8A8_UNORM;
+
 struct SSAOResources {
     ComPtr<ID3D12Resource> texture;
     DescriptorHandle rtv;
@@ -31,12 +33,12 @@ struct SSAOResources {
         desc.Height = height;
         desc.DepthOrArraySize = 1;
         desc.MipLevels = 1;
-        desc.Format = DXGI_FORMAT_R8_UNORM;
+        desc.Format = kSSAOTextureFormat;
         desc.SampleDesc.Count = 1;
         desc.Flags = D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET | D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
 
         D3D12_CLEAR_VALUE clearValue = {};
-        clearValue.Format = DXGI_FORMAT_R8_UNORM;
+        clearValue.Format = kSSAOTextureFormat;
         clearValue.Color[0] = 1.0f;
         clearValue.Color[1] = 1.0f;
         clearValue.Color[2] = 1.0f;
@@ -71,7 +73,7 @@ struct SSAOResources {
         }
 
         D3D12_RENDER_TARGET_VIEW_DESC rtvDesc = {};
-        rtvDesc.Format = DXGI_FORMAT_R8_UNORM;
+        rtvDesc.Format = kSSAOTextureFormat;
         rtvDesc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
         device->CreateRenderTargetView(texture.Get(), &rtvDesc, rtv.cpu);
 
@@ -84,7 +86,7 @@ struct SSAOResources {
         }
 
         D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
-        srvDesc.Format = DXGI_FORMAT_R8_UNORM;
+        srvDesc.Format = kSSAOTextureFormat;
         srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
         srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
         srvDesc.Texture2D.MipLevels = 1;
@@ -99,7 +101,7 @@ struct SSAOResources {
         }
 
         D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc = {};
-        uavDesc.Format = DXGI_FORMAT_R8_UNORM;
+        uavDesc.Format = kSSAOTextureFormat;
         uavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
         device->CreateUnorderedAccessView(texture.Get(), nullptr, &uavDesc, uav.cpu);
         return Result<void>::Ok();

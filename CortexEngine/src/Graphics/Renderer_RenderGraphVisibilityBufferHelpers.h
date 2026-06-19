@@ -96,6 +96,7 @@ struct VisibilityBufferGraphResources {
     RGResourceHandle shadow;
     RGResourceHandle rtShadow;
     RGResourceHandle rtGI;
+    RGResourceHandle ssao;
     RGResourceHandle directLighting;
     RGResourceHandle directLightingUnshadowed;
     RGResourceHandle shadowVisibility;
@@ -128,6 +129,8 @@ inline VisibilityBufferGraphResources ImportVisibilityBufferGraphResources(
     D3D12_RESOURCE_STATES rtShadowMaskState,
     ID3D12Resource* rtGIColor,
     D3D12_RESOURCE_STATES rtGIState,
+    ID3D12Resource* ssao,
+    D3D12_RESOURCE_STATES ssaoState,
     ID3D12Resource* directLighting = nullptr,
     ID3D12Resource* directLightingUnshadowed = nullptr,
     ID3D12Resource* shadowVisibility = nullptr,
@@ -168,6 +171,7 @@ inline VisibilityBufferGraphResources ImportVisibilityBufferGraphResources(
     resources.shadow = ImportOptionalResource(graph, shadowMap, shadowMapState, "ShadowMap_VB");
     resources.rtShadow = ImportOptionalResource(graph, rtShadowMask, rtShadowMaskState, "RTShadowMask_VB");
     resources.rtGI = ImportOptionalResource(graph, rtGIColor, rtGIState, "RTGI_VB");
+    resources.ssao = ImportOptionalResource(graph, ssao, ssaoState, "SSAO_VB");
     resources.directLighting = ImportOptionalResource(
         graph, directLighting, lightingSplitState, "FullSceneV3_DirectLighting");
     resources.directLightingUnshadowed = ImportOptionalResource(

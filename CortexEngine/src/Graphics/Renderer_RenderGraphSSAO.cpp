@@ -40,11 +40,24 @@ Renderer::ExecuteSSAOInRenderGraph() {
     m_services.renderGraph->BeginFrame();
     const RGResourceHandle depthHandle =
         m_services.renderGraph->ImportResource(m_depthResources.resources.buffer.Get(), m_depthResources.resources.resourceState, "Depth_SSAO");
+    ID3D12Resource* normalRoughnessResource = m_mainTargets.normalRoughness.resources.texture.Get();
+    D3D12_RESOURCE_STATES normalRoughnessState = m_mainTargets.normalRoughness.resources.state;
+    const bool usingVBNormalRoughness =
+        m_services.visibilityBuffer && m_services.visibilityBuffer->GetNormalRoughnessBuffer();
+    if (usingVBNormalRoughness) {
+        normalRoughnessResource = m_services.visibilityBuffer->GetNormalRoughnessBuffer();
+        normalRoughnessState = m_services.visibilityBuffer->GetResourceStateSnapshot().normalRoughness;
+    }
+    const RGResourceHandle normalRoughnessHandle =
+        normalRoughnessResource
+            ? m_services.renderGraph->ImportResource(normalRoughnessResource, normalRoughnessState, "NormalRoughness_SSAO")
+            : RGResourceHandle{};
     const RGResourceHandle ssaoHandle =
         m_services.renderGraph->ImportResource(m_ssao.State().resources.texture.Get(), m_ssao.State().resources.resourceState, "SSAO");
 
     SSAOPass::GraphContext ssaoContext{};
     ssaoContext.depth = depthHandle;
+    ssaoContext.normalRoughness = normalRoughnessHandle;
     ssaoContext.ssao = ssaoHandle;
     ssaoContext.useCompute = useComputeSSAO;
     ssaoContext.status.failed = &stageFailed;
@@ -63,7 +76,7 @@ Renderer::ExecuteSSAOInRenderGraph() {
     };
     auto& ssaoSrvTable = m_ssao.State().descriptors.srvTables[m_frameRuntime.frameIndex % kFrameCount];
     if (useComputeSSAO) {
-        const bool compactRoot = m_pipelineState.singleSrvUavComputeRootSignature != nullptr;
+        const bool compactRoot = false;
         ID3D12RootSignature* ssaoRootSignature =
             compactRoot ? m_pipelineState.singleSrvUavComputeRootSignature.Get() : m_pipelineState.computeRootSignature->GetRootSignature();
         const uint32_t srvTableSize = compactRoot ? 1u : 10u;
@@ -80,6 +93,7 @@ Renderer::ExecuteSSAOInRenderGraph() {
         ssaoContext.compute.uavTableRoot = compactRoot ? 2u : 6u;
         ssaoContext.compute.target = m_ssao.State().resources.texture.Get();
         ssaoContext.compute.depth = m_depthResources.resources.buffer.Get();
+        ssaoContext.compute.normalRoughness = normalRoughnessResource;
         ssaoContext.compute.srvTable = std::span<DescriptorHandle>(ssaoSrvTable.data(), srvTableSize);
         ssaoContext.compute.uavTable = std::span<DescriptorHandle>(ssaoUavTable.data(), uavTableSize);
     } else {
@@ -92,6 +106,7 @@ Renderer::ExecuteSSAOInRenderGraph() {
         ssaoContext.graphics.target = m_ssao.State().resources.texture.Get();
         ssaoContext.graphics.targetRtv = m_ssao.State().resources.rtv;
         ssaoContext.graphics.depth = m_depthResources.resources.buffer.Get();
+        ssaoContext.graphics.normalRoughness = normalRoughnessResource;
         ssaoContext.graphics.srvTable = std::span<DescriptorHandle>(ssaoSrvTable.data(), ssaoSrvTable.size());
     }
     (void)SSAOPass::AddToGraph(*m_services.renderGraph, ssaoContext);
@@ -111,6 +126,16 @@ Renderer::ExecuteSSAOInRenderGraph() {
         }
     } else {
         m_depthResources.resources.resourceState = m_services.renderGraph->GetResourceState(depthHandle);
+        if (normalRoughnessHandle.IsValid()) {
+            if (usingVBNormalRoughness && m_services.visibilityBuffer) {
+                auto snapshot = m_services.visibilityBuffer->GetResourceStateSnapshot();
+                snapshot.normalRoughness = m_services.renderGraph->GetResourceState(normalRoughnessHandle);
+                m_services.visibilityBuffer->ApplyResourceStateSnapshot(snapshot);
+            } else {
+                m_mainTargets.normalRoughness.resources.state =
+                    m_services.renderGraph->GetResourceState(normalRoughnessHandle);
+            }
+        }
         m_ssao.State().resources.resourceState = m_services.renderGraph->GetResourceState(ssaoHandle);
         result.executed = true;
     }

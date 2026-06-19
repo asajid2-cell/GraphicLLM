@@ -411,6 +411,9 @@ bool ApplyDeferredLighting(const DeferredLightingContext& context) {
     if (context.rtGIValid && context.rtGIState) {
         *context.rtGIState = kVBShaderResourceState;
     }
+    if (context.ssaoValid && context.ssaoState) {
+        *context.ssaoState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+    }
 
     auto states = context.renderer->GetResourceStateSnapshot();
     states.albedo = kVBShaderResourceState;
@@ -446,6 +449,7 @@ bool ApplyDeferredLighting(const DeferredLightingContext& context) {
         context.envFormat,
         context.shadowMapSRV,
         context.rtGIResource,
+        context.ssaoResource,
         context.params);
     context.renderer->SetTransitionSkipControls(previousControls);
     if (lightingResult.IsErr()) {
@@ -483,6 +487,9 @@ bool ApplyFullSceneLightingV3(const FullSceneLightingV3Context& context) {
     if (context.rtGIValid && context.rtGIState) {
         *context.rtGIState = kVBShaderResourceState;
     }
+    if (context.ssaoValid && context.ssaoState) {
+        *context.ssaoState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+    }
 
     auto states = context.renderer->GetResourceStateSnapshot();
     states.albedo = kVBShaderResourceState;
@@ -517,6 +524,7 @@ bool ApplyFullSceneLightingV3(const FullSceneLightingV3Context& context) {
         context.envFormat,
         context.shadowMapSRV,
         context.rtGIResource,
+        context.ssaoResource,
         context.params);
     context.renderer->SetTransitionSkipControls(previousControls);
     if (lightingResult.IsErr()) {
@@ -668,6 +676,7 @@ bool AddStagedPath(RenderGraph& graph, const GraphContext& context) {
                 if (resources.shadow.IsValid()) builder.Read(resources.shadow, RGResourceUsage::ShaderResource);
                 if (resources.rtShadow.IsValid()) builder.Read(resources.rtShadow, RGResourceUsage::ShaderResource);
                 if (resources.rtGI.IsValid()) builder.Read(resources.rtGI, RGResourceUsage::ShaderResource);
+                if (resources.ssao.IsValid()) builder.Read(resources.ssao, RGResourceUsage::ShaderResource);
                 builder.Write(resources.hdr, RGResourceUsage::RenderTarget);
             },
             [context](ID3D12GraphicsCommandList*, const RenderGraph&) {
@@ -694,6 +703,7 @@ bool AddStagedPath(RenderGraph& graph, const GraphContext& context) {
                     if (resources.shadow.IsValid()) builder.Read(resources.shadow, RGResourceUsage::ShaderResource);
                     if (resources.rtShadow.IsValid()) builder.Read(resources.rtShadow, RGResourceUsage::ShaderResource);
                     if (resources.rtGI.IsValid()) builder.Read(resources.rtGI, RGResourceUsage::ShaderResource);
+                    if (resources.ssao.IsValid()) builder.Read(resources.ssao, RGResourceUsage::ShaderResource);
                     builder.Write(resources.directLighting, RGResourceUsage::RenderTarget);
                     builder.Write(resources.directLightingUnshadowed, RGResourceUsage::RenderTarget);
                     builder.Write(resources.shadowVisibility, RGResourceUsage::RenderTarget);

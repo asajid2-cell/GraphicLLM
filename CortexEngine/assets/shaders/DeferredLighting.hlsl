@@ -46,6 +46,7 @@ struct Light {
 StructuredBuffer<Light> g_LocalLights : register(t12);
 StructuredBuffer<uint2> g_ClusterRanges : register(t13);
 StructuredBuffer<uint> g_ClusterLightIndices : register(t14);
+Texture2D<float4> g_GTAO : register(t15); // RGB = encoded bent normal, A = GTAO visibility
 
 uint DecodeFixtureClass(uint type, Light light) {
     if (type == LIGHT_TYPE_AREA_RECT) {
@@ -118,6 +119,73 @@ cbuffer PerFrameData : register(b0) {
     float4 g_SceneLocalPayloadParams;      // x=payload ready, y=texture richness, z=proxy score, w=shader influence
     float4 g_CinematicStabilityParams;     // x=specular damping, y=debug stability, z=shadow softness, w=highlight protection
 };
+
+struct GTAOSample {
+    float ao;
+    float3 bentNormal;
+};
+
+float3 DecodeNormalSafe(float3 encoded, float3 fallback)
+{
+    float3 n = encoded * 2.0f - 1.0f;
+    if (!all(isfinite(n)) || length(n) < 0.25f) {
+        return fallback;
+    }
+    return normalize(n);
+}
+
+GTAOSample SampleGTAO(uint2 pixelCoord, float3 normal, float centerDepth)
+{
+    float2 screenSize = max(float2(g_ScreenAndCluster.xy), float2(1.0f, 1.0f));
+    float2 uv = (float2(pixelCoord) + 0.5f) / screenSize;
+    float2 texel = 1.0f / screenSize;
+
+    float aoAccum = 0.0f;
+    float3 bentAccum = 0.0f.xxx;
+    float weightAccum = 0.0f;
+
+    [unroll]
+    for (int y = -1; y <= 1; ++y)
+    {
+        [unroll]
+        for (int x = -1; x <= 1; ++x)
+        {
+            float2 sampleUV = uv + float2(x, y) * texel;
+            float4 gtao = g_GTAO.SampleLevel(g_LinearSampler, sampleUV, 0.0f);
+            float sampleAO = (gtao.a > 1e-4f) ? saturate(gtao.a) : 1.0f;
+            float3 sampleBent = DecodeNormalSafe(gtao.rgb, normal);
+            float sampleDepth = g_DepthBuffer.SampleLevel(g_LinearSampler, sampleUV, 0.0f);
+            float3 sampleNormal = DecodeNormalSafe(
+                g_GBufferNormalRoughness.SampleLevel(g_LinearSampler, sampleUV, 0.0f).xyz,
+                normal);
+
+            float depthWeight = saturate(1.0f - abs(sampleDepth - centerDepth) * 80.0f);
+            float normalWeight = pow(saturate(dot(sampleNormal, normal)), 8.0f);
+            float kernelWeight = (x == 0 && y == 0) ? 1.0f : ((abs(x) + abs(y)) == 1 ? 0.55f : 0.32f);
+            float w = max(depthWeight * normalWeight * kernelWeight, (x == 0 && y == 0) ? 0.25f : 0.0f);
+
+            aoAccum += sampleAO * w;
+            bentAccum += sampleBent * w;
+            weightAccum += w;
+        }
+    }
+
+    GTAOSample result;
+    result.ao = (weightAccum > 0.0f) ? saturate(aoAccum / weightAccum) : 1.0f;
+    result.bentNormal = (weightAccum > 0.0f) ? normalize(bentAccum / weightAccum) : normal;
+    if (!all(isfinite(result.bentNormal)) || length(result.bentNormal) < 0.25f) {
+        result.bentNormal = normal;
+    }
+    return result;
+}
+
+float BentNormalSpecularOcclusion(float3 normal, float3 bentNormal, float3 V, float ao, float roughness)
+{
+    float3 R = reflect(-V, normal);
+    float bentVisibility = saturate(dot(R, bentNormal) * 0.5f + 0.5f);
+    bentVisibility = lerp(bentVisibility * bentVisibility, 1.0f, saturate(roughness * 1.25f));
+    return HorizonSpecularOcclusion(bentNormal, V, ao, roughness) * bentVisibility;
+}
 
 float4 SampleRtDiffuseGI(uint2 pixelCoord)
 {
@@ -1218,7 +1286,8 @@ float4 PSMain(VSOutput input) : SV_Target0 {
 
     // Unpack G-buffer data
     float3 albedoColor = albedo.rgb;
-    float ao = saturate(albedo.a);
+    float materialAo = saturate(albedo.a);
+    float ao = materialAo;
     float3 normal = normalize(normalRoughness.xyz * 2.0f - 1.0f);
     float roughness = normalRoughness.w;
     float3 emissive = emissiveMetallic.rgb;
@@ -1267,6 +1336,11 @@ float4 PSMain(VSOutput input) : SV_Target0 {
             return float4(ComputeLocalOutdoorSky(viewDir) * backgroundExposure, 1.0f);
         }
     }
+
+    GTAOSample gtao = SampleGTAO(pixelCoord, normal, depth);
+    ao = saturate(materialAo * gtao.ao);
+    float3 bentNormal = gtao.bentNormal;
+    float3 diffuseAoNormal = normalize(lerp(normal, bentNormal, saturate(1.0f - ao) * 0.75f));
 
     // Reconstruct world position from depth
     float3 worldPos = ReconstructWorldPosition(pixelUv, depth);
@@ -1682,11 +1756,11 @@ float4 PSMain(VSOutput input) : SV_Target0 {
         // its highest mip so raw equirectangular room detail does not project
         // sharply onto broad matte receivers.
         float3 irradianceGlobal = iblEnabled
-            ? SampleEnvDiffuse(normal, INVALID_BINDLESS_INDEX, diffuseMip)
+            ? SampleEnvDiffuse(diffuseAoNormal, INVALID_BINDLESS_INDEX, diffuseMip)
             : 0.0f.xxx;
         float3 irradianceLocal = localProbeTextureRadianceAllowed && diffuseEnvIndex != INVALID_BINDLESS_INDEX
-            ? SampleEnvDiffuse(normal, diffuseEnvIndex, diffuseMip)
-            : ComputeSceneLocalProbeDiffuse(normal, surfaceClass, sceneMaterialClass);
+            ? SampleEnvDiffuse(diffuseAoNormal, diffuseEnvIndex, diffuseMip)
+            : ComputeSceneLocalProbeDiffuse(diffuseAoNormal, surfaceClass, sceneMaterialClass);
         diffuseIBL = irradianceGlobal * albedoColor * kD_ibl;
         diffuseIBL += irradianceLocal * albedoColor * kD_ibl * localProbeDiffuseScale * probeWeight;
     }
@@ -1759,7 +1833,7 @@ float4 PSMain(VSOutput input) : SV_Target0 {
 
     // Apply ambient occlusion to indirect lighting only (not direct sun).
     float aoDiffuse = ao;
-    float aoSpec = HorizonSpecularOcclusion(normal, V, ao, roughness);
+    float aoSpec = BentNormalSpecularOcclusion(normal, bentNormal, V, ao, roughness);
     ambient *= aoDiffuse;
     ambient += diffuseIBL * (iblEnabled ? g_EnvParams.x : 1.0f) * aoDiffuse;
     ambient += specularIBL * aoSpec;
@@ -1874,7 +1948,8 @@ FullSceneLightingV3Output PSMainV3LightingSplit(VSOutput input) {
     }
 
     float3 albedoColor = albedo.rgb;
-    float ao = saturate(albedo.a);
+    float materialAo = saturate(albedo.a);
+    float ao = materialAo;
     float3 normal = normalize(normalRoughness.xyz * 2.0f - 1.0f);
     float roughness = normalRoughness.w;
     float3 emissive = emissiveMetallic.rgb;
@@ -1890,6 +1965,10 @@ FullSceneLightingV3Output PSMainV3LightingSplit(VSOutput input) {
     float anisotropy = saturate(materialExt2.g);
     float sheenWeight = saturate(materialExt2.b);
     float subsurfaceWrap = SceneMaterialSubsurfaceWrap(sceneMaterialClass);
+    GTAOSample gtao = SampleGTAO(pixelCoord, normal, depth);
+    ao = saturate(materialAo * gtao.ao);
+    float3 bentNormal = gtao.bentNormal;
+    float3 diffuseAoNormal = normalize(lerp(normal, bentNormal, saturate(1.0f - ao) * 0.75f));
 
     float3 worldPos = ReconstructWorldPosition(pixelUv, depth);
     float3 V = normalize(g_CameraPosition.xyz - worldPos);
@@ -2212,17 +2291,17 @@ FullSceneLightingV3Output PSMainV3LightingSplit(VSOutput input) {
     float3 specularIBL = 0.0f.xxx;
     if ((iblEnabled && g_EnvParams.x > 0.0f) || localProbeDiffuseScale > 0.0f) {
         float3 irradianceGlobal = iblEnabled
-            ? SampleEnvDiffuse(normal, INVALID_BINDLESS_INDEX, diffuseMip)
+            ? SampleEnvDiffuse(diffuseAoNormal, INVALID_BINDLESS_INDEX, diffuseMip)
             : 0.0f.xxx;
         float3 irradianceLocal = localProbeTextureRadianceAllowed && diffuseEnvIndex != INVALID_BINDLESS_INDEX
-            ? SampleEnvDiffuse(normal, diffuseEnvIndex, diffuseMip)
-            : ComputeSceneLocalProbeDiffuse(normal, surfaceClass, sceneMaterialClass);
+            ? SampleEnvDiffuse(diffuseAoNormal, diffuseEnvIndex, diffuseMip)
+            : ComputeSceneLocalProbeDiffuse(diffuseAoNormal, surfaceClass, sceneMaterialClass);
         diffuseIBL = irradianceGlobal * albedoColor * kD_ibl;
         diffuseIBL += irradianceLocal * albedoColor * kD_ibl * localProbeDiffuseScale * probeWeight;
     }
 
     float aoDiffuse = ao;
-    float aoSpec = HorizonSpecularOcclusion(normal, V, ao, roughness);
+    float aoSpec = BentNormalSpecularOcclusion(normal, bentNormal, V, ao, roughness);
     if ((iblEnabled && g_EnvParams.y > 0.0f) || localProbeSpecularScale > 0.0f) {
         float reflectionSafeMipFloor = saturate(g_AmbientColor.w) * specMaxMip;
         float globalFootprintMip = EnvReflectionFootprintMipFromDirection(specDirGlobal, (float)specWidth, (float)specHeight, specMaxMip);

@@ -26,6 +26,7 @@ struct SSAORenderContext {
     ID3D12Resource* depthBuffer = nullptr;
     D3D12_RESOURCE_STATES* depthState = nullptr;
     bool depthSrvValid = false;
+    ID3D12Resource* normalRoughness = nullptr;
 };
 
 // Owns the SSAO target + descriptor tables and the immediate graphics/compute

@@ -33,7 +33,7 @@ bool UpdateDescriptorTable(const DescriptorUpdateContext& context) {
     }
     writeOrNull(1, bloom, DXGI_FORMAT_R11G11B10_FLOAT);
 
-    writeOrNull(2, context.ssao, DXGI_FORMAT_R8_UNORM);
+    writeOrNull(2, context.ssao, DXGI_FORMAT_R8G8B8A8_UNORM);
     writeOrNull(3, context.history, DXGI_FORMAT_R16G16B16A16_FLOAT);
     writeOrNull(4, context.depth, DXGI_FORMAT_R32_FLOAT);
     writeOrNull(5, context.normalRoughness, DXGI_FORMAT_R16G16B16A16_FLOAT);

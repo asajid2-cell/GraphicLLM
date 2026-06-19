@@ -37,18 +37,25 @@ Result<void> VisibilityBufferRenderer::CreateDeferredLightingPipeline() {
     //   t12: Local lights (StructuredBuffer<Light>)
     //   t13: Cluster ranges (StructuredBuffer<uint2>)
     //   t14: Cluster light indices (StructuredBuffer<uint>)
+    //   t15: GTAO/bent-normal texture
     //   s0: Linear sampler
     //   s1: Shadow sampler
     // ========================================================================
     {
-        // Descriptor ranges for G-buffer SRVs (t0-t6: 7 textures)
-        D3D12_DESCRIPTOR_RANGE1 gbufferRange = {};
-        gbufferRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
-        gbufferRange.NumDescriptors = kVBDeferredGBufferSrvSlots;
-        gbufferRange.BaseShaderRegister = 0;
-        gbufferRange.RegisterSpace = 0;
-        gbufferRange.Flags = kDynamicDescriptorRangeFlags;
-        gbufferRange.OffsetInDescriptorsFromTableStart = 0;
+        // Descriptor ranges for G-buffer SRVs plus GTAO (t0-t6, t15).
+        D3D12_DESCRIPTOR_RANGE1 gbufferRanges[2] = {};
+        gbufferRanges[0].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
+        gbufferRanges[0].NumDescriptors = 7;
+        gbufferRanges[0].BaseShaderRegister = 0;
+        gbufferRanges[0].RegisterSpace = 0;
+        gbufferRanges[0].Flags = kDynamicDescriptorRangeFlags;
+        gbufferRanges[0].OffsetInDescriptorsFromTableStart = 0;
+        gbufferRanges[1].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
+        gbufferRanges[1].NumDescriptors = 1;
+        gbufferRanges[1].BaseShaderRegister = 15;
+        gbufferRanges[1].RegisterSpace = 0;
+        gbufferRanges[1].Flags = kDynamicDescriptorRangeFlags;
+        gbufferRanges[1].OffsetInDescriptorsFromTableStart = 7;
 
         // Descriptor ranges for env + shadow + BRDF LUT + RTGI (t7-t11: 5 textures)
         D3D12_DESCRIPTOR_RANGE1 envShadowRange = {};
@@ -69,8 +76,8 @@ Result<void> VisibilityBufferRenderer::CreateDeferredLightingPipeline() {
 
         // t0-t6: G-buffer + depth + material extension SRVs
         params[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-        params[1].DescriptorTable.NumDescriptorRanges = 1;
-        params[1].DescriptorTable.pDescriptorRanges = &gbufferRange;
+        params[1].DescriptorTable.NumDescriptorRanges = _countof(gbufferRanges);
+        params[1].DescriptorTable.pDescriptorRanges = gbufferRanges;
         params[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
 
         // t7-t11: Environment + shadow map + BRDF LUT + RTGI SRVs

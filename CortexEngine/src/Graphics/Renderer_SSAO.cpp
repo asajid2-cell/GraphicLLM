@@ -28,6 +28,10 @@ SSAORenderContext Renderer::MakeSSAORenderContext() {
     ctx.depthBuffer = m_depthResources.resources.buffer.Get();
     ctx.depthState = &m_depthResources.resources.resourceState;
     ctx.depthSrvValid = m_depthResources.descriptors.srv.IsValid();
+    ctx.normalRoughness =
+        (m_services.visibilityBuffer && m_services.visibilityBuffer->GetNormalRoughnessBuffer())
+            ? m_services.visibilityBuffer->GetNormalRoughnessBuffer()
+            : m_mainTargets.normalRoughness.resources.texture.Get();
     return ctx;
 }
 

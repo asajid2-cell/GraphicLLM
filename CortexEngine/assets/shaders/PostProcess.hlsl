@@ -3320,7 +3320,7 @@ float4 PSMain(VSOutput input) : SV_TARGET
                 float2 offset = float2(x, y) * texel;
                 float2 sampleUV = uv + offset;
 
-                float sampleAO    = g_SSAO.Sample(g_Sampler, sampleUV).r;
+                float sampleAO    = g_SSAO.Sample(g_Sampler, sampleUV).a;
                 float sampleDepth = g_Depth.Sample(g_Sampler, sampleUV).r;
 
                 float depthDelta = abs(sampleDepth - depthCenter);

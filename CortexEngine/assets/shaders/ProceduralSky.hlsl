@@ -2,29 +2,7 @@
 // Atmospheric scattering-based procedural sky for outdoor terrain rendering
 // Renders when IBL is disabled to provide sun-driven outdoor lighting
 
-cbuffer FrameConstants : register(b1) {
-    float4x4 g_ViewMatrix;
-    float4x4 g_ProjectionMatrix;
-    float4x4 g_InvViewMatrix;
-    float4x4 g_InvProjectionMatrix;
-    float4x4 g_ViewProjectionMatrix;
-    float4x4 g_InvViewProjectionMatrix;
-    float4x4 g_PrevViewProjectionMatrix;
-
-    float4 g_CameraPosition;
-    float4 g_SunDirection;      // xyz = direction TO the sun (normalized)
-    float4 g_SunRadiance;       // rgb = sun color * intensity
-    float4 g_Time;              // x = total time, y = delta time
-
-    float4 g_AmbientColor;
-    float4 g_FogParams;         // x = start, y = end, z = density, w = enabled
-    float4   g_FogExtraParams;
-    float4 g_FogColor;
-
-    float4 g_ScreenParams;      // x = width, y = height, z = 1/width, w = 1/height
-    float4 g_ShadowParams;
-    float4 g_DebugMode;
-};
+#include "FrameConstants.hlsli"
 
 struct VSOutput {
     float4 position : SV_POSITION;
@@ -101,12 +79,30 @@ float FBM(float2 p)
 
 float CloudMask(float3 viewDir, float horizon, float up)
 {
-    float2 cloudUv = float2(viewDir.x * 2.3f + viewDir.z * 0.55f + g_Time.x * 0.0015f,
+    float2 cloudUv = float2(viewDir.x * 2.3f + viewDir.z * 0.55f + g_TimeAndExposure.x * 0.0015f,
                             up * 1.85f + viewDir.z * 0.18f);
     float streaks = FBM(cloudUv * float2(1.25f, 0.55f));
     float wisps = FBM(cloudUv * float2(3.40f, 1.05f) + 23.0f);
     float layer = smoothstep(0.38f, 0.66f, streaks * 0.78f + wisps * 0.30f);
     return layer * saturate(up * 1.35f + 0.28f) * saturate(1.0f - horizon * 0.18f);
+}
+
+float3 GetAtmosphereSunDirection()
+{
+    if (g_LightCount.x > 0 && (uint)g_Lights[0].position_type.w == 0u)
+    {
+        return normalize(g_Lights[0].direction_cosInner.xyz);
+    }
+    return normalize(float3(0.35f, 0.70f, 0.55f));
+}
+
+float3 GetAtmosphereSunColor()
+{
+    if (g_LightCount.x > 0 && (uint)g_Lights[0].position_type.w == 0u)
+    {
+        return max(g_Lights[0].color_range.rgb, 0.0f.xxx);
+    }
+    return float3(1.0f, 0.86f, 0.62f);
 }
 
 // Simplified atmospheric scattering for real-time rendering. This is tuned for
@@ -120,7 +116,7 @@ float3 ComputeAtmosphericScattering(float3 viewDir, float3 sunDir) {
     float up = saturate(viewY);
     float down = saturate(-viewY);
 
-    float3 sunColor = g_SunRadiance.rgb;
+    float3 sunColor = GetAtmosphereSunColor();
     float sunLum = max(dot(sunColor, float3(0.2126f, 0.7152f, 0.0722f)), 0.01f);
     sunColor = sunColor / sunLum;
 
@@ -182,7 +178,7 @@ float4 PSMain(VSOutput input) : SV_TARGET {
     float3 worldDir = normalize(mul(invViewRot, viewDir));
 
     // Sun direction (pointing toward sun)
-    float3 sunDir = normalize(g_SunDirection.xyz);
+    float3 sunDir = GetAtmosphereSunDirection();
 
     // Compute atmospheric scattering
     float3 skyColor = ComputeAtmosphericScattering(worldDir, sunDir);

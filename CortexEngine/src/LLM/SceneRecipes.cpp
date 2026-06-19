@@ -704,8 +704,9 @@ void BuildBathroom(std::vector<std::shared_ptr<SceneCommand>>& out, const Scene:
     Place(out, cat, c, "bathroomSink", 0.8f, 1.7f, -1.2f, -90.0f);           // right wall
     PlaceOn(out, cat, c, "bathroomMirror", 0.7f, 2.3f, 1.45f, -1.2f, -90.0f); // mirror above the sink
     Place(out, cat, c, "bathroomCabinet", 0.7f, -1.7f, 0.5f, 90.0f);
+    PlaceOn(out, cat, c, "ceramic_vase_01", 0.16f, -1.7f, 0.74f, 0.5f, 0.0f, kTex); // high-poly vase on the cabinet
     Place(out, cat, c, "rugDoormat", 1.1f, 0.1f, 0.7f, 0.0f, glm::vec4(0.40f, 0.45f, 0.50f, 1.0f));
-    Place(out, cat, c, "plantSmall3", 0.3f, 1.8f, 1.4f, 0.0f);
+    Place(out, cat, c, "calathea_orbifolia_01", 0.4f, 1.8f, 1.4f, 0.0f, kTex); // high-poly corner plant
 }
 
 // Outdoor garden/patio: a lawn (no room shell) with a patio seating set framed by

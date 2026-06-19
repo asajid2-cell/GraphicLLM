@@ -2738,10 +2738,10 @@ void Engine::BuildRecipeScene() {
         renderer->SetIBLEnabled(true);
         // Outdoor: the SUN is the key light; keep the (gray neutral) IBL modest so
         // it doesn't flood the scene flat-gray, and use a gentle sky-blue fill.
-        const float iblBase = outdoor ? 0.45f : 0.26f;
+        const float iblBase = outdoor ? 0.45f : 0.42f; // enclosed rooms lost the sky flood -> more IBL fill
         const float ibl = outdoor
             ? std::clamp(iblBase + style.brightness * 0.25f, 0.2f, 1.3f)
-            : std::clamp(iblBase + style.brightness * 0.10f, 0.08f, 0.42f);
+            : std::clamp(iblBase + style.brightness * 0.10f, 0.20f, 0.60f);
         renderer->SetIBLIntensity(ibl, outdoor ? ibl : ibl * 0.72f);
         if (outdoor) {
             renderer->SetBackgroundPresentation(true, 0.95f, 0.0f);
@@ -2749,12 +2749,12 @@ void Engine::BuildRecipeScene() {
             renderer->SetBackgroundPresentation(false, 0.0f, 0.0f);
         }
         // Warmth shifts the ambient toward warm/cool; brightness scales the fill.
-        glm::vec3 amb = outdoor ? glm::vec3(0.24f, 0.27f, 0.31f) : glm::vec3(0.18f, 0.17f, 0.16f);
+        glm::vec3 amb = outdoor ? glm::vec3(0.24f, 0.27f, 0.31f) : glm::vec3(0.26f, 0.25f, 0.23f);
         amb.r += style.warmth * 0.06f;
         amb.b -= style.warmth * 0.06f;
         amb *= (1.0f + style.brightness * (outdoor ? 0.35f : 0.16f));
-        renderer->SetAmbientLighting(glm::max(amb, glm::vec3(outdoor ? 0.05f : 0.035f)), outdoor ? 1.0f : 0.72f);
-        renderer->SetExposure(std::clamp((outdoor ? 0.68f : 0.66f) + style.brightness * 0.06f, 0.52f, outdoor ? 1.0f : 0.82f));
+        renderer->SetAmbientLighting(glm::max(amb, glm::vec3(outdoor ? 0.05f : 0.06f)), outdoor ? 1.0f : 0.9f);
+        renderer->SetExposure(std::clamp((outdoor ? 0.68f : 0.82f) + style.brightness * 0.06f, 0.52f, outdoor ? 1.0f : 0.98f));
         // Global warm/cool grade makes the modern <-> rustic difference clear.
         renderer->SetColorGrade(std::max(0.0f, style.warmth) * 0.38f,
                                 std::max(0.0f, -style.warmth) * 0.32f);
@@ -2764,7 +2764,7 @@ void Engine::BuildRecipeScene() {
             renderer->SetSunIntensity(1.9f);
         } else {
             renderer->SetSunColor(glm::vec3(1.0f, 0.92f, 0.80f));
-            renderer->SetSunIntensity(std::clamp(0.86f + style.brightness * 0.10f, 0.62f, 1.12f));
+            renderer->SetSunIntensity(std::clamp(1.05f + style.brightness * 0.10f, 0.8f, 1.35f));
         }
         renderer->SetShadowBias(outdoor ? 0.0035f : 0.0014f);
         renderer->SetShadowPCFRadius(outdoor ? 2.5f : 1.65f);

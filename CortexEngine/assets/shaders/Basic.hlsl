@@ -980,26 +980,29 @@ float3 CalculateLighting(float3 normal, float3 worldPos, float3 albedo, float me
     }
     roughness = saturate(roughness);
 
-    // Simple specular anti-aliasing: when the normal field varies rapidly
-    // across neighbouring pixels (for example, along the dragon scales),
-    // increase effective roughness slightly so the specular lobe is wide
-    // enough for TAA to stabilize without visible "sparkling".
     float3 n = normalize(normal);
-    float3 dnDx = ddx(n);
-    float3 dnDy = ddy(n);
-    float normalVariance = dot(dnDx, dnDx) + dot(dnDy, dnDy);
-    normalVariance = saturate(normalVariance);
-    // Bias the variance term so flat regions remain unaffected while
-    // highly curved areas get a modest roughness boost. The factor is kept
-    // conservative so materials do not lose their intended gloss.
-    float specAAStrength = 0.8f;
-    float roughnessFromVariance = normalVariance * specAAStrength;
+    float specAAVarianceScale = 0.85f;
+    if (isGlass || isMirror)
+    {
+        specAAVarianceScale = 0.30f;
+    }
+    else if (metallic > 0.8f)
+    {
+        specAAVarianceScale = 0.55f;
+    }
+    else if (isPlastic)
+    {
+        specAAVarianceScale = 0.75f;
+    }
+    else if (isBrick)
+    {
+        specAAVarianceScale = 1.0f;
+    }
 
     // Raise roughness floor to soften extremely sharp highlights and reduce
-    // specular aliasing when the camera moves quickly, then fold in the
-    // variance-based adjustment. Highly polished metals and glass are given
-    // a lower floor so mirror-like surfaces remain sharp, plastics sit in
-    // the mid-range, and brick/masonry stays fairly rough.
+    // specular aliasing when the camera moves quickly. Highly polished metals
+    // and glass are given a lower floor so mirror-like surfaces remain sharp,
+    // plastics sit in the mid-range, and brick/masonry stays fairly rough.
     float minBaseRoughness;
     if (isGlass || metallic > 0.8f)
     {
@@ -1018,7 +1021,7 @@ float3 CalculateLighting(float3 normal, float3 worldPos, float3 albedo, float me
         minBaseRoughness = 0.2f;
     }
     float baseRoughness = max(roughness, minBaseRoughness);
-    roughness = saturate(baseRoughness + roughnessFromVariance);
+    roughness = baseRoughness;
     float wetness = saturate(g_ExtraParams.w);
     if (wetness > 0.001f)
     {
@@ -1031,6 +1034,7 @@ float3 CalculateLighting(float3 normal, float3 worldPos, float3 albedo, float me
         clearCoatRoughness = lerp(clearCoatRoughness, min(clearCoatRoughness, lerp(0.18f, 0.055f, wetStreak)), pooledWetness);
         albedo = lerp(albedo, albedo * lerp(0.92f, 0.72f, wetStreak), wetness * 0.28f);
     }
+    roughness = SpecularAAGeometricRoughness(n, roughness, specAAVarianceScale);
     ao = saturate(ao);
 
     // Dielectric F0 from IOR (KHR_materials_ior), modulated by KHR_materials_specular.
@@ -2011,6 +2015,31 @@ PSOutput PSMainInternal(PSInput input, bool useClusteredLocalLights)
 
     // Normal mapping using bindless sampling
     float3 normal = normalize(input.normal);
+    float normalMapSpecularVariance = 0.0f;
+    float normalMapSpecAAVarianceScale = 0.85f;
+    {
+        float materialTypeForSpecAA = g_FractalParams1.w;
+        bool normalAAIsGlass = (materialTypeForSpecAA > 0.5f && materialTypeForSpecAA < 1.5f);
+        bool normalAAIsMirror = (materialTypeForSpecAA > 1.5f && materialTypeForSpecAA < 2.5f);
+        bool normalAAIsPlastic = (materialTypeForSpecAA > 2.5f && materialTypeForSpecAA < 3.5f);
+        bool normalAAIsMasonry = (materialTypeForSpecAA > 3.5f && materialTypeForSpecAA < 4.5f);
+        if (normalAAIsGlass || normalAAIsMirror)
+        {
+            normalMapSpecAAVarianceScale = 0.30f;
+        }
+        else if (metallic > 0.8f)
+        {
+            normalMapSpecAAVarianceScale = 0.55f;
+        }
+        else if (normalAAIsPlastic)
+        {
+            normalMapSpecAAVarianceScale = 0.75f;
+        }
+        else if (normalAAIsMasonry)
+        {
+            normalMapSpecAAVarianceScale = 1.0f;
+        }
+    }
     bool hasNormalMap = (g_TextureIndices.y != INVALID_BINDLESS_INDEX) || g_MapFlags.y;
     if (hasNormalMap) {
         float3 tangent = normalize(input.tangent.xyz);
@@ -2022,8 +2051,15 @@ PSOutput PSMainInternal(PSInput input, bool useClusteredLocalLights)
         // Reconstruct Z instead of trusting the sampled blue channel; reading
         // BC5 as RGB gives invalid sideways normals and breaks rough-surface
         // lighting/reflections.
-        float2 nXY = SampleNormal(input.texCoord).xy * 2.0f - 1.0f;
+        float4 normalSample = SampleNormal(input.texCoord);
+        float2 nXY = normalSample.xy * 2.0f - 1.0f;
         nXY *= normalScale;
+        float3 sampledNormalTS = normalSample.xyz * 2.0f - 1.0f;
+        sampledNormalTS.xy *= normalScale;
+        normalMapSpecularVariance = SpecularAAToksvigAlpha2Variance(
+            sampledNormalTS,
+            nXY,
+            normalMapSpecAAVarianceScale);
         float3 nSample = normalize(float3(nXY, sqrt(saturate(1.0f - dot(nXY, nXY)))));
         normal = normalize(mul(TBN, nSample));
     }
@@ -2084,6 +2120,7 @@ PSOutput PSMainInternal(PSInput input, bool useClusteredLocalLights)
     }
 
     ApplyProceduralSurfaceDetail(input.worldPos, normal, albedo, roughness, metallic);
+    roughness = SpecularAAToksvigRoughness(roughness, normalMapSpecularVariance);
 
     // Debug views
     uint debugView = (uint)g_DebugMode.x;

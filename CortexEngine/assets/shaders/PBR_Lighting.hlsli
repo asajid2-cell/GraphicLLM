@@ -7,6 +7,55 @@
 
 static const float PI = 3.14159265f;
 
+static const float CORTEX_SPECULAR_AA_NORMAL_SIGMA = 1.25f;
+static const float CORTEX_SPECULAR_AA_KAPPA = 0.70f;
+static const float CORTEX_SPECULAR_AA_TOKSVIG_STRENGTH = 0.18f;
+static const float CORTEX_SPECULAR_AA_TOKSVIG_SLOPE_SCALE = 0.35f;
+static const float CORTEX_SPECULAR_AA_TOKSVIG_KAPPA = 0.55f;
+
+float SpecularAAApplyAlpha2Variance(float roughness, float alpha2Variance)
+{
+    float r = saturate(roughness);
+    float alpha = r * r;
+    float a2 = alpha * alpha;
+    a2 = saturate(a2 + max(alpha2Variance, 0.0f));
+    return sqrt(sqrt(max(a2, 1e-8f)));
+}
+
+float SpecularAAGeometricAlpha2Variance(float3 shadingNormal, float varianceScale)
+{
+    float scale = saturate(varianceScale);
+    float3 N = normalize(shadingNormal);
+    float3 dNdx = ddx(N);
+    float3 dNdy = ddy(N);
+    float variance = CORTEX_SPECULAR_AA_NORMAL_SIGMA *
+                     scale *
+                     (dot(dNdx, dNdx) + dot(dNdy, dNdy));
+    return min(2.0f * variance, CORTEX_SPECULAR_AA_KAPPA * scale * scale);
+}
+
+float SpecularAAGeometricRoughness(float3 shadingNormal, float roughness, float varianceScale)
+{
+    return SpecularAAApplyAlpha2Variance(
+        roughness,
+        SpecularAAGeometricAlpha2Variance(shadingNormal, varianceScale));
+}
+
+float SpecularAAToksvigAlpha2Variance(float3 sampledNormalTS, float2 scaledNormalXY, float varianceScale)
+{
+    float scale = saturate(varianceScale);
+    float normalLength = clamp(length(sampledNormalTS), 1e-3f, 1.0f);
+    float lengthVariance = (1.0f - normalLength) / normalLength;
+    float slopeVariance = dot(scaledNormalXY, scaledNormalXY) * CORTEX_SPECULAR_AA_TOKSVIG_SLOPE_SCALE;
+    float variance = scale * (lengthVariance * CORTEX_SPECULAR_AA_TOKSVIG_STRENGTH + slopeVariance);
+    return min(variance, CORTEX_SPECULAR_AA_TOKSVIG_KAPPA * scale * scale);
+}
+
+float SpecularAAToksvigRoughness(float roughness, float normalMapAlpha2Variance)
+{
+    return SpecularAAApplyAlpha2Variance(roughness, normalMapAlpha2Variance);
+}
+
 float DistributionGGX(float NdotH, float roughness)
 {
     float a = roughness * roughness;

@@ -4,6 +4,7 @@
 // Output: G-buffer textures (albedo, normal+roughness, emissive+metallic)
 
 // Include biome materials for terrain rendering
+#include "PBR_Lighting.hlsli"
 #include "BiomeMaterials.hlsli"
 #include "SurfaceClassification.hlsli"
 
@@ -816,6 +817,7 @@ void CSMain(uint3 dispatchThreadID : SV_DispatchThreadID) {
     float anisotropy = 0.0f;
     float sheenWeight = 0.0f;
     float subsurfaceWrap = 0.0f;
+    float normalMapSpecularVariance = 0.0f;
     uint materialClass = SURFACE_CLASS_DEFAULT;
     uint sceneMaterialClass = SCENE_MATERIAL_DEFAULT;
 
@@ -914,8 +916,15 @@ void CSMain(uint3 dispatchThreadID : SV_DispatchThreadID) {
             // Most authored showcase normal maps are BC5: XY are stored and Z
             // must be reconstructed. Treat all tangent-space normal maps this
             // way so BC5 assets do not decode with a bogus blue channel.
-            float2 nXY = normalTex.SampleGrad(g_Sampler, texCoord, ddxUV, ddyUV).xy * 2.0f - 1.0f;
+            float4 normalSample = normalTex.SampleGrad(g_Sampler, texCoord, ddxUV, ddyUV);
+            float2 nXY = normalSample.xy * 2.0f - 1.0f;
             nXY *= normalScale;
+            float3 sampledNormalTS = normalSample.xyz * 2.0f - 1.0f;
+            sampledNormalTS.xy *= normalScale;
+            normalMapSpecularVariance = SpecularAAToksvigAlpha2Variance(
+                sampledNormalTS,
+                nXY,
+                SurfaceNormalVarianceRoughnessBoost(materialClass, roughness, metallic));
             float3 nTS = normalize(float3(nXY, sqrt(saturate(1.0f - dot(nXY, nXY)))));
 
             float3 T = tangent.xyz;
@@ -1071,6 +1080,7 @@ void CSMain(uint3 dispatchThreadID : SV_DispatchThreadID) {
     // Apply class-owned roughness floors to prevent sparkle without flattening
     // intentionally glossy classes such as glass, water, and mirrors.
     {
+        roughness = SpecularAAToksvigRoughness(roughness, normalMapSpecularVariance);
         roughness = max(saturate(roughness), SurfaceRoughnessFloor(materialClass, metallic));
         roughness = ApplyMetallicRoughnessFloor(roughness, metallic);
 

@@ -1188,16 +1188,10 @@ float4 PSMain(VSOutput input) : SV_Target0 {
     float3 V = normalize(g_CameraPosition.xyz - worldPos);
     float NdotV = max(dot(normal, V), 0.0);
     roughness = max(saturate(roughness), SurfaceRoughnessFloor(surfaceClass, metallic));
-    {
-        // Forward shading widens specular lobes when the projected normal
-        // field varies quickly. VB material resolve writes a per-pixel normal
-        // buffer, so recover the same stabilizing signal here before lighting.
-        float3 dnDx = ddx(normal);
-        float3 dnDy = ddy(normal);
-        float normalVariance = saturate(dot(dnDx, dnDx) + dot(dnDy, dnDy));
-        float varianceBoost = SurfaceNormalVarianceRoughnessBoost(surfaceClass, roughness, metallic);
-        roughness = saturate(roughness + normalVariance * varianceBoost);
-    }
+    roughness = SpecularAAGeometricRoughness(
+        normal,
+        roughness,
+        SurfaceNormalVarianceRoughnessBoost(surfaceClass, roughness, metallic));
 
     // PBR material properties (KHR_materials_ior + KHR_materials_specular).
     float f0Ior = pow((ior - 1.0f) / max(ior + 1.0f, 1e-4f), 2.0f);
@@ -1812,13 +1806,10 @@ FullSceneLightingV3Output PSMainV3LightingSplit(VSOutput input) {
     float3 V = normalize(g_CameraPosition.xyz - worldPos);
     float NdotV = max(dot(normal, V), 0.0f);
     roughness = max(saturate(roughness), SurfaceRoughnessFloor(surfaceClass, metallic));
-    {
-        float3 dnDx = ddx(normal);
-        float3 dnDy = ddy(normal);
-        float normalVariance = saturate(dot(dnDx, dnDx) + dot(dnDy, dnDy));
-        float varianceBoost = SurfaceNormalVarianceRoughnessBoost(surfaceClass, roughness, metallic);
-        roughness = saturate(roughness + normalVariance * varianceBoost);
-    }
+    roughness = SpecularAAGeometricRoughness(
+        normal,
+        roughness,
+        SurfaceNormalVarianceRoughnessBoost(surfaceClass, roughness, metallic));
 
     float f0Ior = pow((ior - 1.0f) / max(ior + 1.0f, 1e-4f), 2.0f);
     float3 dielectricF0 = f0Ior.xxx * specularFactor * specularColor;

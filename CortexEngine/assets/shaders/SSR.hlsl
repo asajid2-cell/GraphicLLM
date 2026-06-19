@@ -148,9 +148,16 @@ float4 SSRPS(VSOutput input) : SV_TARGET
     float3 N = normalize(nr.xyz * 2.0f - 1.0f);
     float  roughness = saturate(nr.w);
 
-    // Roughness-aware reflection weight (sharper falloff for mid/rough materials).
-    float reflectionWeight = pow(saturate(1.0f - roughness), 2.0f);
-    if (reflectionWeight <= 0.01f)
+    // Smooth surfaces own SSR; rough/matte surfaces must not receive noisy
+    // screen-space reflection fragments.
+    float3 viewNormal = mul((float3x3)g_ViewMatrix, N);
+    float ndv = saturate(abs(viewNormal.z));
+    float fresnel = 0.04f + 0.96f * pow(1.0f - ndv, 5.0f);
+    float smoothness = saturate(1.0f - roughness);
+    float smoothLobe = smoothstep(0.46f, 0.88f, smoothness);
+    float roughVeto = smoothstep(0.54f, 0.78f, roughness);
+    float reflectionWeight = saturate(max(smoothLobe * 0.92f, fresnel * smoothLobe) * (1.0f - roughVeto));
+    if (reflectionWeight <= 0.015f)
     {
         return float4(0.0f, 0.0f, 0.0f, 0.0f);
     }
@@ -175,7 +182,7 @@ float4 SSRPS(VSOutput input) : SV_TARGET
     // from disappearing entirely.
     float thicknessMax = max(g_SSRParams.y, 0.005f);
     float thicknessMin = max(thicknessMax * 0.15f, 0.005f);
-    float thicknessVS = lerp(thicknessMin, thicknessMax, roughness);
+    float thicknessVS = lerp(thicknessMin, thicknessMax, saturate(roughness * 0.75f));
 
     float3 hitColor = 0.0f;
     bool   hit      = false;
@@ -197,8 +204,8 @@ float4 SSRPS(VSOutput input) : SV_TARGET
     // Require the ray to travel a minimum distance before accepting a hit.
     // This avoids near-origin self-hits that show up as a small nested copy
     // on glossy curved surfaces.
-    float minHitDistance = lerp(0.16f, 0.04f, roughness);
-    float minZSeparation = lerp(0.30f, 0.08f, roughness);
+    float minHitDistance = lerp(0.18f, 0.06f, roughness);
+    float minZSeparation = lerp(0.34f, 0.10f, roughness);
 
     float previousDz = 0.0f;
     bool previousComparable = false;
@@ -311,6 +318,6 @@ float4 SSRPS(VSOutput input) : SV_TARGET
 
     float edgeFade = smoothstep(0.0f, 0.06f, min(min(input.uv.x, 1.0f - input.uv.x), min(input.uv.y, 1.0f - input.uv.y)));
     float ssrStrength = saturate(g_SSRParams.z);
-    float sourceConfidence = sqrt(saturate(reflectionWeight)) * distanceFactor * edgeFade * ssrStrength;
+    float sourceConfidence = saturate(reflectionWeight) * distanceFactor * edgeFade * ssrStrength;
     return float4(hitColor * ssrStrength, sourceConfidence);
 }

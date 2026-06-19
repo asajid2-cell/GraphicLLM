@@ -53,6 +53,11 @@ static float DecodeReflectionDenoiseAlpha()
     return max((float)((postFxFlags >> 16u) & 255u) * (1.0f / 255.0f), 0.02f);
 }
 
+static float Luma(float3 color)
+{
+    return dot(color, float3(0.2126f, 0.7152f, 0.0722f));
+}
+
 static uint2 MapToDepthPixel(uint2 p, uint2 outDim)
 {
     uint depthW;
@@ -69,15 +74,22 @@ static float3 LoadNormal(uint2 depthPixel)
     return n * rsqrt(len2);
 }
 
+static float LoadRoughness(uint2 depthPixel)
+{
+    return saturate(g_NormalRoughness.Load(int3(depthPixel, 0)).w);
+}
+
 static float EdgeWeight(uint2 centerDepthPixel, uint2 sampleDepthPixel)
 {
     const float centerDepth = g_Depth.Load(int3(centerDepthPixel, 0));
     const float sampleDepth = g_Depth.Load(int3(sampleDepthPixel, 0));
     const float3 centerNormal = LoadNormal(centerDepthPixel);
     const float3 sampleNormal = LoadNormal(sampleDepthPixel);
+    const float centerRoughness = LoadRoughness(centerDepthPixel);
 
-    const float depthWeight = exp2(-abs(centerDepth - sampleDepth) * 192.0f);
-    const float normalWeight = saturate((dot(centerNormal, sampleNormal) - 0.72f) / 0.28f);
+    const float depthWeight = exp2(-abs(centerDepth - sampleDepth) * lerp(224.0f, 72.0f, centerRoughness));
+    const float normalFloor = lerp(0.82f, 0.48f, centerRoughness);
+    const float normalWeight = saturate((dot(centerNormal, sampleNormal) - normalFloor) / max(1.0f - normalFloor, 1.0e-3f));
     return depthWeight * normalWeight;
 }
 
@@ -115,26 +127,46 @@ static float4 SpatialReflectionColor(uint2 p, uint2 outDim)
     uint h;
     g_ReflectionCurrent.GetDimensions(w, h);
     const uint2 centerDepthPixel = MapToDepthPixel(p, outDim);
+    const float centerRoughness = LoadRoughness(centerDepthPixel);
 
-    float4 sum = g_ReflectionCurrent.Load(int3(p, 0));
+    float4 center = max(g_ReflectionCurrent.Load(int3(p, 0)), 0.0f);
+    float4 sum = center;
+    float3 moment2 = center.rgb * center.rgb;
     float weightSum = 1.0f;
+    const float radius = lerp(1.0f, 4.25f, smoothstep(0.18f, 0.78f, centerRoughness));
 
     [unroll]
-    for (int y = -1; y <= 1; ++y)
+    for (int y = -4; y <= 4; ++y)
     {
         [unroll]
-        for (int x = -1; x <= 1; ++x)
+        for (int x = -4; x <= 4; ++x)
         {
             if (x == 0 && y == 0) continue;
+            if (max(abs(x), abs(y)) > radius + 0.25f) continue;
             const uint2 q = uint2(clamp(int2(p) + int2(x, y), int2(0, 0), int2(int(w) - 1, int(h) - 1)));
             const uint2 sampleDepthPixel = MapToDepthPixel(q, outDim);
-            const float weight = EdgeWeight(centerDepthPixel, sampleDepthPixel);
-            sum += g_ReflectionCurrent.Load(int3(q, 0)) * weight;
+            float spatial = exp2(-dot(float2((float)x, (float)y), float2((float)x, (float)y)) /
+                                 max(radius * radius, 0.5f));
+            const float weight = EdgeWeight(centerDepthPixel, sampleDepthPixel) * spatial;
+            float4 sampleColor = max(g_ReflectionCurrent.Load(int3(q, 0)), 0.0f);
+            const float roughClamp = smoothstep(0.32f, 0.78f, centerRoughness);
+            const float sampleLimit = lerp(64.0f, 2.6f, roughClamp) * (Luma(center.rgb) + 0.06f);
+            const float sampleLuma = Luma(sampleColor.rgb);
+            sampleColor.rgb *= min(1.0f, sampleLimit / max(sampleLuma, 1.0e-4f));
+            sum += sampleColor * weight;
+            moment2 += sampleColor.rgb * sampleColor.rgb * weight;
             weightSum += weight;
         }
     }
 
-    return max(sum / max(weightSum, 1e-4f), 0.0f);
+    float4 mean = sum / max(weightSum, 1e-4f);
+    float3 variance = max(moment2 / max(weightSum, 1e-4f) - mean.rgb * mean.rgb, 0.0f.xxx);
+    float sigmaScale = lerp(1.05f, 1.10f, centerRoughness);
+    float3 sigma = sqrt(variance + 1.0e-5f.xxx) * sigmaScale;
+    float3 clampedCenter = clamp(center.rgb, mean.rgb - sigma, mean.rgb + sigma);
+    float preserveSharp = 1.0f - smoothstep(0.18f, 0.42f, centerRoughness);
+    mean.rgb = lerp(mean.rgb, clampedCenter, preserveSharp);
+    return max(mean, 0.0f);
 }
 
 static float4 SpatialGIColor(uint2 p, uint2 outDim)
@@ -248,10 +280,18 @@ static void StoreReflection(uint3 id, bool useHistory, float alpha)
     float reprojectionValid = 0.0f;
     const uint2 hp = ReprojectHistoryPixel(p, outDim, reprojectionValid);
     const float4 history = g_ReflectionHistory.Load(int3(hp, 0));
-    const float historyWeight = saturate(1.0f - alpha) *
+    const float lumaDelta = abs(dot(current.rgb - history.rgb, float3(0.2126f, 0.7152f, 0.0722f)));
+    const float roughness = LoadRoughness(MapToDepthPixel(p, outDim));
+    const float roughHistory = smoothstep(0.34f, 0.78f, roughness);
+    const float varianceAccept = max(saturate(1.0f - lumaDelta / lerp(0.35f, 1.65f, roughness)),
+                                     roughHistory * 0.62f);
+    const float temporalAcceptance =
         reprojectionValid *
         HistoryAcceptance(p, hp, outDim) *
-        SharedTemporalAcceptance(p, outDim);
+        lerp(SharedTemporalAcceptance(p, outDim), 1.0f, roughHistory * 0.35f) *
+        varianceAccept;
+    const float historyWeight = max(saturate(1.0f - alpha) * temporalAcceptance,
+                                    roughHistory * 0.82f * temporalAcceptance);
     g_ReflectionOut[p] = max(lerp(current, history, historyWeight), 0.0f);
 }
 

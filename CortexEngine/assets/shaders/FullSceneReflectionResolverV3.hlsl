@@ -94,6 +94,113 @@ static float Luma(float3 color) {
     return dot(color, float3(0.2126f, 0.7152f, 0.0722f));
 }
 
+static float3 DecodeWorldNormal(float4 normalRoughness) {
+    float3 n = normalRoughness.xyz * 2.0f - 1.0f;
+    float len2 = dot(n, n);
+    if (!all(isfinite(n)) || len2 < 1.0e-4f) {
+        return float3(0.0f, 1.0f, 0.0f);
+    }
+    return n * rsqrt(len2);
+}
+
+static float ViewFresnelFromNormal(float3 worldNormal, float metallic, bool mirrorLike) {
+    float3 viewNormal = mul((float3x3)g_ViewMatrix, worldNormal);
+    float ndv = saturate(abs(viewNormal.z));
+    float f0 = mirrorLike ? 0.92f : lerp(0.04f, 0.72f, saturate(metallic));
+    return saturate(f0 + (1.0f - f0) * pow(1.0f - ndv, 5.0f));
+}
+
+static float MaterialReflectionOwnership(uint surfaceClass,
+                                         uint sceneMaterialClass,
+                                         float roughness,
+                                         float metallic,
+                                         float fresnel) {
+    bool waterLike = surfaceClass == SURFACE_CLASS_WATER ||
+                     sceneMaterialClass == SCENE_MATERIAL_WATER;
+    bool glassLike = surfaceClass == SURFACE_CLASS_GLASS ||
+                     sceneMaterialClass == SCENE_MATERIAL_GLASS_PANE;
+    bool mirrorLike = surfaceClass == SURFACE_CLASS_MIRROR ||
+                      sceneMaterialClass == SCENE_MATERIAL_MIRROR;
+    bool polishedMetalLike = sceneMaterialClass == SCENE_MATERIAL_POLISHED_METAL ||
+                             SurfaceIsPolishedConductor(surfaceClass, metallic, roughness);
+    bool brushedMetalLike = surfaceClass == SURFACE_CLASS_BRUSHED_METAL ||
+                            sceneMaterialClass == SCENE_MATERIAL_BRUSHED_METAL;
+    bool wetLike = sceneMaterialClass == SCENE_MATERIAL_WET_SURFACE;
+    bool tileLike = sceneMaterialClass == SCENE_MATERIAL_CERAMIC_TILE;
+    bool polishedWoodLike = sceneMaterialClass == SCENE_MATERIAL_POLISHED_WOOD;
+
+    float smoothness = saturate(1.0f - roughness);
+    float smoothLobe = smoothstep(0.42f, 0.86f, smoothness);
+    float classFloor =
+        mirrorLike ? 1.00f :
+        waterLike ? 0.96f :
+        polishedMetalLike ? 0.92f :
+        glassLike ? 0.86f :
+        wetLike ? 0.80f :
+        tileLike ? lerp(0.72f, 0.24f, smoothstep(0.24f, 0.68f, roughness)) :
+        polishedWoodLike ? 0.66f :
+        brushedMetalLike ? 0.60f :
+        0.0f;
+
+    float genericSmooth = smoothLobe * saturate(0.22f + 0.50f * fresnel + 0.45f * metallic);
+    if (roughness < 0.16f) {
+        genericSmooth = max(genericSmooth, 0.58f + 0.22f * metallic);
+    }
+
+    bool namedMatte = sceneMaterialClass == SCENE_MATERIAL_PAINTED_WALL ||
+                      sceneMaterialClass == SCENE_MATERIAL_FABRIC ||
+                      sceneMaterialClass == SCENE_MATERIAL_CONCRETE ||
+                      sceneMaterialClass == SCENE_MATERIAL_RUBBER;
+    bool roughStructural = surfaceClass == SURFACE_CLASS_MASONRY ||
+                           (surfaceClass == SURFACE_CLASS_WOOD && !polishedWoodLike);
+    float matteVeto = (namedMatte || roughStructural)
+        ? smoothstep(0.18f, 0.42f, roughness)
+        : 0.0f;
+
+    float roughVeto = (mirrorLike || waterLike || glassLike || wetLike)
+        ? 0.0f
+        : (tileLike ? smoothstep(0.44f, 0.74f, roughness) : smoothstep(0.58f, 0.86f, roughness));
+
+    return saturate(max(classFloor, genericSmooth) * (1.0f - matteVeto) * (1.0f - roughVeto));
+}
+
+static float4 RoughnessFilteredSample(Texture2D<float4> source, float2 uv, float roughness) {
+    uint w;
+    uint h;
+    source.GetDimensions(w, h);
+    if (w == 0u || h == 0u) {
+        return 0.0f.xxxx;
+    }
+
+    float2 texel = 1.0f / float2(w, h);
+    if (roughness < 0.20f) {
+        return source.SampleLevel(g_LinearClamp, uv, 0.0f);
+    }
+
+    float radius = lerp(0.75f, 4.25f, smoothstep(0.18f, 0.78f, roughness));
+    float centerLuma = Luma(max(source.SampleLevel(g_LinearClamp, uv, 0.0f).rgb, 0.0f.xxx));
+    float4 sum = 0.0f.xxxx;
+    float weightSum = 0.0f;
+    [unroll]
+    for (int y = -4; y <= 4; ++y) {
+        [unroll]
+        for (int x = -4; x <= 4; ++x) {
+            float2 o = float2((float)x, (float)y);
+            float d2 = dot(o, o);
+            float wgt = exp2(-d2 / max(radius * radius, 0.25f));
+            wgt *= step(max(abs(o.x), abs(o.y)), radius + 0.25f);
+            float4 sampleColor = max(source.SampleLevel(g_LinearClamp, uv + o * texel, 0.0f), 0.0f.xxxx);
+            float roughClamp = smoothstep(0.34f, 0.78f, roughness);
+            float sampleLimit = lerp(64.0f, 3.0f, roughClamp) * (centerLuma + 0.08f);
+            float sampleLuma = Luma(sampleColor.rgb);
+            sampleColor.rgb *= min(1.0f, sampleLimit / max(sampleLuma, 1.0e-4f));
+            sum += sampleColor * wgt;
+            weightSum += wgt;
+        }
+    }
+    return sum / max(weightSum, 1.0e-4f);
+}
+
 PSOutput PSMain(VSOutput input) {
     int2 pixelCoord = int2(input.position.xy);
     // These source buffers are pixel-aligned render targets. Use exact loads so
@@ -107,6 +214,7 @@ PSOutput PSMain(VSOutput input) {
     float4 normalRoughness = g_NormalRoughness.Load(int3(pixelCoord, 0));
     float4 emissiveMetallic = g_EmissiveMetallic.Load(int3(pixelCoord, 0));
     float4 materialExt2 = g_MaterialExt2.Load(int3(pixelCoord, 0));
+    float3 worldNormal = DecodeWorldNormal(normalRoughness);
     float roughness = saturate(normalRoughness.w);
     float metallic = saturate(emissiveMetallic.a);
     uint surfaceClass = DecodeSurfaceClass(materialExt2.r);
@@ -121,9 +229,16 @@ PSOutput PSMain(VSOutput input) {
                          sceneMaterialClass == SCENE_MATERIAL_BRUSHED_METAL ||
                          sceneMaterialClass == SCENE_MATERIAL_POLISHED_METAL;
     bool wetLike = sceneMaterialClass == SCENE_MATERIAL_WET_SURFACE;
+    bool tileLike = sceneMaterialClass == SCENE_MATERIAL_CERAMIC_TILE;
+    bool brushedMetalLike = surfaceClass == SURFACE_CLASS_BRUSHED_METAL ||
+                            sceneMaterialClass == SCENE_MATERIAL_BRUSHED_METAL;
+    bool polishedWoodLike = sceneMaterialClass == SCENE_MATERIAL_POLISHED_WOOD;
+    float fresnel = ViewFresnelFromNormal(worldNormal, metallic, mirrorLike);
+    float reflectionOwnership = MaterialReflectionOwnership(
+        surfaceClass, sceneMaterialClass, roughness, metallic, fresnel);
     float smoothness = saturate(1.0f - roughness);
     float roughReflection = smoothstep(0.45f, 0.92f, roughness);
-    float glossyMaterial = saturate(smoothness * (0.62f + 0.38f * metallic));
+    float glossyMaterial = saturate(reflectionOwnership * (0.70f + 0.30f * smoothness));
     float classSourceFloor =
         mirrorLike ? 1.00f :
         waterLike ? 0.92f :
@@ -131,13 +246,15 @@ PSOutput PSMain(VSOutput input) {
         conductorLike ? 0.76f :
         wetLike ? 0.70f :
         0.0f;
-    float ssrMaterialWeight = max(saturate(0.24f + 0.76f * glossyMaterial), classSourceFloor);
-    float rtMaterialWeight = max(saturate(0.32f + 0.68f * glossyMaterial), classSourceFloor);
+    float ssrMaterialWeight = reflectionOwnership * max(glossyMaterial, classSourceFloor);
+    float rtMaterialWeight = reflectionOwnership * max(saturate(0.18f + 0.82f * glossyMaterial), classSourceFloor);
 
-    float4 ssr = g_SSRReflection.Load(int3(pixelCoord, 0));
+    float filterRoughnessFloor = tileLike ? 0.82f : (brushedMetalLike ? 0.68f : (polishedWoodLike ? 0.50f : roughness));
+    float filterRoughness = max(roughness, filterRoughnessFloor);
+    float4 ssr = RoughnessFilteredSample(g_SSRReflection, input.texCoord, filterRoughness);
     float3 ssrRadiance = max(ssr.rgb, 0.0f.xxx);
     float ssrRawConfidence = saturate(ssr.a);
-    float ssrConfidence = smoothstep(0.55f, 0.86f, ssrRawConfidence);
+    float ssrConfidence = smoothstep(0.22f, 0.78f, ssrRawConfidence);
     float ssrLuma = Luma(ssrRadiance);
     ssrConfidence *= step(0.001f, ssrLuma);
     ssrConfidence *= ssrMaterialWeight;
@@ -145,13 +262,17 @@ PSOutput PSMain(VSOutput input) {
     float ssrForcedConfidence = max(ssrConfidence, saturate(ssrRawConfidence));
     float ssrActive = step(0.001f, ssrConfidence);
 
-    float4 rt = g_RTReflection.Load(int3(pixelCoord, 0));
+    float4 rt = RoughnessFilteredSample(g_RTReflection, input.texCoord, filterRoughness);
     float3 rtRadiance = max(rt.rgb, 0.0f.xxx);
     float rtRawConfidence = saturate(rt.a);
     float rtLuma = Luma(rtRadiance);
-    float rtConfidence = smoothstep(0.08f, 0.35f, max(rtRawConfidence, saturate(rtLuma)));
+    float rtGeometryHitConfidence = smoothstep(0.55f, 0.95f, rtRawConfidence);
+    float rtEnvironmentConfidence = saturate(rtRawConfidence * (1.0f - rtGeometryHitConfidence));
+    float rtConfidence = saturate(rtGeometryHitConfidence + rtEnvironmentConfidence * 0.42f);
+    rtConfidence = max(rtConfidence, smoothstep(0.08f, 0.35f, saturate(rtLuma)) * 0.35f);
     rtConfidence *= step(0.001f, rtRawConfidence + rtLuma);
     rtConfidence *= rtMaterialWeight;
+    rtConfidence *= lerp(1.0f, 0.38f, smoothstep(0.34f, 0.76f, filterRoughness));
     float rtRawActive = step(0.001f, (rtRawConfidence + rtLuma));
     float rtActive = step(0.001f, rtConfidence);
 
@@ -159,8 +280,8 @@ PSOutput PSMain(VSOutput input) {
     float envScale = max(max(g_EnvParams.x, g_EnvParams.y), g_LocalProbeParams.y);
     float3 envRadiance = max(g_AmbientColor.rgb, 0.0f.xxx) * max(envScale, 0.08f) * envEnabled;
     float envConfidence = saturate(envEnabled * (0.18f + 0.32f * saturate(envScale)));
-    envConfidence = saturate(envConfidence + roughReflection * (0.04f + 0.08f * (1.0f - metallic)));
-    localConfidence = saturate(localConfidence + roughReflection * (0.04f + 0.06f * (1.0f - metallic)));
+    envConfidence = saturate(envConfidence + roughReflection * (0.04f + 0.08f * (1.0f - metallic))) * reflectionOwnership;
+    localConfidence = saturate(localConfidence + roughReflection * (0.04f + 0.06f * (1.0f - metallic))) * reflectionOwnership;
     localActive = step(0.001f, localConfidence + Luma(localRadiance));
     float envActive = step(0.001f, envConfidence + Luma(envRadiance));
 
@@ -196,11 +317,11 @@ PSOutput PSMain(VSOutput input) {
     bool ssrHistoryEligible = autoPolicy && ssrActive > 0.0f && ssrAdmissionConfidence >= ssrAutoThreshold;
     bool rtHistoryEligible = autoPolicy && rtActive > 0.0f && rtAdmissionConfidence >= rtAutoThreshold;
 
-    bool chooseSSR = !forceNone && ((forceSSR && ssrRawActive > 0.0f) || ssrHistoryEligible);
-    bool chooseRT = !forceNone && !chooseSSR &&
+    bool chooseRT = !forceNone &&
                     ((forceRT && rtRawActive > 0.0f) ||
                      rtHistoryEligible);
-    bool chooseLocal = !forceNone && !chooseSSR && !chooseRT &&
+    bool chooseSSR = !forceNone && !chooseRT && ((forceSSR && ssrRawActive > 0.0f) || ssrHistoryEligible);
+    bool chooseLocal = !forceNone && !chooseRT && !chooseSSR &&
                        ((forceLocal && localActive > 0.0f) ||
                         (!forceLocal && !forceSSR && !forceRT && !forceEnvironment && localActive > 0.0f));
     bool chooseEnvironment = !forceNone && !chooseLocal &&
@@ -251,11 +372,32 @@ PSOutput PSMain(VSOutput input) {
         chooseEnvironment = holdEnvironment;
     }
 
-    float sourceCode = chooseSSR ? 2.0f : (chooseRT ? 3.0f : (chooseLocal ? 1.0f : (chooseEnvironment ? 4.0f : 0.0f)));
-    float3 radiance = chooseSSR ? ssrRadiance : (chooseRT ? rtRadiance : (chooseLocal ? localRadiance : (chooseEnvironment ? envRadiance : 0.0f.xxx)));
-    float confidence = chooseSSR ? (forceSSR ? ssrForcedConfidence : ssrAdmissionConfidence) :
-                       (chooseRT ? (forceRT ? max(rtConfidence, rtRawConfidence) : rtAdmissionConfidence) :
-                        (chooseLocal ? localConfidence : (chooseEnvironment ? envConfidence : 0.0f)));
+    float rtBlendConfidence = forceRT ? max(rtConfidence, rtRawConfidence) : rtAdmissionConfidence;
+    float ssrBlendConfidence = forceSSR ? ssrForcedConfidence : ssrAdmissionConfidence;
+    float rtBlendWeight = autoPolicy ? rtBlendConfidence : (chooseRT ? rtBlendConfidence : 0.0f);
+    float ssrBlendWeight = autoPolicy ? ssrBlendConfidence * saturate(1.0f - rtBlendWeight) : (chooseSSR ? ssrBlendConfidence : 0.0f);
+    float localBlendWeight = autoPolicy ? localConfidence * saturate(1.0f - rtBlendWeight - ssrBlendWeight) : (chooseLocal ? localConfidence : 0.0f);
+    float envBlendWeight = autoPolicy ? envConfidence * saturate(1.0f - rtBlendWeight - ssrBlendWeight - localBlendWeight) : (chooseEnvironment ? envConfidence : 0.0f);
+    if (forceNone) {
+        rtBlendWeight = 0.0f;
+        ssrBlendWeight = 0.0f;
+        localBlendWeight = 0.0f;
+        envBlendWeight = 0.0f;
+    }
+
+    float totalBlendWeight = rtBlendWeight + ssrBlendWeight + localBlendWeight + envBlendWeight;
+    float3 blendedRadiance =
+        (rtRadiance * rtBlendWeight +
+         ssrRadiance * ssrBlendWeight +
+         localRadiance * localBlendWeight +
+         envRadiance * envBlendWeight) / max(totalBlendWeight, 1.0e-4f);
+    float sourceCode =
+        (rtBlendWeight >= max(max(ssrBlendWeight, localBlendWeight), envBlendWeight) && rtBlendWeight > 0.0f) ? 3.0f :
+        (ssrBlendWeight >= max(localBlendWeight, envBlendWeight) && ssrBlendWeight > 0.0f) ? 2.0f :
+        (localBlendWeight >= envBlendWeight && localBlendWeight > 0.0f) ? 1.0f :
+        (envBlendWeight > 0.0f ? 4.0f : 0.0f);
+    float3 radiance = totalBlendWeight > 0.0f ? blendedRadiance : 0.0f.xxx;
+    float confidence = saturate(totalBlendWeight);
     float active = step(0.001f, confidence + Luma(radiance));
 
     PSOutput output;
@@ -293,7 +435,7 @@ PSOutput PSMain(VSOutput input) {
     output.sourceSuppression = float4(historySuppressedSource,
                                       materialSuppressedSource,
                                       roughness,
-                                      metallic);
+                                      reflectionOwnership);
 
     // Stable scene-local sources do not require history. Forced policies that
     // cannot be satisfied are visible in G so packets can prove the override

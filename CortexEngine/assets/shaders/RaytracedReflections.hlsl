@@ -127,7 +127,10 @@ float3 SampleEnvironment(float3 dir, float roughness)
     float perceptualRoughness = saturate(roughness);
     const float kApproxEnvMaxMip = 5.0f;
     float reflectionSafeMipFloor = saturate(g_AmbientColor.w) * kApproxEnvMaxMip;
-    float envMip = max(perceptualRoughness * perceptualRoughness * kApproxEnvMaxMip,
+    float envMipRoughness = lerp(perceptualRoughness * perceptualRoughness,
+                                 perceptualRoughness,
+                                 smoothstep(0.24f, 0.62f, perceptualRoughness));
+    float envMip = max(envMipRoughness * kApproxEnvMaxMip,
                        reflectionSafeMipFloor);
     float3 env = g_EnvSpecular.SampleLevel(g_Sampler, envUV, envMip).rgb;
     float envMax = max(max(env.r, env.g), env.b);
@@ -138,6 +141,58 @@ float3 SampleEnvironment(float3 dir, float roughness)
     }
     float  specIntensity = g_EnvParams.y;
     return env * specIntensity;
+}
+
+float MaterialReflectionOwnershipRT(uint surfaceClass,
+                                    uint sceneMaterialClass,
+                                    float roughness,
+                                    float metallic)
+{
+    bool waterLike = surfaceClass == SURFACE_CLASS_WATER ||
+                     sceneMaterialClass == SCENE_MATERIAL_WATER;
+    bool glassLike = surfaceClass == SURFACE_CLASS_GLASS ||
+                     sceneMaterialClass == SCENE_MATERIAL_GLASS_PANE;
+    bool mirrorLike = surfaceClass == SURFACE_CLASS_MIRROR ||
+                      sceneMaterialClass == SCENE_MATERIAL_MIRROR;
+    bool polishedMetalLike = sceneMaterialClass == SCENE_MATERIAL_POLISHED_METAL ||
+                             SurfaceIsPolishedConductor(surfaceClass, metallic, roughness);
+    bool brushedMetalLike = surfaceClass == SURFACE_CLASS_BRUSHED_METAL ||
+                            sceneMaterialClass == SCENE_MATERIAL_BRUSHED_METAL;
+    bool wetLike = sceneMaterialClass == SCENE_MATERIAL_WET_SURFACE;
+    bool tileLike = sceneMaterialClass == SCENE_MATERIAL_CERAMIC_TILE;
+    bool polishedWoodLike = sceneMaterialClass == SCENE_MATERIAL_POLISHED_WOOD;
+
+    float smoothness = saturate(1.0f - roughness);
+    float classFloor =
+        mirrorLike ? 1.00f :
+        waterLike ? 0.96f :
+        polishedMetalLike ? 0.92f :
+        glassLike ? 0.86f :
+        wetLike ? 0.80f :
+        tileLike ? lerp(0.72f, 0.24f, smoothstep(0.24f, 0.68f, roughness)) :
+        polishedWoodLike ? 0.66f :
+        brushedMetalLike ? 0.60f :
+        0.0f;
+
+    float genericSmooth = smoothstep(0.48f, 0.90f, smoothness) * lerp(0.28f, 0.72f, saturate(metallic));
+    if (roughness < 0.16f) {
+        genericSmooth = max(genericSmooth, 0.56f + 0.22f * metallic);
+    }
+
+    bool namedMatte = sceneMaterialClass == SCENE_MATERIAL_PAINTED_WALL ||
+                      sceneMaterialClass == SCENE_MATERIAL_FABRIC ||
+                      sceneMaterialClass == SCENE_MATERIAL_CONCRETE ||
+                      sceneMaterialClass == SCENE_MATERIAL_RUBBER;
+    bool roughStructural = surfaceClass == SURFACE_CLASS_MASONRY ||
+                           (surfaceClass == SURFACE_CLASS_WOOD && !polishedWoodLike);
+    float matteVeto = (namedMatte || roughStructural)
+        ? smoothstep(0.18f, 0.42f, roughness)
+        : 0.0f;
+    float roughVeto = (mirrorLike || waterLike || glassLike || wetLike)
+        ? 0.0f
+        : (tileLike ? smoothstep(0.44f, 0.74f, roughness) : smoothstep(0.58f, 0.86f, roughness));
+
+    return saturate(max(classFloor, genericSmooth) * (1.0f - matteVeto) * (1.0f - roughVeto));
 }
 
 float3 EstimateHitSurfaceRadiance(ReflectionPayload payload, float3 hitPoint, float3 incomingRayDir)
@@ -447,6 +502,7 @@ void RayGen_Reflection()
     float roughness = saturate(nr.a);
     float4 materialExt2 = g_MaterialExt2.Load(int3(pix, 0));
     uint surfaceClass = DecodeSurfaceClass(materialExt2.r);
+    uint sceneMaterialClass = DecodeSceneMaterialClass(materialExt2.a);
     if (!all(isfinite(N)) || length(N) < 0.1f)
     {
         N = ApproximateNormal(launchIndex, launchDims);
@@ -458,9 +514,17 @@ void RayGen_Reflection()
     bool reflectiveClass =
         SurfaceIsMirrorClass(surfaceClass) ||
         SurfaceIsWater(surfaceClass) ||
-        SurfaceIsPolishedConductor(surfaceClass, 0.0f, roughness);
+        SurfaceIsPolishedConductor(surfaceClass, 0.0f, roughness) ||
+        sceneMaterialClass == SCENE_MATERIAL_MIRROR ||
+        sceneMaterialClass == SCENE_MATERIAL_WATER ||
+        sceneMaterialClass == SCENE_MATERIAL_GLASS_PANE ||
+        sceneMaterialClass == SCENE_MATERIAL_POLISHED_METAL ||
+        sceneMaterialClass == SCENE_MATERIAL_WET_SURFACE ||
+        sceneMaterialClass == SCENE_MATERIAL_CERAMIC_TILE ||
+        sceneMaterialClass == SCENE_MATERIAL_POLISHED_WOOD;
+    float materialOwnership = MaterialReflectionOwnershipRT(surfaceClass, sceneMaterialClass, roughness, 0.0f);
     float rtRoughnessThreshold = clamp(g_RTReflectionParams.x, 0.05f, 1.0f);
-    if (debugView != 24u && roughness >= rtRoughnessThreshold && !reflectiveClass)
+    if (debugView != 24u && (materialOwnership <= 0.01f || (roughness >= rtRoughnessThreshold && !reflectiveClass)))
     {
         g_ReflectionOut[launchIndex] = float4(0.0f, 0.0f, 0.0f, 0.0f);
         return;
@@ -484,6 +548,7 @@ void RayGen_Reflection()
     float3 currentDir = initialR;
     float currentRoughness = max(roughness, 0.02f);
     bool finalHit = false;
+    bool escapedToEnvironment = false;
 
     for (int bounce = 0; bounce < MAX_BOUNCES; bounce++)
     {
@@ -532,6 +597,7 @@ void RayGen_Reflection()
         {
             // Ray escaped to environment/sky - accumulate and stop
             accumulatedColor += payload.color * throughput;
+            escapedToEnvironment = true;
             break;
         }
 
@@ -596,9 +662,15 @@ void RayGen_Reflection()
         ? (initialR * 0.5f + 0.5f)
         : accumulatedColor;
 
-    // The current reflection shader samples the environment on both hit and
-    // miss, so a binary "hit/miss" validity flag creates visible discontinuity
-    // bands in the post-process (half-res upsample + filtering sees abrupt
-    // alpha edges). Treat the output as always valid for blending.
-    g_ReflectionOut[launchIndex] = float4(outColor, 1.0f);
+    float roughFilteredClass = (sceneMaterialClass == SCENE_MATERIAL_CERAMIC_TILE ||
+                                sceneMaterialClass == SCENE_MATERIAL_POLISHED_WOOD ||
+                                sceneMaterialClass == SCENE_MATERIAL_BRUSHED_METAL)
+        ? smoothstep(0.30f, 0.72f, roughness)
+        : 0.0f;
+    float geometryConfidence = finalHit ? lerp(1.0f, 0.34f, roughFilteredClass) : 0.0f;
+    float environmentConfidence = escapedToEnvironment
+        ? lerp(0.18f, 0.58f, saturate(1.0f - roughness))
+        : 0.0f;
+    float sourceValidity = saturate(max(geometryConfidence, environmentConfidence) * materialOwnership);
+    g_ReflectionOut[launchIndex] = float4(outColor, sourceValidity);
 }

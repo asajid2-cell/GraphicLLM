@@ -52,9 +52,18 @@ PSOutput PSMain(VSOutput input) {
         reflectionLuma / max(compositeLumaBeforeReflection + 0.08f, 0.08f);
     float overReflective = smoothstep(0.70f, 2.60f, relativeReflection);
     float lumaRolloff = lerp(1.0f, 0.30f, hotReflection);
-    float confidenceRolloff = lerp(0.42f, 1.0f, confidenceGate);
     float plasticGuard = lerp(1.0f, 0.46f, overReflective * (1.0f - confidenceGate * 0.35f));
-    float reflectionWeight = 0.10f * confidenceGate * lumaRolloff * confidenceRolloff * plasticGuard;
+    float materialOwnership = saturate(reflectionConfidence);
+    float strongSurfaceGate = smoothstep(0.04f, 0.62f, materialOwnership);
+    float lowConfidenceGuard = lerp(0.35f, 1.0f, strongSurfaceGate);
+    float hotSignalGuard = lerp(1.0f, 0.72f, hotReflection * strongSurfaceGate);
+    float overbrightGuard = lerp(1.0f, 0.62f, overReflective * (1.0f - strongSurfaceGate));
+    float reflectionWeight = saturate(
+        materialOwnership *
+        lowConfidenceGuard *
+        lerp(0.72f, 1.0f, confidenceGate) *
+        max(lumaRolloff, hotSignalGuard) *
+        max(plasticGuard, overbrightGuard));
     float3 reflectionContribution = reflection * reflectionWeight;
     composite += reflectionContribution;
 

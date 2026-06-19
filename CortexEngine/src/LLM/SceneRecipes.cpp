@@ -551,6 +551,11 @@ void BuildKitchen(std::vector<std::shared_ptr<SceneCommand>>& out, const Scene::
     Place(out, cat, c, "kitchenBar", 1.9f, -0.2f, 0.3f, 0.0f);
     Place(out, cat, c, "stoolBar", 0.42f, -0.9f, 1.2f, 180.0f);
     Place(out, cat, c, "stoolBar", 0.42f, 0.5f, 1.2f, 180.0f);
+    // Ceiling fixtures + over-stove light: the deep room had no local lights (only the
+    // global key/window), so it read dark. Two warm-white ceiling lamps + a hood light.
+    AddPointLight(out, 0.0f, 2.6f, -1.0f, glm::vec3(1.0f, 0.95f, 0.86f), 6.5f, 4.8f); // back ceiling fixture
+    AddPointLight(out, 0.0f, 2.6f, 1.2f, glm::vec3(1.0f, 0.95f, 0.86f), 6.0f, 4.8f);  // front ceiling fixture
+    AddPointLight(out, 0.65f, 1.45f, backZ + 0.25f, glm::vec3(1.0f, 0.92f, 0.78f), 3.2f, 2.6f); // over-stove / hood
 }
 
 } // namespace

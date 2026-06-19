@@ -405,8 +405,8 @@ void BuildLivingRoom(std::vector<std::shared_ptr<SceneCommand>>& out, const Scen
     PlaceFurn(out, cat, c, style, 1.1f, -3.0f, 1.0f, 90.0f, "bookcaseOpen", "Shelf_01"); // side wall
     Place(out, cat, c, "cabinetTelevision", 1.6f, 0.0f, 2.7f, 180.0f);  // front wall (behind camera)
     Place(out, cat, c, "televisionModern", 1.2f, 0.0f, 2.5f, 180.0f);
-    Place(out, cat, c, "pottedPlant", 0.6f, 2.9f, -2.6f, 0.0f);         // back-right corner greenery
-    Place(out, cat, c, "pottedPlant", 0.55f, -3.0f, -2.7f, 0.0f);       // back-left corner
+    Place(out, cat, c, "calathea_orbifolia_01", 0.6f, 2.9f, -2.6f, 0.0f, kTex);  // high-poly corner plant
+    Place(out, cat, c, "calathea_orbifolia_01", 0.55f, -3.0f, -2.7f, 0.0f, kTex);
 }
 
 void BuildBedroom(std::vector<std::shared_ptr<SceneCommand>>& out, const Scene::AssetCatalog& cat, FootprintCache& c, const SceneStyle& style) {
@@ -602,9 +602,10 @@ void BuildDiningRoom(std::vector<std::shared_ptr<SceneCommand>>& out, const Scen
     Place(out, cat, c, "cabinetTelevisionDoors", 1.4f, -2.7f, 1.3f, 90.0f);
     PlaceOn(out, cat, c, "books", 0.3f, -2.7f, 0.62f, 1.3f, 12.0f);
     PlaceOn(out, cat, c, "plantSmall2", 0.25f, -2.7f, 0.62f, 0.7f, 0.0f);
-    // Corner greenery, kept at the BACK so it doesn't crowd the camera.
-    Place(out, cat, c, "pottedPlant", 0.55f, 2.7f, -2.4f, 0.0f);  // back-right corner
-    Place(out, cat, c, "pottedPlant", 0.5f, -2.7f, -2.4f, 0.0f);  // back-left corner
+    PlaceOn(out, cat, c, "ceramic_vase_01", 0.2f, 0.0f, 0.76f, tz, 0.0f, kTex); // high-poly vase centrepiece
+    // High-poly corner greenery, kept at the BACK so it doesn't crowd the camera.
+    Place(out, cat, c, "calathea_orbifolia_01", 0.55f, 2.7f, -2.4f, 0.0f, kTex);  // back-right corner
+    Place(out, cat, c, "calathea_orbifolia_01", 0.5f, -2.7f, -2.4f, 0.0f, kTex);  // back-left corner
 }
 
 void BuildBathroom(std::vector<std::shared_ptr<SceneCommand>>& out, const Scene::AssetCatalog& cat, FootprintCache& c) {

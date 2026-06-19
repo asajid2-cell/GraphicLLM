@@ -2835,7 +2835,7 @@ void Engine::BuildRecipeScene() {
     // because the engine's m_commandQueue is not constructed until after scene
     // initialization runs (RebuildScene happens during Engine init).
     LLM::CommandQueue recipeQueue;
-    auto cmds = LLM::BuildSceneRecipe(recipe, recipeQueue.EnsureCatalog());
+    auto cmds = LLM::BuildSceneRecipe(recipe, recipeQueue.EnsureCatalog(), 0, style);
     if (cmds.empty()) {
         spdlog::warn("Recipe '{}' produced no commands; empty scene", recipe);
     } else {

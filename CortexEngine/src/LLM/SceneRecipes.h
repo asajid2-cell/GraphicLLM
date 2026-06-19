@@ -45,6 +45,10 @@ struct SceneStyle {
     float warmth = 0.0f;
     float brightness = 0.0f;
     std::string name; // human-readable style label ("modern", "rustic", ...) or empty
+    // Furniture aesthetic: true -> high-poly classic/ornate set (Poly Haven, the
+    // higher-quality default); false -> clean modern set (Kenney). Set false only
+    // when the prompt explicitly asks for a modern/minimal look.
+    bool classic = true;
 };
 [[nodiscard]] SceneStyle ParseSceneStyle(const std::string& prompt);
 
@@ -54,6 +58,7 @@ struct SceneStyle {
 // supply the needed assets.
 [[nodiscard]] std::vector<std::shared_ptr<SceneCommand>> BuildSceneRecipe(const std::string& recipeName,
                                                                           const Scene::AssetCatalog& catalog,
-                                                                          std::uint32_t seed = 0);
+                                                                          std::uint32_t seed = 0,
+                                                                          const SceneStyle& style = {});
 
 } // namespace Cortex::LLM

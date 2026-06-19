@@ -700,6 +700,9 @@ void BuildDiningRoom(std::vector<std::shared_ptr<SceneCommand>>& out, const Scen
     // High-poly corner greenery, kept at the BACK so it doesn't crowd the camera.
     Place(out, cat, c, "calathea_orbifolia_01", 0.55f, 2.7f, -2.4f, 0.0f, kTex);  // back-right corner
     Place(out, cat, c, "calathea_orbifolia_01", 0.5f, -2.7f, -2.4f, 0.0f, kTex);  // back-left corner
+    // Pendant over the table + a front ceiling fill (room had no local lights).
+    AddPointLight(out, 0.0f, 1.95f, tz, glm::vec3(1.0f, 0.86f, 0.62f), 6.0f, 4.6f);   // warm pendant over the table
+    AddPointLight(out, 0.0f, 2.6f, 1.6f, glm::vec3(1.0f, 0.92f, 0.80f), 4.2f, 4.6f);  // front ceiling fill
 }
 
 void BuildBathroom(std::vector<std::shared_ptr<SceneCommand>>& out, const Scene::AssetCatalog& cat, FootprintCache& c) {
@@ -712,6 +715,9 @@ void BuildBathroom(std::vector<std::shared_ptr<SceneCommand>>& out, const Scene:
     PlaceOn(out, cat, c, "ceramic_vase_01", 0.16f, -1.7f, 0.74f, 0.5f, 0.0f, kTex); // high-poly vase on the cabinet
     Place(out, cat, c, "rugDoormat", 1.1f, 0.1f, 0.7f, 0.0f, glm::vec4(0.40f, 0.45f, 0.50f, 1.0f));
     Place(out, cat, c, "calathea_orbifolia_01", 0.4f, 1.8f, 1.4f, 0.0f, kTex); // high-poly corner plant
+    // Ceiling + vanity lighting (room had no local lights; bathrooms read bright).
+    AddPointLight(out, 0.0f, 2.5f, -0.3f, glm::vec3(1.0f, 0.96f, 0.90f), 5.5f, 4.6f);   // bright ceiling
+    AddPointLight(out, 1.45f, 1.7f, -1.2f, glm::vec3(1.0f, 0.97f, 0.92f), 3.0f, 2.4f);  // vanity light at the mirror
 }
 
 // Outdoor garden/patio: a lawn (no room shell) with a patio seating set framed by

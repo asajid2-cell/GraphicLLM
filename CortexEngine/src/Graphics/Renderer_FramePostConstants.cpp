@@ -794,10 +794,10 @@ void Renderer::PopulateFrameDebugAndPostConstants(FrameConstants& frameData,
         m_fogState.height,
         m_fogState.falloff,
         m_fogState.enabled ? 1.0f : 0.0f);
-    const float hazeAnisotropy = 0.38f;
-    const float hazeScatterStrength = glm::clamp(0.76f + m_postProcessState.godRayIntensity * 0.22f, 0.50f, 1.20f);
+    const float hazeAnisotropy = 0.68f;
+    const float hazeScatterStrength = glm::clamp(1.85f + m_postProcessState.godRayIntensity * 0.70f, 1.75f, 3.40f);
     const float hazeNearFade = 0.85f;
-    const float hazeMaxLuma = 3.2f;
+    const float hazeMaxLuma = 5.25f;
     frameData.fogExtraParams = glm::vec4(
         hazeAnisotropy,
         hazeScatterStrength,

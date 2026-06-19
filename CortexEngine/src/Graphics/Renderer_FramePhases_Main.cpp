@@ -237,6 +237,24 @@ Renderer::MainSceneEffectsResult Renderer::ExecuteMainSceneEffectsFramePhase(con
         MarkPassComplete("RenderRTReflections_Done");
     }
 
+    {
+        FramePhase::BeginGpuScope(m_commandResources.graphicsList.Get(), "Volumetrics", "PostProcess");
+        RenderVolumetrics();
+        FramePhase::EndGpuScope(m_commandResources.graphicsList.Get());
+        const bool ranVolumetrics =
+            m_volumetrics.resourcesValid &&
+            m_pipelineState.volumetricInjectCompute &&
+            m_pipelineState.volumetricIntegrateCompute &&
+            m_pipelineState.volumetricCompositeCompute;
+        RecordFramePass("VolumetricFroxels",
+                        ranVolumetrics,
+                        ranVolumetrics,
+                        0,
+                        {"frame_constants", "depth", "shadow_map", "hdr_color", "volumetric_history"},
+                        {"hdr_color", "volumetric_injected", "volumetric_integrated", "volumetric_history"});
+        MarkPassComplete(ranVolumetrics ? "RenderVolumetrics_Done" : "RenderVolumetrics_Skipped");
+    }
+
     if (featurePlan.runMotionVectors) {
         WriteBreadcrumb(GpuMarker::MotionVectors);
         FramePhase::BeginGpuScope(m_commandResources.graphicsList.Get(), "MotionVectors", "PostProcess");

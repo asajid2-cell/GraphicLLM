@@ -161,6 +161,8 @@ void Renderer::ResetTemporalHistoryForSceneChange() {
     InvalidateRTShadowHistory("scene_change");
     InvalidateRTGIHistory("scene_change");
     InvalidateRTReflectionHistory("scene_change");
+    m_volumetrics.historyValid = false;
+    m_volumetrics.historyWriteIndex = 0;
     m_cameraState.ResetHistory();
     m_gpuCullingState.previousWorldByEntity.clear();
     m_gpuCullingState.previousCenterByEntity.clear();

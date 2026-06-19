@@ -2750,7 +2750,8 @@ float4 PSMain(VSOutput input) : SV_TARGET
     // hard white rectangles.
     if (g_FogParams.w > 0.5f)
     {
-        hdrBlurred = ApplyLocalizedSingleScatterHaze(hdrBlurred, uv);
+    // Froxel volumetrics are composited into HDR before post; keep this legacy
+    // screen-space haze disabled so shafts remain depth-correct 3D lighting.
     }
 
     // Underwater grading: when the camera is below the global water level,

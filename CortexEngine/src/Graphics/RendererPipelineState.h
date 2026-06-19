@@ -36,6 +36,9 @@ struct RendererPipelineReadiness {
     bool ssao = false;
     bool ssaoCompute = false;
     bool localReflectionRadianceCompute = false;
+    bool volumetricInjectCompute = false;
+    bool volumetricIntegrateCompute = false;
+    bool volumetricCompositeCompute = false;
     bool hzbInit = false;
     bool hzbDownsample = false;
     bool motionVectors = false;
@@ -85,6 +88,9 @@ struct RendererPipelineState {
     std::unique_ptr<DX12Pipeline> ssao;
     std::unique_ptr<DX12ComputePipeline> ssaoCompute;
     std::unique_ptr<DX12ComputePipeline> localReflectionRadianceCompute;
+    std::unique_ptr<DX12ComputePipeline> volumetricInjectCompute;
+    std::unique_ptr<DX12ComputePipeline> volumetricIntegrateCompute;
+    std::unique_ptr<DX12ComputePipeline> volumetricCompositeCompute;
     std::unique_ptr<DX12ComputePipeline> hzbInit;
     std::unique_ptr<DX12ComputePipeline> hzbDownsample;
     std::unique_ptr<DX12Pipeline> motionVectors;
@@ -130,6 +136,9 @@ struct RendererPipelineState {
         readiness.ssao = ssao != nullptr;
         readiness.ssaoCompute = ssaoCompute != nullptr;
         readiness.localReflectionRadianceCompute = localReflectionRadianceCompute != nullptr;
+        readiness.volumetricInjectCompute = volumetricInjectCompute != nullptr;
+        readiness.volumetricIntegrateCompute = volumetricIntegrateCompute != nullptr;
+        readiness.volumetricCompositeCompute = volumetricCompositeCompute != nullptr;
         readiness.hzbInit = hzbInit != nullptr;
         readiness.hzbDownsample = hzbDownsample != nullptr;
         readiness.motionVectors = motionVectors != nullptr;
@@ -172,6 +181,9 @@ struct RendererPipelineState {
         ssao.reset();
         ssaoCompute.reset();
         localReflectionRadianceCompute.reset();
+        volumetricInjectCompute.reset();
+        volumetricIntegrateCompute.reset();
+        volumetricCompositeCompute.reset();
         hzbInit.reset();
         hzbDownsample.reset();
         motionVectors.reset();

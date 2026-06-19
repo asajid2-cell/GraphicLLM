@@ -147,7 +147,19 @@ Result<void> Renderer::CreateHDRTarget() {
         spdlog::warn("Failed to create SSAO resources: {}", ssaoResult.Error());
     }
 
+    auto volumetricResult = CreateVolumetricResources();
+    if (volumetricResult.IsErr()) {
+        spdlog::warn("Failed to create volumetric froxel resources: {}", volumetricResult.Error());
+    }
+
     return Result<void>::Ok();
+}
+
+Result<void> Renderer::CreateVolumetricResources() {
+    if (!m_services.device) {
+        return Result<void>::Err("Renderer not initialized for volumetric froxel creation");
+    }
+    return m_volumetrics.CreateResources(m_services.device->GetDevice());
 }
 
 #undef CORTEX_REPORT_DEVICE_REMOVED

@@ -157,6 +157,7 @@ Result<void> Renderer::InitializePostProcessDescriptorTable() {
             handle = {};
         }
     }
+    m_volumetrics.ResetDescriptors();
     for (auto& handle : m_rt.ReflectionTargets().dispatchClearUAVs) {
         handle = {};
     }
@@ -260,6 +261,14 @@ Result<void> Renderer::InitializePostProcessDescriptorTable() {
     if (bloomTableResult.IsErr()) {
         return bloomTableResult;
     }
+    auto volumetricSrvResult = allocateTableSet(m_volumetrics.srvTables, "volumetric froxel SRV");
+    if (volumetricSrvResult.IsErr()) {
+        return volumetricSrvResult;
+    }
+    auto volumetricUavResult = allocateTableSet(m_volumetrics.uavTables, "volumetric froxel UAV");
+    if (volumetricUavResult.IsErr()) {
+        return volumetricUavResult;
+    }
 
     auto allocateHandleSet = [&](auto& handles, const char* label) -> Result<void> {
         return DescriptorTable::AllocateHandleSet(
@@ -333,6 +342,11 @@ Result<void> Renderer::InitializePostProcessDescriptorTable() {
     m_rt.ReflectionSignalState().descriptors.valid =
         rtReflectionSignalStatsSrvValid && rtReflectionSignalStatsUavValid;
     validateTableSet(m_bloom.State().descriptors.srvTables, m_bloom.State().descriptors.srvTableValid, "Bloom");
+    bool volumetricSrvValid = false;
+    bool volumetricUavValid = false;
+    validateTableSet(m_volumetrics.srvTables, volumetricSrvValid, "Volumetric froxel SRV");
+    validateTableSet(m_volumetrics.uavTables, volumetricUavValid, "Volumetric froxel UAV");
+    m_volumetrics.descriptorTablesValid = volumetricSrvValid && volumetricUavValid;
     return Result<void>::Ok();
 }
 

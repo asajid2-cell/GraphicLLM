@@ -69,6 +69,7 @@
 #include "Graphics/RendererTextureUploadState.h"
 #include "Graphics/RendererVegetationState.h"
 #include "Graphics/RendererVisibilityBufferState.h"
+#include "Graphics/RendererVolumetricState.h"
 #include "Graphics/Subsystems/VisibilityBufferSubsystem.h"
 #include "Graphics/RendererUploadState.h"
 #include "Graphics/RendererVoxelState.h"
@@ -654,6 +655,7 @@ private:
     Result<void> CreateVisibilityBuffer();
     Result<void> CreateBloomResources();
     Result<void> CreateSSAOResources();
+    Result<void> CreateVolumetricResources();
     Result<void> CreateTemporalRejectionMaskResources();
     Result<void> CreateRTShadowMask();
     Result<void> CreateRTReflectionResources();
@@ -744,6 +746,7 @@ private:
     void RenderSSAO();
     void RenderSSAOAsync();  // Async compute version
     SSAORenderContext MakeSSAORenderContext();
+    void RenderVolumetrics();
     void RenderBloom();
     BloomContext MakeBloomContext();
     void RenderPostProcess();
@@ -846,6 +849,8 @@ public:
     MainRenderTargetState m_mainTargets;
 
     SSAOSubsystem m_ssao;
+
+    RendererVolumetricState m_volumetrics;
 
     SSRSubsystem m_ssr;
     LocalReflectionRadianceState m_localReflectionRadianceState;

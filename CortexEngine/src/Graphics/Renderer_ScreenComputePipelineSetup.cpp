@@ -255,6 +255,37 @@ Result<void> Renderer::CreateScreenSpacePipelineStates(const RendererCompiledSha
                          localRadianceResult.Error());
         }
 
+        struct VolumetricPipelineSpec {
+            const char* entryPoint;
+            std::unique_ptr<DX12ComputePipeline> RendererPipelineState::*slot;
+            const char* label;
+        };
+        const VolumetricPipelineSpec volumetricSpecs[] = {
+            {"InjectCS", &RendererPipelineState::volumetricInjectCompute, "volumetric froxel inject"},
+            {"IntegrateCS", &RendererPipelineState::volumetricIntegrateCompute, "volumetric froxel integrate"},
+            {"CompositeCS", &RendererPipelineState::volumetricCompositeCompute, "volumetric froxel composite"},
+        };
+        for (const auto& spec : volumetricSpecs) {
+            auto shaderResult =
+                ShaderCompiler::CompileFromFile("assets/shaders/VolumetricFroxels.hlsl", spec.entryPoint, "cs_5_1");
+            if (shaderResult.IsErr()) {
+                spdlog::warn("Failed to compile {} compute shader: {}", spec.label, shaderResult.Error());
+                continue;
+            }
+            auto& pipelineSlot = m_pipelineState.*(spec.slot);
+            pipelineSlot = std::make_unique<DX12ComputePipeline>();
+            auto pipelineResult = pipelineSlot->Initialize(
+                m_services.device->GetDevice(),
+                m_pipelineState.computeRootSignature->GetRootSignature(),
+                shaderResult.Value());
+            if (pipelineResult.IsErr()) {
+                spdlog::warn("Failed to create {} compute pipeline: {}", spec.label, pipelineResult.Error());
+                pipelineSlot.reset();
+            } else {
+                spdlog::info("{} compute pipeline created successfully", spec.label);
+            }
+        }
+
         static const char* kHzbInitCS = R"(
 Texture2D<float> g_Depth : register(t0);
 RWTexture2D<float> g_OutMip : register(u0);

@@ -417,14 +417,14 @@ void BuildBedroom(std::vector<std::shared_ptr<SceneCommand>>& out, const Scene::
 void BuildOffice(std::vector<std::shared_ptr<SceneCommand>>& out, const Scene::AssetCatalog& cat, FootprintCache& c) {
     BuildRoomShell(out, cat, c, 6.4f, 6.2f, glm::vec4(0.46f, 0.46f, 0.48f, 1.0f));
     Place(out, cat, c, "rugSquare", 2.4f, -0.4f, -0.3f, 0.0f, glm::vec4(0.33f, 0.34f, 0.40f, 1.0f));
-    Place(out, cat, c, "deskCorner", 1.9f, -0.5f, -1.5f, 8.0f);          // focal: back-centre
-    Place(out, cat, c, "chairDesk", 0.8f, -0.5f, -0.55f, 180.0f);        // seated at the desk, faces it
-    PlaceOn(out, cat, c, "computerScreen", 0.55f, -0.85f, 0.74f, -1.75f, 4.0f);  // monitor on the desk
-    PlaceOn(out, cat, c, "computerKeyboard", 0.4f, -0.7f, 0.74f, -1.25f, 4.0f);  // keyboard
-    PlaceOn(out, cat, c, "lampSquareTable", 0.26f, 0.35f, 0.74f, -1.7f, 0.0f);   // desk lamp
-    AddPointLight(out, 0.35f, 1.02f, -1.7f, glm::vec3(1.0f, 0.80f, 0.52f), 5.0f, 3.4f);
-    Place(out, cat, c, "bookcaseOpen", 1.2f, -2.85f, 0.9f, 90.0f);       // left wall
-    Place(out, cat, c, "bookcaseClosedWide", 1.5f, -1.3f, -2.95f, 0.0f); // back wall
+    Place(out, cat, c, "ClassicConsole_01", 1.9f, -0.5f, -1.5f, 8.0f, kTex);  // focal: high-poly console desk
+    Place(out, cat, c, "WoodenChair_01", 0.8f, -0.5f, -0.55f, 180.0f, kTex);  // high-poly chair, faces desk
+    PlaceOn(out, cat, c, "computerScreen", 0.55f, -0.85f, 0.78f, -1.75f, 4.0f);  // monitor on the desk
+    PlaceOn(out, cat, c, "computerKeyboard", 0.4f, -0.7f, 0.78f, -1.25f, 4.0f);  // keyboard
+    PlaceOn(out, cat, c, "lampSquareTable", 0.26f, 0.35f, 0.78f, -1.7f, 0.0f);   // desk lamp
+    AddPointLight(out, 0.35f, 1.06f, -1.7f, glm::vec3(1.0f, 0.80f, 0.52f), 5.0f, 3.4f);
+    Place(out, cat, c, "Shelf_01", 1.2f, -2.85f, 0.9f, 90.0f, kTex);     // left wall (high-poly)
+    Place(out, cat, c, "Shelf_01", 1.5f, -1.3f, -2.95f, 0.0f, kTex);     // back wall (high-poly)
     Place(out, cat, c, "pottedPlant", 0.55f, 2.6f, -2.3f, 0.0f);         // back-right corner
     Place(out, cat, c, "trashcan", 0.3f, 0.8f, -1.1f, 0.0f);
 }

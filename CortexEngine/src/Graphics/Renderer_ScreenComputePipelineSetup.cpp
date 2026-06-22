@@ -219,9 +219,7 @@ Result<void> Renderer::CreateScreenSpacePipelineStates(const RendererCompiledSha
             m_pipelineState.ssaoCompute = std::make_unique<DX12ComputePipeline>();
             auto computePipelineResult = m_pipelineState.ssaoCompute->Initialize(
                 m_services.device->GetDevice(),
-                m_pipelineState.singleSrvUavComputeRootSignature
-                    ? m_pipelineState.singleSrvUavComputeRootSignature.Get()
-                    : m_pipelineState.computeRootSignature->GetRootSignature(),
+                m_pipelineState.computeRootSignature->GetRootSignature(),
                 ssaoComputeResult.Value());
             if (computePipelineResult.IsErr()) {
                 spdlog::warn("Failed to create SSAO compute pipeline: {}", computePipelineResult.Error());

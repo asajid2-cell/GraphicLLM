@@ -92,7 +92,7 @@ Result<void> DX12RaytracingContext::InitializeShadowPipeline() {
 
         // Subobject 2: Shader config (payload + attributes)
         D3D12_RAYTRACING_SHADER_CONFIG shaderConfig{};
-        shaderConfig.MaxPayloadSizeInBytes = 4; // bool occluded
+        shaderConfig.MaxPayloadSizeInBytes = 8; // ShadowPayload: visibility + hitT
         shaderConfig.MaxAttributeSizeInBytes = 8; // barycentrics
 
         subobjects[2].Type = D3D12_STATE_SUBOBJECT_TYPE_RAYTRACING_SHADER_CONFIG;

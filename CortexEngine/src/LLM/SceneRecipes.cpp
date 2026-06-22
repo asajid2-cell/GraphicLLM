@@ -184,6 +184,70 @@ PbrResponse PbrForKey(const std::string& k) {
     return {0.7f, 0.0f};
 }
 
+struct MaterialLayerResponse {
+    float clearcoat = 0.0f;
+    float clearcoatRoughness = 0.0f;
+    float sheen = 0.0f;
+    float subsurface = 0.0f;
+    float anisotropy = 0.0f;
+    float wetness = 0.0f;
+    float proceduralMask = 0.0f;
+};
+
+MaterialLayerResponse LayersForKey(const std::string& k) {
+    auto has = [&](const char* n) { return k.find(n) != std::string::npos; };
+    MaterialLayerResponse layers{};
+    if (has("mirror") || has("glass") || has("window") || has("screen") ||
+        has("television") || has("monitor")) {
+        layers.clearcoat = 0.55f;
+        layers.clearcoatRoughness = 0.06f;
+        layers.proceduralMask = 0.04f;
+        return layers;
+    }
+    if (has("fridge") || has("stove") || has("sink") || has("hood") || has("microwave") ||
+        has("oven") || has("toaster") || has("kettle") || has("dishwasher")) {
+        layers.clearcoat = 0.12f;
+        layers.clearcoatRoughness = 0.22f;
+        layers.anisotropy = 0.42f;
+        layers.proceduralMask = 0.08f;
+        return layers;
+    }
+    if (has("sofa") || has("couch") || has("chair") || has("cushion") || has("stool") ||
+        has("bed") || has("pillow") || has("rug") || has("doormat") || has("lounge") ||
+        has("bench") || has("coat")) {
+        layers.sheen = 0.34f;
+        layers.subsurface = 0.10f;
+        layers.proceduralMask = 0.18f;
+        return layers;
+    }
+    if (has("plant") || has("fern") || has("grass") || has("bush") || has("foliage")) {
+        layers.subsurface = 0.24f;
+        layers.proceduralMask = 0.14f;
+        return layers;
+    }
+    if (has("table") || has("desk") || has("cabinet") || has("bookcase") || has("shelf") ||
+        has("wood") || has("stump") || has("trunk") || has("branch") || has("dresser") ||
+        has("wardrobe") || has("drawer") || has("barrel") || has("side")) {
+        layers.clearcoat = 0.16f;
+        layers.clearcoatRoughness = 0.42f;
+        layers.anisotropy = 0.14f;
+        layers.proceduralMask = 0.24f;
+        return layers;
+    }
+    layers.proceduralMask = 0.08f;
+    return layers;
+}
+
+void ApplyMaterialLayers(AddEntityCommand& cmd, const MaterialLayerResponse& layers) {
+    cmd.clearcoat = layers.clearcoat;
+    cmd.clearcoatRoughness = layers.clearcoatRoughness;
+    cmd.sheen = layers.sheen;
+    cmd.subsurface = layers.subsurface;
+    cmd.anisotropy = layers.anisotropy;
+    cmd.wetness = layers.wetness;
+    cmd.proceduralMask = layers.proceduralMask;
+}
+
 // Emit one real catalog asset, normalized so its largest horizontal extent ~=
 // targetFootprint meters, placed at (x,0,z), yawed yawDeg about Y, ground-snapped
 // by the executor. Returns false (and emits nothing) if the asset can't resolve.
@@ -243,6 +307,7 @@ bool Place(std::vector<std::shared_ptr<SceneCommand>>& out,
     const PbrResponse pbr = PbrForKey(lk); // per-class material response (glossy/metal/satin/matte)
     cmd->roughness = pbr.roughness;
     cmd->metallic = pbr.metallic;
+    ApplyMaterialLayers(*cmd, LayersForKey(lk));
     cmd->rotationEuler = glm::vec3(0.0f, yawDeg, 0.0f);
     cmd->hasRotation = true;
     cmd->supportHeight = supportHeight; // base rests on this surface (0 = floor)
@@ -325,6 +390,10 @@ void PlaceFloor(std::vector<std::shared_ptr<SceneCommand>>& out,
     cmd->color = color;
     cmd->roughness = 0.52f; // satin floor: catches soft reflections of the room (SSR) instead of dead-matte
     cmd->metallic = 0.0f;
+    cmd->clearcoat = 0.08f;
+    cmd->clearcoatRoughness = 0.48f;
+    cmd->anisotropy = 0.10f;
+    cmd->proceduralMask = 0.22f;
     cmd->allowPlacementJitter = false;
     cmd->disableCollisionAvoidance = true;
     const float metersPerTile = std::max(tileMeters, 0.1f);
@@ -396,6 +465,7 @@ void BuildRoomShell(std::vector<std::shared_ptr<SceneCommand>>& out, const Scene
         cmd->color = col;
         cmd->metallic = 0.0f;
         cmd->roughness = 0.92f;
+        cmd->proceduralMask = 0.14f;
         cmd->allowPlacementJitter = false;
         cmd->disableCollisionAvoidance = true;
         if (material) {
@@ -463,6 +533,9 @@ void BuildRoomShell(std::vector<std::shared_ptr<SceneCommand>>& out, const Scene
         pane->color = glm::vec4(0.70f, 0.83f, 0.98f, 1.0f); // daylight sky
         pane->metallic = 0.0f;
         pane->roughness = 0.2f;
+        pane->clearcoat = 0.45f;
+        pane->clearcoatRoughness = 0.08f;
+        pane->proceduralMask = 0.04f;
         pane->setEmissiveStrength = true;
         pane->emissiveStrength = 0.78f;  // bright but below hard clip
         pane->setEmissiveBloom = true;

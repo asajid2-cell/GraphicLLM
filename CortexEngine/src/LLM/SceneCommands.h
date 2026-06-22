@@ -60,6 +60,13 @@ struct AddEntityCommand : public SceneCommand {
     float metallic = 0.0f;
     float roughness = 0.5f;
     float ao = 1.0f;
+    float clearcoat = 0.0f;
+    float clearcoatRoughness = 0.0f;
+    float sheen = 0.0f;
+    float subsurface = 0.0f;
+    float anisotropy = 0.0f;
+    float wetness = 0.0f;
+    float proceduralMask = 0.0f;
     bool hasPreset = false;
     std::string presetName;
     glm::vec3 positionOffset = glm::vec3(0.0f);

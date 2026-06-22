@@ -2860,6 +2860,9 @@ void Engine::BuildRecipeScene() {
         // Global warm/cool grade makes the modern <-> rustic difference clear.
         renderer->SetColorGrade(std::max(0.0f, style.warmth) * 0.38f,
                                 std::max(0.0f, -style.warmth) * 0.32f);
+        renderer->SetToneGrade(outdoor ? 1.03f : 1.06f, outdoor ? 1.02f : 1.04f);
+        renderer->SetCinematicPostEnabled(true);
+        renderer->SetCinematicPost(outdoor ? 0.045f : 0.075f, 0.0f);
         renderer->SetSunDirection(glm::normalize(outdoor ? glm::vec3(-0.59f, 0.05f, -0.79f) : glm::vec3(-0.35f, 0.82f, 0.45f)));
         if (outdoor) {
             renderer->SetSunColor(glm::vec3(1.0f, 0.95f, 0.86f)); // warm daylight

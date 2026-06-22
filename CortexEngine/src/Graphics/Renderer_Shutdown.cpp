@@ -97,6 +97,7 @@ void Renderer::Shutdown() {
     m_mainTargets.compositeV3.resources.Reset();
     m_mainTargets.candidateBeautyV3.resources.Reset();
     m_ssao.State().resources.texture.Reset();
+    m_localReflectionRadianceState.cubemapCapture.ResetResources();
     m_commandResources.graphicsList.Reset();
     for (auto& allocator : m_commandResources.graphicsAllocators) {
         allocator.Reset();

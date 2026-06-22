@@ -272,6 +272,7 @@ set(CORTEX_SOURCES
     src/Graphics/Renderer_RenderGraphTemporalMask.cpp
     src/Graphics/Renderer_RenderGraphTemporalScreen.cpp
     src/Graphics/Renderer_RenderGraphVisibilityBuffer.cpp
+    src/Graphics/Renderer_LocalReflectionCubemapCapture.cpp
     src/Graphics/Renderer_RenderOrchestration.cpp
     src/Graphics/Renderer_DebugSettings.cpp
     src/Graphics/Renderer_FeatureSettings.cpp

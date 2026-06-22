@@ -350,6 +350,20 @@ void Renderer::UpdateFrameContractSnapshot(Scene::ECS_Registry* registry,
         m_environmentState.localProbeDiffuseIntensity;
     contract.environment.localReflectionProbeSpecularIntensity =
         m_environmentState.localProbeSpecularIntensity;
+    const auto& cubemapCapture = m_localReflectionRadianceState.cubemapCapture;
+    contract.environment.localReflectionCubemapCaptureAllocated = cubemapCapture.allocated;
+    contract.environment.localReflectionCubemapCaptureScheduled = cubemapCapture.scheduledThisFrame;
+    contract.environment.localReflectionCubemapCaptureExecuted = cubemapCapture.executedThisFrame;
+    contract.environment.localReflectionCubemapCaptureFailed = cubemapCapture.failedThisFrame;
+    contract.environment.localReflectionCubemapCaptureFaceSize = cubemapCapture.faceSize;
+    contract.environment.localReflectionCubemapCaptureFaceCount = LocalReflectionProbeCubemapCaptureState::kFaceCount;
+    contract.environment.localReflectionCubemapCaptureScheduledProbes = cubemapCapture.scheduledProbes;
+    contract.environment.localReflectionCubemapCaptureCapturedFaces = cubemapCapture.capturedFaces;
+    contract.environment.localReflectionCubemapCaptureCenterX = cubemapCapture.captureCenter.x;
+    contract.environment.localReflectionCubemapCaptureCenterY = cubemapCapture.captureCenter.y;
+    contract.environment.localReflectionCubemapCaptureCenterZ = cubemapCapture.captureCenter.z;
+    contract.environment.localReflectionCubemapCaptureMode = cubemapCapture.captureMode;
+    contract.environment.localReflectionCubemapCaptureFailureReason = cubemapCapture.failureReason;
     if (const auto* env = m_environmentState.ActiveEnvironment()) {
         contract.environment.runtimePath = env->path;
         contract.environment.budgetClass = env->budgetClass;

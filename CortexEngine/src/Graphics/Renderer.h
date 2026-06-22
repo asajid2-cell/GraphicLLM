@@ -526,6 +526,7 @@ private:
     [[nodiscard]] bool BeginFrameExecution(FrameExecutionContext& frameCtx);
     [[nodiscard]] bool TryRenderSpecialFramePath(const FrameExecutionContext& frameCtx);
     void ExecuteRayTracingFramePhase(const FrameExecutionContext& frameCtx);
+    void ExecuteLocalReflectionProbeCubemapCapture(const FrameExecutionContext& frameCtx);
     void ExecuteShadowFramePhase(const FrameExecutionContext& frameCtx);
     void BeginMainSceneFramePhase(const FrameExecutionContext& frameCtx);
     void ExecuteGeometryFramePhase(const FrameExecutionContext& frameCtx);

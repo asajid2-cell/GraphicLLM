@@ -120,6 +120,8 @@ void Renderer::Render(Scene::ECS_Registry* registry, float deltaTime) {
         return;
     }
 
+    ExecuteLocalReflectionProbeCubemapCapture(frameCtx);
+
     ExecuteRayTracingFramePhase(frameCtx);
 
     const auto tMainStart = clock::now();

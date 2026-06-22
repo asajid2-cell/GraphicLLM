@@ -1124,6 +1124,17 @@ Result<void> Engine::Initialize(const EngineConfig& config) {
         }
         spdlog::info("Asset-led scene controls reapplied after startup graphics/environment presets");
     }
+    if (m_renderer && m_currentScenePreset == ScenePreset::RecipeRoom) {
+        // Startup debug/user settings are applied after the recipe scene is built
+        // and can otherwise leave product scenes without TAA, IBL, or fog.
+        RebuildScene(m_currentScenePreset);
+        if (!config.initialCameraBookmark.empty() &&
+            !ApplyShowcaseCameraBookmark(config.initialCameraBookmark)) {
+            spdlog::warn("Startup camera bookmark '{}' was not found after recipe scene reapply",
+                         config.initialCameraBookmark);
+        }
+        spdlog::info("Recipe scene controls reapplied after startup graphics/debug settings");
+    }
 
     if (m_renderer && m_currentScenePreset == ScenePreset::DragonOverWater) {
         // Debug/user settings are applied after the scene is built. Reapply

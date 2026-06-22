@@ -798,6 +798,59 @@ namespace {
         return "recipe_living_room_enclosed";
     }
 
+    struct RecipeLightingBalance {
+        const char* policyId = "recipe_scene_lighting_balance_v1";
+        float sunScale = 0.86f;
+        float ambientScale = 0.90f;
+        float localFixtureScale = 0.88f;
+        float localProbeDiffuseScale = 0.88f;
+        float localProbeSpecularScale = 0.92f;
+        float exposureScale = 0.92f;
+        float ssaoScale = 1.18f;
+    };
+
+    RecipeLightingBalance RecipeLightingBalanceFor(const std::string& recipe) {
+        RecipeLightingBalance balance{};
+        if (recipe == "garden") {
+            balance.policyId = "recipe_garden_lighting_balance_v1";
+            balance.sunScale = 0.95f;
+            balance.ambientScale = 0.98f;
+            balance.localFixtureScale = 0.92f;
+            balance.localProbeDiffuseScale = 0.92f;
+            balance.localProbeSpecularScale = 0.96f;
+            balance.exposureScale = 0.96f;
+            balance.ssaoScale = 1.08f;
+        } else if (recipe == "kitchen") {
+            balance.policyId = "recipe_kitchen_lighting_balance_v1";
+            balance.sunScale = 0.88f;
+            balance.ambientScale = 0.88f;
+            balance.localFixtureScale = 0.84f;
+            balance.localProbeDiffuseScale = 0.86f;
+            balance.localProbeSpecularScale = 0.92f;
+            balance.exposureScale = 0.90f;
+            balance.ssaoScale = 1.25f;
+        } else if (recipe == "office") {
+            balance.policyId = "recipe_office_lighting_balance_v1";
+            balance.sunScale = 0.84f;
+            balance.ambientScale = 0.88f;
+            balance.localFixtureScale = 0.86f;
+            balance.localProbeDiffuseScale = 0.86f;
+            balance.localProbeSpecularScale = 0.90f;
+            balance.exposureScale = 0.90f;
+            balance.ssaoScale = 1.24f;
+        } else if (recipe == "bathroom") {
+            balance.policyId = "recipe_bathroom_lighting_balance_v1";
+            balance.sunScale = 0.90f;
+            balance.ambientScale = 0.92f;
+            balance.localFixtureScale = 0.86f;
+            balance.localProbeDiffuseScale = 0.88f;
+            balance.localProbeSpecularScale = 0.92f;
+            balance.exposureScale = 0.92f;
+            balance.ssaoScale = 1.20f;
+        }
+        return balance;
+    }
+
     void ApplyRecipeVisualContract(Renderer* renderer, const std::string& recipe) {
         if (!renderer) {
             return;
@@ -805,6 +858,7 @@ namespace {
 
         const bool outdoor = recipe == "garden";
         const std::string palette = RecipeMaterialPalette(recipe);
+        const RecipeLightingBalance balance = RecipeLightingBalanceFor(recipe);
 
         Graphics::FrameContract::SceneVisualInfo visualContract{};
         visualContract.active = true;
@@ -828,6 +882,15 @@ namespace {
         visualContract.postPolicyId = outdoor ? "recipe_garden_highlight_rolloff" : "recipe_room_highlight_rolloff";
         visualContract.postQualitySetId = "scene_local_cinematic_post_quality_v1";
         visualContract.toneMapperPreset = "filmic_soft";
+        visualContract.lightingBalancePolicyId = balance.policyId;
+        visualContract.lightingBalancePolicyActive = true;
+        visualContract.lightingBalanceSunScale = balance.sunScale;
+        visualContract.lightingBalanceAmbientScale = balance.ambientScale;
+        visualContract.lightingBalanceLocalFixtureScale = balance.localFixtureScale;
+        visualContract.lightingBalanceLocalProbeDiffuseScale = balance.localProbeDiffuseScale;
+        visualContract.lightingBalanceLocalProbeSpecularScale = balance.localProbeSpecularScale;
+        visualContract.lightingBalanceExposureScale = balance.exposureScale;
+        visualContract.lightingBalanceSSAOScale = balance.ssaoScale;
         renderer->SetSceneVisualContract(std::move(visualContract));
         renderer->SetToneMapperPreset("filmic_soft");
         renderer->SetLightingRigContract(outdoor ? "recipe_garden_daylight" : "recipe_enclosed_room_motivated",
@@ -2760,6 +2823,7 @@ void Engine::BuildRecipeScene() {
     }
 
     const bool outdoor = (recipe == "garden");
+    const RecipeLightingBalance lightingBalance = RecipeLightingBalanceFor(recipe);
     if (auto* renderer = m_renderer.get()) {
         ApplyRecipeVisualContract(renderer, recipe);
         renderer->SetEnvironmentPreset("neutral_procedural");
@@ -2772,8 +2836,8 @@ void Engine::BuildRecipeScene() {
             : std::clamp(iblBase + style.brightness * 0.10f, 0.20f, 0.60f);
         renderer->SetIBLIntensity(ibl, outdoor ? ibl : ibl * 0.72f);
         renderer->SetLocalReflectionProbeRadiance(true,
-                                                   outdoor ? 0.16f : 0.22f,
-                                                   outdoor ? 0.16f : 0.20f);
+                                                   (outdoor ? 0.16f : 0.22f) * lightingBalance.localProbeDiffuseScale,
+                                                   (outdoor ? 0.16f : 0.20f) * lightingBalance.localProbeSpecularScale);
         if (outdoor) {
             renderer->SetBackgroundPresentation(true, 0.95f, 0.0f);
         } else {
@@ -2784,18 +2848,26 @@ void Engine::BuildRecipeScene() {
         amb.r += style.warmth * 0.06f;
         amb.b -= style.warmth * 0.06f;
         amb *= (1.0f + style.brightness * (outdoor ? 0.35f : 0.16f));
-        renderer->SetAmbientLighting(glm::max(amb, glm::vec3(outdoor ? 0.05f : 0.06f)), outdoor ? 1.0f : 0.9f);
-        renderer->SetExposure(std::clamp((outdoor ? 0.68f : 0.82f) + style.brightness * 0.06f, 0.52f, outdoor ? 1.0f : 0.98f));
+        renderer->SetAmbientLighting(glm::max(amb, glm::vec3(outdoor ? 0.05f : 0.06f)),
+                                     (outdoor ? 1.0f : 0.9f) * lightingBalance.ambientScale);
+        const float recipeExposure =
+            std::clamp((outdoor ? 0.68f : 0.82f) + style.brightness * 0.06f,
+                       0.52f,
+                       outdoor ? 1.0f : 0.98f);
+        renderer->SetExposure(std::clamp(recipeExposure * lightingBalance.exposureScale,
+                                         0.45f,
+                                         outdoor ? 1.0f : 0.98f));
         // Global warm/cool grade makes the modern <-> rustic difference clear.
         renderer->SetColorGrade(std::max(0.0f, style.warmth) * 0.38f,
                                 std::max(0.0f, -style.warmth) * 0.32f);
         renderer->SetSunDirection(glm::normalize(outdoor ? glm::vec3(-0.59f, 0.05f, -0.79f) : glm::vec3(-0.35f, 0.82f, 0.45f)));
         if (outdoor) {
             renderer->SetSunColor(glm::vec3(1.0f, 0.95f, 0.86f)); // warm daylight
-            renderer->SetSunIntensity(1.9f);
+            renderer->SetSunIntensity(1.9f * lightingBalance.sunScale);
         } else {
             renderer->SetSunColor(glm::vec3(1.0f, 0.92f, 0.80f));
-            renderer->SetSunIntensity(std::clamp(1.05f + style.brightness * 0.10f, 0.8f, 1.35f));
+            renderer->SetSunIntensity(std::clamp(1.05f + style.brightness * 0.10f, 0.8f, 1.35f) *
+                                      lightingBalance.sunScale);
         }
         renderer->SetShadowBias(outdoor ? 0.0035f : 0.0014f);
         renderer->SetShadowPCFRadius(outdoor ? 2.5f : 1.65f);
@@ -2806,7 +2878,9 @@ void Engine::BuildRecipeScene() {
         renderer->SetTAAEnabled(true);
         renderer->SetSSREnabled(true);
         renderer->SetSSAOEnabled(true);
-        renderer->SetSSAOParams(outdoor ? 0.75f : 1.18f, outdoor ? 0.020f : 0.012f, outdoor ? 1.35f : 3.10f);
+        renderer->SetSSAOParams((outdoor ? 0.75f : 1.18f) * lightingBalance.ssaoScale,
+                                outdoor ? 0.020f : 0.012f,
+                                outdoor ? 1.35f : 3.10f);
         renderer->SetShadowsEnabled(true);
         renderer->SetFogEnabled(true);
         renderer->SetFogParams(outdoor ? 0.0075f : 0.016f, outdoor ? 0.05f : 0.15f, outdoor ? 0.34f : 0.42f, outdoor ? 4.0f : 0.0f);
@@ -2848,7 +2922,8 @@ void Engine::BuildRecipeScene() {
         // Warm or cool key light by style (cool modern <-> warm rustic).
         l.color = glm::mix(glm::vec3(0.92f, 0.96f, 1.0f), glm::vec3(1.0f, 0.90f, 0.78f),
                            glm::clamp(style.warmth * 0.5f + 0.5f, 0.0f, 1.0f));
-        l.intensity = outdoor ? (10.0f + style.brightness * 2.5f) : (12.8f + style.brightness * 1.6f);
+        l.intensity = (outdoor ? (10.0f + style.brightness * 2.5f) : (12.8f + style.brightness * 1.6f)) *
+                      lightingBalance.localFixtureScale;
         l.range = outdoor ? 24.0f : 8.5f;
         l.innerConeDegrees = outdoor ? 48.0f : 46.0f;
         l.outerConeDegrees = outdoor ? 80.0f : 86.0f;

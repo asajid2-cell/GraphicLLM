@@ -2872,8 +2872,8 @@ void Engine::BuildRecipeScene() {
             renderer->SetSunIntensity(std::clamp(1.05f + style.brightness * 0.10f, 0.8f, 1.35f) *
                                       lightingBalance.sunScale);
         }
-        renderer->SetShadowBias(outdoor ? 0.0035f : 0.0014f);
-        renderer->SetShadowPCFRadius(outdoor ? 2.5f : 1.65f);
+        renderer->SetShadowBias(outdoor ? 0.0035f : 0.0011f);
+        renderer->SetShadowPCFRadius(outdoor ? 2.5f : 1.38f);
         // Run the recipe scenes through the FULL-quality path (scene presets
         // otherwise default to 0.85 render scale + IBL off): full-res, TAA,
         // screen-space reflections + AO. Re-asserted last so no profile undoes it.

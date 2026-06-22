@@ -74,6 +74,7 @@ Result<void> Renderer::CreateExposureResources() {
     m_exposureState.targetExposure = m_exposureState.adaptedExposure;
 
     auto stateDesc = BufferDesc(sizeof(ExposureStateGpuData), D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
+    auto transferDesc = BufferDesc(sizeof(ExposureStateGpuData));
     auto defaultHeap = HeapProps(D3D12_HEAP_TYPE_DEFAULT);
     HRESULT hr = device->CreateCommittedResource(
         &defaultHeap,
@@ -92,7 +93,7 @@ Result<void> Renderer::CreateExposureResources() {
     hr = device->CreateCommittedResource(
         &uploadHeap,
         D3D12_HEAP_FLAG_NONE,
-        &stateDesc,
+        &transferDesc,
         D3D12_RESOURCE_STATE_GENERIC_READ,
         nullptr,
         IID_PPV_ARGS(&m_exposureState.initUploadBuffer));
@@ -135,7 +136,7 @@ Result<void> Renderer::CreateExposureResources() {
         hr = device->CreateCommittedResource(
             &readbackHeap,
             D3D12_HEAP_FLAG_NONE,
-            &stateDesc,
+            &transferDesc,
             D3D12_RESOURCE_STATE_COPY_DEST,
             nullptr,
             IID_PPV_ARGS(&m_exposureState.readbackBuffers[frame]));

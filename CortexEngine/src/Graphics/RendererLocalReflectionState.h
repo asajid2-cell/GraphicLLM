@@ -5,6 +5,7 @@
 #include <string>
 
 #include "Graphics/Renderer_ConstantBuffer.h"
+#include "Graphics/ShaderTypes.h"
 #include "RHI/DescriptorHeap.h"
 #include "RHI/DX12Texture.h"
 
@@ -18,7 +19,12 @@ struct LocalReflectionProbeCubemapCaptureState {
     static constexpr uint32_t kDefaultFaceSize = 128;
 
     std::shared_ptr<DX12Texture> target;
+    std::shared_ptr<DX12Texture> normalRoughnessTarget;
+    std::shared_ptr<DX12Texture> depthTarget;
+    std::unique_ptr<ConstantBuffer<FrameConstants>> frameConstants;
     std::array<DescriptorHandle, kFaceCount> faceRTVs{};
+    std::array<DescriptorHandle, kFaceCount> normalRoughnessRTVs{};
+    DescriptorHandle depthDSV{};
     std::array<glm::mat4, kFaceCount> viewMatrices{};
     glm::mat4 projectionMatrix{1.0f};
     glm::vec3 captureCenter{0.0f};
@@ -44,9 +50,16 @@ struct LocalReflectionProbeCubemapCaptureState {
 
     void ResetResources() {
         target.reset();
+        normalRoughnessTarget.reset();
+        depthTarget.reset();
+        frameConstants.reset();
         for (auto& rtv : faceRTVs) {
             rtv = {};
         }
+        for (auto& rtv : normalRoughnessRTVs) {
+            rtv = {};
+        }
+        depthDSV = {};
         allocated = false;
         captureCompleted = false;
         captureMode = "none";

@@ -2771,6 +2771,9 @@ void Engine::BuildRecipeScene() {
             ? std::clamp(iblBase + style.brightness * 0.25f, 0.2f, 1.3f)
             : std::clamp(iblBase + style.brightness * 0.10f, 0.20f, 0.60f);
         renderer->SetIBLIntensity(ibl, outdoor ? ibl : ibl * 0.72f);
+        renderer->SetLocalReflectionProbeRadiance(true,
+                                                   outdoor ? 0.16f : 0.22f,
+                                                   outdoor ? 0.16f : 0.20f);
         if (outdoor) {
             renderer->SetBackgroundPresentation(true, 0.95f, 0.0f);
         } else {
@@ -2815,6 +2818,20 @@ void Engine::BuildRecipeScene() {
                                     outdoor ? 1.55f : 1.70f,
                                     outdoor ? 0.66f : 0.58f,
                                     outdoor ? 0.46f : 0.68f);
+    }
+
+    {
+        entt::entity e = m_registry->CreateEntity();
+        m_registry->AddComponent<Scene::TagComponent>(e, outdoor ? "Recipe_Garden_LocalReflectionProbe"
+                                                                 : "Recipe_Room_LocalReflectionProbe");
+        auto& t = m_registry->AddComponent<TransformComponent>(e);
+        t.position = outdoor ? glm::vec3(0.0f, 1.45f, 0.0f) : glm::vec3(0.0f, 1.40f, -0.15f);
+        Scene::ReflectionProbeComponent probe{};
+        probe.extents = outdoor ? glm::vec3(5.25f, 2.50f, 5.25f) : glm::vec3(4.25f, 2.25f, 4.25f);
+        probe.blendDistance = outdoor ? 2.25f : 1.75f;
+        probe.environmentIndex = 0;
+        probe.enabled = 1;
+        m_registry->AddComponent<Scene::ReflectionProbeComponent>(e, probe);
     }
 
     // Soft key light: outdoor stays high like sun fill; interiors use a

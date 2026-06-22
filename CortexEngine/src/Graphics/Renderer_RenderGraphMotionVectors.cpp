@@ -29,9 +29,9 @@ Renderer::ExecuteMotionVectorsInRenderGraph() {
         return result;
     }
 
-    const char* vbMotionEnv = std::getenv("CORTEX_ENABLE_VB_MOTION_VECTORS");
+    const char* disableVbMotionEnv = std::getenv("CORTEX_DISABLE_VB_MOTION_VECTORS");
     const bool allowVisibilityBufferMotion =
-        vbMotionEnv && std::string(vbMotionEnv) == "1";
+        !(disableVbMotionEnv && std::string(disableVbMotionEnv) == "1");
     const bool useVisibilityBufferMotion =
         allowVisibilityBufferMotion &&
         m_vb.State().enabled &&

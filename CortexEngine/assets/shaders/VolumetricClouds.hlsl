@@ -3,31 +3,7 @@
 // Reference: "Real-Time Volumetric Cloudscapes" - Horizon Zero Dawn GDC
 // Reference: "The Real-Time Volumetric Cloudscapes of Horizon" - SIGGRAPH 2015
 
-#include "Common.hlsli"
-
-// Cloud layer parameters
-cbuffer CloudsCB : register(b6) {
-    float4 g_CloudLayerParams;      // x=lowAltitude, y=highAltitude, z=coverage, w=density
-    float4 g_CloudShapeParams;      // x=baseScale, y=detailScale, z=erosion, w=curliness
-    float4 g_CloudLightParams;      // x=absorb, y=scatter, z=ambientMult, w=sunMult
-    float4 g_CloudAnimParams;       // xy=windDir, z=windSpeed, w=time
-    float4 g_SunDirection;          // xyz=direction, w=intensity
-    float4 g_SunColor;              // xyz=color, w=unused
-    float4 g_AmbientColor;          // xyz=ambient, w=unused
-    float4 g_CloudColor;            // xyz=base cloud color, w=unused
-    float4x4 g_InvViewProj;
-    float4 g_CameraPosition;
-    float4 g_RaymarchParams;        // x=maxSteps, y=stepSize, z=jitter, w=unused
-};
-
-// Noise textures
-Texture3D<float> g_ShapeNoise : register(t10);      // Low-freq Worley/Perlin
-Texture3D<float> g_DetailNoise : register(t11);     // High-freq detail
-Texture2D<float2> g_CurlNoise : register(t12);      // 2D curl noise for distortion
-Texture2D<float> g_WeatherMap : register(t13);      // Coverage/type map
-
-SamplerState g_LinearWrap : register(s0);
-SamplerState g_PointWrap : register(s1);
+#include "FrameConstants.hlsli"
 
 // Constants
 static const float EARTH_RADIUS = 6371000.0;        // meters
@@ -35,15 +11,123 @@ static const float CLOUD_TOP_OFFSET = 10000.0;      // Cloud layer offset from v
 static const int MAX_STEPS = 64;
 static const int LIGHT_STEPS = 6;
 
+static const float CLOUD_LOW_ALTITUDE = 1100.0f;
+static const float CLOUD_HIGH_ALTITUDE = 3600.0f;
+static const float CLOUD_COVERAGE = 0.58f;
+static const float CLOUD_DENSITY = 0.00042f;
+static const float CLOUD_BASE_SCALE = 0.74f;
+static const float CLOUD_DETAIL_SCALE = 1.85f;
+static const float CLOUD_EROSION = 0.46f;
+static const float CLOUD_CURLINESS = 0.85f;
+static const float CLOUD_ABSORPTION = 0.00018f;
+static const float CLOUD_SCATTERING = 0.00024f;
+static const float CLOUD_AMBIENT_MULT = 0.78f;
+static const float CLOUD_SUN_MULT = 3.2f;
+static const float CLOUD_STEP_SIZE = 155.0f;
+static const float3 CLOUD_BASE_COLOR = float3(0.78f, 0.82f, 0.78f);
+static const float2 CLOUD_WIND_DIR = normalize(float2(0.72f, 0.31f));
+static const float CLOUD_WIND_SPEED = 38.0f;
+
 // Remapping utility
 float Remap(float value, float oldMin, float oldMax, float newMin, float newMax) {
     return newMin + (value - oldMin) / (oldMax - oldMin) * (newMax - newMin);
 }
 
+float Hash31(float3 p) {
+    p = frac(p * float3(0.1031f, 0.11369f, 0.13787f));
+    p += dot(p, p.yzx + 19.19f);
+    return frac((p.x + p.y) * p.z);
+}
+
+float ValueNoise3D(float3 p) {
+    float3 i = floor(p);
+    float3 f = frac(p);
+    float3 u = f * f * (3.0f - 2.0f * f);
+
+    float n000 = Hash31(i + float3(0.0f, 0.0f, 0.0f));
+    float n100 = Hash31(i + float3(1.0f, 0.0f, 0.0f));
+    float n010 = Hash31(i + float3(0.0f, 1.0f, 0.0f));
+    float n110 = Hash31(i + float3(1.0f, 1.0f, 0.0f));
+    float n001 = Hash31(i + float3(0.0f, 0.0f, 1.0f));
+    float n101 = Hash31(i + float3(1.0f, 0.0f, 1.0f));
+    float n011 = Hash31(i + float3(0.0f, 1.0f, 1.0f));
+    float n111 = Hash31(i + float3(1.0f, 1.0f, 1.0f));
+
+    float nx00 = lerp(n000, n100, u.x);
+    float nx10 = lerp(n010, n110, u.x);
+    float nx01 = lerp(n001, n101, u.x);
+    float nx11 = lerp(n011, n111, u.x);
+    float nxy0 = lerp(nx00, nx10, u.y);
+    float nxy1 = lerp(nx01, nx11, u.y);
+    return lerp(nxy0, nxy1, u.z);
+}
+
+float FBM3D(float3 p) {
+    float value = 0.0f;
+    float amp = 0.5f;
+    [unroll]
+    for (int i = 0; i < 5; ++i) {
+        value += ValueNoise3D(p) * amp;
+        p = p * 2.03f + float3(17.1f, 31.7f, 11.3f);
+        amp *= 0.5f;
+    }
+    return value;
+}
+
+float2 Hash22(float2 p) {
+    float3 p3 = frac(float3(p.xyx) * float3(0.1031f, 0.1030f, 0.0973f));
+    p3 += dot(p3, p3.yzx + 33.33f);
+    return frac((p3.xx + p3.yz) * p3.zy);
+}
+
+float ValueNoise2D(float2 p) {
+    float2 i = floor(p);
+    float2 f = frac(p);
+    float2 u = f * f * (3.0f - 2.0f * f);
+    float a = Hash22(i).x;
+    float b = Hash22(i + float2(1.0f, 0.0f)).x;
+    float c = Hash22(i + float2(0.0f, 1.0f)).x;
+    float d = Hash22(i + float2(1.0f, 1.0f)).x;
+    return lerp(lerp(a, b, u.x), lerp(c, d, u.x), u.y);
+}
+
+float FBM2D(float2 p) {
+    float value = 0.0f;
+    float amp = 0.5f;
+    [unroll]
+    for (int i = 0; i < 4; ++i) {
+        value += ValueNoise2D(p) * amp;
+        p = p * 2.07f + 9.71f;
+        amp *= 0.5f;
+    }
+    return value;
+}
+
+float2 CurlNoise2D(float2 p) {
+    const float e = 0.15f;
+    float dx = FBM2D(p + float2(e, 0.0f)) - FBM2D(p - float2(e, 0.0f));
+    float dy = FBM2D(p + float2(0.0f, e)) - FBM2D(p - float2(0.0f, e));
+    return float2(dy, -dx);
+}
+
+float3 GetCloudSunDirection() {
+    if (g_LightCount.x > 0 && (uint)g_Lights[0].position_type.w == 0u) {
+        return normalize(g_Lights[0].direction_cosInner.xyz);
+    }
+    return normalize(float3(0.35f, 0.70f, 0.55f));
+}
+
+float3 GetCloudSunColor() {
+    if (g_LightCount.x > 0 && (uint)g_Lights[0].position_type.w == 0u) {
+        return max(g_Lights[0].color_range.rgb, 0.0f.xxx);
+    }
+    return float3(1.0f, 0.86f, 0.62f);
+}
+
 // Get height fraction within cloud layer (0 at bottom, 1 at top)
 float GetHeightFraction(float altitude) {
-    float lowAlt = g_CloudLayerParams.x;
-    float highAlt = g_CloudLayerParams.y;
+    float lowAlt = CLOUD_LOW_ALTITUDE;
+    float highAlt = CLOUD_HIGH_ALTITUDE;
     return saturate((altitude - lowAlt) / (highAlt - lowAlt));
 }
 
@@ -72,32 +156,31 @@ float GetDensityHeightGradient(float heightFraction, float cloudType) {
 
 // Sample weather map for coverage and cloud type
 float2 SampleWeatherMap(float2 worldXZ) {
-    float2 uv = worldXZ * 0.00001 + g_CloudAnimParams.xy * g_CloudAnimParams.z * g_CloudAnimParams.w * 0.001;
-    float2 weather = g_WeatherMap.SampleLevel(g_LinearWrap, uv, 0);
-    return weather;  // x=coverage, y=cloudType
+    float t = g_TimeAndExposure.x;
+    float2 uv = worldXZ * 0.000010f + CLOUD_WIND_DIR * CLOUD_WIND_SPEED * t * 0.000025f;
+    float coverage = smoothstep(0.30f, 0.78f, FBM2D(uv * 2.1f));
+    float type = saturate(FBM2D(uv * 0.85f + 41.0f) * 1.15f);
+    return float2(coverage, type);  // x=coverage, y=cloudType
 }
 
 // Sample low-frequency shape noise
 float SampleShapeNoise(float3 position) {
-    float3 uvw = position * g_CloudShapeParams.x * 0.0001;
-    uvw.xy += g_CloudAnimParams.xy * g_CloudAnimParams.z * g_CloudAnimParams.w * 0.0001;
+    float t = g_TimeAndExposure.x;
+    float3 uvw = position * CLOUD_BASE_SCALE * 0.00011f;
+    uvw.xz += CLOUD_WIND_DIR * CLOUD_WIND_SPEED * t * 0.000030f;
 
-    float noise = g_ShapeNoise.SampleLevel(g_LinearWrap, uvw, 0);
-
-    // Apply curl distortion
-    float2 curlUV = position.xz * 0.00005;
-    float2 curl = g_CurlNoise.SampleLevel(g_LinearWrap, curlUV, 0) * 2.0 - 1.0;
-    uvw.xz += curl * g_CloudShapeParams.w * 0.1;
-
-    return noise;
+    float2 curl = CurlNoise2D(position.xz * 0.000055f + t * 0.004f);
+    uvw.xz += curl * CLOUD_CURLINESS * 0.22f;
+    return FBM3D(uvw);
 }
 
 // Sample high-frequency detail noise
 float SampleDetailNoise(float3 position, float mipLevel) {
-    float3 uvw = position * g_CloudShapeParams.y * 0.001;
-    uvw.xy += g_CloudAnimParams.xy * g_CloudAnimParams.z * g_CloudAnimParams.w * 0.0005;
+    float t = g_TimeAndExposure.x;
+    float3 uvw = position * CLOUD_DETAIL_SCALE * 0.00062f;
+    uvw.xz += CLOUD_WIND_DIR * CLOUD_WIND_SPEED * t * 0.000075f;
 
-    return g_DetailNoise.SampleLevel(g_LinearWrap, uvw, mipLevel);
+    return FBM3D(uvw);
 }
 
 // Full density sample at position
@@ -112,7 +195,7 @@ float SampleCloudDensity(float3 position, float mipLevel, bool sampleDetail) {
 
     // Sample weather map
     float2 weather = SampleWeatherMap(position.xz);
-    float coverage = weather.x * g_CloudLayerParams.z;
+    float coverage = weather.x * CLOUD_COVERAGE;
     float cloudType = weather.y;
 
     // Height gradient
@@ -134,12 +217,12 @@ float SampleCloudDensity(float3 position, float mipLevel, bool sampleDetail) {
         float detail = SampleDetailNoise(position, mipLevel);
 
         // Erode edges with detail
-        float erosion = g_CloudShapeParams.z;
+        float erosion = CLOUD_EROSION;
         float detailModifier = lerp(detail, 1.0 - detail, saturate(heightFraction * 5.0));
         density = saturate(Remap(density, detailModifier * erosion, 1.0, 0.0, 1.0));
     }
 
-    return density * g_CloudLayerParams.w;
+    return density * CLOUD_DENSITY;
 }
 
 // Beer-Lambert light extinction
@@ -161,8 +244,8 @@ float HenyeyGreenstein(float cosAngle, float g) {
 
 // Light marching toward sun
 float LightMarch(float3 position) {
-    float3 lightDir = normalize(g_SunDirection.xyz);
-    float stepSize = (g_CloudLayerParams.y - g_CloudLayerParams.x) / float(LIGHT_STEPS);
+    float3 lightDir = GetCloudSunDirection();
+    float stepSize = (CLOUD_HIGH_ALTITUDE - CLOUD_LOW_ALTITUDE) / float(LIGHT_STEPS);
 
     float totalDensity = 0.0;
     float3 lightPos = position;
@@ -174,7 +257,7 @@ float LightMarch(float3 position) {
         totalDensity += density * stepSize;
     }
 
-    float transmittance = BeerLambert(totalDensity, g_CloudLightParams.x);
+    float transmittance = BeerLambert(totalDensity, CLOUD_ABSORPTION);
     return transmittance;
 }
 
@@ -201,8 +284,8 @@ bool RaySphereIntersect(float3 rayOrigin, float3 rayDir, float3 sphereCenter, fl
 void GetCloudLayerIntersection(float3 rayOrigin, float3 rayDir,
                                 out float nearDist, out float farDist) {
     // Simplified planar layers for now
-    float lowAlt = g_CloudLayerParams.x;
-    float highAlt = g_CloudLayerParams.y;
+    float lowAlt = CLOUD_LOW_ALTITUDE;
+    float highAlt = CLOUD_HIGH_ALTITUDE;
 
     // Ray-plane intersection
     if (abs(rayDir.y) < 0.0001) {
@@ -220,7 +303,7 @@ void GetCloudLayerIntersection(float3 rayOrigin, float3 rayDir,
 
 // Main raymarching
 float4 RaymarchClouds(float3 rayOrigin, float3 rayDir, float maxDist, float dither) {
-    float3 sunDir = normalize(g_SunDirection.xyz);
+    float3 sunDir = GetCloudSunDirection();
     float cosAngle = dot(rayDir, sunDir);
 
     // Phase functions
@@ -239,8 +322,8 @@ float4 RaymarchClouds(float3 rayOrigin, float3 rayDir, float maxDist, float dith
     farDist = min(farDist, maxDist);
 
     // Raymarch parameters
-    float stepSize = g_RaymarchParams.y;
-    int maxSteps = int(g_RaymarchParams.x);
+    float stepSize = CLOUD_STEP_SIZE;
+    int maxSteps = MAX_STEPS;
 
     // Dithered start position
     float t = nearDist + dither * stepSize;
@@ -265,17 +348,17 @@ float4 RaymarchClouds(float3 rayOrigin, float3 rayDir, float maxDist, float dith
             float lightTransmit = LightMarch(pos);
 
             // Scattering
-            float3 ambient = g_AmbientColor.rgb * g_CloudLightParams.z;
-            float3 sun = g_SunColor.rgb * lightTransmit * phase * g_CloudLightParams.w;
+            float3 ambient = g_AmbientColor.rgb * CLOUD_AMBIENT_MULT;
+            float3 sun = GetCloudSunColor() * lightTransmit * phase * CLOUD_SUN_MULT;
 
-            float3 luminance = g_CloudColor.rgb * (ambient + sun);
+            float3 luminance = CLOUD_BASE_COLOR * (ambient + sun);
 
             // Powder effect
             float powder = PowderEffect(density * stepSize, cosAngle);
             luminance *= powder;
 
             // Accumulate
-            float sampleTransmit = BeerLambert(density * stepSize, g_CloudLightParams.y);
+            float sampleTransmit = BeerLambert(density * stepSize, CLOUD_SCATTERING);
             float3 integScatter = luminance * (1.0 - sampleTransmit);
 
             scatteredLight += integScatter * transmittance;
@@ -313,7 +396,7 @@ VSOutput VSMain(uint vertexID : SV_VertexID) {
     // Reconstruct world ray
     float4 clipPos = float4(output.texCoord * 2.0 - 1.0, 1.0, 1.0);
     clipPos.y = -clipPos.y;
-    float4 worldPos = mul(g_InvViewProj, clipPos);
+    float4 worldPos = mul(g_InvViewProjMatrix, clipPos);
     worldPos.xyz /= worldPos.w;
 
     output.rayDir = normalize(worldPos.xyz - g_CameraPosition.xyz);
@@ -328,7 +411,7 @@ float4 PSMain(VSOutput input) : SV_Target {
 
     // Blue noise dithering for raymarching
     float dither = frac(sin(dot(input.position.xy, float2(12.9898, 78.233))) * 43758.5453);
-    dither = lerp(dither, 0.5, 1.0 - g_RaymarchParams.z);
+    dither = lerp(dither, 0.5, 0.18);
 
     // Maximum ray distance
     float maxDist = 50000.0;

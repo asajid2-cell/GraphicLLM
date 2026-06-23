@@ -50,6 +50,7 @@ struct RendererPipelineReadiness {
 
     bool skybox = false;
     bool proceduralSky = false;
+    bool volumetricClouds = false;
     bool debugLine = false;
     bool water = false;
     bool waterOverlay = false;
@@ -103,6 +104,7 @@ struct RendererPipelineState {
 
     std::unique_ptr<DX12Pipeline> skybox;
     std::unique_ptr<DX12Pipeline> proceduralSky;
+    std::unique_ptr<DX12Pipeline> volumetricClouds;
     std::unique_ptr<DX12Pipeline> debugLine;
     std::unique_ptr<DX12Pipeline> water;
     std::unique_ptr<DX12Pipeline> waterOverlay;
@@ -151,6 +153,7 @@ struct RendererPipelineState {
         readiness.bloomComposite = bloomComposite != nullptr;
         readiness.skybox = skybox != nullptr;
         readiness.proceduralSky = proceduralSky != nullptr;
+        readiness.volumetricClouds = volumetricClouds != nullptr;
         readiness.debugLine = debugLine != nullptr;
         readiness.water = water != nullptr;
         readiness.waterOverlay = waterOverlay != nullptr;
@@ -197,6 +200,7 @@ struct RendererPipelineState {
         bloomComposite.reset();
         skybox.reset();
         proceduralSky.reset();
+        volumetricClouds.reset();
         debugLine.reset();
         water.reset();
         waterOverlay.reset();

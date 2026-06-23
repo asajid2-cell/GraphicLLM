@@ -13,6 +13,8 @@ struct RendererCompiledShaders {
 
     std::optional<ShaderBytecode> skyboxVS;
     std::optional<ShaderBytecode> skyboxPS;
+    std::optional<ShaderBytecode> volumetricCloudsVS;
+    std::optional<ShaderBytecode> volumetricCloudsPS;
 
     ShaderBytecode shadowVS;
     std::optional<ShaderBytecode> shadowAlphaPS;

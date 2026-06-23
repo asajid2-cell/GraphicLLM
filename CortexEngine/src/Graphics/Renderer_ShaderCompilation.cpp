@@ -39,6 +39,24 @@ Result<RendererCompiledShaders> Renderer::CompileRendererPipelineShaders() {
         shaders.skyboxPS = std::move(skyboxPsResult).Value();
     }
 
+    auto volumetricCloudsVsResult =
+        ShaderCompiler::CompileFromFile("assets/shaders/VolumetricClouds.hlsl", "VSMain", "vs_5_1");
+    if (volumetricCloudsVsResult.IsOk()) {
+        shaders.volumetricCloudsVS = std::move(volumetricCloudsVsResult).Value();
+    } else {
+        spdlog::warn("Failed to compile volumetric clouds vertex shader: {}",
+                     volumetricCloudsVsResult.Error());
+    }
+
+    auto volumetricCloudsPsResult =
+        ShaderCompiler::CompileFromFile("assets/shaders/VolumetricClouds.hlsl", "PSMain", "ps_5_1");
+    if (volumetricCloudsPsResult.IsOk()) {
+        shaders.volumetricCloudsPS = std::move(volumetricCloudsPsResult).Value();
+    } else {
+        spdlog::warn("Failed to compile volumetric clouds pixel shader: {}",
+                     volumetricCloudsPsResult.Error());
+    }
+
     auto shadowVsResult = ShaderCompiler::CompileFromFile("assets/shaders/Basic.hlsl", "VSShadow", "vs_5_1");
     if (shadowVsResult.IsErr()) {
         return Result<RendererCompiledShaders>::Err(

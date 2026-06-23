@@ -308,6 +308,39 @@ float3 SampleEnvDiffuse(float3 dir, uint diffuseIndex, float mipLevel)
     return g_EnvDiffuse.SampleLevel(g_LinearSampler, uv, mipLevel).rgb;
 }
 
+float3 SampleEnvDiffuseSH9(float3 normal, uint diffuseIndex, float mipLevel)
+{
+    float3 n = normalize(normal);
+    if (!all(isfinite(n)) || length(n) < 1e-4f) {
+        n = float3(0.0f, 1.0f, 0.0f);
+    }
+
+    float3 up = (abs(n.y) < 0.96f) ? float3(0.0f, 1.0f, 0.0f) : float3(1.0f, 0.0f, 0.0f);
+    float3 t = normalize(cross(up, n));
+    float3 b = normalize(cross(n, t));
+
+    // Keep three mips above the 1x1 endpoint so the nine low-order samples retain
+    // broad directional color while still filtering away panorama detail.
+    float shMip = max(mipLevel - 3.0f, 0.0f);
+    float3 irradiance = SampleEnvDiffuse(n, diffuseIndex, shMip) * 0.28f;
+
+    float axisN = 0.72f;
+    float axisT = 0.69f;
+    irradiance += SampleEnvDiffuse(normalize(n * axisN + t * axisT), diffuseIndex, shMip) * 0.11f;
+    irradiance += SampleEnvDiffuse(normalize(n * axisN - t * axisT), diffuseIndex, shMip) * 0.11f;
+    irradiance += SampleEnvDiffuse(normalize(n * axisN + b * axisT), diffuseIndex, shMip) * 0.11f;
+    irradiance += SampleEnvDiffuse(normalize(n * axisN - b * axisT), diffuseIndex, shMip) * 0.11f;
+
+    float diagN = 0.58f;
+    float diagTB = 0.575f;
+    irradiance += SampleEnvDiffuse(normalize(n * diagN + ( t + b) * diagTB), diffuseIndex, shMip) * 0.07f;
+    irradiance += SampleEnvDiffuse(normalize(n * diagN + (-t + b) * diagTB), diffuseIndex, shMip) * 0.07f;
+    irradiance += SampleEnvDiffuse(normalize(n * diagN + ( t - b) * diagTB), diffuseIndex, shMip) * 0.07f;
+    irradiance += SampleEnvDiffuse(normalize(n * diagN + (-t - b) * diagTB), diffuseIndex, shMip) * 0.07f;
+
+    return max(irradiance, 0.0f.xxx);
+}
+
 float3 SampleEnvSpecular(float3 dir, float mipLevel, uint specularIndex)
 {
     float2 uv = DirectionToLatLong(RotateEnvironmentDirection(dir));
@@ -1743,14 +1776,11 @@ float4 PSMain(VSOutput input) : SV_Target0 {
     // environment, but local probes can contribute low-frequency room
     // radiance for enclosed scenes without making an external HDRI visible.
     if ((iblEnabled && g_EnvParams.x > 0.0f) || localProbeDiffuseScale > 0.0f) {
-        // Match the forward path: the active diffuse environment is sampled at
-        // its highest mip so raw equirectangular room detail does not project
-        // sharply onto broad matte receivers.
         float3 irradianceGlobal = iblEnabled
-            ? SampleEnvDiffuse(diffuseAoNormal, INVALID_BINDLESS_INDEX, diffuseMip)
+            ? SampleEnvDiffuseSH9(diffuseAoNormal, INVALID_BINDLESS_INDEX, diffuseMip)
             : 0.0f.xxx;
         float3 irradianceLocal = localProbeTextureRadianceAllowed && diffuseEnvIndex != INVALID_BINDLESS_INDEX
-            ? SampleEnvDiffuse(diffuseAoNormal, diffuseEnvIndex, diffuseMip)
+            ? SampleEnvDiffuseSH9(diffuseAoNormal, diffuseEnvIndex, diffuseMip)
             : ComputeSceneLocalProbeDiffuse(diffuseAoNormal, surfaceClass, sceneMaterialClass);
         diffuseIBL = irradianceGlobal * albedoColor * kD_ibl;
         diffuseIBL += irradianceLocal * albedoColor * kD_ibl * localProbeDiffuseScale * probeWeight;
@@ -2286,10 +2316,10 @@ FullSceneLightingV3Output PSMainV3LightingSplit(VSOutput input) {
     float3 specularIBL = 0.0f.xxx;
     if ((iblEnabled && g_EnvParams.x > 0.0f) || localProbeDiffuseScale > 0.0f) {
         float3 irradianceGlobal = iblEnabled
-            ? SampleEnvDiffuse(diffuseAoNormal, INVALID_BINDLESS_INDEX, diffuseMip)
+            ? SampleEnvDiffuseSH9(diffuseAoNormal, INVALID_BINDLESS_INDEX, diffuseMip)
             : 0.0f.xxx;
         float3 irradianceLocal = localProbeTextureRadianceAllowed && diffuseEnvIndex != INVALID_BINDLESS_INDEX
-            ? SampleEnvDiffuse(diffuseAoNormal, diffuseEnvIndex, diffuseMip)
+            ? SampleEnvDiffuseSH9(diffuseAoNormal, diffuseEnvIndex, diffuseMip)
             : ComputeSceneLocalProbeDiffuse(diffuseAoNormal, surfaceClass, sceneMaterialClass);
         diffuseIBL = irradianceGlobal * albedoColor * kD_ibl;
         diffuseIBL += irradianceLocal * albedoColor * kD_ibl * localProbeDiffuseScale * probeWeight;

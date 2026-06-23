@@ -603,6 +603,48 @@ float3 RotateEnvironmentDirection(float3 dir)
     return normalize(float3(c * dir.x + s * dir.z, dir.y, -s * dir.x + c * dir.z));
 }
 
+float3 SampleGlobalDiffuseIrradianceSH9(float3 normal, float mipLevel)
+{
+    float3 n = normalize(normal);
+    if (!all(isfinite(n)) || length(n) < 1e-4f) {
+        n = float3(0.0f, 1.0f, 0.0f);
+    }
+
+    float3 up = (abs(n.y) < 0.96f) ? float3(0.0f, 1.0f, 0.0f) : float3(1.0f, 0.0f, 0.0f);
+    float3 t = normalize(cross(up, n));
+    float3 b = normalize(cross(n, t));
+
+    // Low-order SH-style irradiance: nine coarse samples around the cosine
+    // lobe, filtered above the 1x1 endpoint to preserve broad directional tint.
+    float shMip = max(mipLevel - 3.0f, 0.0f);
+    float3 irradiance = g_EnvDiffuse.SampleLevel(
+        g_Sampler, DirectionToLatLong(RotateEnvironmentDirection(n)), shMip).rgb * 0.28f;
+
+    float axisN = 0.72f;
+    float axisT = 0.69f;
+    irradiance += g_EnvDiffuse.SampleLevel(
+        g_Sampler, DirectionToLatLong(RotateEnvironmentDirection(normalize(n * axisN + t * axisT))), shMip).rgb * 0.11f;
+    irradiance += g_EnvDiffuse.SampleLevel(
+        g_Sampler, DirectionToLatLong(RotateEnvironmentDirection(normalize(n * axisN - t * axisT))), shMip).rgb * 0.11f;
+    irradiance += g_EnvDiffuse.SampleLevel(
+        g_Sampler, DirectionToLatLong(RotateEnvironmentDirection(normalize(n * axisN + b * axisT))), shMip).rgb * 0.11f;
+    irradiance += g_EnvDiffuse.SampleLevel(
+        g_Sampler, DirectionToLatLong(RotateEnvironmentDirection(normalize(n * axisN - b * axisT))), shMip).rgb * 0.11f;
+
+    float diagN = 0.58f;
+    float diagTB = 0.575f;
+    irradiance += g_EnvDiffuse.SampleLevel(
+        g_Sampler, DirectionToLatLong(RotateEnvironmentDirection(normalize(n * diagN + ( t + b) * diagTB))), shMip).rgb * 0.07f;
+    irradiance += g_EnvDiffuse.SampleLevel(
+        g_Sampler, DirectionToLatLong(RotateEnvironmentDirection(normalize(n * diagN + (-t + b) * diagTB))), shMip).rgb * 0.07f;
+    irradiance += g_EnvDiffuse.SampleLevel(
+        g_Sampler, DirectionToLatLong(RotateEnvironmentDirection(normalize(n * diagN + ( t - b) * diagTB))), shMip).rgb * 0.07f;
+    irradiance += g_EnvDiffuse.SampleLevel(
+        g_Sampler, DirectionToLatLong(RotateEnvironmentDirection(normalize(n * diagN + (-t - b) * diagTB))), shMip).rgb * 0.07f;
+
+    return max(irradiance, 0.0f.xxx);
+}
+
 float EnvReflectionFootprintMip(float2 uv, float width, float height, float maxMip)
 {
     float2 dx = ddx(uv);
@@ -1589,12 +1631,9 @@ float3 CalculateLighting(float3 normal, float3 worldPos, float3 albedo, float me
         g_EnvSpecular.GetDimensions(0, specWidth, specHeight, specMips);
         float maxMip = specMips > 0 ? float(specMips - 1) : 0.0f;
 
-        // The current environment assets are raw equirectangular maps, not
-        // separately convolved irradiance maps. Use the highest mip as a
-        // low-frequency irradiance approximation so diffuse IBL does not
-        // project sharp HDRI room details onto every matte surface.
-        float2 envUV = DirectionToLatLong(RotateEnvironmentDirection(N));
-        float3 irradiance = g_EnvDiffuse.SampleLevel(g_Sampler, envUV, maxMip).rgb;
+        // The diffuse environment is raw equirectangular input, so evaluate a
+        // filtered nine-sample SH-style lobe instead of a single 1x1 top mip.
+        float3 irradiance = SampleGlobalDiffuseIrradianceSH9(N, maxMip);
 
         float3 kd = (1.0f - metallic) * (1.0f - FresnelSchlickRoughness(NdotV, F0, roughness));
         kd = ApplySheenEnergyConservation(kd, sheenWeight, roughness);

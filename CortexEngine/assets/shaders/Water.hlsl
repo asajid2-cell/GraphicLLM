@@ -333,13 +333,77 @@ float3 LiquidReflectionPalette(float3 R,
 float LiquidSpecularGlint(float3 R, float3 L, float NdotV, float viscosity, float flowNoise)
 {
     float alignment = saturate(dot(R, L));
-    float sharpPower = lerp(420.0f, 58.0f, viscosity);
-    float broadPower = lerp(36.0f, 12.0f, viscosity);
+    float sharpPower = lerp(760.0f, 78.0f, viscosity);
+    float broadPower = lerp(48.0f, 15.0f, viscosity);
     float sharp = pow(alignment, sharpPower);
     float broad = pow(alignment, broadPower) * (0.35f + 0.65f * viscosity);
     float grazing = pow(saturate(1.0f - NdotV), 1.65f);
-    float brokenSurface = 0.74f + 0.26f * flowNoise;
-    return (sharp + broad * 0.42f + grazing * 0.08f) * brokenSurface;
+    float brokenSurface = 0.68f + 0.32f * flowNoise;
+    return (sharp * 1.35f + broad * 0.48f + grazing * 0.06f) * brokenSurface;
+}
+
+float2 MultiOctaveWaterSlope(float2 worldXZ, float2 primaryDir, float time, float flowSpeed, float viscosity)
+{
+    float2 d0 = normalize(primaryDir);
+    if (!all(isfinite(d0)) || dot(d0, d0) < 0.25f)
+    {
+        d0 = float2(0.82f, 0.57f);
+    }
+
+    float2 d1 = normalize(float2(-d0.y, d0.x) * 0.74f + d0 * 0.26f);
+    float2 d2 = normalize(float2(d0.x * 0.38f - d0.y * 0.92f, d0.x * 0.92f + d0.y * 0.38f));
+    float speed = max(flowSpeed, 0.12f);
+    float calm = lerp(1.0f, 0.32f, viscosity);
+
+    float2 slope = 0.0f.xx;
+    float k0 = 0.42f;
+    float k1 = 0.83f;
+    float k2 = 1.72f;
+    float p0 = dot(worldXZ, d0) * k0 + time * speed * 0.38f;
+    float p1 = dot(worldXZ, d1) * k1 - time * speed * 0.27f + 1.7f;
+    float p2 = dot(worldXZ, d2) * k2 + time * speed * 0.18f + 3.1f;
+
+    slope += d0 * cos(p0) * (0.44f * k0);
+    slope += d1 * cos(p1) * (0.20f * k1);
+    slope += d2 * cos(p2) * (0.070f * k2);
+
+    float2 noiseP = worldXZ * 0.23f + d0 * (time * speed * 0.035f);
+    float2 brokenSwell = float2(FBM(noiseP), FBM(noiseP * 1.67f + 31.4f)) * 2.0f - 1.0f;
+    slope += brokenSwell * 0.040f;
+    return slope * calm;
+}
+
+float SunGlitterRoad(float3 worldPos,
+                     float3 cameraPos,
+                     float3 L,
+                     float3 R,
+                     float NdotV,
+                     float viscosity,
+                     float flowNoise,
+                     float time)
+{
+    float2 sunXZ = normalize(L.xz);
+    if (!all(isfinite(sunXZ)) || dot(sunXZ, sunXZ) < 0.25f)
+    {
+        sunXZ = float2(0.28f, 0.96f);
+    }
+
+    float2 viewXZ = worldPos.xz - cameraPos.xz;
+    float viewLen = max(length(viewXZ), 1.0e-3f);
+    float2 toWater = viewXZ / viewLen;
+    float roadCenter = saturate(dot(toWater, sunXZ));
+    float roadWidth = smoothstep(0.48f, 0.96f, roadCenter);
+    float distanceLift = smoothstep(4.0f, 42.0f, viewLen) * (1.0f - smoothstep(88.0f, 150.0f, viewLen));
+
+    float sparkleA = FBM(worldPos.xz * 10.5f + float2(time * 0.62f, -time * 0.34f));
+    float sparkleB = FBM(worldPos.xz * 27.0f + float2(-time * 0.74f, time * 0.49f));
+    float beadMask = smoothstep(0.58f, 0.92f, sparkleA) * smoothstep(0.50f, 0.88f, sparkleB);
+    float sunAlignment = saturate(dot(R, L));
+    float sharpBeads = pow(sunAlignment, lerp(1320.0f, 210.0f, viscosity)) * beadMask;
+    float brokenTrack = pow(roadCenter, lerp(18.0f, 8.0f, viscosity)) * distanceLift;
+    float fresnelTrack = pow(saturate(1.0f - NdotV), 1.15f);
+
+    return (sharpBeads * 2.1f + brokenTrack * (0.08f + flowNoise * 0.15f) * (0.45f + fresnelTrack)) * roadWidth;
 }
 
 float3 GetAtmosphereSunDirection()
@@ -410,6 +474,44 @@ float3 ApplyAerialPerspective(float3 hdrColor, float3 worldPos)
     return lerp(hdrColor, fogTint, fogAmount);
 }
 
+float3 ApplyWaterHorizonBlend(float3 hdrColor,
+                              float3 worldPos,
+                              float farEdgeMask,
+                              float3 shallowTint,
+                              float3 deepTint,
+                              float3 sunTint,
+                              float flowNoise)
+{
+    float3 viewVec = worldPos - g_CameraPosition.xyz;
+    float dist = length(viewVec);
+    if (dist <= 1.0e-3f)
+    {
+        return hdrColor;
+    }
+
+    float3 rayDir = viewVec / dist;
+    float horizonRay = 1.0f - smoothstep(0.025f, 0.20f, abs(rayDir.y));
+    float farWater = smoothstep(5.0f, 22.0f, dist);
+    float planeEdgeHaze = saturate(farEdgeMask) * smoothstep(7.0f, 16.0f, dist);
+    float hazeAmount = saturate(horizonRay * farWater + planeEdgeHaze * 0.42f);
+    if (hazeAmount <= 1.0e-4f)
+    {
+        return hdrColor;
+    }
+
+    float3 sunDir = GetAtmosphereSunDirection();
+    float3 safeSunTint = saturate(sunTint);
+    float sunPhase = HazePhaseHG(saturate(dot(rayDir, sunDir)), clamp(g_FogExtraParams.x, -0.45f, 0.55f));
+    float3 warmSky = max(g_AmbientColor.rgb * 2.35f + safeSunTint * 0.14f,
+                         shallowTint * float3(1.04f, 0.94f, 0.76f) + safeSunTint * 0.10f);
+    float3 waterMist = lerp(deepTint * float3(1.05f, 1.14f, 1.08f), warmSky, 0.84f);
+    waterMist += safeSunTint * (0.070f + sunPhase * 0.030f + flowNoise * 0.020f);
+    waterMist = min(waterMist, clamp(g_FogExtraParams.w, 0.28f, 5.0f).xxx);
+
+    float cappedHaze = min(hazeAmount * 0.50f, 0.48f);
+    return lerp(hdrColor, waterMist, cappedHaze);
+}
+
 float4 WaterPS(PSInput input) : SV_TARGET
 {
     float3 N = normalize(input.normal);
@@ -436,8 +538,12 @@ float4 WaterPS(PSInput input) : SV_TARGET
     float flowSpeed = max(g_CoatParams.w, 0.0f);
 
     float t = g_TimeAndExposure.x;
+    float2 primaryWaveDir = g_WaterParams1.xy;
+    float2 largeWaveSlope = MultiOctaveWaterSlope(input.worldPos.xz, primaryWaveDir, t, max(flowSpeed, g_WaterParams0.z), viscosity);
+    N = normalize(N + float3(-largeWaveSlope.x, 0.0f, -largeWaveSlope.y) * lerp(0.24f, 0.055f, viscosity));
+
     float microFreq = lerp(3.20f, 0.85f, viscosity);
-    float microAmp = lerp(0.16f, 0.035f, viscosity) * (1.0f + sloshStrength * 0.65f);
+    float microAmp = lerp(0.18f, 0.035f, viscosity) * (1.0f + sloshStrength * 0.65f);
     float2 microP = input.worldPos.xz * microFreq + float2(t * 0.06f, -t * 0.045f) * max(flowSpeed, 0.15f);
     float2 microRipple = float2(FBM(microP), FBM(microP + 19.37f)) * 2.0f - 1.0f;
     N = normalize(N + float3(microRipple.x, 0.0f, microRipple.y) * microAmp);
@@ -469,7 +575,8 @@ float4 WaterPS(PSInput input) : SV_TARGET
     float thicknessDepth = saturate(bodyThickness * 0.42f + meniscus * 0.35f);
     float viewDistance = length(g_CameraPosition.xyz - input.worldPos);
     float viewDepth = saturate((viewDistance - 10.0f) / 150.0f);
-    float depthMix = saturate(lerp(basinDepth, waveDepth, 0.28f) + absorption * 0.22f + thicknessDepth);
+    float farDepth = smoothstep(18.0f, 120.0f, viewDistance);
+    float depthMix = saturate(lerp(basinDepth, waveDepth, 0.28f) + absorption * 0.22f + thicknessDepth + farDepth * 0.13f);
 
     float flowNoise = FBM(input.worldPos.xz * lerp(0.17f, 0.32f, 1.0f - viscosity) +
                           float2(t * 0.035f, -t * 0.025f) * max(flowSpeed, 0.1f));
@@ -481,7 +588,7 @@ float4 WaterPS(PSInput input) : SV_TARGET
     float3 baseColor = lerp(shallowProfile, deepProfile, depthMix);
     if (liquidType == 0u)
     {
-        depthMix = saturate(depthMix + viewDepth * 0.24f);
+        depthMix = saturate(depthMix + viewDepth * 0.32f);
         float3 clearWaterTint = lerp(shallowProfile * float3(1.10f, 1.22f, 1.18f),
                                      deepProfile * float3(0.85f, 1.05f, 1.35f),
                                      saturate(depthMix + viewDepth * 0.18f));
@@ -605,12 +712,14 @@ float4 WaterPS(PSInput input) : SV_TARGET
     float sparkleNoiseB = FBM(input.worldPos.xz * 19.0f + float2(-t * 0.58f, t * 0.36f));
     float sparkleMask = smoothstep(0.62f, 0.94f, sparkleNoiseA) * smoothstep(0.54f, 0.90f, sparkleNoiseB);
     float sunAlignment = saturate(dot(R, L));
-    float sunSparkle = pow(sunAlignment, lerp(980.0f, 180.0f, viscosity)) * sparkleMask;
+    float sunSparkle = pow(sunAlignment, lerp(1180.0f, 210.0f, viscosity)) * sparkleMask;
+    float sunRoad = SunGlitterRoad(input.worldPos, g_CameraPosition.xyz, L, R, NdotV, viscosity, flowNoise, t);
     float3 glintTint = (liquidType == 0u) ? lerp(float3(0.74f, 0.90f, 0.78f), max(radiance, float3(0.70f, 0.82f, 0.72f)), 0.45f) :
                        (liquidType == 1u) ? float3(1.0f, 0.52f, 0.12f) :
                        (liquidType == 2u) ? float3(1.0f, 0.80f, 0.26f) :
                                             float3(0.92f, 0.56f, 0.24f);
-    color += (glint + sunSparkle * 1.65f) * glintTint * lerp(0.48f, 0.20f, depthMix) * (0.55f + 0.45f * fresnelStrength);
+    float glitterDepthMask = lerp(0.54f, 0.20f, depthMix) * (1.0f - bankDarkening * 0.24f);
+    color += (glint + sunSparkle * 1.90f + sunRoad) * glintTint * glitterDepthMask * (0.55f + 0.45f * fresnelStrength);
 
     float causticNoiseA = FBM(input.worldPos.xz * 2.15f + float2(t * 0.08f, -t * 0.05f));
     float causticNoiseB = FBM(input.worldPos.xz * 4.10f - float2(t * 0.035f, t * 0.045f));
@@ -648,6 +757,10 @@ float4 WaterPS(PSInput input) : SV_TARGET
         naturalBody = lerp(naturalBody, naturalBody * 0.72f + localSilt * 0.24f, bankDarkening * 0.42f);
         naturalBody += surfaceFilm * float3(0.020f, 0.034f, 0.018f) * (1.0f - depthMix * 0.35f);
         float3 sunSheen = glintTint * specular * (0.26f + 0.22f * grazingReflect);
+        float3 fresnelDepthWash = lerp(shallowProfile * float3(1.10f, 1.04f, 0.86f),
+                                       deepProfile * float3(0.82f, 1.06f, 1.24f),
+                                       saturate(depthMix + grazingReflect * 0.22f + farDepth * 0.12f));
+        naturalBody = lerp(naturalBody, fresnelDepthWash, 0.22f + grazingReflect * 0.12f);
         color = lerp(color, naturalBody + reflectedRoom * reflectionWeight * 0.92f + sunSheen, 0.42f);
     }
     else if (liquidType == 1u)
@@ -689,6 +802,11 @@ float4 WaterPS(PSInput input) : SV_TARGET
     alpha = saturate(alpha + bodyThickness * 0.06f + meniscus * 0.08f);
 
     color = ApplyAerialPerspective(color, input.worldPos);
+    if (liquidType == 0u)
+    {
+        float farEdgeMask = smoothstep(0.70f, 0.98f, input.texCoord.y);
+        color = ApplyWaterHorizonBlend(color, input.worldPos, farEdgeMask, shallowProfile, deepProfile, radiance, flowNoise);
+    }
 
     return float4(color, alpha);
 }

@@ -198,6 +198,15 @@ float3 ClampRadianceGI(float3 color, float maxLuma)
     return min(color, 24.0f.xxx);
 }
 
+float3 PreserveLumaSaturationGI(float3 color, float saturation)
+{
+    color = max(color, 0.0f.xxx);
+    float baseLuma = LumaGI(color);
+    float3 enriched = max(lerp(baseLuma.xxx, color, saturation), 0.0f.xxx);
+    float enrichedLuma = max(LumaGI(enriched), 1.0e-4f);
+    return enriched * (baseLuma / enrichedLuma);
+}
+
 float3 AmbientFallbackIncident()
 {
     return max(g_AmbientColor.rgb, 0.0f.xxx) * 0.65f;
@@ -239,7 +248,10 @@ float3 EstimateHitRadiance(RTMaterial material, float3 hitPos)
     bool previousValid = false;
     float3 incident = SamplePreviousFrameIncident(hitPos, previousValid);
 
-    float3 bounced = albedo * incident * diffuseWeight;
+    float3 bleedAlbedo = PreserveLumaSaturationGI(albedo, 1.45f);
+    float chroma = max(max(albedo.r, albedo.g), albedo.b) - min(min(albedo.r, albedo.g), albedo.b);
+    float bounceEnergy = lerp(1.08f, 1.18f, saturate(chroma * 1.6f));
+    float3 bounced = bleedAlbedo * incident * diffuseWeight * bounceEnergy;
     return ClampRadianceGI(emissive + bounced, previousValid ? 12.0f : 4.0f);
 }
 

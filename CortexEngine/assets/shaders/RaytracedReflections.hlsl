@@ -84,6 +84,18 @@ static const uint LIGHT_TYPE_POINT       = 1u;
 static const uint LIGHT_TYPE_SPOT        = 2u;
 static const uint LIGHT_TYPE_AREA_RECT   = 3u;
 
+float LumaReflection(float3 color)
+{
+    return dot(color, float3(0.2126f, 0.7152f, 0.0722f));
+}
+
+float3 ClampReflectionLuma(float3 color, float maxLuma)
+{
+    color = max(color, 0.0f.xxx);
+    float luma = LumaReflection(color);
+    return color * min(1.0f, maxLuma / max(luma, 1.0e-4f));
+}
+
 // Convert a world-space direction into lat-long UVs, matching the IBL
 // sampling used in Basic.hlsl so RT reflections align with the skybox
 // and specular environment lighting.
@@ -298,13 +310,8 @@ float3 EstimateHitSurfaceRadiance(ReflectionPayload payload, float3 hitPoint, fl
         radiance += (diffuse + specular) * lightRadiance * attenuation * NdotL;
     }
 
-    float maxChannel = max(max(radiance.r, radiance.g), radiance.b);
-    const float kMaxHitRadiance = 24.0f;
-    if (maxChannel > kMaxHitRadiance)
-    {
-        radiance *= kMaxHitRadiance / maxChannel;
-    }
-    return max(radiance, 0.0f.xxx);
+    float hitLumaLimit = lerp(6.0f, 1.1f, smoothstep(0.18f, 0.82f, roughness));
+    return ClampReflectionLuma(radiance, hitLumaLimit);
 }
 
 float2 LaunchToUV(uint2 launchIndex, uint2 launchDims)
@@ -661,6 +668,16 @@ void RayGen_Reflection()
         (debugView == 24u)
         ? (initialR * 0.5f + 0.5f)
         : accumulatedColor;
+    float outputLumaLimit = lerp(5.0f, 0.70f, smoothstep(0.18f, 0.82f, roughness));
+    if (sceneMaterialClass == SCENE_MATERIAL_CERAMIC_TILE ||
+        sceneMaterialClass == SCENE_MATERIAL_POLISHED_WOOD)
+    {
+        outputLumaLimit = min(outputLumaLimit, 0.65f);
+    }
+    if (debugView != 24u)
+    {
+        outColor = ClampReflectionLuma(outColor, outputLumaLimit);
+    }
 
     float roughFilteredClass = (sceneMaterialClass == SCENE_MATERIAL_CERAMIC_TILE ||
                                 sceneMaterialClass == SCENE_MATERIAL_POLISHED_WOOD ||

@@ -393,6 +393,7 @@ void CSMain(uint3 dispatchThreadId : SV_DispatchThreadID)
     float stability = SurfaceReflectionStabilityScale(surfaceClass, roughness, metallic);
     stability *= lerp(1.0f, 0.82f, saturate(g_CinematicStabilityParams.x) * saturate(materialReflectance * gloss));
     float alpha = saturate(authorizedPotential * ceiling * stability);
-    float fireflyClamp = clamp(g_RTReflectionParams.z, 4.0f, 32.0f);
+    float fireflyClamp = min(clamp(g_RTReflectionParams.z, 0.65f, 8.0f),
+                             lerp(5.0f, 0.65f, smoothstep(0.25f, 0.85f, roughness)));
     g_OutputRadiance[dispatchThreadId.xy] = float4(SoftLimitReflectionLuma(source, fireflyClamp), alpha);
 }

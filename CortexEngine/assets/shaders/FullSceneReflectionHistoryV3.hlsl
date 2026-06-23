@@ -168,8 +168,10 @@ PSOutput PSMain(VSOutput input) {
     CurrentRadianceNeighborhoodStats(p, maxPixel, neighborhoodMin, neighborhoodMax, neighborhoodMean);
 
     float neighborhoodMeanLuma = max(Luma(neighborhoodMean), 1.0e-4f);
+    float neighborhoodMinLuma = min(Luma(neighborhoodMin), neighborhoodMeanLuma);
     float currentLuma = Luma(currentRadiance);
     float currentOutlierLimit = neighborhoodMeanLuma * lerp(1.25f, 1.80f, confidence) + 0.030f;
+    currentOutlierLimit = min(currentOutlierLimit, neighborhoodMinLuma + lerp(0.18f, 0.45f, confidence));
     float currentFirefly = smoothstep(currentOutlierLimit * 0.90f, currentOutlierLimit * 1.35f, currentLuma);
     currentFirefly *= lerp(1.0f, 0.62f, confidence);
     currentRadiance = lerp(
@@ -179,6 +181,7 @@ PSOutput PSMain(VSOutput input) {
 
     float3 clampedHistoryRadiance = clamp(historyRadiance, neighborhoodMin, neighborhoodMax);
     float historyOutlierLimit = neighborhoodMeanLuma * lerp(1.30f, 1.95f, prevConfidence) + 0.035f;
+    historyOutlierLimit = min(historyOutlierLimit, neighborhoodMinLuma + lerp(0.16f, 0.42f, prevConfidence));
     clampedHistoryRadiance = ClampRadianceLuma(clampedHistoryRadiance, historyOutlierLimit);
 
     float resetGuard = saturate((1.0f - sourceSwitch) * (1.0f - forcedUnavailable) * (1.0f - historyRequiredButMissing));

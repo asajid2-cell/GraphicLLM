@@ -58,6 +58,18 @@ static float Luma(float3 color)
     return dot(color, float3(0.2126f, 0.7152f, 0.0722f));
 }
 
+static float3 ClampFireflyLuma(float3 color, float localMean, float localVariance, float localMin, float sigmaScale, float minHeadroom, float meanMultiplier, float minPeakHeadroom, float absoluteLimit)
+{
+    color = max(color, 0.0f.xxx);
+    float luma = Luma(color);
+    float sigma = sqrt(max(localVariance, 0.0f) + 1.0e-5f);
+    float limit = max(localMean + sigma * sigmaScale + minHeadroom,
+                      localMean * meanMultiplier + minHeadroom);
+    limit = min(limit, localMin + minPeakHeadroom);
+    limit = min(limit, absoluteLimit);
+    return color * min(1.0f, limit / max(luma, 1.0e-4f));
+}
+
 static uint2 MapToDepthPixel(uint2 p, uint2 outDim)
 {
     uint depthW;
@@ -130,10 +142,14 @@ static float4 SpatialReflectionColor(uint2 p, uint2 outDim)
     const float centerRoughness = LoadRoughness(centerDepthPixel);
 
     float4 center = max(g_ReflectionCurrent.Load(int3(p, 0)), 0.0f);
-    float4 sum = center;
-    float3 moment2 = center.rgb * center.rgb;
-    float weightSum = 1.0f;
+    const float roughClamp = smoothstep(0.32f, 0.78f, centerRoughness);
+    const float sampleLimit = max(0.22f, lerp(6.0f, 0.65f, roughClamp) * (Luma(center.rgb) + 0.03f));
     const float radius = lerp(1.0f, 4.25f, smoothstep(0.18f, 0.78f, centerRoughness));
+
+    float statLumaSum = 0.0f;
+    float statLumaMoment = 0.0f;
+    float statWeightSum = 0.0f;
+    float statLumaMin = 1.0e6f;
 
     [unroll]
     for (int y = -4; y <= 4; ++y)
@@ -149,10 +165,62 @@ static float4 SpatialReflectionColor(uint2 p, uint2 outDim)
                                  max(radius * radius, 0.5f));
             const float weight = EdgeWeight(centerDepthPixel, sampleDepthPixel) * spatial;
             float4 sampleColor = max(g_ReflectionCurrent.Load(int3(q, 0)), 0.0f);
-            const float roughClamp = smoothstep(0.32f, 0.78f, centerRoughness);
-            const float sampleLimit = lerp(64.0f, 2.6f, roughClamp) * (Luma(center.rgb) + 0.06f);
             const float sampleLuma = Luma(sampleColor.rgb);
             sampleColor.rgb *= min(1.0f, sampleLimit / max(sampleLuma, 1.0e-4f));
+            const float cappedLuma = Luma(sampleColor.rgb);
+            statLumaSum += cappedLuma * weight;
+            statLumaMoment += cappedLuma * cappedLuma * weight;
+            statWeightSum += weight;
+            statLumaMin = min(statLumaMin, cappedLuma);
+        }
+    }
+
+    const float centerLuma = Luma(center.rgb);
+    if (statWeightSum <= 1.0e-4f)
+    {
+        statLumaSum = centerLuma;
+        statLumaMoment = centerLuma * centerLuma;
+        statWeightSum = 1.0f;
+        statLumaMin = centerLuma;
+    }
+
+    const float localLumaMean = statLumaSum / max(statWeightSum, 1.0e-4f);
+    statLumaMin = min(statLumaMin, localLumaMean);
+    const float localLumaVariance = max(statLumaMoment / max(statWeightSum, 1.0e-4f) -
+                                        localLumaMean * localLumaMean, 0.0f);
+    center.rgb = ClampFireflyLuma(center.rgb, localLumaMean, localLumaVariance, statLumaMin,
+                                  lerp(1.10f, 0.70f, roughClamp),
+                                  lerp(0.04f, 0.015f, roughClamp),
+                                  lerp(2.5f, 1.25f, roughClamp),
+                                  lerp(1.5f, 0.08f, roughClamp),
+                                  lerp(4.0f, 0.75f, roughClamp));
+
+    float4 sum = center;
+    float3 moment2 = center.rgb * center.rgb;
+    float weightSum = 1.0f;
+
+    [unroll]
+    for (int y = -4; y <= 4; ++y)
+    {
+        [unroll]
+        for (int x = -4; x <= 4; ++x)
+        {
+            if (x == 0 && y == 0) continue;
+            if (max(abs(x), abs(y)) > radius + 0.25f) continue;
+            const uint2 q = uint2(clamp(int2(p) + int2(x, y), int2(0, 0), int2(int(w) - 1, int(h) - 1)));
+            const uint2 sampleDepthPixel = MapToDepthPixel(q, outDim);
+            float spatial = exp2(-dot(float2((float)x, (float)y), float2((float)x, (float)y)) /
+                                 max(radius * radius, 0.5f));
+            const float weight = EdgeWeight(centerDepthPixel, sampleDepthPixel) * spatial;
+            float4 sampleColor = max(g_ReflectionCurrent.Load(int3(q, 0)), 0.0f);
+            const float sampleLuma = Luma(sampleColor.rgb);
+            sampleColor.rgb *= min(1.0f, sampleLimit / max(sampleLuma, 1.0e-4f));
+            sampleColor.rgb = ClampFireflyLuma(sampleColor.rgb, localLumaMean, localLumaVariance, statLumaMin,
+                                               lerp(0.75f, 0.50f, roughClamp),
+                                               lerp(0.03f, 0.012f, roughClamp),
+                                               lerp(2.0f, 1.10f, roughClamp),
+                                               lerp(1.2f, 0.06f, roughClamp),
+                                               lerp(3.0f, 0.55f, roughClamp));
             sum += sampleColor * weight;
             moment2 += sampleColor.rgb * sampleColor.rgb * weight;
             weightSum += weight;
@@ -178,9 +246,52 @@ static float4 SpatialGIColor(uint2 p, uint2 outDim, out float3 variance)
 
     const float4 center = max(g_GICurrent.Load(int3(p, 0)), 0.0f);
     const float centerLuma = Luma(center.rgb);
-    const float sampleLimit = max(1.4f, 5.0f * (centerLuma + 0.04f));
-    float4 sum = center;
-    float3 moment2 = center.rgb * center.rgb;
+    const float sampleLimit = max(0.25f, 1.10f * (centerLuma + 0.025f));
+    float statLumaSum = 0.0f;
+    float statLumaMoment = 0.0f;
+    float statWeightSum = 0.0f;
+    float statLumaMin = 1.0e6f;
+
+    [unroll]
+    for (int y = -2; y <= 2; ++y)
+    {
+        [unroll]
+        for (int x = -2; x <= 2; ++x)
+        {
+            if (x == 0 && y == 0) continue;
+            const uint2 q = uint2(clamp(int2(p) + int2(x, y), int2(0, 0), int2(int(w) - 1, int(h) - 1)));
+            const uint2 sampleDepthPixel = MapToDepthPixel(q, outDim);
+            const float spatial = exp2(-dot(float2((float)x, (float)y), float2((float)x, (float)y)) * 0.32f);
+            const float weight = EdgeWeight(centerDepthPixel, sampleDepthPixel) * spatial;
+            float4 sampleColor = max(g_GICurrent.Load(int3(q, 0)), 0.0f);
+            const float sampleLuma = Luma(sampleColor.rgb);
+            sampleColor.rgb *= min(1.0f, sampleLimit / max(sampleLuma, 1.0e-4f));
+            const float cappedLuma = Luma(sampleColor.rgb);
+            statLumaSum += cappedLuma * weight;
+            statLumaMoment += cappedLuma * cappedLuma * weight;
+            statWeightSum += weight;
+            statLumaMin = min(statLumaMin, cappedLuma);
+        }
+    }
+
+    if (statWeightSum <= 1.0e-4f)
+    {
+        statLumaSum = centerLuma;
+        statLumaMoment = centerLuma * centerLuma;
+        statWeightSum = 1.0f;
+        statLumaMin = centerLuma;
+    }
+
+    const float localLumaMean = statLumaSum / max(statWeightSum, 1.0e-4f);
+    statLumaMin = min(statLumaMin, localLumaMean);
+    const float localLumaVariance = max(statLumaMoment / max(statWeightSum, 1.0e-4f) -
+                                        localLumaMean * localLumaMean, 0.0f);
+
+    float4 filteredCenter = center;
+    filteredCenter.rgb = ClampFireflyLuma(filteredCenter.rgb, localLumaMean, localLumaVariance, statLumaMin,
+                                          0.65f, 0.018f, 1.45f, 0.055f, 0.75f);
+    float4 sum = filteredCenter;
+    float3 moment2 = filteredCenter.rgb * filteredCenter.rgb;
     float weightSum = 1.0f;
 
     [unroll]
@@ -197,6 +308,8 @@ static float4 SpatialGIColor(uint2 p, uint2 outDim, out float3 variance)
             float4 sampleColor = max(g_GICurrent.Load(int3(q, 0)), 0.0f);
             const float sampleLuma = Luma(sampleColor.rgb);
             sampleColor.rgb *= min(1.0f, sampleLimit / max(sampleLuma, 1.0e-4f));
+            sampleColor.rgb = ClampFireflyLuma(sampleColor.rgb, localLumaMean, localLumaVariance, statLumaMin,
+                                               0.45f, 0.012f, 1.20f, 0.045f, 0.55f);
             sum += sampleColor * weight;
             moment2 += sampleColor.rgb * sampleColor.rgb * weight;
             weightSum += weight;
@@ -326,11 +439,11 @@ static void StoreGI(uint3 id, bool useHistory, float alpha)
     float reprojectionValid = 0.0f;
     const uint2 hp = ReprojectHistoryPixel(p, outDim, reprojectionValid);
     float4 history = max(g_GIHistory.Load(int3(hp, 0)), 0.0f);
-    const float3 sigma = sqrt(localVariance + 1.0e-5f.xxx) * 1.20f + 0.035f.xxx;
+    const float3 sigma = sqrt(localVariance + 1.0e-5f.xxx) * 0.70f + 0.02f.xxx;
     history.rgb = clamp(history.rgb, max(current.rgb - sigma, 0.0f.xxx), current.rgb + sigma);
     history.a = clamp(history.a, current.a - 0.30f, current.a + 0.30f);
     const float historyLuma = Luma(history.rgb);
-    const float historyLimit = max(1.2f, 2.4f * (Luma(current.rgb) + 0.05f));
+    const float historyLimit = max(0.25f, 1.05f * (Luma(current.rgb) + 0.025f));
     history.rgb *= min(1.0f, historyLimit / max(historyLuma, 1.0e-4f));
     const float historyWeight = saturate(1.0f - alpha) *
         reprojectionValid *

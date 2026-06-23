@@ -195,7 +195,7 @@ float3 ClampRadianceGI(float3 color, float maxLuma)
     {
         color *= maxLuma / max(luma, 1.0e-4f);
     }
-    return min(color, 24.0f.xxx);
+    return min(color, 3.0f.xxx);
 }
 
 float3 PreserveLumaSaturationGI(float3 color, float saturation)
@@ -230,7 +230,7 @@ float3 SamplePreviousFrameIncident(float3 hitPos, out bool valid)
     }
 
     float3 previousLit = g_PrevFrameLit.SampleLevel(g_LinearSampler, uv, 0.0f).rgb;
-    previousLit = ClampRadianceGI(previousLit, 10.0f);
+    previousLit = ClampRadianceGI(previousLit, 2.0f);
 
     // Null/unseeded history reads as black. Treat that as invalid so the first
     // few frames converge from ambient instead of extinguishing GI.
@@ -252,7 +252,7 @@ float3 EstimateHitRadiance(RTMaterial material, float3 hitPos)
     float chroma = max(max(albedo.r, albedo.g), albedo.b) - min(min(albedo.r, albedo.g), albedo.b);
     float bounceEnergy = lerp(1.08f, 1.18f, saturate(chroma * 1.6f));
     float3 bounced = bleedAlbedo * incident * diffuseWeight * bounceEnergy;
-    return ClampRadianceGI(emissive + bounced, previousValid ? 12.0f : 4.0f);
+    return ClampRadianceGI(emissive + bounced, previousValid ? 2.0f : 1.2f);
 }
 
 [shader("miss")]
@@ -355,5 +355,5 @@ void RayGen_GI()
 
     float3 irradiance = max(radianceSum / (float)kRayCount, 0.0f.xxx);
     float visibility = saturate(visibilitySum / (float)kRayCount);
-    StoreGIBlock(launchIndex, launchDims, float4(min(irradiance, 32.0f.xxx), visibility));
+    StoreGIBlock(launchIndex, launchDims, float4(min(irradiance, 3.0f.xxx), visibility));
 }

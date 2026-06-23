@@ -1230,22 +1230,14 @@ float3 CalculateLighting(float3 normal, float3 worldPos, float3 albedo, float me
             specular *= 1.25f;
         }
 
-        // Optional cloth/sheen term: adds a soft grazing-angle highlight
-        // suitable for fabric/velvet presets. Uses coatParams.z as a simple
-        // weight so presets can enable or tune the effect without changing
-        // the material layout.
-        float3 sheenColor = albedo;
         if (sheenWeight > 0.01f)
         {
-            float oneMinusNL = 1.0f - NdotL;
-            float oneMinusNV = 1.0f - NdotV;
-            float sheen = pow(saturate(oneMinusNL), 4.0f) * pow(saturate(oneMinusNV), 4.0f);
-            float3 sheenTerm = sheenWeight * sheen * sheenColor * radiance * attenuation;
-            // Sheen is purely additive on top of the base BRDF.
-            specular += sheenTerm / max(NdotL, 1e-4f);
+            specular += EvaluateCharlieSheenBRDF(
+                normal, viewDir, lightDir, albedo, roughForLight, sheenWeight);
         }
 
         float3 kd = (1.0f - F) * (1.0f - metallic);
+        kd = ApplySheenEnergyConservation(kd, sheenWeight, roughForLight);
         // Glass is dominated by specular; keep only a very small diffuse
         // term so that tinted glass can still contribute slightly to GI
         // without washing out reflections.
@@ -1536,17 +1528,14 @@ float3 CalculateLighting(float3 normal, float3 worldPos, float3 albedo, float me
                 specular *= 1.25f;
             }
 
-            float3 sheenColor = albedo;
             if (sheenWeight > 0.01f)
             {
-                float oneMinusNL = 1.0f - NdotL;
-                float oneMinusNV = 1.0f - NdotV;
-                float sheen = pow(saturate(oneMinusNL), 4.0f) * pow(saturate(oneMinusNV), 4.0f);
-                float3 sheenTerm = sheenWeight * sheen * sheenColor * radiance * attenuation;
-                specular += sheenTerm / max(NdotL, 1e-4f);
+                specular += EvaluateCharlieSheenBRDF(
+                    normal, viewDir, lightDir, albedo, roughForLight, sheenWeight);
             }
 
             float3 kd = (1.0f - F) * (1.0f - metallic);
+            kd = ApplySheenEnergyConservation(kd, sheenWeight, roughForLight);
             if (isGlass) {
                 kd *= 0.1f;
             }
@@ -1608,6 +1597,7 @@ float3 CalculateLighting(float3 normal, float3 worldPos, float3 albedo, float me
         float3 irradiance = g_EnvDiffuse.SampleLevel(g_Sampler, envUV, maxMip).rgb;
 
         float3 kd = (1.0f - metallic) * (1.0f - FresnelSchlickRoughness(NdotV, F0, roughness));
+        kd = ApplySheenEnergyConservation(kd, sheenWeight, roughness);
         diffuseIBL = irradiance * kd * albedo;
 
         float3 R = reflect(-V, N);
@@ -1759,6 +1749,7 @@ float3 CalculateLighting(float3 normal, float3 worldPos, float3 albedo, float me
         const float giStrength = saturate(g_CinematicParams.z);
         float3 Fgi = FresnelSchlickRoughness(saturate(dot(normalize(normal), normalize(g_CameraPosition.xyz - worldPos))), F0, roughness);
         float3 kDgi = (1.0f - metallic) * (1.0f - Fgi);
+        kDgi = ApplySheenEnergyConservation(kDgi, sheenWeight, roughness);
         ambient += albedo * rtDiffuseGI * kDgi * (1.35f * giStrength);
         giVisibility = max(lerp(1.0f, giVisibility, giStrength * 0.35f), 0.88f);
     }

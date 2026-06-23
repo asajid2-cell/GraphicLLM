@@ -591,18 +591,18 @@ float SceneMaterialCinematicDirectSpecularGain(uint sceneMaterialClass,
 
 float3 ApplySceneMaterialCinematicDirectBRDF(float3 diffuseTerm,
                                              float3 specularTerm,
+                                             float3 fabricSheenTerm,
                                              float3 albedo,
                                              uint sceneMaterialClass,
                                              uint surfaceClass,
                                              float roughness,
                                              float metallic,
                                              float clearCoatWeight,
-                                             float sheenWeight,
                                              float NdotV,
                                              float NdotL,
                                              float LdotH)
 {
-    float3 base = max(diffuseTerm + specularTerm, 0.0f.xxx);
+    float3 base = max(diffuseTerm + specularTerm + fabricSheenTerm, 0.0f.xxx);
     float cinematicActive = saturate(max(g_CinematicStabilityParams.z - 1.0f, 0.0f) * 2.5f +
                                      g_CinematicStabilityParams.w * 3.0f);
     if (cinematicActive <= 0.001f) {
@@ -616,19 +616,8 @@ float3 ApplySceneMaterialCinematicDirectBRDF(float3 diffuseTerm,
         sceneMaterialClass, surfaceClass, roughness, metallic, clearCoatWeight);
     float3 shapedSpecular = specularTerm * lerp(1.0f, specularGain, cinematicActive);
 
-    float fabricLike =
-        (sceneMaterialClass == SCENE_MATERIAL_FABRIC ||
-         sceneMaterialClass == SCENE_MATERIAL_PAINTED_WALL ||
-         sceneMaterialClass == SCENE_MATERIAL_RUBBER) ? 1.0f : 0.0f;
-    float velvet = pow(saturate(1.0f - NdotV), 2.2f) *
-                   pow(saturate(1.0f - NdotL), 0.65f) *
-                   (0.045f + sheenWeight * 0.075f) *
-                   fabricLike *
-                   cinematicActive;
-    float3 sheenLayer = albedo * velvet * (1.0f - saturate(metallic));
-
     float grazingSparkleGuard = 1.0f - smoothstep(0.985f, 1.0f, LdotH) * saturate(roughness * 0.65f);
-    float3 shaped = shapedDiffuse + shapedSpecular * grazingSparkleGuard + sheenLayer;
+    float3 shaped = shapedDiffuse + shapedSpecular * grazingSparkleGuard + fabricSheenTerm;
 
     float baseLuma = max(dot(base, float3(0.2126f, 0.7152f, 0.0722f)), 1e-4f);
     float shapedLuma = dot(shaped, float3(0.2126f, 0.7152f, 0.0722f));
@@ -638,6 +627,13 @@ float3 ApplySceneMaterialCinematicDirectBRDF(float3 diffuseTerm,
     }
 
     return max(shaped, 0.0f.xxx);
+}
+
+float SceneMaterialFabricSheenWeight(uint sceneMaterialClass, float sheenWeight, float metallic)
+{
+    return (sceneMaterialClass == SCENE_MATERIAL_FABRIC)
+        ? saturate(sheenWeight) * (1.0f - saturate(metallic))
+        : 0.0f;
 }
 
 float SceneMaterialCinematicIndirectContactStrength(uint sceneMaterialClass,
@@ -1301,6 +1297,7 @@ float4 PSMain(VSOutput input) : SV_Target0 {
     uint sceneMaterialClass = DecodeSceneMaterialClass(materialExt2.a);
     float anisotropy = saturate(materialExt2.g);
     float sheenWeight = saturate(materialExt2.b);
+    float fabricSheenWeight = SceneMaterialFabricSheenWeight(sceneMaterialClass, sheenWeight, metallic);
     float subsurfaceWrap = SceneMaterialSubsurfaceWrap(sceneMaterialClass);
 
     // Check for background pixels (depth = 1.0)
@@ -1403,12 +1400,9 @@ float4 PSMain(VSOutput input) : SV_Target0 {
         float wrapped = saturate((NdotL + subsurfaceWrap) / (1.0f + subsurfaceWrap));
         kD *= wrapped / lambert;
     }
-
-    if (sheenWeight > 0.01f) {
-        float sheen = pow(saturate(1.0f - NdotL), 4.0f) *
-                      pow(saturate(1.0f - NdotV), 4.0f);
-        specular += sheenWeight * sheen * albedoColor;
-    }
+    kD = ApplySheenEnergyConservation(kD, fabricSheenWeight, roughness);
+    float3 fabricSunSheenBrdf = EvaluateCharlieSheenBRDF(
+        normal, V, L, albedoColor, roughness, fabricSheenWeight);
 
     // Shadow
     float shadow = ComputeShadow(worldPos, normal, sceneMaterialClass, surfaceClass, roughness, metallic);
@@ -1422,13 +1416,13 @@ float4 PSMain(VSOutput input) : SV_Target0 {
     float3 sunBrdf = ApplySceneMaterialCinematicDirectBRDF(
         kD * albedoColor * (diffuseBurley / PI),
         specular,
+        fabricSunSheenBrdf,
         albedoColor,
         sceneMaterialClass,
         surfaceClass,
         roughness,
         metallic,
         clearCoatWeight,
-        sheenWeight,
         NdotV,
         NdotL,
         sunLdotH);
@@ -1595,12 +1589,9 @@ float4 PSMain(VSOutput input) : SV_Target0 {
                 float wrapped_l = saturate((NdotLl + subsurfaceWrap) / (1.0f + subsurfaceWrap));
                 kD_l *= wrapped_l / lambert_l;
             }
-
-            if (sheenWeight > 0.01f) {
-                float sheen_l = pow(saturate(1.0f - NdotLl), 4.0f) *
-                                pow(saturate(1.0f - NdotV), 4.0f);
-                spec_l += sheenWeight * sheen_l * albedoColor;
-            }
+            kD_l = ApplySheenEnergyConservation(kD_l, fabricSheenWeight, roughForLight);
+            float3 fabricLocalSheenBrdf = EvaluateCharlieSheenBRDF(
+                normal, V, Ll, albedoColor, roughForLight, fabricSheenWeight);
 
             float shadowLocal = 1.0f;
             if (isSpot && light.params.y >= 0.0f) {
@@ -1621,13 +1612,13 @@ float4 PSMain(VSOutput input) : SV_Target0 {
             float3 localBrdf = ApplySceneMaterialCinematicDirectBRDF(
                 kD_l * albedoColor * (localDiffuseBurley / PI),
                 spec_l,
+                fabricLocalSheenBrdf,
                 albedoColor,
                 sceneMaterialClass,
                 surfaceClass,
                 roughness,
                 metallic,
                 clearCoatWeight,
-                sheenWeight,
                 NdotV,
                 fixtureNdotLl,
                 localLdotH);
@@ -1651,6 +1642,7 @@ float4 PSMain(VSOutput input) : SV_Target0 {
     if (subsurfaceWrap > 0.01f) {
         kD_ibl *= 1.0f + subsurfaceWrap * 0.35f;
     }
+    kD_ibl = ApplySheenEnergyConservation(kD_ibl, fabricSheenWeight, roughness);
     const bool authoredInteriorNoEnvironment = (!iblEnabled && g_EnvParams.w <= 0.001f);
 
     // Hemisphere ambient fallback when IBL is disabled (outdoor/terrain lighting).
@@ -1863,9 +1855,10 @@ float4 PSMain(VSOutput input) : SV_Target0 {
         metallic,
         ao,
         NdotV);
-    if (sheenWeight > 0.01f) {
-        float grazing = pow(saturate(1.0f - NdotV), 4.0f);
-        ambient += albedoColor * sheenWeight * grazing * 0.08f;
+    if (fabricSheenWeight > 0.01f) {
+        float3 sheenAmbientRadiance = max(g_AmbientColor.rgb, 0.04f.xxx);
+        ambient += EvaluateCharlieSheenIBL(
+            sheenAmbientRadiance, albedoColor, NdotV, roughness, fabricSheenWeight) * aoSpec;
     }
 
     if (g_ReflectionProbeParams.z == 44u) {
@@ -1963,6 +1956,7 @@ FullSceneLightingV3Output PSMainV3LightingSplit(VSOutput input) {
     uint sceneMaterialClass = DecodeSceneMaterialClass(materialExt2.a);
     float anisotropy = saturate(materialExt2.g);
     float sheenWeight = saturate(materialExt2.b);
+    float fabricSheenWeight = SceneMaterialFabricSheenWeight(sceneMaterialClass, sheenWeight, metallic);
     float subsurfaceWrap = SceneMaterialSubsurfaceWrap(sceneMaterialClass);
     GTAOSample gtao = SampleGTAO(pixelCoord, normal, depth);
     ao = saturate(materialAo * gtao.ao);
@@ -2012,11 +2006,9 @@ FullSceneLightingV3Output PSMainV3LightingSplit(VSOutput input) {
         float wrapped = saturate((NdotL + subsurfaceWrap) / (1.0f + subsurfaceWrap));
         kD *= wrapped / lambert;
     }
-    if (sheenWeight > 0.01f) {
-        float sheen = pow(saturate(1.0f - NdotL), 4.0f) *
-                      pow(saturate(1.0f - NdotV), 4.0f);
-        specular += sheenWeight * sheen * albedoColor;
-    }
+    kD = ApplySheenEnergyConservation(kD, fabricSheenWeight, roughness);
+    float3 fabricSunSheenBrdf = EvaluateCharlieSheenBRDF(
+        normal, V, L, albedoColor, roughness, fabricSheenWeight);
 
     float shadow = ComputeShadow(worldPos, normal, sceneMaterialClass, surfaceClass, roughness, metallic);
     shadow = SunContactVisibility(worldPos, normal, shadow);
@@ -2025,13 +2017,13 @@ FullSceneLightingV3Output PSMainV3LightingSplit(VSOutput input) {
     float3 sunBrdf = ApplySceneMaterialCinematicDirectBRDF(
         kD * albedoColor * (diffuseBurley / PI),
         specular,
+        fabricSunSheenBrdf,
         albedoColor,
         sceneMaterialClass,
         surfaceClass,
         roughness,
         metallic,
         clearCoatWeight,
-        sheenWeight,
         NdotV,
         NdotL,
         sunLdotH);
@@ -2156,6 +2148,9 @@ FullSceneLightingV3Output PSMainV3LightingSplit(VSOutput input) {
                 float wrapped_l = saturate((NdotLl + subsurfaceWrap) / (1.0f + subsurfaceWrap));
                 kD_l *= wrapped_l / lambert_l;
             }
+            kD_l = ApplySheenEnergyConservation(kD_l, fabricSheenWeight, roughForLight);
+            float3 fabricLocalSheenBrdf = EvaluateCharlieSheenBRDF(
+                normal, V, Ll, albedoColor, roughForLight, fabricSheenWeight);
 
             float shadowLocal = 1.0f;
             if (isSpot && light.params.y >= 0.0f) {
@@ -2176,13 +2171,13 @@ FullSceneLightingV3Output PSMainV3LightingSplit(VSOutput input) {
             float3 localBrdf = ApplySceneMaterialCinematicDirectBRDF(
                 kD_l * albedoColor * (localDiffuseBurley / PI),
                 spec_l,
+                fabricLocalSheenBrdf,
                 albedoColor,
                 sceneMaterialClass,
                 surfaceClass,
                 roughness,
                 metallic,
                 clearCoatWeight,
-                sheenWeight,
                 NdotV,
                 fixtureNdotLl,
                 localLdotH);
@@ -2200,6 +2195,7 @@ FullSceneLightingV3Output PSMainV3LightingSplit(VSOutput input) {
     if (subsurfaceWrap > 0.01f) {
         kD_ibl *= 1.0f + subsurfaceWrap * 0.35f;
     }
+    kD_ibl = ApplySheenEnergyConservation(kD_ibl, fabricSheenWeight, roughness);
 
     const bool iblEnabled = (g_EnvParams.z > 0.5f);
     const bool authoredInteriorNoEnvironment = (!iblEnabled && g_EnvParams.w <= 0.001f);
@@ -2382,9 +2378,10 @@ FullSceneLightingV3Output PSMainV3LightingSplit(VSOutput input) {
         metallic,
         ao,
         NdotV);
-    if (sheenWeight > 0.01f) {
-        float grazing = pow(saturate(1.0f - NdotV), 4.0f);
-        ambient += albedoColor * sheenWeight * grazing * 0.08f;
+    if (fabricSheenWeight > 0.01f) {
+        float3 sheenAmbientRadiance = max(g_AmbientColor.rgb, 0.04f.xxx);
+        ambient += EvaluateCharlieSheenIBL(
+            sheenAmbientRadiance, albedoColor, NdotV, roughness, fabricSheenWeight) * aoSpec;
     }
 
     output.directLighting = float4(max(directLight, 0.0f.xxx), 1.0f);

@@ -139,6 +139,88 @@ float Pow5(float x)
     return x2 * x2 * x;
 }
 
+float DistributionCharlie(float NdotH, float roughness)
+{
+    float r = max(saturate(roughness), 0.25f);
+    float invAlpha = rcp(max(r * r, 0.08f));
+    float sin2h = max(1.0f - saturate(NdotH) * saturate(NdotH), 0.0f);
+    return (2.0f + invAlpha) * pow(sin2h, invAlpha * 0.5f) / (2.0f * PI);
+}
+
+float CharlieSheenVisibility(float NdotV, float NdotL)
+{
+    float denom = 4.0f * max(NdotL + NdotV - NdotL * NdotV, 1e-4f);
+    return rcp(denom);
+}
+
+float3 SheenTintFromAlbedo(float3 albedo)
+{
+    return lerp(1.0f.xxx, sqrt(saturate(albedo)), 0.72f);
+}
+
+float FabricSheenEnergy(float sheenWeight, float roughness)
+{
+    float r = saturate(roughness);
+    return saturate(saturate(sheenWeight) * lerp(0.08f, 0.16f, r));
+}
+
+float3 ApplySheenEnergyConservation(float3 kD, float sheenWeight, float roughness)
+{
+    return kD * (1.0f - FabricSheenEnergy(sheenWeight, roughness));
+}
+
+float3 EvaluateCharlieSheenBRDF(float3 N,
+                                float3 V,
+                                float3 L,
+                                float3 albedo,
+                                float roughness,
+                                float sheenWeight)
+{
+    float weight = saturate(sheenWeight);
+    if (weight <= 0.001f) {
+        return 0.0f.xxx;
+    }
+
+    float3 H = normalize(V + L);
+    float NdotV = saturate(dot(N, V));
+    float NdotL = saturate(dot(N, L));
+    float NdotH = saturate(dot(N, H));
+    float LdotH = saturate(dot(L, H));
+    if (NdotV <= 1e-4f || NdotL <= 1e-4f) {
+        return 0.0f.xxx;
+    }
+
+    float sheenRoughness = saturate(max(roughness, 0.45f));
+    float D = DistributionCharlie(NdotH, sheenRoughness);
+    float Vis = CharlieSheenVisibility(NdotV, NdotL);
+    float grazing = Pow5(1.0f - LdotH);
+    float sheenF = lerp(0.24f, 1.0f, grazing);
+    float3 tint = SheenTintFromAlbedo(albedo);
+    return tint * weight * D * Vis * sheenF * 0.34f;
+}
+
+float CharlieSheenDFG(float NdotV, float roughness)
+{
+    float r = saturate(roughness);
+    float grazing = Pow5(1.0f - saturate(NdotV));
+    return saturate((0.05f + 0.10f * r) + grazing * lerp(0.28f, 0.48f, r));
+}
+
+float3 EvaluateCharlieSheenIBL(float3 ambientRadiance,
+                               float3 albedo,
+                               float NdotV,
+                               float roughness,
+                               float sheenWeight)
+{
+    float weight = saturate(sheenWeight);
+    if (weight <= 0.001f) {
+        return 0.0f.xxx;
+    }
+
+    float3 tint = SheenTintFromAlbedo(albedo);
+    return ambientRadiance * tint * weight * CharlieSheenDFG(NdotV, roughness) * 0.32f;
+}
+
 float3 GGXMultiscatterEnergyCompensation(float3 F0, float roughness)
 {
     // Fdez-Aguera style analytic multiple-scatter compensation. It restores

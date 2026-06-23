@@ -1163,6 +1163,12 @@ float ScreenSpaceContactOcclusion(float3 worldPos,
         return 0.0f;
     }
 
+    float lightFacing = smoothstep(0.08f, 0.42f, saturate(dot(normal, lightDir)));
+    if (lightFacing <= 0.001f)
+    {
+        return 0.0f;
+    }
+
     float3 origin = worldPos + normal * normalBias + lightDir * 0.015f;
     float3 viewOrigin = mul(g_ViewMatrix, float4(origin, 1.0f)).xyz;
     float3 viewDir = mul((float3x3)g_ViewMatrix, lightDir);
@@ -1171,10 +1177,10 @@ float ScreenSpaceContactOcclusion(float3 worldPos,
     float occlusion = 0.0f;
 
     [unroll]
-    for (int i = 1; i <= 7; ++i)
+    for (int i = 1; i <= 8; ++i)
     {
         float fi = (float)i;
-        float t = (fi * fi) * (maxDistance / 49.0f);
+        float t = (fi * fi) * (maxDistance / 64.0f);
         float3 rayView = viewOrigin + viewDir * t;
         if (rayView.z <= 0.0f)
         {
@@ -1202,17 +1208,13 @@ float ScreenSpaceContactOcclusion(float3 worldPos,
         occlusion = max(occlusion, hit * nearWeight);
     }
 
-    float grazing = smoothstep(0.08f, 0.42f, saturate(dot(normal, lightDir)));
-    return saturate(occlusion * grazing);
+    return saturate(occlusion * lightFacing);
 }
 
 float SunContactVisibility(float3 worldPos, float3 normal, float shadow)
 {
     float receiver = smoothstep(0.10f, 0.45f, normal.y);
-    if (receiver <= 0.001f)
-    {
-        return shadow;
-    }
+    receiver = lerp(0.65f, 1.0f, receiver);
     float contact = ScreenSpaceContactOcclusion(worldPos, normal, normalize(g_SunDirection.xyz), 1.20f, 0.085f, 0.020f);
     return ApplyContactShadowVisibility(shadow, contact * receiver, 0.30f);
 }
@@ -1220,10 +1222,7 @@ float SunContactVisibility(float3 worldPos, float3 normal, float shadow)
 float LocalContactVisibility(float3 worldPos, float3 normal, float3 lightDir, float lightDistance, float shadow)
 {
     float receiver = smoothstep(0.10f, 0.45f, normal.y);
-    if (receiver <= 0.001f)
-    {
-        return shadow;
-    }
+    receiver = lerp(0.65f, 1.0f, receiver);
     float maxDistance = min(0.85f, max(lightDistance * 0.18f, 0.18f));
     float contact = ScreenSpaceContactOcclusion(worldPos, normal, lightDir, maxDistance, 0.070f, 0.015f);
     return ApplyContactShadowVisibility(shadow, contact * receiver, 0.24f);

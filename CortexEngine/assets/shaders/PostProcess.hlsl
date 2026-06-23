@@ -2145,7 +2145,8 @@ float3 SampleHighlightStreakAxis(float2 uv, float2 axis, float radiusPixels, flo
 
     float2 pixelStep = safeAxis * g_PostParams.xy;
     float3 accum = 0.0f;
-    float weightSum = 0.0f;
+    float gatedWeightSum = 0.0f;
+    float kernelWeightSum = 0.0f;
 
     [unroll]
     for (int i = 1; i <= 9; ++i)
@@ -2164,10 +2165,21 @@ float3 SampleHighlightStreakAxis(float2 uv, float2 axis, float radiusPixels, flo
 
         accum += s0 * weight * gate0;
         accum += s1 * weight * gate1;
-        weightSum += weight * (gate0 + gate1);
+        gatedWeightSum += weight * (gate0 + gate1);
+        kernelWeightSum += weight * 2.0f;
     }
 
-    return (weightSum > 1e-4f) ? (accum / weightSum) * strength : 0.0f.xxx;
+    if (kernelWeightSum <= 1e-4f)
+    {
+        return 0.0f.xxx;
+    }
+
+    float3 streak = (accum / kernelWeightSum) * strength;
+    float streakLuma = StreakBloomLuma(streak);
+    float supportCoverage = gatedWeightSum / kernelWeightSum;
+    float sourceGate = smoothstep(0.020f, 0.120f, streakLuma) *
+                       smoothstep(0.060f, 0.220f, supportCoverage);
+    return streak * sourceGate;
 }
 
 float3 SampleHighlightStreaks(float2 uv)

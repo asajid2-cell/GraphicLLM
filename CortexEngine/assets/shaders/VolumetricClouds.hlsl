@@ -8,22 +8,22 @@
 // Constants
 static const float EARTH_RADIUS = 6371000.0;        // meters
 static const float CLOUD_TOP_OFFSET = 10000.0;      // Cloud layer offset from viewer
-static const int MAX_STEPS = 64;
-static const int LIGHT_STEPS = 6;
+static const int MAX_STEPS = 36;
+static const int LIGHT_STEPS = 4;
 
 static const float CLOUD_LOW_ALTITUDE = 1100.0f;
 static const float CLOUD_HIGH_ALTITUDE = 3600.0f;
-static const float CLOUD_COVERAGE = 0.58f;
-static const float CLOUD_DENSITY = 0.00042f;
+static const float CLOUD_COVERAGE = 0.74f;
+static const float CLOUD_DENSITY = 0.00160f;
 static const float CLOUD_BASE_SCALE = 0.74f;
 static const float CLOUD_DETAIL_SCALE = 1.85f;
 static const float CLOUD_EROSION = 0.46f;
 static const float CLOUD_CURLINESS = 0.85f;
-static const float CLOUD_ABSORPTION = 0.00018f;
-static const float CLOUD_SCATTERING = 0.00024f;
+static const float CLOUD_ABSORPTION = 1.10f;
+static const float CLOUD_SCATTERING = 2.20f;
 static const float CLOUD_AMBIENT_MULT = 0.78f;
 static const float CLOUD_SUN_MULT = 3.2f;
-static const float CLOUD_STEP_SIZE = 155.0f;
+static const float CLOUD_STEP_SIZE = 210.0f;
 static const float3 CLOUD_BASE_COLOR = float3(0.78f, 0.82f, 0.78f);
 static const float2 CLOUD_WIND_DIR = normalize(float2(0.72f, 0.31f));
 static const float CLOUD_WIND_SPEED = 38.0f;
@@ -158,7 +158,7 @@ float GetDensityHeightGradient(float heightFraction, float cloudType) {
 float2 SampleWeatherMap(float2 worldXZ) {
     float t = g_TimeAndExposure.x;
     float2 uv = worldXZ * 0.000010f + CLOUD_WIND_DIR * CLOUD_WIND_SPEED * t * 0.000025f;
-    float coverage = smoothstep(0.30f, 0.78f, FBM2D(uv * 2.1f));
+    float coverage = smoothstep(0.18f, 0.66f, FBM2D(uv * 2.1f));
     float type = saturate(FBM2D(uv * 0.85f + 41.0f) * 1.15f);
     return float2(coverage, type);  // x=coverage, y=cloudType
 }
@@ -205,7 +205,7 @@ float SampleCloudDensity(float3 position, float mipLevel, bool sampleDetail) {
     float shape = SampleShapeNoise(position);
 
     // Combine coverage and shape
-    float baseCloud = saturate(Remap(shape * heightGradient, 1.0 - coverage, 1.0, 0.0, 1.0));
+    float baseCloud = saturate(Remap(shape * heightGradient, 1.0f - coverage * 1.25f, 1.0f, 0.0f, 1.0f));
 
     if (baseCloud <= 0.0) {
         return 0.0;
@@ -303,6 +303,10 @@ void GetCloudLayerIntersection(float3 rayOrigin, float3 rayDir,
 
 // Main raymarching
 float4 RaymarchClouds(float3 rayOrigin, float3 rayDir, float maxDist, float dither) {
+    if (rayDir.y <= 0.015f) {
+        return float4(0.0f, 0.0f, 0.0f, 0.0f);
+    }
+
     float3 sunDir = GetCloudSunDirection();
     float cosAngle = dot(rayDir, sunDir);
 
@@ -316,7 +320,7 @@ float4 RaymarchClouds(float3 rayOrigin, float3 rayDir, float maxDist, float dith
     GetCloudLayerIntersection(rayOrigin, rayDir, nearDist, farDist);
 
     if (farDist <= nearDist || nearDist > maxDist) {
-        return float4(0.0, 0.0, 0.0, 1.0);  // No clouds
+        return float4(0.0, 0.0, 0.0, 0.0);  // No clouds
     }
 
     farDist = min(farDist, maxDist);
@@ -341,7 +345,7 @@ float4 RaymarchClouds(float3 rayOrigin, float3 rayDir, float maxDist, float dith
         float3 pos = rayOrigin + rayDir * t;
         float density = SampleCloudDensity(pos, 0.0, true);
 
-        if (density > 0.001) {
+        if (density > 0.000001f) {
             zeroCount = 0;
 
             // Light contribution
@@ -419,6 +423,14 @@ float4 PSMain(VSOutput input) : SV_Target {
     // Raymarch clouds
     float4 clouds = RaymarchClouds(rayOrigin, rayDir, maxDist, dither);
 
-    // Output premultiplied alpha
-    return float4(clouds.rgb, clouds.a);
+    // The engine's shared blend state uses straight alpha.
+    float alpha = saturate(clouds.a * 1.25f);
+    float3 straightColor = (alpha > 0.001f) ? clouds.rgb / max(clouds.a, 0.001f) : float3(0.0f, 0.0f, 0.0f);
+    float sunFacing = saturate(dot(rayDir, GetCloudSunDirection()) * 0.5f + 0.5f);
+    float viewUp = saturate(rayDir.y * 1.8f);
+    float cloudLight = saturate(pow(alpha, 0.65f) + sunFacing * 0.22f + viewUp * 0.12f);
+    float3 shadowedInterior = straightColor * 0.62f;
+    float3 litEdge = straightColor * 1.32f + GetCloudSunColor() * (0.06f + 0.10f * sunFacing);
+    straightColor = lerp(shadowedInterior, litEdge, cloudLight);
+    return float4(straightColor, alpha);
 }

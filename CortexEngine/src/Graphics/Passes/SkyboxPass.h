@@ -11,6 +11,7 @@ struct DrawContext {
     D3D12_GPU_VIRTUAL_ADDRESS frameConstants = 0;
     DX12Pipeline* skyboxPipeline = nullptr;
     DX12Pipeline* proceduralSkyPipeline = nullptr;
+    DX12Pipeline* volumetricCloudsPipeline = nullptr;
     bool iblEnabled = false;
     DescriptorHandle shadowAndEnvironmentTable{};
 };

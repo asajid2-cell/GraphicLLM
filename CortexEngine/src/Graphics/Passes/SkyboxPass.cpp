@@ -13,6 +13,8 @@ bool Draw(const DrawContext& context) {
     context.commandList->SetGraphicsRootSignature(context.rootSignature->GetRootSignature());
     context.commandList->SetGraphicsRootConstantBufferView(1, context.frameConstants);
 
+    context.commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
     if (context.iblEnabled && context.skyboxPipeline && context.skyboxPipeline->GetPipelineState()) {
         context.commandList->SetPipelineState(context.skyboxPipeline->GetPipelineState());
         if (context.shadowAndEnvironmentTable.IsValid()) {
@@ -24,8 +26,13 @@ bool Draw(const DrawContext& context) {
         return false;
     }
 
-    context.commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
     FullscreenPass::DrawTriangle(context.commandList);
+
+    if (context.volumetricCloudsPipeline && context.volumetricCloudsPipeline->GetPipelineState()) {
+        context.commandList->SetPipelineState(context.volumetricCloudsPipeline->GetPipelineState());
+        FullscreenPass::DrawTriangle(context.commandList);
+    }
+
     return true;
 }
 

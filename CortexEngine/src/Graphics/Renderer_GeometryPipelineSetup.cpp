@@ -380,6 +380,36 @@ Result<void> Renderer::CreateGeometryPipelineStates(const RendererCompiledShader
         }
     }
 
+    if (shaders.volumetricCloudsVS && shaders.volumetricCloudsPS) {
+        m_pipelineState.volumetricClouds = std::make_unique<DX12Pipeline>();
+
+        PipelineDesc cloudDesc = {};
+        cloudDesc.vertexShader = *shaders.volumetricCloudsVS;
+        cloudDesc.pixelShader = *shaders.volumetricCloudsPS;
+        cloudDesc.inputLayout = {};
+        cloudDesc.rtvFormat = DXGI_FORMAT_R16G16B16A16_FLOAT;
+        cloudDesc.dsvFormat = DXGI_FORMAT_D32_FLOAT;
+        cloudDesc.numRenderTargets = 1;
+        cloudDesc.depthTestEnabled = false;
+        cloudDesc.depthWriteEnabled = false;
+        cloudDesc.cullMode = D3D12_CULL_MODE_NONE;
+        cloudDesc.blendEnabled = true;
+
+        auto cloudPipelineResult = m_pipelineState.volumetricClouds->Initialize(
+            m_services.device->GetDevice(),
+            m_pipelineState.rootSignature->GetRootSignature(),
+            cloudDesc);
+        if (cloudPipelineResult.IsErr()) {
+            spdlog::warn("Failed to create volumetric clouds pipeline: {}",
+                         cloudPipelineResult.Error());
+            m_pipelineState.volumetricClouds.reset();
+        } else {
+            spdlog::info("Volumetric clouds pipeline created successfully");
+        }
+    } else {
+        spdlog::warn("Volumetric clouds shaders did not compile; cloud sky layer disabled");
+    }
+
     m_pipelineState.shadow = std::make_unique<DX12Pipeline>();
 
     PipelineDesc shadowDesc = {};

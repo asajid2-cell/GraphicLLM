@@ -14,6 +14,7 @@ void Renderer::RenderSkybox() {
         m_constantBuffers.currentFrameGPU,
         m_pipelineState.skybox.get(),
         m_pipelineState.proceduralSky.get(),
+        m_pipelineState.volumetricClouds.get(),
         m_environmentState.enabled,
         m_environmentState.shadowAndEnvDescriptors[0],
     });

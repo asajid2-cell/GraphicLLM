@@ -13,16 +13,16 @@ static const int LIGHT_STEPS = 4;
 
 static const float CLOUD_LOW_ALTITUDE = 1100.0f;
 static const float CLOUD_HIGH_ALTITUDE = 3600.0f;
-static const float CLOUD_COVERAGE = 0.74f;
-static const float CLOUD_DENSITY = 0.00160f;
-static const float CLOUD_BASE_SCALE = 0.74f;
+static const float CLOUD_COVERAGE = 0.82f;
+static const float CLOUD_DENSITY = 0.00192f;
+static const float CLOUD_BASE_SCALE = 0.68f;
 static const float CLOUD_DETAIL_SCALE = 1.85f;
-static const float CLOUD_EROSION = 0.46f;
+static const float CLOUD_EROSION = 0.52f;
 static const float CLOUD_CURLINESS = 0.85f;
-static const float CLOUD_ABSORPTION = 1.10f;
-static const float CLOUD_SCATTERING = 2.20f;
-static const float CLOUD_AMBIENT_MULT = 0.78f;
-static const float CLOUD_SUN_MULT = 3.2f;
+static const float CLOUD_ABSORPTION = 1.34f;
+static const float CLOUD_SCATTERING = 2.36f;
+static const float CLOUD_AMBIENT_MULT = 0.66f;
+static const float CLOUD_SUN_MULT = 3.75f;
 static const float CLOUD_STEP_SIZE = 210.0f;
 static const float3 CLOUD_BASE_COLOR = float3(0.78f, 0.82f, 0.78f);
 static const float2 CLOUD_WIND_DIR = normalize(float2(0.72f, 0.31f));
@@ -158,7 +158,10 @@ float GetDensityHeightGradient(float heightFraction, float cloudType) {
 float2 SampleWeatherMap(float2 worldXZ) {
     float t = g_TimeAndExposure.x;
     float2 uv = worldXZ * 0.000010f + CLOUD_WIND_DIR * CLOUD_WIND_SPEED * t * 0.000025f;
-    float coverage = smoothstep(0.18f, 0.66f, FBM2D(uv * 2.1f));
+    float broadMass = smoothstep(0.34f, 0.76f, FBM2D(uv * 1.32f));
+    float breakup = smoothstep(0.30f, 0.70f, FBM2D(uv * 3.75f + 19.0f));
+    float coverage = saturate(broadMass * lerp(0.20f, 1.18f, breakup));
+    coverage = smoothstep(0.14f, 0.86f, coverage);
     float type = saturate(FBM2D(uv * 0.85f + 41.0f) * 1.15f);
     return float2(coverage, type);  // x=coverage, y=cloudType
 }
@@ -202,10 +205,11 @@ float SampleCloudDensity(float3 position, float mipLevel, bool sampleDetail) {
     float heightGradient = GetDensityHeightGradient(heightFraction, cloudType);
 
     // Base shape noise
-    float shape = SampleShapeNoise(position);
+    float shape = smoothstep(0.30f, 0.80f, SampleShapeNoise(position));
 
     // Combine coverage and shape
-    float baseCloud = saturate(Remap(shape * heightGradient, 1.0f - coverage * 1.25f, 1.0f, 0.0f, 1.0f));
+    float baseCloud = saturate(Remap(shape * heightGradient, 1.0f - coverage * 1.38f, 1.0f, 0.0f, 1.0f));
+    baseCloud = pow(baseCloud, 1.28f);
 
     if (baseCloud <= 0.0) {
         return 0.0;
@@ -217,7 +221,7 @@ float SampleCloudDensity(float3 position, float mipLevel, bool sampleDetail) {
         float detail = SampleDetailNoise(position, mipLevel);
 
         // Erode edges with detail
-        float erosion = CLOUD_EROSION;
+        float erosion = CLOUD_EROSION * lerp(1.18f, 0.76f, baseCloud);
         float detailModifier = lerp(detail, 1.0 - detail, saturate(heightFraction * 5.0));
         density = saturate(Remap(density, detailModifier * erosion, 1.0, 0.0, 1.0));
     }
@@ -347,13 +351,16 @@ float4 RaymarchClouds(float3 rayOrigin, float3 rayDir, float maxDist, float dith
 
         if (density > 0.000001f) {
             zeroCount = 0;
+            float heightFraction = GetHeightFraction(pos.y);
 
             // Light contribution
             float lightTransmit = LightMarch(pos);
 
             // Scattering
-            float3 ambient = g_AmbientColor.rgb * CLOUD_AMBIENT_MULT;
-            float3 sun = GetCloudSunColor() * lightTransmit * phase * CLOUD_SUN_MULT;
+            float shadowLift = smoothstep(0.14f, 0.92f, lightTransmit);
+            float topLight = smoothstep(0.18f, 0.86f, heightFraction);
+            float3 ambient = g_AmbientColor.rgb * CLOUD_AMBIENT_MULT * lerp(0.76f, 1.08f, topLight) * lerp(0.74f, 1.0f, shadowLift);
+            float3 sun = GetCloudSunColor() * lightTransmit * phase * CLOUD_SUN_MULT * lerp(0.64f, 1.34f, topLight) * lerp(0.54f, 1.16f, shadowLift);
 
             float3 luminance = CLOUD_BASE_COLOR * (ambient + sun);
 
@@ -424,13 +431,13 @@ float4 PSMain(VSOutput input) : SV_Target {
     float4 clouds = RaymarchClouds(rayOrigin, rayDir, maxDist, dither);
 
     // The engine's shared blend state uses straight alpha.
-    float alpha = saturate(clouds.a * 1.25f);
+    float alpha = saturate(smoothstep(0.035f, 0.88f, clouds.a) * 1.16f);
     float3 straightColor = (alpha > 0.001f) ? clouds.rgb / max(clouds.a, 0.001f) : float3(0.0f, 0.0f, 0.0f);
     float sunFacing = saturate(dot(rayDir, GetCloudSunDirection()) * 0.5f + 0.5f);
     float viewUp = saturate(rayDir.y * 1.8f);
-    float cloudLight = saturate(pow(alpha, 0.65f) + sunFacing * 0.22f + viewUp * 0.12f);
-    float3 shadowedInterior = straightColor * 0.62f;
-    float3 litEdge = straightColor * 1.32f + GetCloudSunColor() * (0.06f + 0.10f * sunFacing);
+    float cloudLight = saturate(pow(alpha, 0.70f) + sunFacing * 0.24f + viewUp * 0.10f);
+    float3 shadowedInterior = straightColor * 0.54f;
+    float3 litEdge = straightColor * 1.36f + GetCloudSunColor() * (0.07f + 0.11f * sunFacing);
     straightColor = lerp(shadowedInterior, litEdge, cloudLight);
     return float4(straightColor, alpha);
 }

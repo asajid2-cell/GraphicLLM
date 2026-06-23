@@ -2963,6 +2963,17 @@ void Engine::BuildRecipeScene() {
             target = glm::vec3(0.2f, 0.35f, -0.9f);
             camFov = 52.0f;
         }
+        if (auto* renderer = m_renderer.get()) {
+            const float focusDistance = glm::length(target - camPos);
+            const float focalRange = outdoor ? 4.5f : (recipe == "bathroom" ? 1.05f : 1.25f);
+            const float dofAmount = outdoor ? 0.12f : 0.30f;
+            renderer->SetCinematicPostEffects(0.0f,
+                                              dofAmount,
+                                              focusDistance,
+                                              focalRange,
+                                              false,
+                                              true);
+        }
         t.position = camPos;
         t.rotation = glm::quatLookAtLH(glm::normalize(target - t.position), glm::vec3(0.0f, 1.0f, 0.0f));
         auto& c = m_registry->AddComponent<Scene::CameraComponent>(cam);

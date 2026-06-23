@@ -742,6 +742,13 @@ SceneStyle ParseSceneStyle(const std::string& prompt) {
     if (has("moody") || has("dark") || has("dim") || has("dramatic")) {
         s.brightness -= 0.45f;
     }
+    if (s.name.empty()) {
+        if (s.brightness >= 0.35f) {
+            s.name = "bright";
+        } else if (s.brightness <= -0.35f) {
+            s.name = "moody";
+        }
+    }
     s.warmth = std::clamp(s.warmth, -1.0f, 1.0f);
     s.brightness = std::clamp(s.brightness, -1.0f, 1.0f);
     return s;

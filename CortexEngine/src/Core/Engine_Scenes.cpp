@@ -851,6 +851,44 @@ namespace {
         return balance;
     }
 
+    struct RecipeMoodGrade {
+        float warm = 0.0f;
+        float cool = 0.0f;
+        float contrast = 1.06f;
+        float saturation = 1.04f;
+        float vignette = 0.075f;
+        float exposureOffset = 0.0f;
+    };
+
+    RecipeMoodGrade RecipeMoodGradeFor(const LLM::SceneStyle& style, bool outdoor) {
+        const float warmIntent = std::max(0.0f, style.warmth);
+        const float coolIntent = std::max(0.0f, -style.warmth);
+        const float brightIntent = std::max(0.0f, style.brightness);
+        const float moodyIntent = std::max(0.0f, -style.brightness);
+        const bool rustic = style.name == "rustic";
+        const bool modern = style.name == "modern";
+
+        RecipeMoodGrade grade{};
+        grade.warm = warmIntent * 0.40f + (rustic ? 0.035f : 0.0f);
+        grade.cool = coolIntent * 0.36f + (modern ? 0.035f : 0.0f) + moodyIntent * 0.055f;
+
+        const float baseContrast = outdoor ? 1.03f : 1.055f;
+        const float baseSaturation = outdoor ? 1.02f : 1.035f;
+        grade.contrast = baseContrast + coolIntent * 0.020f + moodyIntent * 0.038f + brightIntent * 0.010f;
+        grade.saturation = baseSaturation + warmIntent * 0.045f + (rustic ? 0.012f : 0.0f) -
+                           coolIntent * 0.010f - brightIntent * 0.006f;
+        grade.vignette = (outdoor ? 0.045f : 0.072f) + warmIntent * 0.012f + moodyIntent * 0.030f -
+                         brightIntent * 0.020f - (modern ? 0.008f : 0.0f);
+        grade.exposureOffset = brightIntent * 0.020f - moodyIntent * 0.030f;
+
+        grade.warm = std::clamp(grade.warm, 0.0f, 0.34f);
+        grade.cool = std::clamp(grade.cool, 0.0f, 0.30f);
+        grade.contrast = std::clamp(grade.contrast, outdoor ? 1.02f : 1.04f, outdoor ? 1.08f : 1.12f);
+        grade.saturation = std::clamp(grade.saturation, outdoor ? 1.00f : 1.01f, outdoor ? 1.06f : 1.09f);
+        grade.vignette = std::clamp(grade.vignette, outdoor ? 0.025f : 0.045f, outdoor ? 0.075f : 0.115f);
+        return grade;
+    }
+
     void ApplyRecipeVisualContract(Renderer* renderer, const std::string& recipe) {
         if (!renderer) {
             return;
@@ -2560,7 +2598,9 @@ void Engine::BuildOutdoorSunsetBeachScene() {
         renderer->SetExposure(1.02f);
         renderer->SetBloomIntensity(0.18f);
         renderer->SetBloomShape(0.82f, 0.70f, 2.0f);
-        renderer->SetColorGrade(0.46f, 0.06f); // push warm sunset temperature
+        renderer->SetColorGrade(0.48f, 0.05f); // warm sunset grade without orange crush
+        renderer->SetToneGrade(1.045f, 1.035f);
+        renderer->SetCinematicPost(0.085f, 0.10f);
         renderer->SetSunDirection(glm::normalize(glm::vec3(0.30f, 0.10f, 0.95f))); // low sun over the water
         renderer->SetSunColor(glm::vec3(1.0f, 0.56f, 0.30f));                        // golden-hour sun
         renderer->SetSunIntensity(2.7f);
@@ -2843,6 +2883,7 @@ void Engine::BuildRecipeScene() {
         } else {
             renderer->SetBackgroundPresentation(false, 0.0f, 0.0f);
         }
+        const RecipeMoodGrade moodGrade = RecipeMoodGradeFor(style, outdoor);
         // Warmth shifts the ambient toward warm/cool; brightness scales the fill.
         glm::vec3 amb = outdoor ? glm::vec3(0.24f, 0.27f, 0.31f) : glm::vec3(0.26f, 0.25f, 0.23f);
         amb.r += style.warmth * 0.06f;
@@ -2851,18 +2892,16 @@ void Engine::BuildRecipeScene() {
         renderer->SetAmbientLighting(glm::max(amb, glm::vec3(outdoor ? 0.05f : 0.06f)),
                                      (outdoor ? 1.0f : 0.9f) * lightingBalance.ambientScale);
         const float recipeExposure =
-            std::clamp((outdoor ? 0.68f : 0.82f) + style.brightness * 0.06f,
+            std::clamp((outdoor ? 0.68f : 0.82f) + style.brightness * 0.06f + moodGrade.exposureOffset,
                        0.52f,
                        outdoor ? 1.0f : 0.98f);
         renderer->SetExposure(std::clamp(recipeExposure * lightingBalance.exposureScale,
                                          0.45f,
                                          outdoor ? 1.0f : 0.98f));
-        // Global warm/cool grade makes the modern <-> rustic difference clear.
-        renderer->SetColorGrade(std::max(0.0f, style.warmth) * 0.38f,
-                                std::max(0.0f, -style.warmth) * 0.32f);
-        renderer->SetToneGrade(outdoor ? 1.03f : 1.06f, outdoor ? 1.02f : 1.04f);
+        renderer->SetColorGrade(moodGrade.warm, moodGrade.cool);
+        renderer->SetToneGrade(moodGrade.contrast, moodGrade.saturation);
         renderer->SetCinematicPostEnabled(true);
-        renderer->SetCinematicPost(outdoor ? 0.045f : 0.075f, 0.0f);
+        renderer->SetCinematicPost(moodGrade.vignette, 0.0f);
         renderer->SetSunDirection(glm::normalize(outdoor ? glm::vec3(-0.59f, 0.05f, -0.79f) : glm::vec3(-0.35f, 0.82f, 0.45f)));
         if (outdoor) {
             renderer->SetSunColor(glm::vec3(1.0f, 0.95f, 0.86f)); // warm daylight

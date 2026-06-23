@@ -366,8 +366,8 @@ inline void AddAreaLight(std::vector<std::shared_ptr<SceneCommand>>& out,
 }
 
 // Style-aware furniture: classic -> high-poly Poly Haven asset (textured, via kTex);
-// modern -> clean Kenney mesh (flat ColorForKey). Self-calibrating Place() scales
-// either to the same target footprint, so the layout is unchanged.
+// modern -> clean/high-poly modern asset. Self-calibrating Place() scales either
+// to the same target footprint, so the layout is unchanged.
 inline bool PlaceFurn(std::vector<std::shared_ptr<SceneCommand>>& out, const Scene::AssetCatalog& cat,
                       FootprintCache& c, const SceneStyle& style, float targetSize, float x, float z,
                       float yawDeg, const char* modernId, const char* classicId) {
@@ -587,13 +587,23 @@ void BuildLivingRoom(std::vector<std::shared_ptr<SceneCommand>>& out, const Scen
     // Cozier footprint so the seating group fills the room instead of floating.
     BuildRoomShell(out, cat, c, 6.8f, 6.6f, glm::vec4(0.50f, 0.43f, 0.36f, 1.0f)); // warm wood floor
     Place(out, cat, c, "rugRectangle", 2.9f, 0.0f, -0.3f, 0.0f, glm::vec4(0.47f, 0.30f, 0.26f, 1.0f));
-    // Style-aware: classic -> high-poly Poly Haven (textured); modern -> clean Kenney.
-    PlaceFurn(out, cat, c, style, 2.3f, 0.0f, -2.0f, 0.0f, "loungeSofa", "Sofa_01");        // back wall
-    PlaceFurn(out, cat, c, style, 0.95f, -2.05f, -0.3f, 50.0f, "loungeChair", "ArmChair_01"); // angled in
-    PlaceFurn(out, cat, c, style, 0.95f, 2.05f, -0.3f, -50.0f, "loungeChair", "ArmChair_01");
+    // Style-aware: classic -> high-poly Poly Haven; modern -> high-poly Khronos glTF furniture.
+    if (style.classic) {
+        Place(out, cat, c, "Sofa_01", 2.3f, 0.0f, -2.0f, 0.0f, kTex);          // back wall
+        Place(out, cat, c, "ArmChair_01", 0.95f, -2.05f, -0.3f, 50.0f, kTex); // angled in
+        Place(out, cat, c, "ArmChair_01", 0.95f, 2.05f, -0.3f, -50.0f, kTex);
+    } else {
+        Place(out, cat, c, "GlamVelvetSofa", 2.35f, 0.0f, -2.05f, 0.0f, kTex);
+        Place(out, cat, c, "ChairDamaskPurplegold", 1.2f, -2.05f, -0.45f, 65.0f, kTex);
+        Place(out, cat, c, "ChairDamaskPurplegold", 1.2f, 2.05f, -0.45f, -65.0f, kTex);
+    }
     PlaceFurn(out, cat, c, style, 1.2f, 0.0f, -0.7f, 0.0f, "tableCoffee", "CoffeeTable_01");  // seating centre
     PlaceOn(out, cat, c, "books", 0.35f, 0.15f, 0.42f, -0.7f, 20.0f);   // on the coffee table
-    Place(out, cat, c, "lampRoundFloor", 0.4f, -2.7f, -2.1f, 0.0f);     // floor lamp beside the sofa
+    if (style.classic) {
+        Place(out, cat, c, "lampRoundFloor", 0.4f, -2.7f, -2.1f, 0.0f); // floor lamp beside the sofa
+    } else {
+        Place(out, cat, c, "LightsPunctualLamp", 0.38f, -2.65f, -2.1f, 0.0f, kTex);
+    }
     AddPointLight(out, -2.55f, 1.45f, -2.1f, glm::vec3(1.0f, 0.78f, 0.48f), 5.4f, 4.3f);
     Place(out, cat, c, "sideTable", 0.5f, 2.7f, -2.1f, 0.0f);           // side table other end
     PlaceOn(out, cat, c, "lampRoundTable", 0.28f, 2.7f, 0.46f, -2.1f, 0.0f); // table lamp on it
@@ -601,8 +611,13 @@ void BuildLivingRoom(std::vector<std::shared_ptr<SceneCommand>>& out, const Scen
     PlaceFurn(out, cat, c, style, 1.1f, -3.0f, 1.0f, 90.0f, "bookcaseOpen", "Shelf_01"); // side wall
     Place(out, cat, c, "cabinetTelevision", 1.6f, 0.0f, 2.7f, 180.0f);  // front wall (behind camera)
     Place(out, cat, c, "televisionModern", 1.2f, 0.0f, 2.5f, 180.0f);
-    Place(out, cat, c, "calathea_orbifolia_01", 0.6f, 2.9f, -2.6f, 0.0f, kTex);  // high-poly corner plant
-    Place(out, cat, c, "calathea_orbifolia_01", 0.55f, -3.0f, -2.7f, 0.0f, kTex);
+    if (style.classic) {
+        Place(out, cat, c, "calathea_orbifolia_01", 0.6f, 2.9f, -2.6f, 0.0f, kTex); // high-poly corner plant
+        Place(out, cat, c, "calathea_orbifolia_01", 0.55f, -3.0f, -2.7f, 0.0f, kTex);
+    } else {
+        Place(out, cat, c, "DiffuseTransmissionPlant", 0.62f, 2.7f, -1.55f, 0.0f, kTex);
+        Place(out, cat, c, "DiffuseTransmissionPlant", 0.36f, -2.95f, -2.65f, 0.0f, kTex);
+    }
     AddAreaLight(out,
                  "LivingRoom_Ceiling_Area",
                  glm::vec3(0.0f, 2.62f, -0.25f),
@@ -644,7 +659,7 @@ void BuildOffice(std::vector<std::shared_ptr<SceneCommand>>& out, const Scene::A
     Place(out, cat, c, "trashcan", 0.3f, 0.8f, -1.1f, 0.0f);
 }
 
-void BuildKitchen(std::vector<std::shared_ptr<SceneCommand>>& out, const Scene::AssetCatalog& cat, FootprintCache& c) {
+void BuildKitchen(std::vector<std::shared_ptr<SceneCommand>>& out, const Scene::AssetCatalog& cat, FootprintCache& c, const SceneStyle& style) {
     BuildRoomShell(out, cat, c, 6.6f, 6.4f, glm::vec4(0.70f, 0.68f, 0.63f, 1.0f), true); // herringbone tile floor
     const float backZ = -2.7f;
     const float counterTop = 0.92f; // lower-cabinet height after scaling
@@ -654,7 +669,11 @@ void BuildKitchen(std::vector<std::shared_ptr<SceneCommand>>& out, const Scene::
     Place(out, cat, c, "kitchenSink", 0.95f, -0.3f, backZ, 0.0f);
     Place(out, cat, c, "kitchenStove", 0.95f, 0.65f, backZ, 0.0f);
     Place(out, cat, c, "kitchenCabinet", 0.95f, 1.6f, backZ, 0.0f);
-    Place(out, cat, c, "kitchenFridge", 1.05f, 2.7f, backZ, 0.0f);
+    if (style.classic) {
+        Place(out, cat, c, "kitchenFridge", 1.05f, 2.7f, backZ, 0.0f);
+    } else {
+        Place(out, cat, c, "CommercialRefrigerator", 1.05f, 2.7f, backZ, 0.0f, kTex);
+    }
     // Upper cabinets + range hood mounted on the wall above the run.
     PlaceOn(out, cat, c, "kitchenCabinetUpper", 0.95f, -2.2f, 1.65f, backZ - 0.06f, 0.0f);
     PlaceOn(out, cat, c, "kitchenCabinetUpperDouble", 1.3f, -0.9f, 1.65f, backZ - 0.06f, 0.0f);
@@ -902,7 +921,7 @@ std::vector<std::shared_ptr<SceneCommand>> BuildSceneRecipe(const std::string& r
     } else if (recipeName == "office") {
         BuildOffice(out, catalog, cache, style);
     } else if (recipeName == "kitchen") {
-        BuildKitchen(out, catalog, cache);
+        BuildKitchen(out, catalog, cache, style);
     } else if (recipeName == "dining_room") {
         BuildDiningRoom(out, catalog, cache, style);
     } else if (recipeName == "bathroom") {

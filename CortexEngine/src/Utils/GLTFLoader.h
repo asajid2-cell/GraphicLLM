@@ -11,7 +11,7 @@ namespace Cortex::Utils {
 // Very small glTF 2.0 mesh loader tailored for the Khronos sample models.
 // Supports:
 //   - .gltf (JSON) with external .bin buffers
-//   - single mesh / single primitive
+//   - default-scene node traversal with mesh merging and node transforms
 //   - POSITION, NORMAL, TEXCOORD_0 attributes (float)
 //   - uint16/uint32 indices
 Result<std::shared_ptr<Scene::MeshData>> LoadGLTFMesh(const std::string& path);

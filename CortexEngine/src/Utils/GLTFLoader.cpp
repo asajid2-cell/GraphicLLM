@@ -5,6 +5,9 @@
 #include <spdlog/spdlog.h>
 #include <unordered_map>
 #include <algorithm>
+#include <functional>
+#include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/quaternion.hpp>
 
 namespace fs = std::filesystem;
 
@@ -198,6 +201,39 @@ glm::vec3 ReadVec3(const nlohmann::json& jv, const glm::vec3& fallback) {
     return glm::vec3(jv[0].get<float>(), jv[1].get<float>(), jv[2].get<float>());
 }
 
+glm::mat4 ReadNodeTransform(const nlohmann::json& node) {
+    if (node.contains("matrix") && node["matrix"].is_array() && node["matrix"].size() >= 16) {
+        glm::mat4 m(1.0f);
+        for (int col = 0; col < 4; ++col) {
+            for (int row = 0; row < 4; ++row) {
+                m[col][row] = node["matrix"][col * 4 + row].get<float>();
+            }
+        }
+        return m;
+    }
+
+    glm::vec3 translation(0.0f);
+    if (node.contains("translation")) {
+        translation = ReadVec3(node["translation"], translation);
+    }
+
+    glm::quat rotation(1.0f, 0.0f, 0.0f, 0.0f);
+    if (node.contains("rotation") && node["rotation"].is_array() && node["rotation"].size() >= 4) {
+        rotation = glm::quat(node["rotation"][3].get<float>(),
+                             node["rotation"][0].get<float>(),
+                             node["rotation"][1].get<float>(),
+                             node["rotation"][2].get<float>());
+    }
+
+    glm::vec3 scale(1.0f);
+    if (node.contains("scale")) {
+        scale = ReadVec3(node["scale"], scale);
+    }
+
+    return glm::translate(glm::mat4(1.0f), translation) * glm::mat4_cast(rotation) *
+           glm::scale(glm::mat4(1.0f), scale);
+}
+
 std::string TexturePathForIndex(const nlohmann::json& j, const fs::path& baseDir, int textureIndex) {
     if (textureIndex < 0 || !j.contains("textures") || !j["textures"].is_array() ||
         textureIndex >= static_cast<int>(j["textures"].size())) {
@@ -317,145 +353,231 @@ Result<std::shared_ptr<Scene::MeshData>> LoadGLTFMesh(const std::string& pathStr
         return Result<std::shared_ptr<Scene::MeshData>>::Err("gltf has no meshes");
     }
 
-    // Many Khronos sample models contain multiple meshes (e.g., backdrop + hero
-    // object). Instead of blindly taking meshes[0], choose the mesh whose first
-    // primitive's POSITION accessor has the largest vertex count. This tends to
-    // select the "main" mesh (e.g., the dragon rather than the cloth backdrop).
+    auto mesh = std::make_shared<Scene::MeshData>();
     const auto& meshes = j["meshes"];
-    int bestMeshIndex = -1;
-    size_t bestVertexCount = 0;
+    constexpr size_t kMaxMergedIndices = 500000;
+    size_t primitiveCount = 0;
+    size_t skippedBudgetPrimitives = 0;
+    Scene::MeshData::EmbeddedPbrMaterial firstMaterial;
+    bool haveMaterial = false;
+    bool haveTexturedMaterial = false;
 
-    for (int mi = 0; mi < static_cast<int>(meshes.size()); ++mi) {
-        const auto& mesh = meshes[mi];
-        if (!mesh.contains("primitives") || !mesh["primitives"].is_array() || mesh["primitives"].empty()) {
-            continue;
+    auto appendPrimitive = [&](const nlohmann::json& prim, const glm::mat4& transform) -> Result<void> {
+        if (prim.value("mode", 4) != 4) {
+            return Result<void>::Ok();
         }
-        const auto& prim0 = mesh["primitives"][0];
-        if (!prim0.contains("attributes")) {
-            continue;
+        if (!prim.contains("attributes")) {
+            return Result<void>::Ok();
         }
-        const auto& attrs0 = prim0["attributes"];
-        if (!attrs0.contains("POSITION")) {
-            continue;
+
+        const auto& attrs = prim["attributes"];
+        auto getAccessorIndex = [&](const char* semantic) -> int {
+            if (!attrs.contains(semantic)) return -1;
+            return attrs[semantic].get<int>();
+        };
+
+        int posIndex = getAccessorIndex("POSITION");
+        if (posIndex < 0 || posIndex >= static_cast<int>(accessors.size())) {
+            return Result<void>::Ok();
         }
-        int posAccIndex = attrs0["POSITION"].get<int>();
-        if (posAccIndex < 0 || posAccIndex >= static_cast<int>(accessors.size())) {
-            continue;
+
+        const AccessorInfo& posAcc = accessors[posIndex];
+        if (posAcc.componentType != 5126 || posAcc.type != "VEC3" ||
+            posAcc.bufferView < 0 || posAcc.bufferView >= static_cast<int>(views.size())) {
+            return Result<void>::Err("POSITION accessor must be float VEC3 with valid bufferView");
         }
-        const AccessorInfo& posAcc0 = accessors[posAccIndex];
-        if (posAcc0.count > bestVertexCount) {
-            bestVertexCount = posAcc0.count;
-            bestMeshIndex = mi;
+
+        const BufferViewInfo& posView = views[posAcc.bufferView];
+        if (posView.buffer < 0 || posView.buffer >= static_cast<int>(buffers.size())) {
+            return Result<void>::Err("POSITION bufferView references invalid buffer");
         }
-    }
+        std::vector<glm::vec3> positions;
+        ReadAccessorFloats<glm::vec3>(posAcc, posView, buffers[posView.buffer], 3, positions);
 
-    if (bestMeshIndex < 0) {
-        return Result<std::shared_ptr<Scene::MeshData>>::Err("Failed to choose mesh: no valid POSITION accessor found");
-    }
+        std::vector<glm::vec3> normals;
+        int normIndex = getAccessorIndex("NORMAL");
+        if (normIndex >= 0 && normIndex < static_cast<int>(accessors.size())) {
+            const AccessorInfo& nAcc = accessors[normIndex];
+            if (nAcc.componentType == 5126 && nAcc.type == "VEC3" &&
+                nAcc.bufferView >= 0 && nAcc.bufferView < static_cast<int>(views.size())) {
+                const BufferViewInfo& nView = views[nAcc.bufferView];
+                if (nView.buffer >= 0 && nView.buffer < static_cast<int>(buffers.size())) {
+                    ReadAccessorFloats<glm::vec3>(nAcc, nView, buffers[nView.buffer], 3, normals);
+                }
+            }
+        }
 
-    const auto& mesh0 = meshes[bestMeshIndex];
-    if (!mesh0.contains("primitives") || !mesh0["primitives"].is_array() || mesh0["primitives"].empty()) {
-        return Result<std::shared_ptr<Scene::MeshData>>::Err("gltf mesh has no primitives");
-    }
+        std::vector<glm::vec2> uvs;
+        int uvIndex = getAccessorIndex("TEXCOORD_0");
+        if (uvIndex >= 0 && uvIndex < static_cast<int>(accessors.size())) {
+            const AccessorInfo& uvAcc = accessors[uvIndex];
+            if (uvAcc.componentType == 5126 && uvAcc.type == "VEC2" &&
+                uvAcc.bufferView >= 0 && uvAcc.bufferView < static_cast<int>(views.size())) {
+                const BufferViewInfo& uvView = views[uvAcc.bufferView];
+                if (uvView.buffer >= 0 && uvView.buffer < static_cast<int>(buffers.size())) {
+                    ReadAccessorFloats<glm::vec2>(uvAcc, uvView, buffers[uvView.buffer], 2, uvs);
+                }
+            }
+        }
 
-    const auto& prim = mesh0["primitives"][0];
+        std::vector<uint32_t> indices;
+        if (prim.contains("indices")) {
+            int idxAccIndex = prim["indices"].get<int>();
+            if (idxAccIndex < 0 || idxAccIndex >= static_cast<int>(accessors.size())) {
+                return Result<void>::Err("indices accessor index out of range");
+            }
+            const AccessorInfo& idxAcc = accessors[idxAccIndex];
+            if (idxAcc.bufferView < 0 || idxAcc.bufferView >= static_cast<int>(views.size())) {
+                return Result<void>::Err("indices accessor has invalid bufferView");
+            }
+            const BufferViewInfo& idxView = views[idxAcc.bufferView];
+            if (idxView.buffer < 0 || idxView.buffer >= static_cast<int>(buffers.size())) {
+                return Result<void>::Err("indices bufferView references invalid buffer");
+            }
+            auto idxRes = ReadIndices(idxAcc, idxView, buffers[idxView.buffer], indices);
+            if (idxRes.IsErr()) {
+                return Result<void>::Err(idxRes.Error());
+            }
+        } else {
+            indices.resize(positions.size());
+            for (size_t i = 0; i < positions.size(); ++i) {
+                indices[i] = static_cast<uint32_t>(i);
+            }
+        }
 
-    // Attributes
-    if (!prim.contains("attributes")) {
-        return Result<std::shared_ptr<Scene::MeshData>>::Err("primitive has no attributes");
-    }
+        if (!mesh->indices.empty() && mesh->indices.size() + indices.size() > kMaxMergedIndices) {
+            ++skippedBudgetPrimitives;
+            spdlog::warn("LoadGLTFMesh: skipping primitive that would exceed merged index budget for '{}' ({} + {} > {})",
+                         path.string(), mesh->indices.size(), indices.size(), kMaxMergedIndices);
+            return Result<void>::Ok();
+        }
 
-    const auto& attrs = prim["attributes"];
+        if (!normals.empty() && normals.size() != positions.size()) {
+            normals.clear();
+        }
+        if (!uvs.empty() && uvs.size() != positions.size()) {
+            uvs.clear();
+        }
 
-    auto getAccessorIndex = [&](const char* semantic) -> int {
-        if (!attrs.contains(semantic)) return -1;
-        return attrs[semantic].get<int>();
+        const uint32_t baseVertex = static_cast<uint32_t>(mesh->positions.size());
+        const size_t previousVertexCount = mesh->positions.size();
+        const bool appendNormals = !normals.empty() || !mesh->normals.empty();
+        const bool appendUvs = !uvs.empty() || !mesh->texCoords.empty();
+        if (appendNormals && mesh->normals.empty() && previousVertexCount > 0) {
+            mesh->normals.resize(previousVertexCount, glm::vec3(0.0f, 1.0f, 0.0f));
+        }
+        if (appendUvs && mesh->texCoords.empty() && previousVertexCount > 0) {
+            mesh->texCoords.resize(previousVertexCount, glm::vec2(0.0f));
+        }
+
+        const glm::mat3 normalMatrix = glm::transpose(glm::inverse(glm::mat3(transform)));
+        for (size_t i = 0; i < positions.size(); ++i) {
+            mesh->positions.push_back(glm::vec3(transform * glm::vec4(positions[i], 1.0f)));
+            if (appendNormals) {
+                const glm::vec3 n = !normals.empty() ? normals[i] : glm::vec3(0.0f, 1.0f, 0.0f);
+                mesh->normals.push_back(glm::normalize(normalMatrix * n));
+            }
+            if (appendUvs) {
+                mesh->texCoords.push_back(!uvs.empty() ? uvs[i] : glm::vec2(0.0f));
+            }
+        }
+        for (uint32_t idx : indices) {
+            mesh->indices.push_back(baseVertex + idx);
+        }
+
+        auto mat = ReadEmbeddedMaterial(j, baseDir, prim);
+        if (!haveMaterial || (!haveTexturedMaterial && mat.HasTexture())) {
+            firstMaterial = std::move(mat);
+            haveMaterial = true;
+            haveTexturedMaterial = firstMaterial.HasTexture();
+        }
+        ++primitiveCount;
+        return Result<void>::Ok();
     };
 
-    int posIndex = getAccessorIndex("POSITION");
-    if (posIndex < 0 || posIndex >= static_cast<int>(accessors.size())) {
-        return Result<std::shared_ptr<Scene::MeshData>>::Err("primitive missing POSITION accessor");
-    }
-
-    int normIndex = getAccessorIndex("NORMAL");
-    int uvIndex   = getAccessorIndex("TEXCOORD_0");
-
-    const AccessorInfo& posAcc = accessors[posIndex];
-    if (posAcc.bufferView < 0 || posAcc.bufferView >= static_cast<int>(views.size())) {
-        return Result<std::shared_ptr<Scene::MeshData>>::Err("POSITION accessor has invalid bufferView");
-    }
-
-    std::vector<glm::vec3> positions;
-    std::vector<glm::vec3> normals;
-    std::vector<glm::vec2> uvs;
-
-    // Positions
-    {
-        if (posAcc.componentType != 5126 || posAcc.type != "VEC3") {
-            return Result<std::shared_ptr<Scene::MeshData>>::Err("POSITION accessor must be float VEC3");
+    auto appendMesh = [&](int meshIndex, const glm::mat4& transform) -> Result<void> {
+        if (meshIndex < 0 || meshIndex >= static_cast<int>(meshes.size())) {
+            return Result<void>::Ok();
         }
-        const BufferViewInfo& v = views[posAcc.bufferView];
-        const BufferInfo& b = buffers[v.buffer];
-        ReadAccessorFloats<glm::vec3>(posAcc, v, b, 3, positions);
-    }
+        const auto& jm = meshes[meshIndex];
+        if (!jm.contains("primitives") || !jm["primitives"].is_array()) {
+            return Result<void>::Ok();
+        }
+        for (const auto& prim : jm["primitives"]) {
+            auto primRes = appendPrimitive(prim, transform);
+            if (primRes.IsErr()) {
+                return primRes;
+            }
+        }
+        return Result<void>::Ok();
+    };
 
-    // Normals (optional)
-    if (normIndex >= 0 && normIndex < static_cast<int>(accessors.size())) {
-        const AccessorInfo& nAcc = accessors[normIndex];
-        if (nAcc.componentType == 5126 && nAcc.type == "VEC3" && nAcc.bufferView >= 0) {
-            const BufferViewInfo& v = views[nAcc.bufferView];
-            const BufferInfo& b = buffers[v.buffer];
-            ReadAccessorFloats<glm::vec3>(nAcc, v, b, 3, normals);
-        }
-    }
+    bool traversedScene = false;
+    if (j.contains("nodes") && j["nodes"].is_array() && j.contains("scenes") && j["scenes"].is_array() &&
+        !j["scenes"].empty()) {
+        const int sceneIndex = j.value("scene", 0);
+        if (sceneIndex >= 0 && sceneIndex < static_cast<int>(j["scenes"].size())) {
+            const auto& scene = j["scenes"][sceneIndex];
+            if (scene.contains("nodes") && scene["nodes"].is_array()) {
+                std::function<Result<void>(int, const glm::mat4&)> visitNode =
+                    [&](int nodeIndex, const glm::mat4& parent) -> Result<void> {
+                    if (nodeIndex < 0 || nodeIndex >= static_cast<int>(j["nodes"].size())) {
+                        return Result<void>::Ok();
+                    }
+                    const auto& node = j["nodes"][nodeIndex];
+                    const glm::mat4 local = ReadNodeTransform(node);
+                    const glm::mat4 world = parent * local;
+                    if (node.contains("mesh")) {
+                        auto meshRes = appendMesh(node["mesh"].get<int>(), world);
+                        if (meshRes.IsErr()) {
+                            return meshRes;
+                        }
+                    }
+                    if (node.contains("children") && node["children"].is_array()) {
+                        for (const auto& child : node["children"]) {
+                            auto childRes = visitNode(child.get<int>(), world);
+                            if (childRes.IsErr()) {
+                                return childRes;
+                            }
+                        }
+                    }
+                    return Result<void>::Ok();
+                };
 
-    // UVs (optional)
-    if (uvIndex >= 0 && uvIndex < static_cast<int>(accessors.size())) {
-        const AccessorInfo& uvAcc = accessors[uvIndex];
-        if (uvAcc.componentType == 5126 && uvAcc.type == "VEC2" && uvAcc.bufferView >= 0) {
-            const BufferViewInfo& v = views[uvAcc.bufferView];
-            const BufferInfo& b = buffers[v.buffer];
-            ReadAccessorFloats<glm::vec2>(uvAcc, v, b, 2, uvs);
-        }
-    }
-
-    // Indices (optional - but our renderer expects indexed)
-    std::vector<uint32_t> indices;
-    if (prim.contains("indices")) {
-        int idxAccIndex = prim["indices"].get<int>();
-        if (idxAccIndex < 0 || idxAccIndex >= static_cast<int>(accessors.size())) {
-            return Result<std::shared_ptr<Scene::MeshData>>::Err("indices accessor index out of range");
-        }
-        const AccessorInfo& idxAcc = accessors[idxAccIndex];
-        if (idxAcc.bufferView < 0 || idxAcc.bufferView >= static_cast<int>(views.size())) {
-            return Result<std::shared_ptr<Scene::MeshData>>::Err("indices accessor has invalid bufferView");
-        }
-        const BufferViewInfo& v = views[idxAcc.bufferView];
-        const BufferInfo& b = buffers[v.buffer];
-        auto idxRes = ReadIndices(idxAcc, v, b, indices);
-        if (idxRes.IsErr()) {
-            return Result<std::shared_ptr<Scene::MeshData>>::Err(idxRes.Error());
-        }
-    } else {
-        // Fallback: generate a linear index buffer
-        indices.resize(positions.size());
-        for (size_t i = 0; i < positions.size(); ++i) {
-            indices[i] = static_cast<uint32_t>(i);
+                for (const auto& nodeIndex : scene["nodes"]) {
+                    auto nodeRes = visitNode(nodeIndex.get<int>(), glm::mat4(1.0f));
+                    if (nodeRes.IsErr()) {
+                        return Result<std::shared_ptr<Scene::MeshData>>::Err(nodeRes.Error());
+                    }
+                    traversedScene = true;
+                }
+            }
         }
     }
 
-    auto mesh = std::make_shared<Scene::MeshData>();
-    mesh->positions = std::move(positions);
-    mesh->normals   = std::move(normals);
-    mesh->texCoords = std::move(uvs);
-    mesh->indices   = std::move(indices);
-    mesh->embeddedMaterial = ReadEmbeddedMaterial(j, baseDir, prim);
+    if (!traversedScene) {
+        for (int mi = 0; mi < static_cast<int>(meshes.size()); ++mi) {
+            auto meshRes = appendMesh(mi, glm::mat4(1.0f));
+            if (meshRes.IsErr()) {
+                return Result<std::shared_ptr<Scene::MeshData>>::Err(meshRes.Error());
+            }
+        }
+    }
+
+    if (mesh->positions.empty() || mesh->indices.empty()) {
+        return Result<std::shared_ptr<Scene::MeshData>>::Err("gltf has no loadable triangle primitives");
+    }
+    if (haveMaterial) {
+        mesh->embeddedMaterial = std::move(firstMaterial);
+    }
     mesh->UpdateBounds();
 
-    spdlog::info("Loaded glTF mesh '{}' (verts={}, indices={}, pbrTextures={})",
+    spdlog::info("Loaded glTF mesh '{}' (verts={}, indices={}, primitives={}, skippedBudget={}, pbrTextures={})",
                  path.string(),
                  mesh->positions.size(),
                  mesh->indices.size(),
+                 primitiveCount,
+                 skippedBudgetPrimitives,
                  mesh->embeddedMaterial.HasTexture() ? "yes" : "no");
 
     return Result<std::shared_ptr<Scene::MeshData>>::Ok(mesh);

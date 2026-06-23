@@ -266,6 +266,41 @@ Result<void> AssetCatalog::Load(const fs::path& assetsRoot) {
         }
     }
 
+    // 4) High-poly Khronos glTF Sample Assets furniture: <name>/<name>.gltf,
+    //    falling back to any .gltf in the folder. Folder name is the id.
+    const fs::path khronosFurniture = m_assetsRoot / "assets" / "models" / "khronos_furniture";
+    if (fs::is_directory(khronosFurniture, ec)) {
+        for (const auto& entry : fs::directory_iterator(khronosFurniture, ec)) {
+            if (ec) {
+                break;
+            }
+            if (!entry.is_directory(ec)) {
+                continue;
+            }
+            const std::string name = entry.path().filename().string();
+            fs::path gltf = entry.path() / (name + ".gltf");
+            if (!fs::exists(gltf, ec)) {
+                gltf.clear();
+                for (const auto& f : fs::directory_iterator(entry.path(), ec)) {
+                    if (f.path().extension() == ".gltf") {
+                        gltf = f.path();
+                        break;
+                    }
+                }
+            }
+            if (gltf.empty() || !fs::exists(gltf, ec)) {
+                continue;
+            }
+            CatalogAsset asset;
+            asset.id = name;
+            asset.runtimeAssetPath = gltf.lexically_normal().string();
+            asset.semanticRoles = InferRolesFromId(ToLower(name));
+            asset.sourceClass = "khronos_gltf_sample_assets";
+            asset.fromRegistry = false;
+            AddAsset(std::move(asset));
+        }
+    }
+
     Index();
     m_loaded = true;
     spdlog::info("AssetCatalog: loaded {} assets ({} roles, {} scene families) from {}", m_assets.size(),

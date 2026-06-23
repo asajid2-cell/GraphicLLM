@@ -209,7 +209,8 @@ PSOutput PSMain(VSOutput input) {
     float4 local = g_LocalReflectionRadiance.Load(int3(pixelCoord, 0));
     float3 localRadiance = max(local.rgb, 0.0f.xxx);
     float localConfidence = saturate(local.a);
-    float localActive = step(0.001f, localConfidence + Luma(localRadiance));
+    float localSourceAuthorized = step(0.001f, localConfidence + Luma(localRadiance));
+    float localActive = localSourceAuthorized;
 
     float4 normalRoughness = g_NormalRoughness.Load(int3(pixelCoord, 0));
     float4 emissiveMetallic = g_EmissiveMetallic.Load(int3(pixelCoord, 0));
@@ -278,9 +279,10 @@ PSOutput PSMain(VSOutput input) {
 
     float envEnabled = max(step(0.5f, g_EnvParams.z), step(0.5f, g_LocalProbeParams.z));
     float envScale = max(max(g_EnvParams.x, g_EnvParams.y), g_LocalProbeParams.y);
-    float3 envRadiance = max(g_AmbientColor.rgb, 0.0f.xxx) * max(envScale, 0.08f) * envEnabled;
+    float envAdmission = localSourceAuthorized * reflectionOwnership;
+    float3 envRadiance = max(g_AmbientColor.rgb, 0.0f.xxx) * max(envScale, 0.08f) * envEnabled * envAdmission;
     float envConfidence = saturate(envEnabled * (0.18f + 0.32f * saturate(envScale)));
-    envConfidence = saturate(envConfidence + roughReflection * (0.04f + 0.08f * (1.0f - metallic))) * reflectionOwnership;
+    envConfidence = saturate(envConfidence + roughReflection * (0.04f + 0.08f * (1.0f - metallic))) * envAdmission;
     localConfidence = saturate(localConfidence + roughReflection * (0.04f + 0.06f * (1.0f - metallic))) * reflectionOwnership;
     localActive = step(0.001f, localConfidence + Luma(localRadiance));
     float envActive = step(0.001f, envConfidence + Luma(envRadiance));

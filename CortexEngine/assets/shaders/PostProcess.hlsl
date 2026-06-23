@@ -923,6 +923,22 @@ float Hash12(float2 p)
     return frac((p3.x + p3.y) * p3.z);
 }
 
+float3 ApplyOutputDitherAndFineGrain(float3 color, float2 pixelPosition)
+{
+    float2 pixel = floor(pixelPosition);
+    float triangularNoise =
+        Hash12(pixel + float2(0.37f, 11.17f)) +
+        Hash12(pixel + float2(19.19f, 3.73f)) -
+        1.0f;
+    float dither = triangularNoise * (0.50f / 255.0f);
+
+    float luma = dot(saturate(color), float3(0.2126f, 0.7152f, 0.0722f));
+    float grainMask = smoothstep(0.04f, 0.35f, luma) * (1.0f - smoothstep(0.78f, 1.0f, luma));
+    float grain = (Hash12(pixel * 1.618f + float2(71.7f, 29.3f)) - 0.5f) * (0.18f / 255.0f) * grainMask;
+
+    return color + (dither + grain).xxx;
+}
+
 float HazePhaseHG(float cosTheta, float anisotropy)
 {
     float g = clamp(anisotropy, -0.75f, 0.75f);
@@ -3557,5 +3573,6 @@ float4 PSMain(VSOutput input) : SV_TARGET
         color = depthVis;
     }
 
+    color = ApplyOutputDitherAndFineGrain(color, input.position.xy);
     return float4(saturate(color), 1.0f);
 }

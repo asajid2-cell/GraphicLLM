@@ -47,6 +47,7 @@ StructuredBuffer<Light> g_LocalLights : register(t12);
 StructuredBuffer<uint2> g_ClusterRanges : register(t13);
 StructuredBuffer<uint> g_ClusterLightIndices : register(t14);
 Texture2D<float4> g_GTAO : register(t15); // RGB = encoded bent normal, A = GTAO visibility
+Texture2D<float> g_RtShadowMask : register(t16);
 
 uint DecodeFixtureClass(uint type, Light light) {
     if (type == LIGHT_TYPE_AREA_RECT) {
@@ -240,6 +241,54 @@ void ApplyRtDiffuseGI(inout float3 ambient,
     ambient += albedoColor * max(rtGI.rgb, 0.0f.xxx) * kD * (cinematicScale * aoDiffuse);
     float visibility = max(lerp(1.0f, saturate(rtGI.a), 0.35f), 0.88f);
     ambient *= visibility;
+}
+
+float SampleRtLocalLightMask(uint2 pixelCoord)
+{
+    uint maskWidth = 0u;
+    uint maskHeight = 0u;
+    g_RtShadowMask.GetDimensions(maskWidth, maskHeight);
+    if (maskWidth == 0u || maskHeight == 0u)
+    {
+        return 1.0f;
+    }
+
+    uint2 screenDim = max(g_ScreenAndCluster.xy, uint2(1u, 1u));
+    float2 maskScale = float2(maskWidth, maskHeight) / float2(screenDim);
+    int2 base = int2(floor((float2(pixelCoord) + 0.5f) * maskScale));
+    int2 maxCoord = int2(maskWidth - 1u, maskHeight - 1u);
+
+    float visibilitySum = 0.0f;
+    float weightSum = 0.0f;
+    [unroll]
+    for (int y = -1; y <= 1; ++y)
+    {
+        [unroll]
+        for (int x = -1; x <= 1; ++x)
+        {
+            int2 p = clamp(base + int2(x, y), int2(0, 0), maxCoord);
+            float w = (x == 0 && y == 0) ? 4.0f : ((x == 0 || y == 0) ? 2.0f : 1.0f);
+            visibilitySum += g_RtShadowMask.Load(int3(p, 0)) * w;
+            weightSum += w;
+        }
+    }
+
+    return saturate(visibilitySum / max(weightSum, 1e-4f));
+}
+
+float ApplyRtLocalLightVisibility(uint2 pixelCoord, uint lightType, float shadow)
+{
+    if (g_ShadowParams.z < 0.5f ||
+        (lightType != LIGHT_TYPE_POINT && lightType != LIGHT_TYPE_SPOT && lightType != LIGHT_TYPE_AREA_RECT))
+    {
+        return shadow;
+    }
+
+    float rtVisibility = SampleRtLocalLightMask(pixelCoord);
+    float floorVisibility = (lightType == LIGHT_TYPE_AREA_RECT) ? 0.62f : 0.72f;
+    float strength = (lightType == LIGHT_TYPE_AREA_RECT) ? 0.52f : ((lightType == LIGHT_TYPE_POINT) ? 0.36f : 0.30f);
+    float localVisibility = lerp(1.0f, max(rtVisibility, floorVisibility), strength);
+    return min(shadow, localVisibility);
 }
 
 static const uint INVALID_BINDLESS_INDEX = 0xFFFFFFFFu;
@@ -1638,6 +1687,7 @@ float4 PSMain(VSOutput input) : SV_Target0 {
                     roughness,
                     metallic);
             }
+            shadowLocal = ApplyRtLocalLightVisibility(pixelCoord, type, shadowLocal);
             shadowLocal = LocalContactVisibility(worldPos, normal, Ll, dist, shadowLocal);
             const float fixtureNdotLl = FixtureWrappedNdotL(NdotLl, fixtureClass);
             float localLdotH = saturate(dot(Ll, Hl));
@@ -2194,6 +2244,7 @@ FullSceneLightingV3Output PSMainV3LightingSplit(VSOutput input) {
                     roughness,
                     metallic);
             }
+            shadowLocal = ApplyRtLocalLightVisibility(pixelCoord, type, shadowLocal);
             shadowLocal = LocalContactVisibility(worldPos, normal, Ll, dist, shadowLocal);
             float fixtureNdotLl = FixtureWrappedNdotL(NdotLl, fixtureClass);
             float localLdotH = saturate(dot(Ll, Hl));

@@ -121,7 +121,7 @@ static constexpr uint32_t kVBFrameCount = 3;
 static constexpr uint32_t kVBResolveVisDepthSlots = 2;
 static constexpr uint32_t kVBResolveGBufferUavSlots = 6;
 static constexpr uint32_t kVBDeferredGBufferSrvSlots = 8;
-static constexpr uint32_t kVBDeferredEnvShadowSrvSlots = 5;
+static constexpr uint32_t kVBDeferredEnvShadowSrvSlots = 6;
 
 // Visibility Buffer Renderer
 // Two-phase deferred rendering:
@@ -285,6 +285,7 @@ public:
         ID3D12Resource* envSpecularResource, // Can be null
         DXGI_FORMAT envFormat, // Format for env maps (e.g., DXGI_FORMAT_R16G16B16A16_FLOAT)
         const DescriptorHandle& shadowMapSRV,
+        ID3D12Resource* rtShadowResource,
         ID3D12Resource* rtGIResource,
         ID3D12Resource* ssaoResource,
         const DeferredLightingParams& params
@@ -316,6 +317,7 @@ public:
         ID3D12Resource* envSpecularResource,
         DXGI_FORMAT envFormat,
         const DescriptorHandle& shadowMapSRV,
+        ID3D12Resource* rtShadowResource,
         ID3D12Resource* rtGIResource,
         ID3D12Resource* ssaoResource,
         const DeferredLightingParams& params

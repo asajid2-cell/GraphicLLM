@@ -450,6 +450,7 @@ bool ApplyDeferredLighting(const DeferredLightingContext& context) {
         context.envSpecularResource,
         context.envFormat,
         context.shadowMapSRV,
+        context.rtShadowResource,
         context.rtGIResource,
         context.ssaoResource,
         context.params);
@@ -525,6 +526,7 @@ bool ApplyFullSceneLightingV3(const FullSceneLightingV3Context& context) {
         context.envSpecularResource,
         context.envFormat,
         context.shadowMapSRV,
+        context.rtShadowResource,
         context.rtGIResource,
         context.ssaoResource,
         context.params);

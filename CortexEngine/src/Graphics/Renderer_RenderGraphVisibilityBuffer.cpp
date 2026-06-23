@@ -240,6 +240,7 @@ Renderer::ExecuteVisibilityBufferInRenderGraph(Scene::ECS_Registry* registry) {
         vbGraphContext.deferredLighting.depthSRV = m_depthResources.descriptors.srv;
         vbGraphContext.deferredLighting.envDiffuseResource = deferredInputs.envDiffuseResource;
         vbGraphContext.deferredLighting.envSpecularResource = deferredInputs.envSpecularResource;
+        vbGraphContext.deferredLighting.rtShadowResource = m_rt.ShadowTargets().mask.Get();
         vbGraphContext.deferredLighting.rtGIResource = deferredInputs.rtGIResource;
         vbGraphContext.deferredLighting.ssaoResource = deferredInputs.ssaoResource;
         vbGraphContext.deferredLighting.envFormat = deferredInputs.envFormat;
@@ -289,6 +290,7 @@ Renderer::ExecuteVisibilityBufferInRenderGraph(Scene::ECS_Registry* registry) {
         vbGraphContext.fullSceneLightingV3.depthSRV = m_depthResources.descriptors.srv;
         vbGraphContext.fullSceneLightingV3.envDiffuseResource = deferredInputs.envDiffuseResource;
         vbGraphContext.fullSceneLightingV3.envSpecularResource = deferredInputs.envSpecularResource;
+        vbGraphContext.fullSceneLightingV3.rtShadowResource = m_rt.ShadowTargets().mask.Get();
         vbGraphContext.fullSceneLightingV3.rtGIResource = deferredInputs.rtGIResource;
         vbGraphContext.fullSceneLightingV3.ssaoResource = deferredInputs.ssaoResource;
         vbGraphContext.fullSceneLightingV3.envFormat = deferredInputs.envFormat;

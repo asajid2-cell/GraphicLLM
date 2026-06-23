@@ -12,6 +12,10 @@ RaytracingAccelerationStructure g_TopLevel : register(t0, space2);
 Texture2D<float>               g_Depth     : register(t1, space2);
 RWTexture2D<float>             g_ShadowMask: register(u0, space2);
 
+static const uint LIGHT_TYPE_POINT     = 1u;
+static const uint LIGHT_TYPE_SPOT      = 2u;
+static const uint LIGHT_TYPE_AREA_RECT = 3u;
+
 cbuffer FrameConstants : register(b0, space0)
 {
     float4x4 g_ViewMatrix;
@@ -98,6 +102,108 @@ float3 SampleSunDiskDirection(float3 sunDir, uint2 pixel, uint sampleIndex)
     const float sunAngularRadius = 0.0131f; // ~0.75 degrees, between real sun and cinematic area sun.
     float2 disk = float2(c, s) * (r * sunAngularRadius);
     return normalize(sunDir + tangent * disk.x + bitangent * disk.y);
+}
+
+float Luminance(float3 color)
+{
+    return dot(max(color, 0.0f.xxx), float3(0.2126f, 0.7152f, 0.0722f));
+}
+
+bool SelectStrongestLocalLight(float3 worldPos, out uint lightIndex, out float influence)
+{
+    lightIndex = 0u;
+    influence = 0.0f;
+
+    const uint lightCount = min(g_LightCount.x, LIGHT_MAX);
+    [loop]
+    for (uint i = 1u; i < lightCount; ++i)
+    {
+        Light light = g_Lights[i];
+        uint type = (uint)(light.position_type.w + 0.5f);
+        if (type != LIGHT_TYPE_POINT && type != LIGHT_TYPE_SPOT && type != LIGHT_TYPE_AREA_RECT)
+        {
+            continue;
+        }
+
+        float3 toLight = light.position_type.xyz - worldPos;
+        float dist = length(toLight);
+        float range = max(light.color_range.w, 0.1f);
+        if (dist <= 0.02f || dist >= range)
+        {
+            continue;
+        }
+
+        float falloff = saturate(1.0f - dist / range);
+        falloff *= falloff;
+        float typeBoost = (type == LIGHT_TYPE_AREA_RECT) ? 2.5f : ((type == LIGHT_TYPE_POINT) ? 1.35f : 1.0f);
+        float score = Luminance(light.color_range.rgb) * falloff * typeBoost;
+        if (score > influence)
+        {
+            influence = score;
+            lightIndex = i;
+        }
+    }
+
+    influence = saturate(influence * 0.18f);
+    return influence > 0.01f;
+}
+
+float3 SampleLocalLightTarget(Light light, uint2 pixel)
+{
+    uint type = (uint)(light.position_type.w + 0.5f);
+    float3 target = light.position_type.xyz;
+    if (type == LIGHT_TYPE_AREA_RECT)
+    {
+        float3 rawNormal = light.direction_cosInner.xyz;
+        float3 n = (dot(rawNormal, rawNormal) > 1e-4f)
+            ? normalize(rawNormal)
+            : float3(0.0f, -1.0f, 0.0f);
+        if (dot(n, n) < 0.25f)
+        {
+            n = float3(0.0f, -1.0f, 0.0f);
+        }
+
+        float3 tangent;
+        float3 bitangent;
+        BuildOrthonormalBasis(n, tangent, bitangent);
+
+        float2 xi = BlueNoiseUnit(pixel, 7u) * 2.0f - 1.0f;
+        float2 halfExtent = max(abs(light.params.zw), float2(0.08f, 0.08f));
+        target += tangent * (xi.x * halfExtent.x) + bitangent * (xi.y * halfExtent.y);
+    }
+
+    return target;
+}
+
+float TraceVisibility(float3 origin, float3 direction, float tMax, out float hitT);
+
+float EvaluateLocalLightVisibility(float3 worldPos, uint2 pixel, float bias, out float selectedInfluence)
+{
+    selectedInfluence = 0.0f;
+
+    uint lightIndex;
+    float influence;
+    if (!SelectStrongestLocalLight(worldPos, lightIndex, influence))
+    {
+        return 1.0f;
+    }
+
+    Light light = g_Lights[lightIndex];
+    float3 target = SampleLocalLightTarget(light, pixel);
+    float3 toLight = target - worldPos;
+    float dist = length(toLight);
+    if (dist <= 0.04f)
+    {
+        return 1.0f;
+    }
+
+    float3 dir = toLight / dist;
+    float hitT;
+    float visibility = TraceVisibility(worldPos + dir * bias, dir, max(dist - bias * 2.0f, 0.04f), hitT);
+
+    uint type = (uint)(light.position_type.w + 0.5f);
+    selectedInfluence = (type == LIGHT_TYPE_AREA_RECT) ? max(influence, 0.55f) : max(influence, 0.36f);
+    return visibility;
 }
 
 float TraceVisibility(float3 origin, float3 direction, float tMax, out float hitT)
@@ -226,6 +332,17 @@ void RayGen_Shadow()
         ? (1.0f - smoothstep(0.08f, 1.35f, contactHitT))
         : 0.0f;
     visibility = min(visibility, lerp(visibility, contactVisibility, contact * 0.65f));
+
+    // Stage-1 local-light shadows: one low-rate ray toward the strongest
+    // nearby area/point/spot light, folded conservatively into the existing
+    // mask so deferred lighting can ground furniture without a new RT target.
+    float localInfluence;
+    float localVisibility = EvaluateLocalLightVisibility(worldPos, launchIndex, bias, localInfluence);
+    if (localInfluence > 0.0f)
+    {
+        float localTerm = lerp(1.0f, max(localVisibility, 0.35f), saturate(localInfluence * 0.65f));
+        visibility = min(visibility, localTerm);
+    }
 
     StoreShadowBlock(launchIndex, launchDims, saturate(max(visibility, 0.08f)));
 }

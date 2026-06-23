@@ -122,6 +122,7 @@ struct DeferredLightingContext {
     DescriptorHandle depthSRV{};
     ID3D12Resource* envDiffuseResource = nullptr;
     ID3D12Resource* envSpecularResource = nullptr;
+    ID3D12Resource* rtShadowResource = nullptr;
     ID3D12Resource* rtGIResource = nullptr;
     ID3D12Resource* ssaoResource = nullptr;
     DXGI_FORMAT envFormat = DXGI_FORMAT_R8G8B8A8_UNORM;
@@ -151,6 +152,7 @@ struct FullSceneLightingV3Context {
     DescriptorHandle depthSRV{};
     ID3D12Resource* envDiffuseResource = nullptr;
     ID3D12Resource* envSpecularResource = nullptr;
+    ID3D12Resource* rtShadowResource = nullptr;
     ID3D12Resource* rtGIResource = nullptr;
     ID3D12Resource* ssaoResource = nullptr;
     DXGI_FORMAT envFormat = DXGI_FORMAT_R8G8B8A8_UNORM;

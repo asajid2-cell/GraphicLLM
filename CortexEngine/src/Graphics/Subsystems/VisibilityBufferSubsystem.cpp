@@ -885,6 +885,7 @@ VisibilityBufferSubsystem::DeferredLightingInputs
 VisibilityBufferSubsystem::PrepareVisibilityBufferDeferredLighting(Scene::ECS_Registry* registry,
                                                                    const VisibilityBufferContext& ctx) {
     DeferredLightingInputs inputs{};
+    inputs.rtShadowResource = ctx.rtShadowResource;
     inputs.rtGIResource = ctx.rtGIResource;
     inputs.ssaoResource = ctx.ssaoResource;
     {
@@ -1042,6 +1043,7 @@ void VisibilityBufferSubsystem::ApplyVisibilityBufferDeferredLighting(const Defe
         inputs.envSpecularResource,
         inputs.envFormat,
         ctx.shadows->Resources().resources.srv,
+        inputs.rtShadowResource,
         inputs.rtGIResource,
         inputs.ssaoResource,
         inputs.params);

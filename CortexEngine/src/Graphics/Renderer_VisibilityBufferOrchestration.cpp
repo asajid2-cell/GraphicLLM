@@ -35,6 +35,7 @@ VisibilityBufferContext Renderer::MakeVisibilityBufferContext() {
     ctx.materialFallbacks = &m_materialFallbacks;
     ctx.hzb = &m_hzb;
     ctx.shadows = &m_shadows;
+    ctx.rtShadowResource = m_rt.ShadowTargets().mask.Get();
     ctx.rtGIResource = m_rt.GITargets().color.Get();
     ctx.ssaoResource = m_ssao.State().resources.texture.Get();
 

@@ -38,6 +38,7 @@ Result<void> VisibilityBufferRenderer::CreateDeferredLightingPipeline() {
     //   t13: Cluster ranges (StructuredBuffer<uint2>)
     //   t14: Cluster light indices (StructuredBuffer<uint>)
     //   t15: GTAO/bent-normal texture
+    //   t16: RT shadow/local-light visibility mask
     //   s0: Linear sampler
     //   s1: Shadow sampler
     // ========================================================================
@@ -57,14 +58,21 @@ Result<void> VisibilityBufferRenderer::CreateDeferredLightingPipeline() {
         gbufferRanges[1].Flags = kDynamicDescriptorRangeFlags;
         gbufferRanges[1].OffsetInDescriptorsFromTableStart = 7;
 
-        // Descriptor ranges for env + shadow + BRDF LUT + RTGI (t7-t11: 5 textures)
-        D3D12_DESCRIPTOR_RANGE1 envShadowRange = {};
-        envShadowRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
-        envShadowRange.NumDescriptors = kVBDeferredEnvShadowSrvSlots;
-        envShadowRange.BaseShaderRegister = 7;
-        envShadowRange.RegisterSpace = 0;
-        envShadowRange.Flags = kDynamicDescriptorRangeFlags;
-        envShadowRange.OffsetInDescriptorsFromTableStart = 0;
+        // Descriptor ranges for env + shadow + BRDF LUT + RTGI (t7-t11) plus
+        // RT shadow/local-light visibility (t16), preserving root SRVs t12-t14.
+        D3D12_DESCRIPTOR_RANGE1 envShadowRanges[2] = {};
+        envShadowRanges[0].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
+        envShadowRanges[0].NumDescriptors = 5;
+        envShadowRanges[0].BaseShaderRegister = 7;
+        envShadowRanges[0].RegisterSpace = 0;
+        envShadowRanges[0].Flags = kDynamicDescriptorRangeFlags;
+        envShadowRanges[0].OffsetInDescriptorsFromTableStart = 0;
+        envShadowRanges[1].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
+        envShadowRanges[1].NumDescriptors = 1;
+        envShadowRanges[1].BaseShaderRegister = 16;
+        envShadowRanges[1].RegisterSpace = 0;
+        envShadowRanges[1].Flags = kDynamicDescriptorRangeFlags;
+        envShadowRanges[1].OffsetInDescriptorsFromTableStart = 5;
 
         D3D12_ROOT_PARAMETER1 params[6] = {};
 
@@ -80,10 +88,10 @@ Result<void> VisibilityBufferRenderer::CreateDeferredLightingPipeline() {
         params[1].DescriptorTable.pDescriptorRanges = gbufferRanges;
         params[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
 
-        // t7-t11: Environment + shadow map + BRDF LUT + RTGI SRVs
+        // t7-t11, t16: Environment + shadow map + BRDF LUT + RTGI + RT shadow mask SRVs
         params[2].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-        params[2].DescriptorTable.NumDescriptorRanges = 1;
-        params[2].DescriptorTable.pDescriptorRanges = &envShadowRange;
+        params[2].DescriptorTable.NumDescriptorRanges = _countof(envShadowRanges);
+        params[2].DescriptorTable.pDescriptorRanges = envShadowRanges;
         params[2].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
 
         // t12: Local lights SRV (root descriptor)

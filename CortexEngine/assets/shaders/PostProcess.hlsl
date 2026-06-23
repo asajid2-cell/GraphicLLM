@@ -2074,6 +2074,49 @@ float Hash21(float2 p)
     return frac(p.x * p.y);
 }
 
+float StreakBloomLuma(float3 c)
+{
+    return dot(c, float3(0.2126f, 0.7152f, 0.0722f));
+}
+
+float3 SampleCoherentStreakBloom(float2 uv, float2 axis)
+{
+    float3 center = g_BloomSource.SampleLevel(g_Sampler, uv, 0).rgb;
+    float centerLuma = StreakBloomLuma(center);
+    if (centerLuma <= 1.0e-5f)
+    {
+        return 0.0f.xxx;
+    }
+
+    float2 safeAxis = axis;
+    float axisLen = length(safeAxis);
+    safeAxis = (axisLen > 1.0e-4f) ? (safeAxis / axisLen) : float2(1.0f, 0.0f);
+    float2 perp = float2(-safeAxis.y, safeAxis.x);
+    float2 texel = max(g_PostParams.xy, 1.0e-6f.xx);
+
+    float3 a0 = g_BloomSource.SampleLevel(g_Sampler, uv + safeAxis * texel * 1.35f, 0).rgb;
+    float3 a1 = g_BloomSource.SampleLevel(g_Sampler, uv - safeAxis * texel * 1.35f, 0).rgb;
+    float3 p0 = g_BloomSource.SampleLevel(g_Sampler, uv + perp * texel * 1.35f, 0).rgb;
+    float3 p1 = g_BloomSource.SampleLevel(g_Sampler, uv - perp * texel * 1.35f, 0).rgb;
+
+    float la0 = StreakBloomLuma(a0);
+    float la1 = StreakBloomLuma(a1);
+    float lp0 = StreakBloomLuma(p0);
+    float lp1 = StreakBloomLuma(p1);
+
+    float neighborMax = max(max(la0, la1), max(lp0, lp1));
+    float neighborMean = (la0 + la1 + lp0 + lp1) * 0.25f;
+    float support = max(neighborMean, neighborMax * 0.62f);
+    float supportRatio = support / max(centerLuma, 1.0e-4f);
+
+    float supportGate = smoothstep(0.030f, 0.180f, support) *
+                        smoothstep(0.20f, 0.58f, supportRatio);
+    float supportedCeiling = max(support * 1.75f, centerLuma * supportGate);
+    center *= min(centerLuma, supportedCeiling) / max(centerLuma, 1.0e-4f);
+
+    return center * supportGate;
+}
+
 float LensDirtMask(float2 uv)
 {
     float2 cell = floor(uv * float2(42.0f, 27.0f));
@@ -2112,10 +2155,10 @@ float3 SampleHighlightStreakAxis(float2 uv, float2 axis, float radiusPixels, flo
         float weight = exp2(-t * 4.2f) * (1.0f - t * 0.28f);
         float2 delta = pixelStep * radius;
 
-        float3 s0 = g_BloomSource.SampleLevel(g_Sampler, uv + delta, 0).rgb;
-        float3 s1 = g_BloomSource.SampleLevel(g_Sampler, uv - delta, 0).rgb;
-        float l0 = dot(s0, float3(0.2126f, 0.7152f, 0.0722f));
-        float l1 = dot(s1, float3(0.2126f, 0.7152f, 0.0722f));
+        float3 s0 = SampleCoherentStreakBloom(uv + delta, safeAxis);
+        float3 s1 = SampleCoherentStreakBloom(uv - delta, safeAxis);
+        float l0 = StreakBloomLuma(s0);
+        float l1 = StreakBloomLuma(s1);
         float gate0 = smoothstep(0.015f, 0.35f, l0);
         float gate1 = smoothstep(0.015f, 0.35f, l1);
 

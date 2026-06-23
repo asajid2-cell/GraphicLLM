@@ -939,6 +939,73 @@ float3 ApplyOutputDitherAndFineGrain(float3 color, float2 pixelPosition)
     return color + (dither + grain).xxx;
 }
 
+float LocalExposureLuminance(float3 color)
+{
+    return max(dot(max(color, 0.0f.xxx), float3(0.2126f, 0.7152f, 0.0722f)), 1.0e-4f);
+}
+
+float SampleSceneLogLuminance(float2 uv)
+{
+    float3 hdr = g_SceneColor.SampleLevel(g_Sampler, saturate(uv), 0.0f).rgb;
+    return log2(LocalExposureLuminance(hdr));
+}
+
+float ComputeBlurredSceneLogLuminance(float2 uv)
+{
+    float2 texel = max(g_PostParams.xy, 1.0e-6f.xx);
+    float logLum = SampleSceneLogLuminance(uv) * 0.18f;
+
+    float2 r0 = texel * 10.0f;
+    logLum += SampleSceneLogLuminance(uv + float2( r0.x, 0.0f)) * 0.08f;
+    logLum += SampleSceneLogLuminance(uv + float2(-r0.x, 0.0f)) * 0.08f;
+    logLum += SampleSceneLogLuminance(uv + float2(0.0f,  r0.y)) * 0.08f;
+    logLum += SampleSceneLogLuminance(uv + float2(0.0f, -r0.y)) * 0.08f;
+
+    float2 r1 = texel * 24.0f;
+    logLum += SampleSceneLogLuminance(uv + float2( r1.x,  r1.y)) * 0.055f;
+    logLum += SampleSceneLogLuminance(uv + float2(-r1.x,  r1.y)) * 0.055f;
+    logLum += SampleSceneLogLuminance(uv + float2( r1.x, -r1.y)) * 0.055f;
+    logLum += SampleSceneLogLuminance(uv + float2(-r1.x, -r1.y)) * 0.055f;
+
+    float2 r2 = texel * 46.0f;
+    logLum += SampleSceneLogLuminance(uv + float2( r2.x, 0.0f)) * 0.04f;
+    logLum += SampleSceneLogLuminance(uv + float2(-r2.x, 0.0f)) * 0.04f;
+    logLum += SampleSceneLogLuminance(uv + float2(0.0f,  r2.y)) * 0.04f;
+    logLum += SampleSceneLogLuminance(uv + float2(0.0f, -r2.y)) * 0.04f;
+
+    float2 r3 = texel * 72.0f;
+    logLum += SampleSceneLogLuminance(uv + float2( r3.x,  r3.y)) * 0.03f;
+    logLum += SampleSceneLogLuminance(uv + float2(-r3.x,  r3.y)) * 0.03f;
+    logLum += SampleSceneLogLuminance(uv + float2( r3.x, -r3.y)) * 0.03f;
+    logLum += SampleSceneLogLuminance(uv + float2(-r3.x, -r3.y)) * 0.03f;
+
+    return logLum;
+}
+
+float ComputeLocalExposureScale(float2 uv, float3 hdrColor)
+{
+    float centerLum = LocalExposureLuminance(hdrColor);
+    float localLum = exp2(ComputeBlurredSceneLogLuminance(uv));
+    float rawEv = log2(0.34f / max(localLum, 1.0e-4f));
+    float depth = g_Depth.SampleLevel(g_Sampler, uv, 0.0f).r;
+    float geometryMask = 1.0f - smoothstep(0.995f, 0.9995f, depth);
+
+    float brightEv = clamp(min(rawEv, 0.0f), -0.72f, 0.0f);
+    float darkEv = clamp(max(rawEv, 0.0f), 0.0f, 0.34f);
+
+    float brightNeighborhood = smoothstep(0.42f, 2.40f, localLum);
+    float brightPixel = smoothstep(0.45f, 1.50f, centerLum);
+    float brightWeight = brightNeighborhood * lerp(0.38f, 1.0f, brightPixel);
+    brightWeight = max(brightWeight, smoothstep(2.0f, 8.0f, centerLum) * 0.80f);
+
+    float darkNeighborhood = 1.0f - smoothstep(0.10f, 0.48f, localLum);
+    float darkPixel = 1.0f - smoothstep(0.42f, 1.25f, centerLum);
+    float darkWeight = darkNeighborhood * darkPixel * geometryMask;
+
+    float localEv = brightEv * brightWeight + darkEv * darkWeight;
+    return clamp(exp2(localEv), 0.62f, 1.27f);
+}
+
 float HazePhaseHG(float cosTheta, float anisotropy)
 {
     float g = clamp(anisotropy, -0.75f, 0.75f);
@@ -3144,7 +3211,8 @@ float4 PSMain(VSOutput input) : SV_TARGET
     }
 
     float exposure = max(g_TimeAndExposure.z * profileExposureTrim, 0.01f);
-    float3 color = hdrCombined * exposure;
+    float localExposureScale = ComputeLocalExposureScale(uv, hdrCombined);
+    float3 color = hdrCombined * exposure * localExposureScale;
 
     uint toneMapperMode = (uint)round(max(g_CinematicParams.x, 0.0f));
     color = ApplyToneMapper(color, toneMapperMode);

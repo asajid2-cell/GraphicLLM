@@ -2351,7 +2351,7 @@ float4 PSMain(VSOutput input) : SV_TARGET
     float rtReflectionDenoiseAlpha = max((float)((postFxFlags >> 16u) & 255u) * (1.0f / 255.0f), 0.02f);
     float rtReflectionRoughnessThreshold = clamp(g_RTReflectionParams.x, 0.05f, 1.0f);
     float rtReflectionHistoryMaxBlend = clamp(g_RTReflectionParams.y, 0.0f, 0.5f);
-    float rtReflectionFireflyClampLuma = clamp(g_RTReflectionParams.z, 4.0f, 32.0f);
+    float rtReflectionFireflyClampLuma = clamp(g_RTReflectionParams.z, 1.5f, 6.0f);
     float rtReflectionSignalScale = clamp(g_RTReflectionParams.w, 0.0f, 2.0f);
     uint depthW, depthH;
     g_Depth.GetDimensions(depthW, depthH);
@@ -2540,6 +2540,8 @@ float4 PSMain(VSOutput input) : SV_TARGET
         float  baseW = max(rtValid, 0.05f);
         float3 accum = rtRefl * baseW;
         float  total = baseW;
+        float3 neighborAccum = 0.0f.xxx;
+        float  neighborTotal = 0.0f;
 
         float2 offsets[4] = {
             float2( texel.x,  0.0f),
@@ -2568,9 +2570,19 @@ float4 PSMain(VSOutput input) : SV_TARGET
 
             accum += sampleRT * w;
             total += w;
+            neighborAccum += sampleRT * w;
+            neighborTotal += w;
         }
 
         rtRefl = SoftLimitReflectionLuma(accum / max(total, 1e-4f), rtReflectionFireflyClampLuma);
+        float3 rtNeighborMean = neighborTotal > 1.0e-4f ? (neighborAccum / neighborTotal) : rtRefl;
+        float neighborMeanLuma = max(ReflectionLuma(rtNeighborMean), 1.0e-4f);
+        float rtFilteredLuma = ReflectionLuma(rtRefl);
+        float rtOutlierLimit = neighborMeanLuma * lerp(1.18f, 1.75f, rtValid) + 0.030f;
+        float rtFirefly = smoothstep(rtOutlierLimit * 0.90f, rtOutlierLimit * 1.35f, rtFilteredLuma);
+        rtFirefly *= lerp(1.0f, 0.55f, rtValid);
+        rtRefl *= lerp(1.0f, min(1.0f, rtOutlierLimit / max(rtFilteredLuma, 1.0e-4f)), rtFirefly);
+        rtValid *= (1.0f - 0.55f * rtFirefly);
 
         // If the RT reflection buffer has no meaningful signal, treat it as
         // unavailable so it does not pull reflections toward black (this can
@@ -2594,6 +2606,10 @@ float4 PSMain(VSOutput input) : SV_TARGET
             float4 rtHist4 = g_RTReflectionHistory.Sample(g_Sampler, historyUV);
             float3 rtHist = SoftLimitReflectionLuma(rtHist4.rgb, rtReflectionFireflyClampLuma);
             float  histValid = saturate(rtHist4.a);
+            float histLumaPreClamp = ReflectionLuma(rtHist);
+            float histOutlierLimit = max(rtOutlierLimit, ReflectionLuma(rtRefl) * 1.35f + 0.025f);
+            rtHist *= min(1.0f, histOutlierLimit / max(histLumaPreClamp, 1.0e-4f));
+            histValid *= saturate(1.0f - smoothstep(histOutlierLimit, histOutlierLimit * 1.55f, histLumaPreClamp) * 0.65f);
 
             float3 diff = abs(rtRefl - rtHist);
             float maxDiffHist = max(max(diff.r, diff.g), diff.b);

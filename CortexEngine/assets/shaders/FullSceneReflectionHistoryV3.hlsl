@@ -72,12 +72,43 @@ static float3 SampleNormal(float2 uv) {
     return normalize(n + 1e-5f);
 }
 
+static float3 ClampRadianceLuma(float3 radiance, float maxLuma) {
+    float luma = max(Luma(radiance), 1.0e-4f);
+    return radiance * min(1.0f, maxLuma / luma);
+}
+
+static void CurrentRadianceNeighborhoodStats(uint2 p,
+                                             uint2 maxPixel,
+                                             out float3 minRadiance,
+                                             out float3 maxRadiance,
+                                             out float3 meanRadiance) {
+    float3 center = max(g_ReflectionRadiance.Load(int3(p, 0)).rgb, 0.0f.xxx);
+    minRadiance = center;
+    maxRadiance = center;
+    meanRadiance = 0.0f.xxx;
+
+    [unroll]
+    for (int y = -1; y <= 1; ++y) {
+        [unroll]
+        for (int x = -1; x <= 1; ++x) {
+            int2 qInt = clamp(int2(p) + int2(x, y), int2(0, 0), int2(maxPixel));
+            float3 sampleRadiance = max(g_ReflectionRadiance.Load(int3(uint2(qInt), 0)).rgb, 0.0f.xxx);
+            minRadiance = min(minRadiance, sampleRadiance);
+            maxRadiance = max(maxRadiance, sampleRadiance);
+            meanRadiance += sampleRadiance;
+        }
+    }
+
+    meanRadiance *= (1.0f / 9.0f);
+}
+
 PSOutput PSMain(VSOutput input) {
     uint width;
     uint height;
     g_ReflectionRadiance.GetDimensions(width, height);
     float2 dim = max(float2(width, height), 1.0f);
-    uint2 p = min(uint2(input.position.xy), uint2(width - 1u, height - 1u));
+    uint2 maxPixel = uint2(width - 1u, height - 1u);
+    uint2 p = min(uint2(input.position.xy), maxPixel);
     float2 velocity = g_Velocity.Load(int3(p, 0));
     float2 historyUv = input.texCoord + velocity + g_TAAParams.xy;
     bool inBounds =
@@ -129,8 +160,35 @@ PSOutput PSMain(VSOutput input) {
     highMotionRejection *= historySupport;
     float outOfBoundsRejection = historySupport * (1.0f - boundsAcceptance);
 
+    float3 currentRadiance = max(radiance.rgb, 0.0f.xxx);
+    float3 historyRadiance = max(historyPrev.rgb, 0.0f.xxx);
+    float3 neighborhoodMin;
+    float3 neighborhoodMax;
+    float3 neighborhoodMean;
+    CurrentRadianceNeighborhoodStats(p, maxPixel, neighborhoodMin, neighborhoodMax, neighborhoodMean);
+
+    float neighborhoodMeanLuma = max(Luma(neighborhoodMean), 1.0e-4f);
+    float currentLuma = Luma(currentRadiance);
+    float currentOutlierLimit = neighborhoodMeanLuma * lerp(1.25f, 1.80f, confidence) + 0.030f;
+    float currentFirefly = smoothstep(currentOutlierLimit * 0.90f, currentOutlierLimit * 1.35f, currentLuma);
+    currentFirefly *= lerp(1.0f, 0.62f, confidence);
+    currentRadiance = lerp(
+        currentRadiance,
+        ClampRadianceLuma(currentRadiance, currentOutlierLimit),
+        currentFirefly);
+
+    float3 clampedHistoryRadiance = clamp(historyRadiance, neighborhoodMin, neighborhoodMax);
+    float historyOutlierLimit = neighborhoodMeanLuma * lerp(1.30f, 1.95f, prevConfidence) + 0.035f;
+    clampedHistoryRadiance = ClampRadianceLuma(clampedHistoryRadiance, historyOutlierLimit);
+
+    float resetGuard = saturate((1.0f - sourceSwitch) * (1.0f - forcedUnavailable) * (1.0f - historyRequiredButMissing));
+    float historyBlend = saturate(historyReusable * resetGuard) * 0.88f * (1.0f - 0.82f * currentFirefly);
+    float3 accumulatedRadiance = lerp(currentRadiance, clampedHistoryRadiance, historyBlend);
+    float filteredConfidence = confidence * (1.0f - 0.72f * currentFirefly);
+    float accumulatedConfidence = saturate(max(filteredConfidence, historyReusable));
+
     PSOutput output;
-    output.historyCurr = float4(max(radiance.rgb, 0.0f.xxx), confidence);
+    output.historyCurr = float4(accumulatedRadiance, accumulatedConfidence);
     // x = current reflection active.
     // y = source class from ReflectionV3.
     // z = reprojected previous history reusable this frame.

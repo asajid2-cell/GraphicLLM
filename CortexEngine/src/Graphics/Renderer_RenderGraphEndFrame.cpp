@@ -252,6 +252,7 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
     bool ranSceneLocalEnvironmentV3 = false;
     bool ranSceneLocalEnvironmentV3DebugView = false;
     bool scheduledReflectionResolverV3 = false;
+    bool scheduledReflectionHistoryV3 = false;
     const char* bloomGraphStageError = nullptr;
     const char* postProcessGraphStageError = nullptr;
     VisibilityBufferRenderer::ResourceStateSnapshot vbPostInitialStates{};
@@ -743,6 +744,7 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
             if (!fullSceneShaderV3.SubmitReflectionHistory(historyContext)) {
                 bloomStageFailed = true;
             } else {
+                scheduledReflectionHistoryV3 = true;
                 FullSceneReflectionHistoryV3CopyContext historyCopyContext{};
                 historyCopyContext.historyCurr = reflectionHistoryCurrHandle;
                 historyCopyContext.historyPrev = reflectionHistoryPrevHandle;
@@ -876,9 +878,13 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
             compositeSubmission.indirectLighting = v3IndirectLightingHandle;
             compositeSubmission.shadowVisibility = v3ShadowVisibilityHandle;
             compositeSubmission.legacyHdr = hdrHandle;
-            compositeSubmission.localReflectionRadiance = scheduledReflectionResolverV3 && reflectionRadianceHandle.IsValid()
-                ? reflectionRadianceHandle
-                : localReflRadianceHandle;
+            const bool useAccumulatedReflectionRadiance =
+                scheduledReflectionHistoryV3 && reflectionHistoryCurrHandle.IsValid();
+            compositeSubmission.localReflectionRadiance = useAccumulatedReflectionRadiance
+                ? reflectionHistoryCurrHandle
+                : (scheduledReflectionResolverV3 && reflectionRadianceHandle.IsValid()
+                    ? reflectionRadianceHandle
+                    : localReflRadianceHandle);
             compositeSubmission.reflectionConfidence = scheduledReflectionResolverV3 && reflectionConfidenceHandle.IsValid()
                 ? reflectionConfidenceHandle
                 : RGResourceHandle{};
@@ -1426,12 +1432,16 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
                         true);
         if (wantsCompositeV3ThisFrame) {
             if (ranReflectionResolverV3 && reflectionRadianceHandle.IsValid()) {
+                const char* reflectionCompositeInput =
+                    (scheduledReflectionHistoryV3 && reflectionHistoryCurrHandle.IsValid())
+                        ? "reflection_history_v3_curr"
+                        : "reflection_radiance";
                 RecordFramePass("FullSceneCompositeV3",
                                 true,
                                 result.ranCompositeV3,
                                 result.ranCompositeV3 ? 1u : 0u,
                                 {"direct_lighting", "indirect_lighting", "shadow_visibility", "hdr_color",
-                                 "reflection_radiance", "reflection_confidence", "vb_gbuffer_albedo",
+                                 reflectionCompositeInput, "reflection_confidence", "vb_gbuffer_albedo",
                                  "scene_local_environment"},
                                 {"candidate_hdr_scene_color", "energy_clamp_policy", "overbright_diagnostics",
                                  "composite_contribution_map", "legacy_rescue_usage"},

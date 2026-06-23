@@ -33,6 +33,9 @@ struct DispatchContext {
     std::span<DescriptorHandle> uavTable{};
     ID3D12Resource* envSpecular = nullptr;
     DXGI_FORMAT envSpecularFormat = DXGI_FORMAT_R16G16B16A16_FLOAT;
+    ID3D12Resource* localReflectionCubemap = nullptr;
+    DXGI_FORMAT localReflectionCubemapFormat = DXGI_FORMAT_R16G16B16A16_FLOAT;
+    uint32_t localReflectionCubemapMipLevels = 1;
     uint32_t width = 0;
     uint32_t height = 0;
 };

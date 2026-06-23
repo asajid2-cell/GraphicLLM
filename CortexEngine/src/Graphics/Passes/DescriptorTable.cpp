@@ -33,6 +33,25 @@ bool WriteTexture2DSRV(ID3D12Device* device,
     return true;
 }
 
+bool WriteTextureCubeSRV(ID3D12Device* device,
+                         DescriptorHandle handle,
+                         ID3D12Resource* resource,
+                         DXGI_FORMAT format,
+                         uint32_t mipLevels) {
+    if (!device || !handle.IsValid() || mipLevels == 0) {
+        return false;
+    }
+
+    D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc{};
+    srvDesc.Format = format;
+    srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURECUBE;
+    srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+    srvDesc.TextureCube.MipLevels = mipLevels;
+    srvDesc.TextureCube.MostDetailedMip = 0;
+    device->CreateShaderResourceView(resource, &srvDesc, handle.cpu);
+    return true;
+}
+
 bool WriteTexture2DUAV(ID3D12Device* device,
                        DescriptorHandle handle,
                        ID3D12Resource* resource,

@@ -68,7 +68,7 @@ struct LocalReflectionProbeCubemapCaptureState {
 };
 
 struct LocalReflectionRadianceDescriptorTables {
-    std::array<std::array<DescriptorHandle, 7>, kFrameCount> srvTables{};
+    std::array<std::array<DescriptorHandle, 8>, kFrameCount> srvTables{};
     std::array<std::array<DescriptorHandle, 1>, kFrameCount> uavTables{};
     bool valid = false;
 

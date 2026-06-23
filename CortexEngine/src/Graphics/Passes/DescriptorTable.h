@@ -17,6 +17,12 @@ bool WriteTexture2DSRV(ID3D12Device* device,
                        DXGI_FORMAT format,
                        uint32_t mipLevels = 1);
 
+bool WriteTextureCubeSRV(ID3D12Device* device,
+                         DescriptorHandle handle,
+                         ID3D12Resource* resource,
+                         DXGI_FORMAT format,
+                         uint32_t mipLevels = 1);
+
 bool WriteTexture2DRTVAndSRV(ID3D12Device* device,
                              ID3D12Resource* resource,
                              DescriptorHandle rtv,

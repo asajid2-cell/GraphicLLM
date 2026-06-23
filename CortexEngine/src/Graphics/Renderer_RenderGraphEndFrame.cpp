@@ -9,6 +9,7 @@
 #include "Passes/RenderPassScope.h"
 #include "RenderGraph.h"
 
+#include <algorithm>
 #include <array>
 #include <cstdlib>
 #include <glm/geometric.hpp>
@@ -637,6 +638,15 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
                     envSpecularFormat = env->specularPrefiltered->GetFormat();
                 }
             }
+            ID3D12Resource* localReflectionCubemapResource = nullptr;
+            DXGI_FORMAT localReflectionCubemapFormat = DXGI_FORMAT_R16G16B16A16_FLOAT;
+            uint32_t localReflectionCubemapMipLevels = 1;
+            const auto& capture = m_localReflectionRadianceState.cubemapCapture;
+            if (capture.captureCompleted && capture.target && capture.target->GetResource()) {
+                localReflectionCubemapResource = capture.target->GetResource();
+                localReflectionCubemapFormat = capture.target->GetFormat();
+                localReflectionCubemapMipLevels = std::max(1u, capture.target->GetMipLevels());
+            }
 
             LocalReflectionRadiancePass::GraphContext localRadianceContext{};
             localRadianceContext.resources.depth = depthPpHandle;
@@ -656,6 +666,9 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
                 std::span<DescriptorHandle>(localUavTable.data(), localUavTable.size());
             localRadianceContext.dispatch.envSpecular = envSpecularResource;
             localRadianceContext.dispatch.envSpecularFormat = envSpecularFormat;
+            localRadianceContext.dispatch.localReflectionCubemap = localReflectionCubemapResource;
+            localRadianceContext.dispatch.localReflectionCubemapFormat = localReflectionCubemapFormat;
+            localRadianceContext.dispatch.localReflectionCubemapMipLevels = localReflectionCubemapMipLevels;
             localRadianceContext.dispatch.width = m_services.window->GetWidth();
             localRadianceContext.dispatch.height = m_services.window->GetHeight();
             localRadianceContext.status.failed = &bloomStageFailed;
@@ -1375,7 +1388,7 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
                             {"depth", inputs.frameNormalRoughnessResource,
                              "vb_gbuffer_emissive_metallic", "vb_gbuffer_material_ext1",
                              "vb_gbuffer_material_ext2", "hdr_color",
-                             "environment_specular_prefilter"},
+                             "environment_specular_prefilter", "local_reflection_cubemap"},
                             {"local_reflection_radiance"},
                             false,
                             nullptr,

@@ -31,7 +31,7 @@ void Fail(const GraphContext& context, const char* stage) {
            context.dispatch.pipeline &&
            context.dispatch.pipeline->GetPipelineState() &&
            context.dispatch.frameConstants != 0 &&
-           context.dispatch.srvTable.size() >= 7 &&
+           context.dispatch.srvTable.size() >= 8 &&
            !context.dispatch.uavTable.empty() &&
            context.dispatch.width > 0 &&
            context.dispatch.height > 0;
@@ -61,6 +61,11 @@ void Fail(const GraphContext& context, const char* stage) {
            DescriptorTable::WriteTexture2DSRV(context.device, context.srvTable[4], materialExt2, DXGI_FORMAT_R8G8B8A8_UNORM) &&
            DescriptorTable::WriteTexture2DSRV(context.device, context.srvTable[5], sceneColor, DXGI_FORMAT_R16G16B16A16_FLOAT) &&
            DescriptorTable::WriteTexture2DSRV(context.device, context.srvTable[6], context.envSpecular, context.envSpecularFormat) &&
+           DescriptorTable::WriteTextureCubeSRV(context.device,
+                                                context.srvTable[7],
+                                                context.localReflectionCubemap,
+                                                context.localReflectionCubemapFormat,
+                                                std::max(1u, context.localReflectionCubemapMipLevels)) &&
            DescriptorTable::WriteTexture2DUAV(context.device, context.uavTable[0], output, DXGI_FORMAT_R16G16B16A16_FLOAT);
 }
 

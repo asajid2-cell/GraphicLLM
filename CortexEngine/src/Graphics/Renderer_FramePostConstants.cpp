@@ -983,6 +983,22 @@ void Renderer::PopulateFrameDebugAndPostConstants(FrameConstants& frameData,
         m_environmentState.localProbeSpecularIntensity,
         m_environmentState.localProbeRadianceEnabled ? 1.0f : 0.0f,
         ReflectionV3SourceOverrideFromEnv());
+    frameData.localProbeCenter = glm::vec4(0.0f);
+    frameData.localProbeExtents = glm::vec4(0.0f);
+    if (registry) {
+        auto probeView = registry->View<Scene::ReflectionProbeComponent, Scene::TransformComponent>();
+        for (auto entity : probeView) {
+            const auto& probe = probeView.get<Scene::ReflectionProbeComponent>(entity);
+            if (probe.enabled == 0u) {
+                continue;
+            }
+            const auto& transform = probeView.get<Scene::TransformComponent>(entity);
+            frameData.localProbeCenter = glm::vec4(glm::vec3(transform.worldMatrix[3]), 1.0f);
+            frameData.localProbeExtents = glm::vec4(glm::max(probe.extents, glm::vec3(0.01f)),
+                                                    probe.blendDistance);
+            break;
+        }
+    }
 
     // Default clustered-light parameters for forward+ transparency. These are
     // overridden by the VB path once the per-frame local light buffer and

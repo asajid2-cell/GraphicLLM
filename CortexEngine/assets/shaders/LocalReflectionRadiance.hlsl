@@ -58,6 +58,10 @@ cbuffer FrameConstants : register(b1)
     // x = scene-local probe diffuse scale, y = scene-local probe specular scale,
     // z = scene-local probe radiance enabled (>0.5), w = reserved
     float4   g_LocalProbeParams;
+    // xyz = active local reflection probe center, w = valid flag.
+    float4   g_LocalProbeCenter;
+    // xyz = active local reflection probe half extents, w = blend distance.
+    float4   g_LocalProbeExtents;
 };
 
 Texture2D<float>  g_Depth            : register(t0);
@@ -67,6 +71,7 @@ Texture2D<float4> g_MaterialExt1     : register(t3);
 Texture2D<float4> g_MaterialExt2     : register(t4);
 Texture2D<float4> g_SceneColor       : register(t5);
 Texture2D<float4> g_EnvSpecular      : register(t6);
+TextureCube<float4> g_LocalReflectionCubemap : register(t7);
 RWTexture2D<float4> g_OutputRadiance : register(u0);
 SamplerState g_Sampler               : register(s0);
 
@@ -118,6 +123,42 @@ float3 RotateEnvironmentDirection(float3 dir)
     return normalize(float3(c * dir.x + s * dir.z, dir.y, -s * dir.x + c * dir.z));
 }
 
+float SafeDirectionComponent(float v)
+{
+    return abs(v) < 1e-4f ? (v < 0.0f ? -1e-4f : 1e-4f) : v;
+}
+
+float3 BoxProjectReflectionDirection(float3 worldPos, float3 reflectionDir)
+{
+    if (g_LocalProbeCenter.w <= 0.5f ||
+        g_LocalProbeExtents.x <= 0.0f ||
+        g_LocalProbeExtents.y <= 0.0f ||
+        g_LocalProbeExtents.z <= 0.0f) {
+        return normalize(reflectionDir);
+    }
+
+    float3 dir = normalize(reflectionDir);
+    dir.x = SafeDirectionComponent(dir.x);
+    dir.y = SafeDirectionComponent(dir.y);
+    dir.z = SafeDirectionComponent(dir.z);
+
+    float3 boxMin = g_LocalProbeCenter.xyz - g_LocalProbeExtents.xyz;
+    float3 boxMax = g_LocalProbeCenter.xyz + g_LocalProbeExtents.xyz;
+    float3 tMax = (boxMax - worldPos) / dir;
+    float3 tMin = (boxMin - worldPos) / dir;
+    float3 tHit = float3(
+        dir.x >= 0.0f ? tMax.x : tMin.x,
+        dir.y >= 0.0f ? tMax.y : tMin.y,
+        dir.z >= 0.0f ? tMax.z : tMin.z);
+    float travel = min(tHit.x, min(tHit.y, tHit.z));
+    if (!isfinite(travel) || travel <= 1e-4f) {
+        return normalize(reflectionDir);
+    }
+
+    float3 localHit = worldPos + dir * travel;
+    return normalize(localHit - g_LocalProbeCenter.xyz);
+}
+
 float3 NormalizedKeyLightColor()
 {
     float3 lightColor = (g_LightCount.x > 0u) ? g_Lights[0].color_range.rgb : 1.0f.xxx;
@@ -155,6 +196,39 @@ float StableIblMipRoughness(float roughness,
         return max(roughness, 0.24f);
     }
     return roughness;
+}
+
+bool SampleCapturedLocalReflectionCubemap(float3 worldPos,
+                                          float3 reflectionDir,
+                                          float roughness,
+                                          uint surfaceClass,
+                                          uint sceneMaterialClass,
+                                          float metallic,
+                                          out float3 cubeRadiance)
+{
+    cubeRadiance = 0.0f.xxx;
+    if (g_LocalProbeParams.z <= 0.5f || g_LocalProbeCenter.w <= 0.5f) {
+        return false;
+    }
+
+    uint cubeWidth = 0u;
+    uint cubeHeight = 0u;
+    uint cubeMipCount = 0u;
+    g_LocalReflectionCubemap.GetDimensions(0, cubeWidth, cubeHeight, cubeMipCount);
+    if (cubeWidth == 0u || cubeHeight == 0u || cubeMipCount == 0u) {
+        return false;
+    }
+
+    float maxMip = max((cubeMipCount > 0u) ? (float)(cubeMipCount - 1u) : 0.0f, 0.0f);
+    float mip = StableIblMipRoughness(roughness, surfaceClass, sceneMaterialClass, metallic) * maxMip;
+    float3 cubeDir = BoxProjectReflectionDirection(worldPos, reflectionDir);
+    float3 sampled = g_LocalReflectionCubemap.SampleLevel(g_Sampler, cubeDir, mip).rgb;
+    if (!all(isfinite(sampled)) || ReflectionLuma(sampled) <= 1e-4f) {
+        return false;
+    }
+
+    cubeRadiance = max(sampled, 0.0f.xxx);
+    return true;
 }
 
 float3 ComputeLocalStructure(float3 reflectionDir,
@@ -289,7 +363,21 @@ void CSMain(uint3 dispatchThreadId : SV_DispatchThreadID)
         roughness,
         metallic);
 
+    float3 capturedCubeRadiance = 0.0f.xxx;
+    bool hasCapturedCube = SampleCapturedLocalReflectionCubemap(
+        worldPos,
+        reflectionDir,
+        roughness,
+        surfaceClass,
+        sceneMaterialClass,
+        metallic,
+        capturedCubeRadiance);
+
     float3 source = localStructure;
+    if (hasCapturedCube) {
+        float cubeWeight = lerp(0.42f, 0.86f, gloss) * saturate(localProbeSpecularPotential * 5.0f);
+        source = lerp(localStructure, capturedCubeRadiance, saturate(cubeWeight));
+    }
     if (g_EnvParams.z > 0.5f && g_EnvParams.y > 0.001f) {
         uint specWidth = 1u;
         uint specHeight = 1u;
@@ -298,7 +386,8 @@ void CSMain(uint3 dispatchThreadId : SV_DispatchThreadID)
         float specMaxMip = max((specMipCount > 0u) ? (float)(specMipCount - 1u) : 0.0f, 0.0f);
         float mip = StableIblMipRoughness(roughness, surfaceClass, sceneMaterialClass, metallic) * specMaxMip;
         float3 env = g_EnvSpecular.SampleLevel(g_Sampler, DirectionToLatLong(RotateEnvironmentDirection(reflectionDir)), mip).rgb;
-        source = lerp(max(localStructure, 0.0f.xxx), env * max(g_EnvParams.y, 0.0f), saturate(iblPotential));
+        float envBlend = hasCapturedCube ? saturate(iblPotential * 0.25f) : saturate(iblPotential);
+        source = lerp(max(source, 0.0f.xxx), env * max(g_EnvParams.y, 0.0f), envBlend);
     }
 
     float stability = SurfaceReflectionStabilityScale(surfaceClass, roughness, metallic);

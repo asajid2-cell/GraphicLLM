@@ -180,6 +180,10 @@ struct FrameConstants {
       // z = scene-local probe radiance enabled (>0.5),
       // w = ReflectionV3 source override (0 auto, 1 local, 2 SSR, 3 RT, 4 environment, 255 none).
       glm::vec4 localProbeParams;
+      // xyz = active scene-local reflection probe center, w = valid flag.
+      glm::vec4 localProbeCenter;
+      // xyz = active scene-local reflection probe half extents, w = blend distance.
+      glm::vec4 localProbeExtents;
 };
 
 // The visibility-buffer material resolve path reads vertices via ByteAddressBuffer

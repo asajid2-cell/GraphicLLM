@@ -633,7 +633,7 @@ void BuildLivingRoom(std::vector<std::shared_ptr<SceneCommand>>& out, const Scen
 void BuildBedroom(std::vector<std::shared_ptr<SceneCommand>>& out, const Scene::AssetCatalog& cat, FootprintCache& c, const SceneStyle& style) {
     BuildRoomShell(out, cat, c, 6.4f, 6.2f, glm::vec4(0.48f, 0.44f, 0.46f, 1.0f));
     Place(out, cat, c, "rugRound", 2.7f, -0.1f, 0.2f, 0.0f, glm::vec4(0.46f, 0.40f, 0.48f, 1.0f));
-    PlaceFurn(out, cat, c, style, 2.7f, -0.2f, -1.5f, 0.0f, "bedDouble", "GothicBed_01");  // focal bed
+    PlaceFurn(out, cat, c, style, 2.7f, -0.2f, -1.5f, 0.0f, "ModernBed", "GothicBed_01");  // focal bed
     PlaceFurn(out, cat, c, style, 0.5f, -1.9f, -2.3f, 0.0f, "sideTable", "ClassicNightstand_01");
     PlaceFurn(out, cat, c, style, 0.5f, 1.5f, -2.3f, 0.0f, "sideTable", "ClassicNightstand_01");
     PlaceOn(out, cat, c, "lampSquareTable", 0.3f, 1.5f, 0.52f, -2.3f, 0.0f);  // lamp on nightstand
@@ -647,7 +647,7 @@ void BuildBedroom(std::vector<std::shared_ptr<SceneCommand>>& out, const Scene::
 void BuildOffice(std::vector<std::shared_ptr<SceneCommand>>& out, const Scene::AssetCatalog& cat, FootprintCache& c, const SceneStyle& style) {
     BuildRoomShell(out, cat, c, 6.4f, 6.2f, glm::vec4(0.46f, 0.46f, 0.48f, 1.0f));
     Place(out, cat, c, "rugSquare", 2.4f, -0.4f, -0.3f, 0.0f, glm::vec4(0.33f, 0.34f, 0.40f, 1.0f));
-    PlaceFurn(out, cat, c, style, 1.9f, -0.5f, -1.5f, 8.0f, "deskCorner", "ClassicConsole_01");  // desk
+    PlaceFurn(out, cat, c, style, 1.9f, -0.5f, -1.5f, 8.0f, "OfficeDesk", "ClassicConsole_01");  // desk
     PlaceFurn(out, cat, c, style, 0.8f, -0.5f, -0.55f, 180.0f, "chairDesk", "WoodenChair_01");   // chair
     PlaceOn(out, cat, c, "computerScreen", 0.55f, -0.85f, 0.78f, -1.75f, 4.0f);  // monitor on the desk
     PlaceOn(out, cat, c, "computerKeyboard", 0.4f, -0.7f, 0.78f, -1.25f, 4.0f);  // keyboard

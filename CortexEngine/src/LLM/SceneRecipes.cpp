@@ -827,7 +827,7 @@ void BuildDiningRoom(std::vector<std::shared_ptr<SceneCommand>>& out, const Scen
     BuildRoomShell(out, cat, c, 6.6f, 6.4f, glm::vec4(0.46f, 0.40f, 0.34f, 1.0f)); // warm wood floor
     const float tz = -1.1f; // table centre
     Place(out, cat, c, "rugRounded", 3.0f, 0.0f, tz, 0.0f, glm::vec4(0.40f, 0.30f, 0.26f, 1.0f));
-    PlaceFurn(out, cat, c, style, 1.7f, 0.0f, tz, 0.0f, "tableCloth", "WoodenTable_02");        // focal table
+    PlaceFurn(out, cat, c, style, 1.7f, 0.0f, tz, 0.0f, "DiningTableGlass", "WoodenTable_02");  // focal table
     // Six chairs pulled up to the table, each facing in (style-aware).
     PlaceFurn(out, cat, c, style, 0.55f, -0.95f, tz - 0.5f, -90.0f, "chairCushion", "WoodenChair_01"); // left
     PlaceFurn(out, cat, c, style, 0.55f, -0.95f, tz + 0.5f, -90.0f, "chairCushion", "WoodenChair_01");

@@ -132,6 +132,25 @@ From `CortexEngine`, the usual local run is:
 .\run.ps1
 ```
 
+## Assets
+
+Large binary assets (furniture models, Poly Haven textures, HDRIs, the optional
+SDXL-Turbo model) are **not** committed, to keep the repo small. A fresh clone
+restores everything it can from public sources with one command:
+
+```powershell
+# from CortexEngine/ — downloads anything missing (Khronos + Poly Haven are no-auth)
+.\tools\restore_assets.ps1
+.\tools\restore_assets.ps1 -Background   # download without blocking
+.\tools\restore_assets.ps1 -List         # show status only
+```
+
+The Sketchfab furniture (CC-BY) needs a free API token; the script prompts for it
+(or set `$env:SKETCHFAB_TOKEN`). A few assets are manual (interior HDRIs, the
+Kenney kit, the Dreamer model) and the script prints where to get them. Sources
+are declared in [tools/assets_manifest.json](tools/assets_manifest.json); the core
+renderer runs fine without the manual/optional ones.
+
 ## Run Modes
 
 Default startup is meant to be robust on a wider range of machines. Public

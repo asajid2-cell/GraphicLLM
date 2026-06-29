@@ -28,10 +28,15 @@ nul
 *.mov
 CortexEngine/docs/*LEDGER.md
 
-# Large engine assets that can be downloaded/generated locally
+# Large engine assets that can be downloaded/generated locally.
+# Restore everything with:  cd CortexEngine && node tools/restore_assets.mjs
+# (sources declared in CortexEngine/tools/assets_manifest.json)
 CortexEngine/models/
 CortexEngine/assets/**/*.hdr
 CortexEngine/assets/**/*.exr
+CortexEngine/assets/models/
+CortexEngine/assets/polyhaven/
+CortexEngine/unet_384_build_verbose.txt
 
 # Generated evidence / scene-authoring campaign dumps (untracked, do not version)
 CortexEngine/artifacts/

@@ -1,0 +1,95 @@
+{
+  "_comment": "Declares the large binary assets that are NOT tracked in git (to keep clones small). tools/restore_assets.mjs reads this and downloads anything missing. Paths are relative to the CortexEngine/ directory. Auto types resolve with no/known sources; 'manual' types print placement instructions. Sketchfab needs the SKETCHFAB_TOKEN env var (never commit it).",
+  "groups": [
+    {
+      "id": "khronos_furniture",
+      "type": "khronos",
+      "target": "assets/models/khronos_furniture",
+      "license": "CC-BY-4.0 (Khronos glTF-Sample-Assets)",
+      "items": [
+        "GlamVelvetSofa",
+        "ChairDamaskPurplegold",
+        "CommercialRefrigerator",
+        "LightsPunctualLamp",
+        "DiffuseTransmissionPlant"
+      ]
+    },
+    {
+      "id": "sketchfab_furniture",
+      "type": "sketchfab",
+      "target": "assets/models/sketchfab_furniture",
+      "needs": "SKETCHFAB_TOKEN",
+      "license": "CC-BY-4.0 (see assets/ASSET_CREDITS.md for per-model attribution)",
+      "items": [
+        { "uid": "c41a27d7a1b24dc484bc603e1bc2d0ef", "name": "DiningTableGlass" },
+        { "uid": "a2b2645701c94fa49e65661806219c6b", "name": "ModernBed" },
+        { "uid": "1645fa150e5243b29fc9394312c348c3", "name": "OfficeDesk" }
+      ]
+    },
+    {
+      "id": "naturalistic_showcase",
+      "type": "polyhaven_model",
+      "target": "assets/models/naturalistic_showcase",
+      "res": "1k",
+      "license": "CC0 (Poly Haven)",
+      "items": [
+        "ArmChair_01", "Barrel_01", "ClassicConsole_01", "ClassicNightstand_01",
+        "CoffeeTable_01", "GothicBed_01", "Lantern_01", "Shelf_01", "Sofa_01",
+        "WoodenChair_01", "WoodenTable_01", "WoodenTable_02", "boulder_01",
+        "calathea_orbifolia_01", "ceramic_vase_01", "dead_tree_trunk",
+        "dry_branches_medium_01", "fern_02", "grass_bermuda_01",
+        "rock_moss_set_01", "tree_stump_01", "wild_rooibos_bush"
+      ]
+    },
+    {
+      "id": "polyhaven_textures",
+      "type": "polyhaven_texture",
+      "target": "assets/polyhaven/textures",
+      "res": "4k",
+      "license": "CC0 (Poly Haven)",
+      "items": [
+        { "id": "castle_brick_02_red", "files": ["castle_brick_02_red_diff_4k.jpg", "castle_brick_02_red_disp_4k.png", "castle_brick_02_red_nor_gl_4k.exr", "castle_brick_02_red_rough_4k.jpg"] },
+        { "id": "grey_plaster", "files": ["grey_plaster_diff_4k.jpg", "grey_plaster_disp_4k.png", "grey_plaster_nor_gl_4k.exr", "grey_plaster_rough_4k.jpg"] },
+        { "id": "metal_plate", "files": ["metal_plate_diff_4k.jpg", "metal_plate_disp_4k.png", "metal_plate_metal_4k.exr", "metal_plate_nor_gl_4k.exr", "metal_plate_rough_4k.exr"] },
+        { "id": "rebar_reinforced_concrete", "files": ["rebar_reinforced_concrete_diff_4k.jpg", "rebar_reinforced_concrete_disp_4k.png", "rebar_reinforced_concrete_nor_gl_4k.exr", "rebar_reinforced_concrete_rough_4k.exr"] },
+        { "id": "wood_shutter", "files": ["wood_shutter_diff_4k.jpg", "wood_shutter_disp_4k.png", "wood_shutter_nor_gl_4k.exr", "wood_shutter_rough_4k.exr"] }
+      ]
+    },
+    {
+      "id": "hdris_polyhaven",
+      "type": "polyhaven_hdri",
+      "target": "assets",
+      "res": "4k",
+      "format": "exr",
+      "license": "CC0 (Poly Haven)",
+      "items": [
+        "belfast_sunset_puresky", "citrus_orchard_puresky",
+        "kloofendal_48d_partly_cloudy_puresky", "mirrored_hall",
+        "qwantani_night", "satara_night", "shanghai_bund", "the_sky_is_on_fire"
+      ]
+    },
+    {
+      "id": "hdris_interior_manual",
+      "type": "manual",
+      "target": "assets",
+      "note": "Interior HDRIs (MR_INT-*) are not from a public auto-resolvable source. If missing, place these .hdr files into CortexEngine/assets/ manually.",
+      "items": [
+        "MR_INT-001_NaturalStudio_NAD.hdr", "MR_INT-002_BathroomHard_Pierre.hdr",
+        "MR_INT-003_Kitchen_Pierre.hdr", "MR_INT-004_BigWindowTree_Thea.hdr",
+        "MR_INT-005_WhiteNeons_NAD.hdr", "MR_INT-006_LoftIndustrialWindow_Griffintown.hdr"
+      ]
+    },
+    {
+      "id": "kenney_furniture_kit",
+      "type": "manual",
+      "target": "assets/models/kenney_furniture_kit",
+      "note": "Free Kenney Furniture Kit (CC0). Download from https://kenney.nl/assets/furniture-kit and extract the glTF models into this folder."
+    },
+    {
+      "id": "dreamer",
+      "type": "manual",
+      "target": "models/dreamer",
+      "note": "SDXL-Turbo ONNX + TensorRT engine for the optional Dreamer feature (~6GB). Export ONNX with models/dreamer/export_sdxl_turbo_onnx.py (HuggingFace stabilityai/sdxl-turbo), then build the .engine locally with TensorRT. Not required for the core renderer."
+    }
+  ]
+}

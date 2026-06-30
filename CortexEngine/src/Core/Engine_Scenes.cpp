@@ -2932,7 +2932,7 @@ void Engine::BuildRecipeScene() {
                                 outdoor ? 1.35f : 3.10f);
         renderer->SetShadowsEnabled(true);
         renderer->SetFogEnabled(true);
-        renderer->SetFogParams(outdoor ? 0.0075f : (showcase ? 0.052f : 0.016f), outdoor ? 0.05f : 0.15f, outdoor ? 0.34f : 0.42f, outdoor ? 4.0f : 0.0f);
+        renderer->SetFogParams(outdoor ? 0.0075f : (showcase ? 0.085f : 0.016f), outdoor ? 0.05f : 0.15f, outdoor ? 0.34f : 0.42f, outdoor ? 4.0f : 0.0f);
         renderer->SetGodRayIntensity(outdoor ? 0.0f : (showcase ? 0.78f : 0.40f));
         renderer->SetBloomShape(outdoor ? 1.05f : 1.02f, outdoor ? 0.45f : 0.50f, outdoor ? 2.0f : 0.82f);
         renderer->SetParticlesEnabled(true);

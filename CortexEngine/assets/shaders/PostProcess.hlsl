@@ -1081,7 +1081,7 @@ float3 ApplyLocalizedSingleScatterHaze(float3 hdrColor, float2 uv)
         return hdrColor;
     }
 
-    const int kHazeSteps = 20; // jittered single-tap march: enough for a clear shaft at sane cost
+    const int kHazeSteps = 30; // denser march resolves the thin slat-shadow stripes into beams (showcase-gated)
     float stepLength = marchLength / (float)kHazeSteps;
     float jitter = Hash12(uv * float2(173.3f, 419.7f) + g_TimeAndExposure.xx);
     float3 scatter = 0.0f.xxx;

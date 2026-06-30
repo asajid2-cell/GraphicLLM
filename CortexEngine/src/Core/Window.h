@@ -59,6 +59,10 @@ public:
     // Resize handling
     void OnResize(uint32_t width, uint32_t height);
 
+    // True when running without a presentable swapchain (e.g. Session 0 / no display):
+    // the engine renders to offscreen back buffers and capture/readback still works.
+    [[nodiscard]] bool IsHeadless() const { return m_headless; }
+
 private:
     Result<void> CreateSwapChain(Graphics::DX12Device* device, Graphics::DX12CommandQueue* commandQueue);
     Result<void> CreateRenderTargetViews(Graphics::DX12Device* device);
@@ -73,6 +77,7 @@ private:
     HWND m_hwnd = nullptr;
     Graphics::DX12Device* m_device = nullptr;
     Graphics::DX12CommandQueue* m_commandQueue = nullptr;
+    bool m_headless = false;
 
     ComPtr<IDXGISwapChain3> m_swapChain;
     ComPtr<ID3D12Resource> m_backBuffers[BUFFER_COUNT];

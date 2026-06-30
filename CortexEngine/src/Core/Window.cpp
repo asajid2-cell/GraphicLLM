@@ -2,6 +2,7 @@
 #include "Graphics/RHI/DX12Device.h"
 #include "Graphics/RHI/DX12CommandQueue.h"
 #include <spdlog/spdlog.h>
+#include <cstdlib>
 
 namespace Cortex {
 
@@ -69,58 +70,66 @@ Result<void> Window::CreateSwapChain(Graphics::DX12Device* device, Graphics::DX1
         return Result<void>::Err("Invalid device or command queue pointer");
     }
 
+    // Headless mode: forced via CORTEX_HEADLESS, or auto-fallback when a presentable
+    // swapchain cannot be created (e.g. running in Windows Session 0 with no display).
+    const bool forceHeadless = (std::getenv("CORTEX_HEADLESS") != nullptr);
+
     // Get HWND from SDL window
     SDL_PropertiesID props = SDL_GetWindowProperties(m_window);
     HWND hwnd = (HWND)SDL_GetPointerProperty(props, SDL_PROP_WINDOW_WIN32_HWND_POINTER, nullptr);
-
-    if (!hwnd) {
-        return Result<void>::Err("Failed to get HWND from SDL window");
-    }
     m_hwnd = hwnd;
 
-    // Describe swap chain
-    DXGI_SWAP_CHAIN_DESC1 swapChainDesc = {};
-    swapChainDesc.Width = m_width;
-    swapChainDesc.Height = m_height;
-    swapChainDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
-    swapChainDesc.Stereo = FALSE;
-    swapChainDesc.SampleDesc.Count = 1;
-    swapChainDesc.SampleDesc.Quality = 0;
-    swapChainDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
-    swapChainDesc.BufferCount = BUFFER_COUNT;
-    swapChainDesc.Scaling = DXGI_SCALING_STRETCH;
-    swapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
-    swapChainDesc.AlphaMode = DXGI_ALPHA_MODE_UNSPECIFIED;
-    swapChainDesc.Flags = device->SupportsTearing() ? DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING : 0;
+    if (!forceHeadless && hwnd) {
+        // Describe swap chain
+        DXGI_SWAP_CHAIN_DESC1 swapChainDesc = {};
+        swapChainDesc.Width = m_width;
+        swapChainDesc.Height = m_height;
+        swapChainDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+        swapChainDesc.Stereo = FALSE;
+        swapChainDesc.SampleDesc.Count = 1;
+        swapChainDesc.SampleDesc.Quality = 0;
+        swapChainDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
+        swapChainDesc.BufferCount = BUFFER_COUNT;
+        swapChainDesc.Scaling = DXGI_SCALING_STRETCH;
+        swapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
+        swapChainDesc.AlphaMode = DXGI_ALPHA_MODE_UNSPECIFIED;
+        swapChainDesc.Flags = device->SupportsTearing() ? DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING : 0;
 
-    ComPtr<IDXGISwapChain1> swapChain1;
-    HRESULT hr = device->GetFactory()->CreateSwapChainForHwnd(
-        commandQueue->GetCommandQueue(),
-        hwnd,
-        &swapChainDesc,
-        nullptr,
-        nullptr,
-        &swapChain1
-    );
+        ComPtr<IDXGISwapChain1> swapChain1;
+        HRESULT hr = device->GetFactory()->CreateSwapChainForHwnd(
+            commandQueue->GetCommandQueue(),
+            hwnd,
+            &swapChainDesc,
+            nullptr,
+            nullptr,
+            &swapChain1
+        );
 
-    if (FAILED(hr)) {
-        return Result<void>::Err("Failed to create swap chain");
+        if (SUCCEEDED(hr)) {
+            // Disable Alt+Enter fullscreen toggle (we'll handle it ourselves)
+            device->GetFactory()->MakeWindowAssociation(hwnd, DXGI_MWA_NO_ALT_ENTER);
+
+            // Query for IDXGISwapChain3 interface
+            hr = swapChain1.As(&m_swapChain);
+            if (FAILED(hr)) {
+                return Result<void>::Err("Failed to query IDXGISwapChain3 interface");
+            }
+
+            m_currentBackBufferIndex = m_swapChain->GetCurrentBackBufferIndex();
+            spdlog::info("Swap chain created with {} buffers", BUFFER_COUNT);
+            return CreateRenderTargetViews(device);
+        }
+
+        spdlog::warn("CreateSwapChainForHwnd failed (hr=0x{:08X}); falling back to HEADLESS offscreen rendering",
+                     static_cast<unsigned int>(hr));
     }
 
-    // Disable Alt+Enter fullscreen toggle (we'll handle it ourselves)
-    device->GetFactory()->MakeWindowAssociation(hwnd, DXGI_MWA_NO_ALT_ENTER);
-
-    // Query for IDXGISwapChain3 interface
-    hr = swapChain1.As(&m_swapChain);
-    if (FAILED(hr)) {
-        return Result<void>::Err("Failed to query IDXGISwapChain3 interface");
-    }
-
-    m_currentBackBufferIndex = m_swapChain->GetCurrentBackBufferIndex();
-
-    spdlog::info("Swap chain created with {} buffers", BUFFER_COUNT);
-
-    // Create render target views
+    // Headless: render to offscreen back buffers (no presentation). Capture/readback
+    // reads GetCurrentBackBuffer() exactly as in the windowed path.
+    m_headless = true;
+    m_swapChain.Reset();
+    m_currentBackBufferIndex = 0;
+    spdlog::info("HEADLESS rendering enabled: {} offscreen back buffers ({}x{})", BUFFER_COUNT, m_width, m_height);
     return CreateRenderTargetViews(device);
 }
 
@@ -142,15 +151,46 @@ Result<void> Window::CreateRenderTargetViews(Graphics::DX12Device* device) {
     D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = m_rtvHeap->GetCPUDescriptorHandleForHeapStart();
 
     for (uint32_t i = 0; i < BUFFER_COUNT; ++i) {
-        hr = m_swapChain->GetBuffer(i, IID_PPV_ARGS(&m_backBuffers[i]));
-        if (FAILED(hr)) {
-            return Result<void>::Err("Failed to get back buffer " + std::to_string(i));
+        if (m_headless) {
+            // Offscreen back buffer: a committed RT texture standing in for a swapchain
+            // buffer. Created in COMMON state (== D3D12_RESOURCE_STATE_PRESENT == 0), so the
+            // renderer's existing PRESENT<->RENDER_TARGET barriers are valid without changes.
+            D3D12_HEAP_PROPERTIES heapProps = {};
+            heapProps.Type = D3D12_HEAP_TYPE_DEFAULT;
+
+            D3D12_RESOURCE_DESC rtDesc = {};
+            rtDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+            rtDesc.Width = m_width;
+            rtDesc.Height = m_height;
+            rtDesc.DepthOrArraySize = 1;
+            rtDesc.MipLevels = 1;
+            rtDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+            rtDesc.SampleDesc.Count = 1;
+            rtDesc.SampleDesc.Quality = 0;
+            rtDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
+            rtDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
+
+            hr = device->GetDevice()->CreateCommittedResource(
+                &heapProps,
+                D3D12_HEAP_FLAG_NONE,
+                &rtDesc,
+                D3D12_RESOURCE_STATE_COMMON,
+                nullptr,  // no optimized clear value, matching swapchain buffers
+                IID_PPV_ARGS(&m_backBuffers[i]));
+            if (FAILED(hr)) {
+                return Result<void>::Err("Failed to create headless back buffer " + std::to_string(i));
+            }
+        } else {
+            hr = m_swapChain->GetBuffer(i, IID_PPV_ARGS(&m_backBuffers[i]));
+            if (FAILED(hr)) {
+                return Result<void>::Err("Failed to get back buffer " + std::to_string(i));
+            }
         }
 
         device->GetDevice()->CreateRenderTargetView(m_backBuffers[i].Get(), nullptr, rtvHandle);
 
         // Set debug name
-        std::wstring name = L"BackBuffer" + std::to_wstring(i);
+        std::wstring name = (m_headless ? L"HeadlessBackBuffer" : L"BackBuffer") + std::to_wstring(i);
         m_backBuffers[i]->SetName(name.c_str());
 
         rtvHandle.ptr += m_rtvDescriptorSize;
@@ -168,13 +208,15 @@ void Window::ReleaseRenderTargetViews() {
 }
 
 void Window::Present() {
-    UINT syncInterval = m_vsync ? 1 : 0;
-    UINT presentFlags = 0;
-
     if (!m_swapChain) {
+        // Headless: no presentation. Rotate to the next offscreen back buffer to preserve
+        // the renderer's multi-buffering expectation (each frame targets a different buffer).
+        m_currentBackBufferIndex = (m_currentBackBufferIndex + 1) % BUFFER_COUNT;
         return;
     }
 
+    UINT syncInterval = m_vsync ? 1 : 0;
+    UINT presentFlags = 0;
     m_swapChain->Present(syncInterval, presentFlags);
     m_currentBackBufferIndex = m_swapChain->GetCurrentBackBufferIndex();
 }
@@ -184,9 +226,7 @@ uint32_t Window::GetCurrentBackBufferIndex() const {
 }
 
 ID3D12Resource* Window::GetCurrentBackBuffer() const {
-    if (!m_swapChain) {
-        return nullptr;
-    }
+    // Valid for both swapchain and headless offscreen back buffers.
     return m_backBuffers[m_currentBackBufferIndex].Get();
 }
 

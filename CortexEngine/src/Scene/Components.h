@@ -221,6 +221,11 @@ struct RenderableComponent {
      float emissiveStrength = 1.0f;
      float occlusionStrength = 1.0f;
      float normalScale = 1.0f;
+     // When false, this mesh is skipped in the sun shadow pass (still depth-writes for
+     // the main/depth-prepass). Used for glass/emissive window panes so the directional
+     // sun streams THROUGH them instead of the opaque pane casting a shadow that kills
+     // the volumetric light shaft.
+     bool castsSunShadow = true;
 
      // glTF extensions (KHR_materials_transmission / ior / specular / clearcoat).
      // These are ignored unless a given material chooses to use them.

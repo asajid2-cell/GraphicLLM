@@ -111,6 +111,11 @@ struct AddEntityCommand : public SceneCommand {
     // and place it exactly at the requested position (clamped to world bounds).
     bool disableCollisionAvoidance = false;
 
+    // When false, this entity does not cast the directional sun shadow (still
+    // depth-writes for main/prepass). Set false for glass/emissive window panes
+    // so the sun streams through and forms a real volumetric light shaft.
+    bool castsSunShadow = true;
+
     // When true, treat this entity as an overlay/decal: it will be rendered
     // after opaque geometry using a depth-tested, depth-write-disabled pass.
     // This is used internally by helpers (e.g., road/lane markings) and does

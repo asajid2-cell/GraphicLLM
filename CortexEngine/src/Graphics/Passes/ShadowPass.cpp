@@ -35,6 +35,11 @@ void DrawShadowCasters(const DrawContext& context, DX12Pipeline*& currentPipelin
         if (!sceneEntry.hasGpuBuffers) {
             continue;
         }
+        // Glass/emissive panes opt out of casting the sun shadow so the sun can
+        // stream through the window and form a real volumetric light shaft.
+        if (!renderable.castsSunShadow) {
+            continue;
+        }
 
         const bool alphaTest = IsAlphaTestedDepthClass(depthClass);
         const bool doubleSided = IsDoubleSidedDepthClass(depthClass);

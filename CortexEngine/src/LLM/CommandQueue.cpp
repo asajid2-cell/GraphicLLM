@@ -667,6 +667,7 @@ void CommandQueue::ExecuteAddEntity(AddEntityCommand* cmd, Scene::ECS_Registry* 
     renderable.metallic = SaturateScalar(metallic);
     renderable.roughness = SaturateScalar(roughness);
     renderable.ao = SaturateScalar(ao);
+    renderable.castsSunShadow = cmd->castsSunShadow;
     renderable.clearcoatFactor = SaturateScalar(cmd->clearcoat);
     renderable.clearcoatRoughnessFactor = SaturateScalar(cmd->clearcoatRoughness);
     renderable.sheenWeight = SaturateScalar(cmd->sheen);

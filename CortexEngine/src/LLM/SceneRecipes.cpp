@@ -608,6 +608,7 @@ void BuildRoomShell(std::vector<std::shared_ptr<SceneCommand>>& out, const Scene
         pane->emissiveBloom = showcase ? 0.10f : 0.14f;     // gentle glow; avoids a blown-white halo washing the wall
         pane->allowPlacementJitter = false;
         pane->disableCollisionAvoidance = true;
+        pane->castsSunShadow = false; // let the sun stream THROUGH the glass to form a real shaft
         out.push_back(std::move(pane));
     }
     AddAreaLight(out,

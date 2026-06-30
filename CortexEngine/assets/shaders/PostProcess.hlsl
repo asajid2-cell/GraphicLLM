@@ -1024,6 +1024,28 @@ float3 LimitHazeLuma(float3 color, float maxLuma)
     return color * (maxLuma / luma);
 }
 
+// Sun visibility from the directional shadow cascades, sampled at an arbitrary
+// WORLD-SPACE point (not just a surface) so the volumetric raymarch can carve
+// real light shafts: in-scatter only accumulates where the sun reaches the air.
+float SunVisibilityHaze(float3 worldPos)
+{
+    if (g_ShadowParams.z < 0.5f) return 1.0f; // shadows disabled
+    float viewZ = mul(g_ViewMatrix, float4(worldPos, 1.0f)).z;
+    uint cascade = 0u;
+    if (viewZ > g_CascadeSplits.x) cascade = 1u;
+    if (viewZ > g_CascadeSplits.y) cascade = 2u;
+    cascade = min(cascade, 2u);
+    float4 clip = mul(g_LightViewProjection[cascade], float4(worldPos, 1.0f));
+    float3 ndc = clip.xyz / max(abs(clip.w), 1e-6f);
+    if (any(abs(ndc.xy) > 1.0f) || ndc.z > 1.0f) return 1.0f; // outside cascade -> treat as lit
+    float2 suv = ndc.xy * float2(0.5f, -0.5f) + 0.5f;
+    float bias = 0.0016f + cascade * 0.0010f;
+    // Single tap: the per-step march jitter dithers the shaft edge, so one sample/step
+    // keeps the raymarch affordable while still carving a clear shadow-occluded beam.
+    float d = g_ShadowMap.SampleLevel(g_Sampler, float3(suv, cascade), 0).r;
+    return (ndc.z - bias <= d) ? 1.0f : 0.0f;
+}
+
 float3 ApplyLocalizedSingleScatterHaze(float3 hdrColor, float2 uv)
 {
     float depth = g_Depth.Sample(g_Sampler, uv).r;
@@ -1059,7 +1081,7 @@ float3 ApplyLocalizedSingleScatterHaze(float3 hdrColor, float2 uv)
         return hdrColor;
     }
 
-    const int kHazeSteps = 10;
+    const int kHazeSteps = 20; // jittered single-tap march: enough for a clear shaft at sane cost
     float stepLength = marchLength / (float)kHazeSteps;
     float jitter = Hash12(uv * float2(173.3f, 419.7f) + g_TimeAndExposure.xx);
     float3 scatter = 0.0f.xxx;
@@ -1068,7 +1090,7 @@ float3 ApplyLocalizedSingleScatterHaze(float3 hdrColor, float2 uv)
     float falloff = max(g_FogParams.z, 0.0f);
     float3 ambientTint = max(g_AmbientColor.rgb, 0.0f.xxx);
 
-    [unroll]
+    [loop]
     for (int i = 0; i < kHazeSteps; ++i)
     {
         float t = ((float)i + jitter) / (float)kHazeSteps;
@@ -1087,7 +1109,10 @@ float3 ApplyLocalizedSingleScatterHaze(float3 hdrColor, float2 uv)
                 float3 toLight = -normalize(sun.direction_cosInner.xyz);
                 float sunPhase = HazePhaseHG(dot(toLight, -rayDir), anisotropy);
                 float3 sunTint = max(sun.color_range.rgb, 0.0f.xxx);
-                inscatter += sunTint * sunPhase * 1.35f;
+                // Sample the sun shadow cascades at this marched air point so the
+                // sun in-scatter is OCCLUDED by geometry -> real light shafts, not flat haze.
+                float sunVis = SunVisibilityHaze(p);
+                inscatter += sunTint * sunPhase * 1.6f * sunVis;
             }
         }
 
@@ -3274,6 +3299,16 @@ float4 PSMain(VSOutput input) : SV_TARGET
         max(g_BloomParams.z, 0.0f),
         lookHalation,
         halationTint);
+
+    // Volumetric sun shafts (god rays): a full-res, shadow-occluded single-scatter
+    // raymarch. The sun in-scatter is carved by the shadow cascades so real beams form
+    // where the low sun streams through the window. Gated by the showcase fog density so
+    // standard scenes (low density) are untouched; this is the proper screen-space
+    // volumetric pass that the coarse froxel volume could not resolve into sharp shafts.
+    if (g_FogParams.x > 0.03f)
+    {
+        hdrCombined = ApplyLocalizedSingleScatterHaze(hdrCombined, uv);
+    }
 
     // Clamp HDR before tonemapping to avoid extreme spikes that can show up
     // as sudden RGB flashes when moving the camera across very bright areas.

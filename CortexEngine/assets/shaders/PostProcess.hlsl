@@ -1071,7 +1071,7 @@ float3 ApplyLocalizedSingleScatterHaze(float3 hdrColor, float2 uv)
         return hdrColor;
     }
 
-    float anisotropy = clamp(g_FogExtraParams.x, -0.65f, 0.65f);
+    float anisotropy = clamp(g_FogExtraParams.x, -0.88f, 0.88f); // allow a tight forward lobe -> crisp sun beam
     float nearFade = max(g_FogExtraParams.z, 0.05f);
     float maxFogLuma = clamp(g_FogExtraParams.w, 0.25f, 6.0f);
     float fogStart = 0.20f;
@@ -1112,7 +1112,7 @@ float3 ApplyLocalizedSingleScatterHaze(float3 hdrColor, float2 uv)
                 // Sample the sun shadow cascades at this marched air point so the
                 // sun in-scatter is OCCLUDED by geometry -> real light shafts, not flat haze.
                 float sunVis = SunVisibilityHaze(p);
-                inscatter += sunTint * sunPhase * 1.6f * sunVis;
+                inscatter += sunTint * sunPhase * 2.6f * sunVis; // strong, shadow-carved beam
             }
         }
 

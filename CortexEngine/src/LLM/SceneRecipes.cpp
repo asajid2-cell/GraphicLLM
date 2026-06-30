@@ -603,7 +603,7 @@ void BuildRoomShell(std::vector<std::shared_ptr<SceneCommand>>& out, const Scene
         pane->clearcoatRoughness = 0.08f;
         pane->proceduralMask = 0.04f;
         pane->setEmissiveStrength = true;
-        pane->emissiveStrength = showcase ? 0.52f : 0.95f;  // big showcase window: low per-area emissive so the large pane doesn't clip to white
+        pane->emissiveStrength = showcase ? 0.40f : 0.95f;  // dimmer big showcase pane so the volumetric sun shaft reads against it (not blown)
         pane->setEmissiveBloom = true;
         pane->emissiveBloom = showcase ? 0.10f : 0.14f;     // gentle glow; avoids a blown-white halo washing the wall
         pane->allowPlacementJitter = false;

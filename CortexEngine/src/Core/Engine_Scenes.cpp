@@ -3030,6 +3030,15 @@ void Engine::BuildRecipeScene() {
             target = glm::vec3(0.2f, 0.35f, -0.9f);
             camFov = 52.0f;
         }
+        // Showcase hero framing: low, front-centre, looking up at the blinded window so the
+        // filtered volumetric daylight reads coming down past the furniture (avoids the
+        // right-wall shelf that occluded the earlier side angle).
+        const bool showcaseCam = !outdoor && (std::getenv("CORTEX_SHOWCASE") != nullptr);
+        if (showcaseCam) {
+            camPos = glm::vec3(0.15f, 0.85f, 2.05f);
+            target = glm::vec3(0.0f, 1.62f, -3.0f); // the window high on the back wall
+            camFov = 66.0f;
+        }
         if (auto* renderer = m_renderer.get()) {
             const float focusDistance = glm::length(target - camPos);
             const float focalRange = outdoor ? 4.5f : (recipe == "bathroom" ? 1.05f : 1.25f);

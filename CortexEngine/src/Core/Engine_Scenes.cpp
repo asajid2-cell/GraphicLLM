@@ -2923,7 +2923,12 @@ void Engine::BuildRecipeScene() {
         // Run the recipe scenes through the FULL-quality path (scene presets
         // otherwise default to 0.85 render scale + IBL off): full-res, TAA,
         // screen-space reflections + AO. Re-asserted last so no profile undoes it.
-        renderer->SetRenderScale(1.0f);
+        // Showcase stills supersample at 1.5x (internal 1920x1080 -> resolved to the
+        // swapchain = SSAA): sharper geometry edges + reduced aliasing on the hero
+        // capture. The 1.5 cap is the engine's existing render-scale ceiling; the
+        // budget planner still clamps down if VRAM-limited. Perf is a non-issue for a
+        // one-frame still. Interactive/standard scenes stay at native 1.0.
+        renderer->SetRenderScale(showcase ? 1.5f : 1.0f);
         renderer->SetTAAEnabled(true);
         renderer->SetSSREnabled(true);
         renderer->SetSSAOEnabled(true);

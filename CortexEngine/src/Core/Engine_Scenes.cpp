@@ -2961,7 +2961,7 @@ void Engine::BuildRecipeScene() {
             renderer->SetAutoExposureEnabled(false);
             renderer->SetExposure(0.55f);                                              // fixed night exposure
             renderer->SetGodRayIntensity(0.0f);                                        // no sun shafts at night
-            renderer->SetFogParams(0.075f, 0.15f, 0.42f, 0.0f);                        // fog for lamp volumetric glow
+            renderer->SetFogParams(0.115f, 0.15f, 0.42f, 0.0f);                        // denser air so the warm lamp light visibly scatters (halos/glow)
         }
         renderer->SetBloomShape(outdoor ? 1.05f : 1.02f, outdoor ? 0.45f : 0.50f, outdoor ? 2.0f : 0.82f);
         renderer->SetParticlesEnabled(true);

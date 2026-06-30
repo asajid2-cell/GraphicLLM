@@ -1046,6 +1046,20 @@ float SunVisibilityHaze(float3 worldPos)
     return (ndc.z - bias <= d) ? 1.0f : 0.0f;
 }
 
+// Local (spot) light visibility from its shadow-atlas slice, sampled at a marched air
+// point so shadow-casting spots cast visible volumetric light CONES (not flat in-scatter).
+float LocalShadowVisibilityHaze(float3 worldPos, float shadowSlice)
+{
+    if (g_ShadowParams.z < 0.5f || shadowSlice < 0.5f) return 1.0f; // not a shadow-casting spot
+    uint slice = min((uint)(shadowSlice + 0.5f), 5u);
+    float4 clip = mul(g_LightViewProjection[slice], float4(worldPos, 1.0f));
+    float3 ndc = clip.xyz / max(abs(clip.w), 1e-6f);
+    if (any(abs(ndc.xy) > 1.0f) || ndc.z > 1.0f) return 1.0f;
+    float2 suv = ndc.xy * float2(0.5f, -0.5f) + 0.5f;
+    float d = g_ShadowMap.SampleLevel(g_Sampler, float3(suv, slice), 0).r;
+    return (ndc.z - 0.0020f <= d) ? 1.0f : 0.0f;
+}
+
 float3 ApplyLocalizedSingleScatterHaze(float3 hdrColor, float2 uv)
 {
     float depth = g_Depth.Sample(g_Sampler, uv).r;
@@ -1153,7 +1167,9 @@ float3 ApplyLocalizedSingleScatterHaze(float3 hdrColor, float2 uv)
             float fixturePhase = HazePhaseHG(dot(toLight, -rayDir), anisotropy * 0.70f);
             float distAtten = 1.0f / max(distToLight * distToLight, 0.25f);
             float3 fixtureRadiance = max(light.color_range.rgb, 0.0f.xxx);
-            inscatter += fixtureRadiance * fixturePhase * rangeFalloff * spotAtten * distAtten * 3.2f;
+            // Shadow-casting spots carve a real volumetric cone (occluded by geometry).
+            float fixtureVis = (lightType == 2u) ? LocalShadowVisibilityHaze(p, light.params.y) : 1.0f;
+            inscatter += fixtureRadiance * fixturePhase * rangeFalloff * spotAtten * distAtten * 3.2f * fixtureVis;
         }
 
         float segmentOpticalDepth = localDensity * stepLength;

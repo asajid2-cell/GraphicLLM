@@ -122,6 +122,9 @@ enum class SurfaceClass : uint32_t {
     if (material.metallic > 0.85f && material.roughness < 0.20f) {
         return SurfaceClass::Mirror;
     }
+    if (material.metallic >= 0.80f && material.roughness <= 0.70f) {
+        return SurfaceClass::BrushedMetal;
+    }
     return SurfaceClass::Default;
 }
 
@@ -162,6 +165,9 @@ enum class SurfaceClass : uint32_t {
     }
     if (renderable.metallic > 0.85f && renderable.roughness < 0.20f) {
         return SurfaceClass::Mirror;
+    }
+    if (renderable.metallic >= 0.80f && renderable.roughness <= 0.70f) {
+        return SurfaceClass::BrushedMetal;
     }
     return SurfaceClass::Default;
 }

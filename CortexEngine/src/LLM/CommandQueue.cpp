@@ -640,8 +640,10 @@ void CommandQueue::ExecuteAddEntity(AddEntityCommand* cmd, Scene::ECS_Registry* 
          mesh && mesh->embeddedMaterial.HasTexture())
             ? &mesh->embeddedMaterial
             : nullptr;
-    renderable.albedoColor = embeddedMaterial ? SanitizeColor(embeddedMaterial->baseColorFactor)
-                                              : SanitizeColor(cmd->color);
+    const bool commandMaterialOverride = cmd->hasPreset && !cmd->presetName.empty();
+    renderable.albedoColor = (embeddedMaterial && !commandMaterialOverride)
+                                  ? SanitizeColor(embeddedMaterial->baseColorFactor)
+                                  : SanitizeColor(cmd->color);
 
     auto sanitizeChannel = [](float value, float defValue, const char* fieldName) {
         if (!std::isfinite(value) || value < 0.0f || value > 1.0f) {
@@ -651,10 +653,12 @@ void CommandQueue::ExecuteAddEntity(AddEntityCommand* cmd, Scene::ECS_Registry* 
         return value;
     };
 
-    float metallic = embeddedMaterial ? embeddedMaterial->metallicFactor
-                                      : sanitizeChannel(cmd->metallic, 0.0f, "metallic");
-    float roughness = embeddedMaterial ? embeddedMaterial->roughnessFactor
-                                      : sanitizeChannel(cmd->roughness, 0.5f, "roughness");
+    float metallic = (embeddedMaterial && !commandMaterialOverride)
+                         ? embeddedMaterial->metallicFactor
+                         : sanitizeChannel(cmd->metallic, 0.0f, "metallic");
+    float roughness = (embeddedMaterial && !commandMaterialOverride)
+                          ? embeddedMaterial->roughnessFactor
+                          : sanitizeChannel(cmd->roughness, 0.5f, "roughness");
     float ao = sanitizeChannel(cmd->ao, 1.0f, "ao");
     if (embeddedMaterial && !embeddedMaterial->occlusionPath.empty()) {
         ao = embeddedMaterial->occlusionStrength;
@@ -698,6 +702,10 @@ void CommandQueue::ExecuteAddEntity(AddEntityCommand* cmd, Scene::ECS_Registry* 
         renderable.textures.roughnessPath = embeddedMaterial->metallicRoughnessPath;
         if (primitiveTextureSet) {
             renderable.textures.metallicPath.clear();
+        }
+        if (commandMaterialOverride) {
+            renderable.textures.metallicPath.clear();
+            renderable.textures.roughnessPath.clear();
         }
         renderable.textures.occlusionPath = embeddedMaterial->occlusionPath;
         if (renderable.textures.occlusionPath.empty() &&

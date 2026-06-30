@@ -44,8 +44,8 @@ constexpr float kDefaultEpsilon = 1.0e-4f;
         return glassBase * smoothScale;
     }
     case SurfaceClass::BrushedMetal: {
-        const float metalBase = 0.24f + (0.56f - 0.24f) * smooth;
-        const float conductorScale = 0.70f + (1.0f - 0.70f) * conductor;
+        const float metalBase = 0.30f + (0.70f - 0.30f) * smooth;
+        const float conductorScale = 0.76f + (1.0f - 0.76f) * conductor;
         return metalBase * conductorScale;
     }
     case SurfaceClass::Plastic:
@@ -59,8 +59,9 @@ constexpr float kDefaultEpsilon = 1.0e-4f;
         break;
     }
 
-    if (conductor > 0.85f) {
-        return 0.22f + (0.48f - 0.22f) * smooth;
+    if (conductor >= 0.80f) {
+        const float conductorScale = 0.72f + (1.0f - 0.72f) * conductor;
+        return (0.28f + (0.62f - 0.28f) * smooth) * conductorScale;
     }
     return 0.08f + (0.16f - 0.08f) * smooth;
 }

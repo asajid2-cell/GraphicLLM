@@ -77,7 +77,7 @@ bool SurfaceIsPolishedConductor(uint surfaceClass, float metallic, float roughne
 {
     return surfaceClass == SURFACE_CLASS_MIRROR ||
            surfaceClass == SURFACE_CLASS_BRUSHED_METAL ||
-           (metallic > 0.85f && roughness < 0.18f);
+           (metallic >= 0.80f && roughness <= 0.70f);
 }
 
 float SurfaceReflectionCeiling(uint surfaceClass)
@@ -92,7 +92,7 @@ float SurfaceReflectionCeiling(uint surfaceClass)
         return 0.30f;
     }
     if (surfaceClass == SURFACE_CLASS_BRUSHED_METAL) {
-        return 0.24f;
+        return 0.38f;
     }
     return 0.14f;
 }
@@ -118,7 +118,7 @@ float SurfaceReflectionCeiling(uint surfaceClass,
         return lerp(0.18f, 0.50f, glassReflectance) * lerp(0.70f, 1.0f, smooth);
     }
     if (surfaceClass == SURFACE_CLASS_BRUSHED_METAL) {
-        return lerp(0.24f, 0.56f, smooth) * lerp(0.70f, 1.0f, conductor);
+        return lerp(0.30f, 0.70f, smooth) * lerp(0.76f, 1.0f, conductor);
     }
     if (surfaceClass == SURFACE_CLASS_PLASTIC) {
         return lerp(0.10f, 0.22f, smooth);
@@ -126,8 +126,8 @@ float SurfaceReflectionCeiling(uint surfaceClass,
     if (surfaceClass == SURFACE_CLASS_MASONRY || surfaceClass == SURFACE_CLASS_WOOD) {
         return lerp(0.06f, 0.12f, smooth);
     }
-    if (conductor > 0.85f) {
-        return lerp(0.22f, 0.48f, smooth);
+    if (conductor >= 0.80f) {
+        return lerp(0.28f, 0.62f, smooth) * lerp(0.72f, 1.0f, conductor);
     }
     return lerp(0.08f, 0.16f, smooth);
 }
@@ -313,7 +313,7 @@ float SceneMaterialReflectionStabilityScale(uint sceneMaterialClass,
     }
     if (sceneMaterialClass == SCENE_MATERIAL_BRUSHED_METAL ||
         sceneMaterialClass == SCENE_MATERIAL_CERAMIC_TILE) {
-        return 0.62f;
+        return sceneMaterialClass == SCENE_MATERIAL_BRUSHED_METAL ? 0.74f : 0.62f;
     }
     if (sceneMaterialClass == SCENE_MATERIAL_EMISSIVE_NEON ||
         sceneMaterialClass == SCENE_MATERIAL_SCREEN_PANEL) {

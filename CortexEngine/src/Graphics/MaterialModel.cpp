@@ -159,6 +159,9 @@ bool HasAuthoredTexture(const std::shared_ptr<DX12Texture>& texture,
         PresetContains(model, "metal")) {
         return SceneMaterialClassId::BrushedMetal;
     }
+    if (model.metallic >= 0.80f && model.roughness <= 0.70f) {
+        return SceneMaterialClassId::BrushedMetal;
+    }
     if (MaterialTypeNear(model, 3.0f) || PresetContains(model, "plastic")) {
         return SceneMaterialClassId::Plastic;
     }
@@ -347,10 +350,10 @@ struct MaterialClassPolicy {
             policy.roughnessFloor = 0.24f;
             policy.normalScaleCeiling = 0.36f;
             policy.proceduralMaskCeiling = 0.36f;
-            policy.reflectionStabilityScale = 0.66f;
+            policy.reflectionStabilityScale = 0.74f;
             policy.albedoLuminanceCeiling = 0.60f;
             policy.albedoChromaCeiling = 0.52f;
-            policy.reflectionPreference = MaterialReflectionPreferenceId::LocalProbe;
+            policy.reflectionPreference = MaterialReflectionPreferenceId::RTReflection;
             policy.temporalPolicy = MaterialTemporalPolicyId::StableGlossy;
             policy.reflectionStabilityApplied = true;
             break;

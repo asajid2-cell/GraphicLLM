@@ -125,6 +125,8 @@ static float MaterialReflectionOwnership(uint surfaceClass,
                              SurfaceIsPolishedConductor(surfaceClass, metallic, roughness);
     bool brushedMetalLike = surfaceClass == SURFACE_CLASS_BRUSHED_METAL ||
                             sceneMaterialClass == SCENE_MATERIAL_BRUSHED_METAL;
+    bool smoothConductorLike = (polishedMetalLike || brushedMetalLike || metallic >= 0.80f) &&
+                               roughness <= 0.70f;
     bool wetLike = sceneMaterialClass == SCENE_MATERIAL_WET_SURFACE;
     bool tileLike = sceneMaterialClass == SCENE_MATERIAL_CERAMIC_TILE;
     bool polishedWoodLike = sceneMaterialClass == SCENE_MATERIAL_POLISHED_WOOD;
@@ -139,8 +141,11 @@ static float MaterialReflectionOwnership(uint surfaceClass,
         wetLike ? 0.80f :
         tileLike ? lerp(0.72f, 0.24f, smoothstep(0.24f, 0.68f, roughness)) :
         polishedWoodLike ? 0.66f :
-        brushedMetalLike ? 0.60f :
+        brushedMetalLike ? lerp(0.78f, 0.66f, smoothstep(0.36f, 0.70f, roughness)) :
         0.0f;
+    if (smoothConductorLike) {
+        classFloor = max(classFloor, lerp(0.84f, 0.68f, smoothstep(0.30f, 0.70f, roughness)));
+    }
 
     float genericSmooth = smoothLobe * saturate(0.22f + 0.50f * fresnel + 0.45f * metallic);
     if (roughness < 0.16f) {
@@ -159,7 +164,8 @@ static float MaterialReflectionOwnership(uint surfaceClass,
 
     float roughVeto = (mirrorLike || waterLike || glassLike || wetLike)
         ? 0.0f
-        : (tileLike ? smoothstep(0.44f, 0.74f, roughness) : smoothstep(0.58f, 0.86f, roughness));
+        : (tileLike ? smoothstep(0.44f, 0.74f, roughness) :
+           (smoothConductorLike ? smoothstep(0.72f, 0.92f, roughness) : smoothstep(0.58f, 0.86f, roughness)));
 
     return saturate(max(classFloor, genericSmooth) * (1.0f - matteVeto) * (1.0f - roughVeto));
 }
@@ -244,13 +250,14 @@ PSOutput PSMain(VSOutput input) {
         mirrorLike ? 1.00f :
         waterLike ? 0.92f :
         glassLike ? 0.84f :
-        conductorLike ? 0.76f :
+        conductorLike ? lerp(0.88f, 0.74f, smoothstep(0.36f, 0.70f, roughness)) :
         wetLike ? 0.70f :
         0.0f;
     float ssrMaterialWeight = reflectionOwnership * max(glossyMaterial, classSourceFloor);
     float rtMaterialWeight = reflectionOwnership * max(saturate(0.18f + 0.82f * glossyMaterial), classSourceFloor);
 
-    float filterRoughnessFloor = tileLike ? 0.82f : (brushedMetalLike ? 0.68f : (polishedWoodLike ? 0.50f : roughness));
+    float brushedFilterFloor = lerp(0.34f, 0.68f, smoothstep(0.42f, 0.72f, roughness));
+    float filterRoughnessFloor = tileLike ? 0.82f : (brushedMetalLike ? brushedFilterFloor : (polishedWoodLike ? 0.50f : roughness));
     float filterRoughness = max(roughness, filterRoughnessFloor);
     float4 ssr = RoughnessFilteredSample(g_SSRReflection, input.texCoord, filterRoughness);
     float3 ssrRadiance = max(ssr.rgb, 0.0f.xxx);

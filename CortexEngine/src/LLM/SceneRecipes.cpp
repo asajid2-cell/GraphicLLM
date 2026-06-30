@@ -171,7 +171,7 @@ PbrResponse PbrForKey(const std::string& k) {
     if (has("mirror") || has("glass") || has("window")) return {0.06f, 0.0f};        // glossy glass
     if (has("screen") || has("television") || has("monitor")) return {0.18f, 0.0f};   // screen glass
     if (has("fridge") || has("stove") || has("sink") || has("hood") || has("microwave") ||
-        has("oven") || has("toaster") || has("kettle") || has("dishwasher")) return {0.34f, 0.85f}; // brushed metal
+        has("oven") || has("toaster") || has("kettle") || has("dishwasher")) return {0.30f, 0.90f}; // brushed metal
     if (has("lamp") || has("lantern")) return {0.40f, 0.45f};                          // metal lamp body
     if (has("sofa") || has("couch") || has("chair") || has("cushion") || has("stool") ||
         has("bed") || has("pillow") || has("rug") || has("doormat") || has("lounge") ||
@@ -182,6 +182,25 @@ PbrResponse PbrForKey(const std::string& k) {
         has("wood") || has("stump") || has("trunk") || has("branch") || has("dresser") ||
         has("wardrobe") || has("drawer") || has("barrel")) return {0.55f, 0.0f};       // satin wood
     return {0.7f, 0.0f};
+}
+
+std::string PresetForKey(const std::string& k) {
+    auto has = [&](const char* n) { return k.find(n) != std::string::npos; };
+    if (has("fridge") || has("stove") || has("sink") || has("hood") || has("microwave") ||
+        has("oven") || has("toaster") || has("kettle") || has("dishwasher") ||
+        has("washer") || has("dryer")) {
+        return "brushed_metal";
+    }
+    if (has("television") || has("computer") || has("screen") || has("monitor") || has("laptop")) {
+        return "screen";
+    }
+    if (has("mirror")) {
+        return "mirror";
+    }
+    if (has("glass") || has("window")) {
+        return "glass";
+    }
+    return {};
 }
 
 struct MaterialLayerResponse {
@@ -307,6 +326,11 @@ bool Place(std::vector<std::shared_ptr<SceneCommand>>& out,
     const PbrResponse pbr = PbrForKey(lk); // per-class material response (glossy/metal/satin/matte)
     cmd->roughness = pbr.roughness;
     cmd->metallic = pbr.metallic;
+    const std::string preset = PresetForKey(lk);
+    if (!preset.empty()) {
+        cmd->hasPreset = true;
+        cmd->presetName = preset;
+    }
     ApplyMaterialLayers(*cmd, LayersForKey(lk));
     cmd->rotationEuler = glm::vec3(0.0f, yawDeg, 0.0f);
     cmd->hasRotation = true;

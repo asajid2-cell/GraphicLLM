@@ -449,7 +449,7 @@ void PlaceFloor(std::vector<std::shared_ptr<SceneCommand>>& out,
     cmd->position = glm::vec3(0.0f, 0.012f, 0.0f);
     cmd->scale = glm::vec3(width * 0.5f, 1.0f, depth * 0.5f);
     cmd->color = color;
-    cmd->roughness = 0.52f; // satin floor: catches soft reflections of the room (SSR) instead of dead-matte
+    cmd->roughness = 0.35f; // glossy-satin floor: below the RT-reflection roughness gate so the floor mirrors the lit room (SSR+RT), not dead-matte
     cmd->metallic = 0.0f;
     cmd->clearcoat = 0.08f;
     cmd->clearcoatRoughness = 0.48f;

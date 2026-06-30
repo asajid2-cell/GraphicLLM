@@ -598,9 +598,9 @@ void BuildRoomShell(std::vector<std::shared_ptr<SceneCommand>>& out, const Scene
         pane->clearcoatRoughness = 0.08f;
         pane->proceduralMask = 0.04f;
         pane->setEmissiveStrength = true;
-        pane->emissiveStrength = 1.18f;  // bright but below hard clip
+        pane->emissiveStrength = 0.95f;  // bright daylight, below clip so the sky-blue tint survives (sun lights the room now)
         pane->setEmissiveBloom = true;
-        pane->emissiveBloom = 0.28f;     // soft glow, not a flat white panel
+        pane->emissiveBloom = 0.14f;     // gentle glow; avoids a blown-white halo washing the wall
         pane->allowPlacementJitter = false;
         pane->disableCollisionAvoidance = true;
         out.push_back(std::move(pane));

@@ -873,6 +873,24 @@ std::vector<std::shared_ptr<SceneCommand>> CommandParser::ParseJSON(const std::s
                 if (cmdJson.contains("casts_shadows") && cmdJson["casts_shadows"].is_boolean()) {
                     cmd->castsShadows = cmdJson["casts_shadows"];
                 }
+                if (cmdJson.contains("semantic_class_id")) {
+                    float semantic = ReadNumber(cmdJson["semantic_class_id"], "semantic_class_id", 0.0f);
+                    cmd->semanticClassId = static_cast<uint32_t>(
+                        std::clamp(std::round(semantic), 0.0f, 4.0f));
+                } else if (cmdJson.contains("fixture_class") && cmdJson["fixture_class"].is_string()) {
+                    std::string fixtureClass = cmdJson["fixture_class"];
+                    std::transform(fixtureClass.begin(), fixtureClass.end(), fixtureClass.begin(),
+                                   [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+                    if (fixtureClass == "soft" || fixtureClass == "softbox" || fixtureClass == "window") {
+                        cmd->semanticClassId = 1u;
+                    } else if (fixtureClass == "emissive" || fixtureClass == "screen") {
+                        cmd->semanticClassId = 2u;
+                    } else if (fixtureClass == "stage" || fixtureClass == "spot" || fixtureClass == "rim") {
+                        cmd->semanticClassId = 3u;
+                    } else if (fixtureClass == "practical" || fixtureClass == "lamp") {
+                        cmd->semanticClassId = 4u;
+                    }
+                }
                 if (cmdJson.contains("auto_place") && cmdJson["auto_place"].is_boolean()) {
                     cmd->autoPlace = cmdJson["auto_place"];
                 }

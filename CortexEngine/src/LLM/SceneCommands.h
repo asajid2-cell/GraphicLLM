@@ -3,6 +3,7 @@
 #include <string>
 #include <vector>
 #include <memory>
+#include <cstdint>
 #include <glm/glm.hpp>
 #include "Scene/Components.h"
 
@@ -267,6 +268,7 @@ struct AddLightCommand : public SceneCommand {
     float innerConeDegrees = 20.0f;
     float outerConeDegrees = 30.0f;
     bool castsShadows = false;
+    uint32_t semanticClassId = 0; // 0 generic, 1 soft, 2 emissive, 3 stage, 4 practical
     std::string name;
 
     // Rectangular area lights use the transform's local X/Y as the emitting

@@ -7,6 +7,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <cstdint>
 #include <cmath>
 #include <unordered_map>
 
@@ -31,6 +32,9 @@ bool Contains(const std::string& hay, const char* needle) {
 // doesn't substitute a flat ColorForKey), so the asset's own glTF albedo/normal/
 // roughness textures drive the look.
 const glm::vec4 kTex(0.97f, 0.97f, 0.97f, 1.0f);
+constexpr uint32_t kFixtureSoft = 1u;
+constexpr uint32_t kFixtureEmissive = 2u;
+constexpr uint32_t kFixturePractical = 4u;
 
 Scene::MeshData::EmbeddedPbrMaterial MakeSurfaceMaterial(const char* id,
                                                          const glm::vec4& tint,
@@ -354,14 +358,45 @@ inline bool PlaceOn(std::vector<std::shared_ptr<SceneCommand>>& out,
 // Author a real point light (e.g. a lamp's bulb) so props actually light the room
 // — motivated lighting, not just a glowing mesh.
 inline void AddPointLight(std::vector<std::shared_ptr<SceneCommand>>& out, float x, float y, float z,
-                          const glm::vec3& color, float intensity, float range) {
+                          const glm::vec3& color, float intensity, float range,
+                          uint32_t semanticClassId = kFixturePractical) {
     auto cmd = std::make_shared<AddLightCommand>();
     cmd->lightType = AddLightCommand::LightType::Point;
     cmd->position = glm::vec3(x, y, z);
     cmd->color = color;
     cmd->intensity = std::min(intensity, 7.0f);
     cmd->range = std::min(range, 4.8f);
+    cmd->semanticClassId = semanticClassId;
     cmd->name = "RecipeLampLight";
+    out.push_back(std::move(cmd));
+}
+
+inline void AddSpotLight(std::vector<std::shared_ptr<SceneCommand>>& out,
+                         const std::string& name,
+                         const glm::vec3& position,
+                         const glm::vec3& target,
+                         const glm::vec3& color,
+                         float intensity,
+                         float range,
+                         float innerConeDegrees,
+                         float outerConeDegrees,
+                         bool castsShadows,
+                         uint32_t semanticClassId = kFixtureSoft) {
+    auto cmd = std::make_shared<AddLightCommand>();
+    cmd->lightType = AddLightCommand::LightType::Spot;
+    cmd->name = name;
+    cmd->position = position;
+    const glm::vec3 toTarget = target - position;
+    cmd->direction = glm::length(toTarget) > 1e-4f
+        ? glm::normalize(toTarget)
+        : glm::vec3(0.0f, -1.0f, 0.0f);
+    cmd->color = color;
+    cmd->intensity = std::max(intensity, 0.0f);
+    cmd->range = std::max(range, 0.01f);
+    cmd->innerConeDegrees = innerConeDegrees;
+    cmd->outerConeDegrees = outerConeDegrees;
+    cmd->castsShadows = castsShadows;
+    cmd->semanticClassId = semanticClassId;
     out.push_back(std::move(cmd));
 }
 
@@ -374,7 +409,8 @@ inline void AddAreaLight(std::vector<std::shared_ptr<SceneCommand>>& out,
                          const glm::vec3& up,
                          const glm::vec3& color,
                          float intensity,
-                         float range) {
+                         float range,
+                         uint32_t semanticClassId = kFixtureSoft) {
     auto cmd = std::make_shared<AddLightCommand>();
     cmd->lightType = AddLightCommand::LightType::AreaRect;
     cmd->name = name;
@@ -386,6 +422,7 @@ inline void AddAreaLight(std::vector<std::shared_ptr<SceneCommand>>& out,
     cmd->color = color;
     cmd->intensity = std::max(intensity, 0.0f);
     cmd->range = std::max(range, 0.01f);
+    cmd->semanticClassId = semanticClassId;
     out.push_back(std::move(cmd));
 }
 
@@ -554,14 +591,14 @@ void BuildRoomShell(std::vector<std::shared_ptr<SceneCommand>>& out, const Scene
         pane->name = "Window_Pane";
         pane->position = glm::vec3(0.0f, winY, wallFace + 0.05f);
         pane->scale = glm::vec3(winW, winH, 0.05f);
-        pane->color = glm::vec4(0.70f, 0.83f, 0.98f, 1.0f); // daylight sky
+        pane->color = glm::vec4(0.62f, 0.78f, 1.0f, 1.0f); // daylight sky
         pane->metallic = 0.0f;
         pane->roughness = 0.2f;
         pane->clearcoat = 0.45f;
         pane->clearcoatRoughness = 0.08f;
         pane->proceduralMask = 0.04f;
         pane->setEmissiveStrength = true;
-        pane->emissiveStrength = 0.78f;  // bright but below hard clip
+        pane->emissiveStrength = 1.18f;  // bright but below hard clip
         pane->setEmissiveBloom = true;
         pane->emissiveBloom = 0.28f;     // soft glow, not a flat white panel
         pane->allowPlacementJitter = false;
@@ -576,8 +613,20 @@ void BuildRoomShell(std::vector<std::shared_ptr<SceneCommand>>& out, const Scene
                  glm::vec3(0.0f, 0.0f, 1.0f),
                  glm::vec3(0.0f, 1.0f, 0.0f),
                  glm::vec3(0.74f, 0.86f, 1.0f),
-                 3.2f,
-                 std::max(depth + 1.2f, 5.8f));
+                 2.6f,
+                 std::max(depth + 1.2f, 5.8f),
+                 kFixtureEmissive);
+    AddSpotLight(out,
+                 "Window_Daylight_Beam",
+                 glm::vec3(-0.42f, winY + 0.28f, wallFace + 0.18f),
+                 glm::vec3(1.05f, 0.46f, 1.42f),
+                 glm::vec3(1.0f, 0.88f, 0.68f),
+                 8.8f,
+                 std::max(depth + 1.5f, 6.2f),
+                 24.0f,
+                 44.0f,
+                 true,
+                 kFixtureSoft);
 
     // Framed wall art on the left wall — fills the blank side wall the camera sees
     // (interiors only; the small bathroom's side walls hold fixtures).
@@ -652,6 +701,17 @@ void BuildLivingRoom(std::vector<std::shared_ptr<SceneCommand>>& out, const Scen
                  glm::vec3(1.0f, 0.92f, 0.80f),
                  2.4f,
                  5.4f);
+    AddSpotLight(out,
+                 "LivingRoom_Ceiling_ShadowSpot",
+                 glm::vec3(0.0f, 2.54f, -0.20f),
+                 glm::vec3(0.05f, 0.48f, -0.82f),
+                 glm::vec3(1.0f, 0.91f, 0.78f),
+                 5.2f,
+                 5.6f,
+                 34.0f,
+                 72.0f,
+                 true,
+                 kFixtureSoft);
 }
 
 void BuildBedroom(std::vector<std::shared_ptr<SceneCommand>>& out, const Scene::AssetCatalog& cat, FootprintCache& c, const SceneStyle& style) {
@@ -713,7 +773,17 @@ void BuildKitchen(std::vector<std::shared_ptr<SceneCommand>>& out, const Scene::
     Place(out, cat, c, "stoolBar", 0.42f, 0.5f, 1.2f, 180.0f);
     // Ceiling fixtures + over-stove light: the deep room had no local lights (only the
     // global key/window), so it read dark. Two warm-white ceiling lamps + a hood light.
-    AddPointLight(out, 0.0f, 2.6f, -1.0f, glm::vec3(1.0f, 0.95f, 0.86f), 6.5f, 4.8f); // back ceiling fixture
+    AddSpotLight(out,
+                 "Kitchen_Back_Ceiling_ShadowSpot",
+                 glm::vec3(0.0f, 2.58f, -1.0f),
+                 glm::vec3(0.18f, 0.62f, -1.52f),
+                 glm::vec3(1.0f, 0.95f, 0.84f),
+                 6.2f,
+                 5.2f,
+                 32.0f,
+                 70.0f,
+                 true,
+                 kFixtureSoft);
     AddPointLight(out, 0.0f, 2.6f, 1.2f, glm::vec3(1.0f, 0.95f, 0.86f), 6.0f, 4.8f);  // front ceiling fixture
     AddPointLight(out, 0.65f, 1.45f, backZ + 0.25f, glm::vec3(1.0f, 0.92f, 0.78f), 3.2f, 2.6f); // over-stove / hood
 }

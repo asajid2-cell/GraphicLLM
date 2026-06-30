@@ -848,6 +848,7 @@ void CommandQueue::ExecuteAddLight(AddLightCommand* cmd, Scene::ECS_Registry* re
     light.innerConeDegrees = cmd->innerConeDegrees;
     light.outerConeDegrees = cmd->outerConeDegrees;
     light.castsShadows = cmd->castsShadows;
+    light.semanticClassId = cmd->semanticClassId;
     if (cmd->lightType == AddLightCommand::LightType::AreaRect) {
         light.areaSize = glm::vec2(std::max(cmd->areaWidth, 0.01f),
                                    std::max(cmd->areaHeight, 0.01f));

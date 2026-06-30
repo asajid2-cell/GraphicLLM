@@ -904,9 +904,10 @@ namespace {
         visualContract.family = RecipeVisualFamily(recipe);
         visualContract.source = "recipe_scene_visual_contract";
         visualContract.enclosedScene = !outdoor;
-        visualContract.visibleExternalHDRIAllowed = outdoor;
+        visualContract.visibleExternalHDRIAllowed = true;
         visualContract.externalHDRIVisible = false;
-        visualContract.environmentOwner = "recipe_neutral_procedural";
+        visualContract.environmentOwner = outdoor ? "recipe_neutral_procedural"
+                                                  : "recipe_window_daylight_procedural";
         visualContract.reflectionOwner = outdoor ? "recipe_garden_local_probe" : "recipe_room_local_probe";
         visualContract.localReflectionProbeRigId = outdoor ? "recipe_garden_probe" : "recipe_room_probe";
         visualContract.lightRigId = outdoor ? "recipe_garden_daylight" : "recipe_enclosed_room_motivated";
@@ -2870,29 +2871,29 @@ void Engine::BuildRecipeScene() {
         renderer->SetIBLEnabled(true);
         // Outdoor: the SUN is the key light; keep the (gray neutral) IBL modest so
         // it doesn't flood the scene flat-gray, and use a gentle sky-blue fill.
-        const float iblBase = outdoor ? 0.45f : 0.42f; // enclosed rooms lost the sky flood -> more IBL fill
+        const float iblBase = outdoor ? 0.45f : 0.30f;
         const float ibl = outdoor
             ? std::clamp(iblBase + style.brightness * 0.25f, 0.2f, 1.3f)
-            : std::clamp(iblBase + style.brightness * 0.10f, 0.20f, 0.60f);
-        renderer->SetIBLIntensity(ibl, outdoor ? ibl : ibl * 0.72f);
+            : std::clamp(iblBase + style.brightness * 0.08f, 0.16f, 0.45f);
+        renderer->SetIBLIntensity(ibl, outdoor ? ibl : ibl * 0.62f);
         renderer->SetLocalReflectionProbeRadiance(true,
-                                                   (outdoor ? 0.16f : 0.22f) * lightingBalance.localProbeDiffuseScale,
-                                                   (outdoor ? 0.16f : 0.20f) * lightingBalance.localProbeSpecularScale);
+                                                   (outdoor ? 0.16f : 0.16f) * lightingBalance.localProbeDiffuseScale,
+                                                   (outdoor ? 0.16f : 0.15f) * lightingBalance.localProbeSpecularScale);
         if (outdoor) {
             renderer->SetBackgroundPresentation(true, 0.95f, 0.0f);
         } else {
-            renderer->SetBackgroundPresentation(false, 0.0f, 0.0f);
+            renderer->SetBackgroundPresentation(true, 0.58f, 0.02f);
         }
         const RecipeMoodGrade moodGrade = RecipeMoodGradeFor(style, outdoor);
         // Warmth shifts the ambient toward warm/cool; brightness scales the fill.
-        glm::vec3 amb = outdoor ? glm::vec3(0.24f, 0.27f, 0.31f) : glm::vec3(0.26f, 0.25f, 0.23f);
+        glm::vec3 amb = outdoor ? glm::vec3(0.24f, 0.27f, 0.31f) : glm::vec3(0.19f, 0.18f, 0.16f);
         amb.r += style.warmth * 0.06f;
         amb.b -= style.warmth * 0.06f;
-        amb *= (1.0f + style.brightness * (outdoor ? 0.35f : 0.16f));
+        amb *= (1.0f + style.brightness * (outdoor ? 0.35f : 0.12f));
         renderer->SetAmbientLighting(glm::max(amb, glm::vec3(outdoor ? 0.05f : 0.06f)),
-                                     (outdoor ? 1.0f : 0.9f) * lightingBalance.ambientScale);
+                                     (outdoor ? 1.0f : 0.76f) * lightingBalance.ambientScale);
         const float recipeExposure =
-            std::clamp((outdoor ? 0.68f : 0.82f) + style.brightness * 0.06f + moodGrade.exposureOffset,
+            std::clamp((outdoor ? 0.68f : 0.78f) + style.brightness * 0.05f + moodGrade.exposureOffset,
                        0.52f,
                        outdoor ? 1.0f : 0.98f);
         renderer->SetExposure(std::clamp(recipeExposure * lightingBalance.exposureScale,
@@ -2902,17 +2903,17 @@ void Engine::BuildRecipeScene() {
         renderer->SetToneGrade(moodGrade.contrast, moodGrade.saturation);
         renderer->SetCinematicPostEnabled(true);
         renderer->SetCinematicPost(moodGrade.vignette, 0.0f);
-        renderer->SetSunDirection(glm::normalize(outdoor ? glm::vec3(-0.59f, 0.05f, -0.79f) : glm::vec3(-0.35f, 0.82f, 0.45f)));
+        renderer->SetSunDirection(glm::normalize(outdoor ? glm::vec3(-0.59f, 0.05f, -0.79f) : glm::vec3(-0.42f, 0.74f, -0.52f)));
         if (outdoor) {
             renderer->SetSunColor(glm::vec3(1.0f, 0.95f, 0.86f)); // warm daylight
             renderer->SetSunIntensity(1.9f * lightingBalance.sunScale);
         } else {
-            renderer->SetSunColor(glm::vec3(1.0f, 0.92f, 0.80f));
-            renderer->SetSunIntensity(std::clamp(1.05f + style.brightness * 0.10f, 0.8f, 1.35f) *
+            renderer->SetSunColor(glm::vec3(1.0f, 0.88f, 0.68f));
+            renderer->SetSunIntensity(std::clamp(4.25f + style.brightness * 0.20f, 3.3f, 4.9f) *
                                       lightingBalance.sunScale);
         }
-        renderer->SetShadowBias(outdoor ? 0.0035f : 0.0011f);
-        renderer->SetShadowPCFRadius(outdoor ? 2.5f : 1.38f);
+        renderer->SetShadowBias(outdoor ? 0.0035f : 0.0008f);
+        renderer->SetShadowPCFRadius(outdoor ? 2.5f : 0.82f);
         // Run the recipe scenes through the FULL-quality path (scene presets
         // otherwise default to 0.85 render scale + IBL off): full-res, TAA,
         // screen-space reflections + AO. Re-asserted last so no profile undoes it.
@@ -2950,6 +2951,26 @@ void Engine::BuildRecipeScene() {
         m_registry->AddComponent<Scene::ReflectionProbeComponent>(e, probe);
     }
 
+    if (!outdoor) {
+        entt::entity e = m_registry->CreateEntity();
+        m_registry->AddComponent<Scene::TagComponent>(e, "Recipe_WindowSun_Directional");
+        auto& t = m_registry->AddComponent<TransformComponent>(e);
+        const glm::vec3 dirToLight = glm::normalize(glm::vec3(-0.42f, 0.74f, -0.52f));
+        glm::vec3 up(0.0f, 1.0f, 0.0f);
+        const glm::vec3 lightTravelDirection = -dirToLight;
+        if (std::abs(glm::dot(up, lightTravelDirection)) > 0.98f) {
+            up = glm::vec3(0.0f, 0.0f, 1.0f);
+        }
+        t.rotation = glm::quatLookAtLH(lightTravelDirection, up);
+
+        auto& l = m_registry->AddComponent<Scene::LightComponent>(e);
+        l.type = Scene::LightType::Directional;
+        l.color = glm::vec3(1.0f, 0.88f, 0.68f);
+        l.intensity = std::clamp(4.25f + style.brightness * 0.20f, 3.3f, 4.9f) *
+                      lightingBalance.sunScale;
+        l.castsShadows = true;
+    }
+
     // Soft key light: outdoor stays high like sun fill; interiors use a
     // ceiling-mounted spot just below the capped room shell.
     {
@@ -2964,12 +2985,13 @@ void Engine::BuildRecipeScene() {
         // Warm or cool key light by style (cool modern <-> warm rustic).
         l.color = glm::mix(glm::vec3(0.92f, 0.96f, 1.0f), glm::vec3(1.0f, 0.90f, 0.78f),
                            glm::clamp(style.warmth * 0.5f + 0.5f, 0.0f, 1.0f));
-        l.intensity = (outdoor ? (10.0f + style.brightness * 2.5f) : (12.8f + style.brightness * 1.6f)) *
+        l.intensity = (outdoor ? (10.0f + style.brightness * 2.5f) : (7.4f + style.brightness * 1.0f)) *
                       lightingBalance.localFixtureScale;
         l.range = outdoor ? 24.0f : 8.5f;
         l.innerConeDegrees = outdoor ? 48.0f : 46.0f;
         l.outerConeDegrees = outdoor ? 80.0f : 86.0f;
         l.castsShadows = true;
+        l.semanticClassId = outdoor ? 3u : 1u;
     }
 
     // Interior 3/4 camera looks into the room from below the capped ceiling.

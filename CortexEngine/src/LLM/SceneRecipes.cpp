@@ -722,6 +722,19 @@ void BuildBedroom(std::vector<std::shared_ptr<SceneCommand>>& out, const Scene::
     PlaceFurn(out, cat, c, style, 0.5f, 1.5f, -2.3f, 0.0f, "sideTable", "ClassicNightstand_01");
     PlaceOn(out, cat, c, "lampSquareTable", 0.3f, 1.5f, 0.52f, -2.3f, 0.0f);  // lamp on nightstand
     AddPointLight(out, 1.5f, 0.9f, -2.3f, glm::vec3(1.0f, 0.77f, 0.46f), 3.8f, 3.3f);
+    // Warm shadow-casting ceiling key over the bed so the focal (dark) bed reads with
+    // form + contrast instead of crushing to black (the room had only a weak side lamp).
+    AddSpotLight(out,
+                 "Bedroom_Bed_ShadowSpot",
+                 glm::vec3(-0.2f, 2.52f, -0.85f),
+                 glm::vec3(-0.2f, 0.58f, -1.6f),
+                 glm::vec3(1.0f, 0.92f, 0.80f),
+                 5.0f,
+                 5.4f,
+                 32.0f,
+                 70.0f,
+                 true,
+                 kFixtureSoft);
     PlaceOn(out, cat, c, "books", 0.26f, -1.9f, 0.52f, -2.3f, 15.0f);          // books on the other
     PlaceFurn(out, cat, c, style, 1.1f, -2.85f, 1.1f, 90.0f, "bookcaseClosed", "Shelf_01"); // left wall
     Place(out, cat, c, "coatRackStanding", 0.45f, -2.7f, -2.5f, 0.0f);

@@ -675,7 +675,9 @@ void CommandQueue::ExecuteAddEntity(AddEntityCommand* cmd, Scene::ECS_Registry* 
     renderable.anisotropyStrength = SaturateScalar(cmd->anisotropy);
     renderable.wetnessFactor = SaturateScalar(cmd->wetness);
     renderable.proceduralMaskStrength = SaturateScalar(cmd->proceduralMask);
-    if (cmd->hasPreset) {
+    if (cmd->hasPreset || cmd->classifyOnly) {
+        // classifyOnly propagates the class string for material-class gating but leaves
+        // commandMaterialOverride off (above), so the model keeps its glTF albedo/PBR.
         renderable.presetName = cmd->presetName;
     }
     renderable.visible = true;

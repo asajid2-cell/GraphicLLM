@@ -205,6 +205,24 @@ std::string PresetForKey(const std::string& k) {
     if (has("glass") || has("window")) {
         return "glass";
     }
+    // Furniture & organic classification so the class-gated rendering features
+    // actually engage (the deferred path keys SSS, reflection-ownership, etc. off
+    // the scene-material CLASS, and these were all falling through to Default).
+    // Fabric -> subsurface wrap (SSS) + sheen; foliage -> SSS; wood -> reflection
+    // ownership (PolishedWood) so tables/shelves pick up the lit room.
+    if (has("sofa") || has("couch") || has("chair") || has("cushion") || has("pillow") ||
+        has("stool") || has("bed") || has("lounge") || has("ottoman") || has("armchair")) {
+        return "fabric";
+    }
+    if (has("plant") || has("fern") || has("bush") || has("foliage") || has("flower") ||
+        has("calathea") || has("orbifolia")) {
+        return "foliage";
+    }
+    if (has("table") || has("desk") || has("cabinet") || has("bookcase") || has("shelf") ||
+        has("nightstand") || has("dresser") || has("wardrobe") || has("drawer") ||
+        has("bench") || has("stump") || has("trunk")) {
+        return "wood";
+    }
     return {};
 }
 
@@ -333,8 +351,17 @@ bool Place(std::vector<std::shared_ptr<SceneCommand>>& out,
     cmd->metallic = pbr.metallic;
     const std::string preset = PresetForKey(lk);
     if (!preset.empty()) {
-        cmd->hasPreset = true;
         cmd->presetName = preset;
+        // Soft material classes (fabric/wood/foliage) classify imported assets for the
+        // class-gated features (SSS, reflection ownership) WITHOUT overriding their glTF
+        // albedo/PBR — overriding desaturates e.g. dark leather to a neutral tint. Hard
+        // classes (metal/glass/screen/mirror) keep the full preset override.
+        const bool softClass = (preset == "fabric" || preset == "wood" || preset == "foliage");
+        if (softClass) {
+            cmd->classifyOnly = true;
+        } else {
+            cmd->hasPreset = true;
+        }
     }
     ApplyMaterialLayers(*cmd, LayersForKey(lk));
     cmd->rotationEuler = glm::vec3(0.0f, yawDeg, 0.0f);

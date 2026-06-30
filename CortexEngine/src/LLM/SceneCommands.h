@@ -69,6 +69,10 @@ struct AddEntityCommand : public SceneCommand {
     float wetness = 0.0f;
     float proceduralMask = 0.0f;
     bool hasPreset = false;
+    // Classify the entity's scene-material class (for class-gated features such as
+    // SSS / reflection-ownership) WITHOUT overriding its glTF albedo/PBR. Use this for
+    // imported assets where hasPreset would desaturate the model's own materials.
+    bool classifyOnly = false;
     std::string presetName;
     glm::vec3 positionOffset = glm::vec3(0.0f);
     bool hasPositionOffset = false;

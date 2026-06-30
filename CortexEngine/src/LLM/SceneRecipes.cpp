@@ -542,6 +542,10 @@ void BuildRoomShell(std::vector<std::shared_ptr<SceneCommand>>& out, const Scene
                     FootprintCache& c, float width, float depth, const glm::vec4& floorColor,
                     bool tileFloor = false) {
     const bool showcase = []{ const char* v = std::getenv("CORTEX_SHOWCASE"); return v && v[0] && v[0] != '0'; }();
+    // Night showcase variant (CORTEX_SHOWCASE_NIGHT): the sun is killed and the lamps
+    // become the key lights, so the window goes dim/cool and the daylight injectors are
+    // dropped (see below). Drives the moody night look + volumetric lamp glow.
+    const bool night = showcase && []{ const char* v = std::getenv("CORTEX_SHOWCASE_NIGHT"); return v && v[0] && v[0] != '0'; }();
     // Showcase: polished satin floor so the working RT/SSR reflections mirror the lit
     // room. The embedded floor material's matte roughnessFactor 1.0 otherwise kills it.
     const float floorGloss = showcase ? 0.22f : -1.0f;
@@ -647,7 +651,8 @@ void BuildRoomShell(std::vector<std::shared_ptr<SceneCommand>>& out, const Scene
         pane->name = "Window_Pane";
         pane->position = glm::vec3(0.0f, winY, wallFace + 0.05f);
         pane->scale = glm::vec3(winW, winH, 0.05f);
-        pane->color = showcase ? glm::vec4(1.0f, 0.84f, 0.58f, 1.0f)   // warm golden-hour sky
+        pane->color = night    ? glm::vec4(0.10f, 0.16f, 0.34f, 1.0f)  // deep moonlit night sky
+                     : showcase ? glm::vec4(1.0f, 0.84f, 0.58f, 1.0f)   // warm golden-hour sky
                                : glm::vec4(0.62f, 0.78f, 1.0f, 1.0f);  // daylight sky
         pane->metallic = 0.0f;
         pane->roughness = 0.2f;
@@ -655,9 +660,10 @@ void BuildRoomShell(std::vector<std::shared_ptr<SceneCommand>>& out, const Scene
         pane->clearcoatRoughness = 0.08f;
         pane->proceduralMask = 0.04f;
         pane->setEmissiveStrength = true;
-        pane->emissiveStrength = showcase ? 0.40f : 0.95f;  // dimmer big showcase pane so the volumetric sun shaft reads against it (not blown)
+        // Night: a faint cool sky glow (the lamps, not the window, light the room).
+        pane->emissiveStrength = night ? 0.12f : (showcase ? 0.40f : 0.95f);  // dimmer big showcase pane so the volumetric sun shaft reads against it (not blown)
         pane->setEmissiveBloom = true;
-        pane->emissiveBloom = showcase ? 0.10f : 0.14f;     // gentle glow; avoids a blown-white halo washing the wall
+        pane->emissiveBloom = night ? 0.05f : (showcase ? 0.10f : 0.14f);     // gentle glow; avoids a blown-white halo washing the wall
         pane->allowPlacementJitter = false;
         pane->disableCollisionAvoidance = true;
         pane->castsSunShadow = false; // let the sun stream THROUGH the glass to form a real shaft
@@ -676,28 +682,32 @@ void BuildRoomShell(std::vector<std::shared_ptr<SceneCommand>>& out, const Scene
             }
         }
     }
-    AddAreaLight(out,
-                 "Window_Daylight_Area",
-                 glm::vec3(0.0f, winY, wallFace + 0.11f),
-                 winW * 0.92f,
-                 winH * 0.86f,
-                 glm::vec3(0.0f, 0.0f, 1.0f),
-                 glm::vec3(0.0f, 1.0f, 0.0f),
-                 glm::vec3(0.74f, 0.86f, 1.0f),
-                 2.6f,
-                 std::max(depth + 1.2f, 5.8f),
-                 kFixtureEmissive);
-    AddSpotLight(out,
-                 "Window_Daylight_Beam",
-                 glm::vec3(-0.42f, winY + 0.28f, wallFace + 0.18f),
-                 glm::vec3(1.05f, 0.46f, 1.42f),
-                 glm::vec3(1.0f, 0.88f, 0.68f),
-                 8.8f,
-                 std::max(depth + 1.5f, 6.2f),
-                 24.0f,
-                 44.0f,
-                 true,
-                 kFixtureSoft);
+    // Daylight injectors (window area light + sun beam). Skipped at night: the room is
+    // lit by the lamps, so a daylight area/beam here would flood the moody night look.
+    if (!night) {
+        AddAreaLight(out,
+                     "Window_Daylight_Area",
+                     glm::vec3(0.0f, winY, wallFace + 0.11f),
+                     winW * 0.92f,
+                     winH * 0.86f,
+                     glm::vec3(0.0f, 0.0f, 1.0f),
+                     glm::vec3(0.0f, 1.0f, 0.0f),
+                     glm::vec3(0.74f, 0.86f, 1.0f),
+                     2.6f,
+                     std::max(depth + 1.2f, 5.8f),
+                     kFixtureEmissive);
+        AddSpotLight(out,
+                     "Window_Daylight_Beam",
+                     glm::vec3(-0.42f, winY + 0.28f, wallFace + 0.18f),
+                     glm::vec3(1.05f, 0.46f, 1.42f),
+                     glm::vec3(1.0f, 0.88f, 0.68f),
+                     8.8f,
+                     std::max(depth + 1.5f, 6.2f),
+                     24.0f,
+                     44.0f,
+                     true,
+                     kFixtureSoft);
+    }
 
     // Framed wall art on the left wall — fills the blank side wall the camera sees
     // (interiors only; the small bathroom's side walls hold fixtures).

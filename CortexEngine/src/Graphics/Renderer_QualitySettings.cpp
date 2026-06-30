@@ -24,6 +24,20 @@ void Renderer::SetExposure(float exposure) {
     spdlog::info("Renderer exposure compensation set to {}", m_qualityRuntimeState.exposure);
 }
 
+void Renderer::SetAutoExposureEnabled(bool enabled) {
+    if (m_qualityRuntimeState.autoExposureEnabled == enabled) {
+        return;
+    }
+    m_qualityRuntimeState.autoExposureEnabled = enabled;
+    if (!enabled) {
+        // Pin the adapted exposure to the manual value so the fixed look is stable
+        // immediately (and so a later re-enable starts from a sane point).
+        m_exposureState.adaptedExposure = std::max(m_qualityRuntimeState.exposure, 0.08f);
+        m_exposureState.targetExposure = m_exposureState.adaptedExposure;
+    }
+    spdlog::info("Renderer auto-exposure {}", enabled ? "ENABLED" : "DISABLED (fixed exposure)");
+}
+
 float Renderer::GetBloomIntensity() const {
     return GetQualityState().bloomIntensity;
 }

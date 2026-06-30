@@ -2899,6 +2899,7 @@ void Engine::BuildRecipeScene() {
         renderer->SetExposure(std::clamp(recipeExposure * lightingBalance.exposureScale,
                                          0.45f,
                                          outdoor ? 1.0f : 0.98f));
+        renderer->SetAutoExposureEnabled(true); // recipe default; the night block disables it for a fixed dark look
         renderer->SetColorGrade(moodGrade.warm, moodGrade.cool);
         renderer->SetToneGrade(moodGrade.contrast, moodGrade.saturation);
         renderer->SetCinematicPostEnabled(true);
@@ -2906,6 +2907,7 @@ void Engine::BuildRecipeScene() {
         // Showcase variant (CORTEX_SHOWCASE): a low golden-hour sun rakes through the
         // big window for dramatic long shadows + real volumetric shafts.
         const bool showcase = []{ const char* v = std::getenv("CORTEX_SHOWCASE"); return v && v[0] && v[0] != '0'; }();
+        const bool night = showcase && []{ const char* v = std::getenv("CORTEX_SHOWCASE_NIGHT"); return v && v[0] && v[0] != '0'; }();
         const glm::vec3 interiorSunDir = showcase ? glm::vec3(-0.62f, 0.26f, -0.44f)  // low, raking through the window
                                                   : glm::vec3(-0.42f, 0.74f, -0.52f); // high overhead key
         renderer->SetSunDirection(glm::normalize(outdoor ? glm::vec3(-0.59f, 0.05f, -0.79f) : interiorSunDir));
@@ -2939,6 +2941,28 @@ void Engine::BuildRecipeScene() {
         renderer->SetFogEnabled(true);
         renderer->SetFogParams(outdoor ? 0.0075f : (showcase ? 0.085f : 0.016f), outdoor ? 0.05f : 0.15f, outdoor ? 0.34f : 0.42f, outdoor ? 4.0f : 0.0f);
         renderer->SetGodRayIntensity(outdoor ? 0.0f : (showcase ? 0.78f : 0.40f));
+        if (night) {
+            // NIGHT showcase: kill the daytime key and let the warm lamps (point lights)
+            // be the only real light. Dark cool ambient + faint moonlight fill keep the
+            // room moody; exposure lifts the warm lamp pools without flooding it. Fog stays
+            // so the lamps throw volumetric warm glow/halos; no sun god-ray. Asserted last
+            // so it overrides the daytime sun/ambient/exposure set above. The reflective
+            // PolishedWood floor mirrors the warm pools for the AAA night look.
+            renderer->SetSunIntensity(0.12f);                                          // faint moonlight only
+            renderer->SetSunColor(glm::vec3(0.55f, 0.62f, 0.85f));                      // cool
+            renderer->SetSunDirection(glm::normalize(glm::vec3(-0.30f, 0.42f, -0.42f)));
+            renderer->SetAmbientLighting(glm::vec3(0.010f, 0.013f, 0.022f), 0.30f);     // near-black cool fill
+            // Kill the diffuse IBL flood (it was lighting the room like day); keep a faint
+            // specular env so the polished floor still has something to reflect.
+            renderer->SetIBLIntensity(0.015f, 0.10f);
+            // Auto-exposure meters the dark scene back toward mid-grey (it "sees in the
+            // dark"), washing the moody night to day. Switch to FIXED exposure so the
+            // dark stays dark and the bright warm lamps read as glowing pools.
+            renderer->SetAutoExposureEnabled(false);
+            renderer->SetExposure(0.55f);                                              // fixed night exposure
+            renderer->SetGodRayIntensity(0.0f);                                        // no sun shafts at night
+            renderer->SetFogParams(0.075f, 0.15f, 0.42f, 0.0f);                        // fog for lamp volumetric glow
+        }
         renderer->SetBloomShape(outdoor ? 1.05f : 1.02f, outdoor ? 0.45f : 0.50f, outdoor ? 2.0f : 0.82f);
         renderer->SetParticlesEnabled(true);
         renderer->SetParticleDensityScale(outdoor ? 0.90f : 1.05f);

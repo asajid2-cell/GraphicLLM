@@ -180,6 +180,9 @@ public:
 
     // Mutators for renderer-level commands
     void SetExposure(float exposure);
+    // When disabled, `SetExposure` acts as a FIXED scene exposure (auto-exposure
+    // metering is bypassed) — for deliberately dark/cinematic looks.
+    void SetAutoExposureEnabled(bool enabled);
     void SetShadowsEnabled(bool enabled);
     void SetDebugViewMode(int mode);
     void SetShadowBias(float bias);

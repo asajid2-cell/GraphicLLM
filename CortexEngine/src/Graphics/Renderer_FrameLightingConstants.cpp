@@ -26,7 +26,8 @@ void Renderer::PopulateFrameLightingAndShadows(FrameConstants& frameData,
     // Time/exposure and lighting state (w = bloom intensity, disabled if bloom SRV missing)
     float bloom = (m_bloom.State().resources.combinedSrv.IsValid() ? m_bloom.State().controls.intensity : 0.0f);
     const float adaptedExposure = std::clamp(
-        (m_exposureState.hasReadback || m_exposureState.stateBuffer)
+        (m_qualityRuntimeState.autoExposureEnabled &&
+         (m_exposureState.hasReadback || m_exposureState.stateBuffer))
             ? m_exposureState.adaptedExposure
             : m_qualityRuntimeState.exposure,
         0.08f,

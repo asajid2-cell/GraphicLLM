@@ -37,6 +37,15 @@ constexpr uint32_t kFixtureSoft = 1u;
 constexpr uint32_t kFixtureEmissive = 2u;
 constexpr uint32_t kFixturePractical = 4u;
 
+// True when the night showcase is active (both flags). Used to make lamps the
+// dramatic key at night: brighter emissive bulbs (bloom halo) + stronger point
+// lights throwing warm pools, since the sun/ambient are killed for the night look.
+inline bool ShowcaseNightActive() {
+    const char* s = std::getenv("CORTEX_SHOWCASE");
+    const char* n = std::getenv("CORTEX_SHOWCASE_NIGHT");
+    return s && s[0] && s[0] != '0' && n && n[0] && n[0] != '0';
+}
+
 Scene::MeshData::EmbeddedPbrMaterial MakeSurfaceMaterial(const char* id,
                                                          const glm::vec4& tint,
                                                          float roughness,
@@ -333,11 +342,12 @@ bool Place(std::vector<std::shared_ptr<SceneCommand>>& out,
     // Light sources + screens glow when "on" — a cheap, automatic realism touch.
     if ((lk.find("lamp") != std::string::npos || lk.find("lantern") != std::string::npos) &&
         lk.find("ceiling") == std::string::npos) {
+        const bool nightLamp = ShowcaseNightActive();
         cmd->setEmissiveStrength = true;
-        cmd->emissiveStrength = 0.55f;
+        cmd->emissiveStrength = nightLamp ? 2.6f : 0.55f;  // night: the bulb glows brightly (bloom halo) as the key
         cmd->emissiveColor = glm::vec4(1.0f, 0.86f, 0.60f, 1.0f); // warm bulb
         cmd->setEmissiveBloom = true;
-        cmd->emissiveBloom = 0.25f;
+        cmd->emissiveBloom = nightLamp ? 0.55f : 0.25f;
     } else if (lk.find("screen") != std::string::npos || lk.find("television") != std::string::npos ||
                lk.find("monitor") != std::string::npos) {
         cmd->setEmissiveStrength = true;
@@ -392,6 +402,12 @@ inline void AddPointLight(std::vector<std::shared_ptr<SceneCommand>>& out, float
     cmd->lightType = AddLightCommand::LightType::Point;
     cmd->position = glm::vec3(x, y, z);
     cmd->color = color;
+    // Night: practical lamps are the room's key — push them to the cap so they throw
+    // strong warm pools + volumetric halos against the dark room.
+    if (semanticClassId == kFixturePractical && ShowcaseNightActive()) {
+        intensity = std::max(intensity, 7.0f);
+        range = std::max(range, 4.8f);
+    }
     cmd->intensity = std::min(intensity, 7.0f);
     cmd->range = std::min(range, 4.8f);
     cmd->semanticClassId = semanticClassId;

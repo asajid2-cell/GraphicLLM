@@ -2903,13 +2903,19 @@ void Engine::BuildRecipeScene() {
         renderer->SetToneGrade(moodGrade.contrast, moodGrade.saturation);
         renderer->SetCinematicPostEnabled(true);
         renderer->SetCinematicPost(moodGrade.vignette, 0.0f);
-        renderer->SetSunDirection(glm::normalize(outdoor ? glm::vec3(-0.59f, 0.05f, -0.79f) : glm::vec3(-0.42f, 0.74f, -0.52f)));
+        // Showcase variant (CORTEX_SHOWCASE): a low golden-hour sun rakes through the
+        // big window for dramatic long shadows + real volumetric shafts.
+        const bool showcase = []{ const char* v = std::getenv("CORTEX_SHOWCASE"); return v && v[0] && v[0] != '0'; }();
+        const glm::vec3 interiorSunDir = showcase ? glm::vec3(-0.62f, 0.26f, -0.44f)  // low, raking through the window
+                                                  : glm::vec3(-0.42f, 0.74f, -0.52f); // high overhead key
+        renderer->SetSunDirection(glm::normalize(outdoor ? glm::vec3(-0.59f, 0.05f, -0.79f) : interiorSunDir));
         if (outdoor) {
             renderer->SetSunColor(glm::vec3(1.0f, 0.95f, 0.86f)); // warm daylight
             renderer->SetSunIntensity(1.9f * lightingBalance.sunScale);
         } else {
-            renderer->SetSunColor(glm::vec3(1.0f, 0.88f, 0.68f));
-            renderer->SetSunIntensity(std::clamp(4.25f + style.brightness * 0.20f, 3.3f, 4.9f) *
+            renderer->SetSunColor(showcase ? glm::vec3(1.0f, 0.80f, 0.52f)   // warm golden-hour
+                                           : glm::vec3(1.0f, 0.88f, 0.68f));
+            renderer->SetSunIntensity(std::clamp((showcase ? 4.7f : 4.25f) + style.brightness * 0.20f, 3.3f, 5.2f) *
                                       lightingBalance.sunScale);
         }
         renderer->SetShadowBias(outdoor ? 0.0035f : 0.0008f);
@@ -2926,8 +2932,8 @@ void Engine::BuildRecipeScene() {
                                 outdoor ? 1.35f : 3.10f);
         renderer->SetShadowsEnabled(true);
         renderer->SetFogEnabled(true);
-        renderer->SetFogParams(outdoor ? 0.0075f : 0.016f, outdoor ? 0.05f : 0.15f, outdoor ? 0.34f : 0.42f, outdoor ? 4.0f : 0.0f);
-        renderer->SetGodRayIntensity(outdoor ? 0.0f : 0.40f);
+        renderer->SetFogParams(outdoor ? 0.0075f : (showcase ? 0.052f : 0.016f), outdoor ? 0.05f : 0.15f, outdoor ? 0.34f : 0.42f, outdoor ? 4.0f : 0.0f);
+        renderer->SetGodRayIntensity(outdoor ? 0.0f : (showcase ? 0.78f : 0.40f));
         renderer->SetBloomShape(outdoor ? 1.05f : 1.02f, outdoor ? 0.45f : 0.50f, outdoor ? 2.0f : 0.82f);
         renderer->SetParticlesEnabled(true);
         renderer->SetParticleDensityScale(outdoor ? 0.90f : 1.05f);

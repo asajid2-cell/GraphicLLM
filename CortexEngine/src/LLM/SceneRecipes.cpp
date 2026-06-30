@@ -8,6 +8,7 @@
 #include <algorithm>
 #include <cctype>
 #include <cstdint>
+#include <cstdlib>
 #include <cmath>
 #include <unordered_map>
 
@@ -580,9 +581,12 @@ void BuildRoomShell(std::vector<std::shared_ptr<SceneCommand>>& out, const Scene
     // sky-blue pane. Breaks the blank plane, reads as a real window, and (via GI)
     // throws a little light into the room. Sits high enough to clear back-wall
     // furniture (counters/beds/sofas).
-    const float winW = std::min(1.9f, width * 0.42f);
-    const float winH = 1.25f;
-    const float winY = 1.78f;
+    // Showcase variant (CORTEX_SHOWCASE): a big floor-reaching window so a low
+    // golden-hour sun rakes through it and casts real shafts across the room.
+    const bool showcase = []{ const char* v = std::getenv("CORTEX_SHOWCASE"); return v && v[0] && v[0] != '0'; }();
+    const float winW = showcase ? std::min(3.0f, width * 0.66f) : std::min(1.9f, width * 0.42f);
+    const float winH = showcase ? 2.05f : 1.25f;
+    const float winY = showcase ? 1.42f : 1.78f; // lower sill so the low sun streams onto the floor
     const float wallFace = -hd + wallTh * 0.5f; // inner face of the back wall
     box("Window_Frame", 0.0f, winY, wallFace + 0.02f, winW + 0.18f, winH + 0.18f, 0.06f, baseColor);
     {
@@ -591,16 +595,17 @@ void BuildRoomShell(std::vector<std::shared_ptr<SceneCommand>>& out, const Scene
         pane->name = "Window_Pane";
         pane->position = glm::vec3(0.0f, winY, wallFace + 0.05f);
         pane->scale = glm::vec3(winW, winH, 0.05f);
-        pane->color = glm::vec4(0.62f, 0.78f, 1.0f, 1.0f); // daylight sky
+        pane->color = showcase ? glm::vec4(1.0f, 0.84f, 0.58f, 1.0f)   // warm golden-hour sky
+                               : glm::vec4(0.62f, 0.78f, 1.0f, 1.0f);  // daylight sky
         pane->metallic = 0.0f;
         pane->roughness = 0.2f;
         pane->clearcoat = 0.45f;
         pane->clearcoatRoughness = 0.08f;
         pane->proceduralMask = 0.04f;
         pane->setEmissiveStrength = true;
-        pane->emissiveStrength = 0.95f;  // bright daylight, below clip so the sky-blue tint survives (sun lights the room now)
+        pane->emissiveStrength = showcase ? 0.52f : 0.95f;  // big showcase window: low per-area emissive so the large pane doesn't clip to white
         pane->setEmissiveBloom = true;
-        pane->emissiveBloom = 0.14f;     // gentle glow; avoids a blown-white halo washing the wall
+        pane->emissiveBloom = showcase ? 0.10f : 0.14f;     // gentle glow; avoids a blown-white halo washing the wall
         pane->allowPlacementJitter = false;
         pane->disableCollisionAvoidance = true;
         out.push_back(std::move(pane));

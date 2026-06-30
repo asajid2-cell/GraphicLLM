@@ -2445,6 +2445,38 @@ float3 ApplyCinematicDepthOfField(float2 uv,
     return lerp(centerHdr, blurred, saturate(centerCoc * 1.12f));
 }
 
+// Contrast-adaptive sharpening (CAS-style) on the HDR scene color. Recovers
+// crispness lost to TAA/upscale/filtering without ringing: the adaptive
+// amplitude suppresses sharpening in flat (noise-prone) regions, and the result
+// is clamped to the local neighborhood min/max so no halos or new fireflies are
+// introduced. strength in ~[0,1].
+float3 SharpenSceneColorCAS(float2 uv, float strength)
+{
+    uint sw, sh;
+    g_SceneColor.GetDimensions(sw, sh);
+    float2 t = 1.0f / float2(max(sw, 1u), max(sh, 1u));
+    float3 e = g_SceneColor.SampleLevel(g_Sampler, uv, 0).rgb;
+    float3 b = g_SceneColor.SampleLevel(g_Sampler, uv + float2(0.0f, -t.y), 0).rgb;
+    float3 d = g_SceneColor.SampleLevel(g_Sampler, uv + float2(-t.x, 0.0f), 0).rgb;
+    float3 f = g_SceneColor.SampleLevel(g_Sampler, uv + float2( t.x, 0.0f), 0).rgb;
+    float3 h = g_SceneColor.SampleLevel(g_Sampler, uv + float2(0.0f,  t.y), 0).rgb;
+
+    const float3 kLuma = float3(0.2126f, 0.7152f, 0.0722f);
+    float le = dot(e, kLuma);
+    float lmin = min(le, min(min(dot(b, kLuma), dot(d, kLuma)), min(dot(f, kLuma), dot(h, kLuma))));
+    float lmax = max(le, max(max(dot(b, kLuma), dot(d, kLuma)), max(dot(f, kLuma), dot(h, kLuma))));
+    // Adaptive amplitude: little contrast -> little sharpening (avoid amplifying noise).
+    float amp = sqrt(saturate((lmax - lmin) / max(lmax + 0.10f, 1e-3f)));
+
+    float3 mean = (b + d + f + h) * 0.25f;
+    float3 sharp = e + (e - mean) * (strength * amp);
+
+    // No-overshoot clamp to the cross neighborhood -> no halos, no new fireflies.
+    float3 nmin = min(e, min(min(b, d), min(f, h)));
+    float3 nmax = max(e, max(max(b, d), max(f, h)));
+    return clamp(sharp, nmin, nmax);
+}
+
 float4 PSMain(VSOutput input) : SV_TARGET
 {
     float2 uv = input.uv;
@@ -2495,7 +2527,8 @@ float4 PSMain(VSOutput input) : SV_TARGET
     // overlays preserve the destination alpha because they do not publish
     // matching normal/material buffers.
     float4 sceneSample = g_SceneColor.Sample(g_Sampler, uv);
-    float3 hdrColor = sceneSample.rgb;
+    // Contrast-adaptive output sharpening to restore crispness (AAA detail).
+    float3 hdrColor = SharpenSceneColorCAS(uv, 0.6f);
     float  opacity = sceneSample.a;
 
     // G-buffer normal and roughness for the current pixel, shared between

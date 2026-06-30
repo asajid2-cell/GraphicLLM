@@ -444,7 +444,8 @@ void PlaceFloor(std::vector<std::shared_ptr<SceneCommand>>& out,
                 const glm::vec4& color,
                 const Scene::MeshData::EmbeddedPbrMaterial& material,
                 float tileMeters,
-                float roughnessFactorOverride = -1.0f) {
+                float roughnessFactorOverride = -1.0f,
+                const char* materialPreset = nullptr) {
     auto cmd = std::make_shared<AddEntityCommand>();
     cmd->entityType = AddEntityCommand::EntityType::Plane; // CreatePlane is 2x2 in XZ
     cmd->name = "Floor";
@@ -468,6 +469,16 @@ void PlaceFloor(std::vector<std::shared_ptr<SceneCommand>>& out,
         // mirror the lit room (furniture + window) across the floor.
         cmd->materialTextureSet.roughnessFactor = roughnessFactorOverride;
         cmd->roughness = roughnessFactorOverride;
+    }
+    if (materialPreset && materialPreset[0]) {
+        // Classify the polished floor so the reflection resolver's material-ownership
+        // admits it as a reflective dielectric (PolishedWood classFloor ~0.66 /
+        // CeramicTile ~0.72) instead of a generic matte surface (~0.4). The OWNERSHIP
+        // gate, not roughness, was the ceiling (0.16 vs 0.30 looked identical) — this is
+        // what turns the satin sheen into a real room-mirror. hasPreset also routes the
+        // roughness/metallic above to the command values (textures still apply).
+        cmd->hasPreset = true;
+        cmd->presetName = materialPreset;
     }
     out.push_back(std::move(cmd));
 }
@@ -507,8 +518,9 @@ void BuildRoomShell(std::vector<std::shared_ptr<SceneCommand>>& out, const Scene
     // Showcase: polished satin floor so the working RT/SSR reflections mirror the lit
     // room. The embedded floor material's matte roughnessFactor 1.0 otherwise kills it.
     const float floorGloss = showcase ? 0.22f : -1.0f;
+    const char* floorPreset = showcase ? (tileFloor ? "ceramic_tile" : "polished_wood") : nullptr;
     PlaceFloor(out, width, depth, floorColor, tileFloor ? TileFloorMaterial() : WoodFloorMaterial(),
-               tileFloor ? 0.82f : 1.15f, floorGloss);
+               tileFloor ? 0.82f : 1.15f, floorGloss, floorPreset);
     (void)cat;
     (void)c;
 

@@ -1114,7 +1114,7 @@ float3 ApplyLocalizedSingleScatterHaze(float3 hdrColor, float2 uv)
         float heightFactor = exp(-falloff * max(p.y - baseHeight, 0.0f));
         float localDensity = density * heightFactor * saturate((dist - fogStart) / nearFade);
 
-        float3 inscatter = ambientTint * 0.045f;
+        float3 inscatter = ambientTint * 0.018f; // lighter uniform glow so haze doesn't wash the scene; directional sun/spot terms below carry the beams
         if (g_LightCount.x > 0)
         {
             Light sun = g_Lights[0];
@@ -1182,7 +1182,12 @@ float3 ApplyLocalizedSingleScatterHaze(float3 hdrColor, float2 uv)
     float extinction = 1.0f - exp(-density * marchLength * 0.38f);
     float3 coolWindowTint = float3(0.72f, 0.82f, 1.0f);
     float3 mediumTint = lerp(ambientTint, coolWindowTint, 0.35f);
-    float3 softened = lerp(hdrColor, mediumTint * maxFogLuma * 0.16f, saturate(extinction * scatteringStrength * depthLayer));
+    // Decouple scene crispness from beam strength: cap the multiplicative aerial-haze
+    // veil so distant geometry stays SHARP (AAA detail) while the additive single-scatter
+    // beams below still carry the dramatic shafts. The unclamped lerp was washing the
+    // whole frame milky (~0.48 at distance) and destroying texture/edge detail.
+    float veilAmount = saturate(extinction * scatteringStrength * depthLayer) * 0.30f;
+    float3 softened = lerp(hdrColor, mediumTint * maxFogLuma * 0.16f, veilAmount);
     scatter = LimitHazeLuma(scatter, maxFogLuma);
 
     float sourceLuma = dot(hdrColor, float3(0.2126f, 0.7152f, 0.0722f));

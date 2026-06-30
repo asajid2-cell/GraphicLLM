@@ -443,7 +443,8 @@ void PlaceFloor(std::vector<std::shared_ptr<SceneCommand>>& out,
                 float depth,
                 const glm::vec4& color,
                 const Scene::MeshData::EmbeddedPbrMaterial& material,
-                float tileMeters) {
+                float tileMeters,
+                float roughnessFactorOverride = -1.0f) {
     auto cmd = std::make_shared<AddEntityCommand>();
     cmd->entityType = AddEntityCommand::EntityType::Plane; // CreatePlane is 2x2 in XZ
     cmd->name = "Floor";
@@ -460,6 +461,14 @@ void PlaceFloor(std::vector<std::shared_ptr<SceneCommand>>& out,
     cmd->disableCollisionAvoidance = true;
     const float metersPerTile = std::max(tileMeters, 0.1f);
     ApplyPrimitiveMaterial(*cmd, material, glm::vec2(width / metersPerTile, depth / metersPerTile));
+    if (roughnessFactorOverride >= 0.0f) {
+        // Polished satin finish. The embedded floor material bakes roughnessFactor 1.0
+        // (matte), which the textured path uses INSTEAD of cmd->roughness and so kills
+        // all floor reflection. Drop the factor and the working RT/SSR reflections
+        // mirror the lit room (furniture + window) across the floor.
+        cmd->materialTextureSet.roughnessFactor = roughnessFactorOverride;
+        cmd->roughness = roughnessFactorOverride;
+    }
     out.push_back(std::move(cmd));
 }
 
@@ -494,8 +503,12 @@ void PlaceExplicit(std::vector<std::shared_ptr<SceneCommand>>& out, const Scene:
 void BuildRoomShell(std::vector<std::shared_ptr<SceneCommand>>& out, const Scene::AssetCatalog& cat,
                     FootprintCache& c, float width, float depth, const glm::vec4& floorColor,
                     bool tileFloor = false) {
+    const bool showcase = []{ const char* v = std::getenv("CORTEX_SHOWCASE"); return v && v[0] && v[0] != '0'; }();
+    // Showcase: polished satin floor so the working RT/SSR reflections mirror the lit
+    // room. The embedded floor material's matte roughnessFactor 1.0 otherwise kills it.
+    const float floorGloss = showcase ? 0.22f : -1.0f;
     PlaceFloor(out, width, depth, floorColor, tileFloor ? TileFloorMaterial() : WoodFloorMaterial(),
-               tileFloor ? 0.82f : 1.15f);
+               tileFloor ? 0.82f : 1.15f, floorGloss);
     (void)cat;
     (void)c;
 
@@ -583,7 +596,7 @@ void BuildRoomShell(std::vector<std::shared_ptr<SceneCommand>>& out, const Scene
     // furniture (counters/beds/sofas).
     // Showcase variant (CORTEX_SHOWCASE): a big floor-reaching window so a low
     // golden-hour sun rakes through it and casts real shafts across the room.
-    const bool showcase = []{ const char* v = std::getenv("CORTEX_SHOWCASE"); return v && v[0] && v[0] != '0'; }();
+    // (showcase flag declared at the top of BuildRoomShell, drives the polished floor too.)
     const float winW = showcase ? std::min(3.0f, width * 0.66f) : std::min(1.9f, width * 0.42f);
     const float winH = showcase ? 2.05f : 1.25f;
     const float winY = showcase ? 1.42f : 1.78f; // lower sill so the low sun streams onto the floor

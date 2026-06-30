@@ -610,6 +610,19 @@ void BuildRoomShell(std::vector<std::shared_ptr<SceneCommand>>& out, const Scene
         pane->disableCollisionAvoidance = true;
         pane->castsSunShadow = false; // let the sun stream THROUGH the glass to form a real shaft
         out.push_back(std::move(pane));
+
+        if (showcase) {
+            // Venetian-blind slats across the window: shadow-CASTING bars so the low sun
+            // streams through the gaps and the volumetric raymarch carves distinct dramatic
+            // light beams (the classic god-ray look a broad open window can't give alone).
+            const int kSlats = 7;
+            const glm::vec4 slatColor(0.16f, 0.14f, 0.12f, 1.0f);
+            for (int s = 0; s < kSlats; ++s) {
+                const float fy = winY - winH * 0.5f + winH * (static_cast<float>(s) / static_cast<float>(kSlats - 1));
+                box("Window_Blind_" + std::to_string(s), 0.0f, fy, wallFace + 0.14f,
+                    winW * 1.04f, 0.06f, 0.05f, slatColor);
+            }
+        }
     }
     AddAreaLight(out,
                  "Window_Daylight_Area",

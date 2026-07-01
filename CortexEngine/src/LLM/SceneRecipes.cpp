@@ -785,8 +785,8 @@ void BuildLivingRoom(std::vector<std::shared_ptr<SceneCommand>>& out, const Scen
         Place(out, cat, c, "calathea_orbifolia_01", 0.6f, 2.9f, -2.6f, 0.0f, kTex); // high-poly corner plant
         Place(out, cat, c, "calathea_orbifolia_01", 0.55f, -3.0f, -2.7f, 0.0f, kTex);
     } else {
-        Place(out, cat, c, "DiffuseTransmissionPlant", 0.62f, 2.7f, -1.55f, 0.0f, kTex);
-        Place(out, cat, c, "DiffuseTransmissionPlant", 0.36f, -2.95f, -2.65f, 0.0f, kTex);
+        Place(out, cat, c, "MonsteraPlant", 0.95f, 2.7f, -1.55f, 0.0f, kTex);
+        Place(out, cat, c, "MonsteraPlant", 0.75f, -2.95f, -2.65f, 0.0f, kTex);
     }
     AddAreaLight(out,
                  "LivingRoom_Ceiling_Area",
@@ -815,8 +815,8 @@ void BuildBedroom(std::vector<std::shared_ptr<SceneCommand>>& out, const Scene::
     BuildRoomShell(out, cat, c, 6.4f, 6.2f, glm::vec4(0.48f, 0.44f, 0.46f, 1.0f));
     Place(out, cat, c, "rugRound", 2.7f, -0.1f, 0.2f, 0.0f, glm::vec4(0.46f, 0.40f, 0.48f, 1.0f));
     PlaceFurn(out, cat, c, style, 2.7f, -0.2f, -1.5f, 0.0f, "ModernBed", "GothicBed_01");  // focal bed
-    PlaceFurn(out, cat, c, style, 0.5f, -1.9f, -2.3f, 0.0f, "sideTable", "ClassicNightstand_01");
-    PlaceFurn(out, cat, c, style, 0.5f, 1.5f, -2.3f, 0.0f, "sideTable", "ClassicNightstand_01");
+    PlaceFurn(out, cat, c, style, 0.5f, -1.9f, -2.3f, 0.0f, "BedsideTable", "ClassicNightstand_01");
+    PlaceFurn(out, cat, c, style, 0.5f, 1.5f, -2.3f, 0.0f, "BedsideTable", "ClassicNightstand_01");
     PlaceOn(out, cat, c, "lampSquareTable", 0.3f, 1.5f, 0.52f, -2.3f, 0.0f);  // lamp on nightstand
     AddPointLight(out, 1.5f, 0.9f, -2.3f, glm::vec3(1.0f, 0.77f, 0.46f), 3.8f, 3.3f);
     // Warm shadow-casting ceiling key over the bed so the focal (dark) bed reads with
@@ -835,7 +835,7 @@ void BuildBedroom(std::vector<std::shared_ptr<SceneCommand>>& out, const Scene::
     PlaceOn(out, cat, c, "books", 0.26f, -1.9f, 0.52f, -2.3f, 15.0f);          // books on the other
     PlaceFurn(out, cat, c, style, 1.1f, -2.85f, 1.1f, 90.0f, "bookcaseClosed", "Shelf_01"); // left wall
     Place(out, cat, c, "coatRackStanding", 0.45f, -2.7f, -2.5f, 0.0f);
-    Place(out, cat, c, "pottedPlant", 0.5f, 2.6f, -2.4f, 0.0f);         // back-right corner accent
+    Place(out, cat, c, "MonsteraPlant", 0.6f, 2.6f, -2.4f, 0.0f);       // back-right corner accent
 }
 
 void BuildOffice(std::vector<std::shared_ptr<SceneCommand>>& out, const Scene::AssetCatalog& cat, FootprintCache& c, const SceneStyle& style) {

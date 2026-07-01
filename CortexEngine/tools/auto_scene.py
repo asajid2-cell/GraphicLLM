@@ -41,11 +41,17 @@ def render(prompt: str, outname: str, p: dict, showcase: bool, night: bool) -> P
     env["CORTEX_AUTOCAM_FOV_ADD"] = f"{p['fov']:.2f}"
     env["CORTEX_AUTOCAM_YAW"] = f"{p['yaw']:.2f}"
     env["CORTEX_AUTOEXPOSURE_MULT"] = f"{p['exp']:.3f}"
-    subprocess.run(
-        ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", str(RENDER),
-         "-Prompt", prompt, "-OutName", outname],
-        env=env, cwd=str(ROOT), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=280)
-    return LOGS / f"{outname}.png"
+    png = LOGS / f"{outname}.png"
+    try:
+        if png.exists():
+            png.unlink()
+        subprocess.run(
+            ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", str(RENDER),
+             "-Prompt", prompt, "-OutName", outname],
+            env=env, cwd=str(ROOT), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=280)
+    except Exception as e:
+        print(f"  (render subprocess error: {e})")
+    return png if png.exists() else None   # None = render failed (e.g. GPU hang / timeout)
 
 # --- VISION critic: the claude CLI reviews the frame -------------------------
 CRITIC_PROMPT = """You are a photography art-director reviewing ONE rendered 3D INTERIOR scene
@@ -127,6 +133,9 @@ def main():
     for it in range(a.iters):
         out = f"{tag}_it{it}"
         png = render(a.prompt, out, p, a.showcase, a.night)
+        if png is None:
+            print(f"[it{it}] render produced no frame (GPU hang / timeout) -> stopping with best so far.")
+            break
         c = vision_critique(png) or heuristic_critique(png)
         rec = dict(iter=it, params=dict(p), critic=c["source"], score=c["score"],
                    issue=c["issue"], verdict=c["verdict"], fix=c["fix"], png=str(png))

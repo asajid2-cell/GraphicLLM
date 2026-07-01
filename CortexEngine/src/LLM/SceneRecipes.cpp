@@ -763,9 +763,9 @@ void BuildLivingRoom(std::vector<std::shared_ptr<SceneCommand>>& out, const Scen
         Place(out, cat, c, "ArmChair_01", 0.95f, -2.05f, -0.3f, 50.0f, kTex); // angled in
         Place(out, cat, c, "ArmChair_01", 0.95f, 2.05f, -0.3f, -50.0f, kTex);
     } else {
-        Place(out, cat, c, "GlamVelvetSofa", 2.35f, 0.0f, -2.05f, 0.0f, kTex);
-        Place(out, cat, c, "ChairDamaskPurplegold", 1.2f, -2.05f, -0.45f, 65.0f, kTex);
-        Place(out, cat, c, "ChairDamaskPurplegold", 1.2f, 2.05f, -0.45f, -65.0f, kTex);
+        Place(out, cat, c, "ModernSofa", 2.35f, 0.0f, -2.05f, 0.0f, kTex);
+        Place(out, cat, c, "Armchair366", 1.2f, -2.05f, -0.45f, 65.0f, kTex);
+        Place(out, cat, c, "Armchair366", 1.2f, 2.05f, -0.45f, -65.0f, kTex);
     }
     PlaceFurn(out, cat, c, style, 1.2f, 0.0f, -0.7f, 0.0f, "tableCoffee", "CoffeeTable_01");  // seating centre
     PlaceOn(out, cat, c, "books", 0.35f, 0.15f, 0.42f, -0.7f, 20.0f);   // on the coffee table

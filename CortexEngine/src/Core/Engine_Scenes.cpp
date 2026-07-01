@@ -3068,6 +3068,40 @@ void Engine::BuildRecipeScene() {
             target = glm::vec3(0.0f, 1.62f, -3.0f); // the window high on the back wall
             camFov = 66.0f;
         }
+        // --- Autonomous compose->render->critique->FIX overrides ---
+        // The critique loop (tools/auto_scene.mjs) sets these env vars to reframe a bad
+        // composition (e.g. a desk blocking the hero camera) and correct exposure between
+        // iterations, WITHOUT hand-editing the recipe. All no-ops when unset, so normal
+        // renders are unaffected -- this is how the per-scene hand-tuning is generalized.
+        {
+            auto autoEnvF = [](const char* n, float d) -> float {
+                const char* v = std::getenv(n);
+                if (!v || !*v) return d;
+                char* e = nullptr; const float x = std::strtof(v, &e);
+                return (e == v || !std::isfinite(x)) ? d : x;
+            };
+            const float dolly  = autoEnvF("CORTEX_AUTOCAM_DOLLY", 0.0f);   // +m back along the view ray
+            const float lift   = autoEnvF("CORTEX_AUTOCAM_LIFT", 0.0f);    // +m up
+            const float fovAdd = autoEnvF("CORTEX_AUTOCAM_FOV_ADD", 0.0f); // +deg (wider = more context)
+            const float yaw    = autoEnvF("CORTEX_AUTOCAM_YAW", 0.0f);     // +deg pan the aim right
+            if (std::fabs(dolly) > 1e-4f || std::fabs(lift) > 1e-4f) {
+                const glm::vec3 viewDir = glm::normalize(target - camPos);
+                camPos -= viewDir * dolly;   // dolly back = away from the target
+                camPos.y += lift;
+                target.y += lift * 0.4f;     // keep the framing roughly centred as we lift
+            }
+            if (std::fabs(yaw) > 1e-3f) {    // re-aim to re-centre a subject crowding one side
+                const float rad = glm::radians(yaw);
+                const glm::vec3 d = target - camPos;
+                const float cs = std::cos(rad), sn = std::sin(rad);
+                target = camPos + glm::vec3(cs * d.x + sn * d.z, d.y, -sn * d.x + cs * d.z);
+            }
+            camFov = glm::clamp(camFov + fovAdd, 28.0f, 100.0f);
+            const float expMul = autoEnvF("CORTEX_AUTOEXPOSURE_MULT", 1.0f);
+            if (auto* r = m_renderer.get(); r && std::fabs(expMul - 1.0f) > 1e-3f) {
+                r->SetExposure(r->GetExposure() * glm::clamp(expMul, 0.2f, 5.0f));
+            }
+        }
         if (auto* renderer = m_renderer.get()) {
             const float focusDistance = glm::length(target - camPos);
             const float focalRange = outdoor ? 4.5f : (recipe == "bathroom" ? 1.05f : 1.25f);

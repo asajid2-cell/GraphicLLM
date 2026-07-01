@@ -699,7 +699,14 @@ Result<void> Engine::Initialize(const EngineConfig& config) {
     // best-matching scene + recipe when no explicit --scene was given. (config
     // is const, so the resolved scene key lives in a local.)
     std::string requestedScene = config.initialScenePreset;
-    if (requestedScene.empty()) {
+    // Generative render: a model-composed + solver-placed IR (CORTEX_SCENE_IR_JSON) is built
+    // onto a BLANK room via the "generative" recipe. Force the RecipeRoom preset + recipe and
+    // skip the keyword prompt-router entirely -- this is the engine entry of the generative pipeline.
+    if (std::getenv("CORTEX_SCENE_IR_JSON") != nullptr) {
+        m_currentScenePreset = ScenePreset::RecipeRoom;
+        m_recipeName = "generative";
+        requestedScene.clear();
+    } else if (requestedScene.empty()) {
         if (const char* prompt = std::getenv("CORTEX_SCENE_PROMPT"); prompt && *prompt) {
             auto route = LLM::RouteScenePrompt(prompt);
             requestedScene = route.sceneString;
@@ -940,8 +947,14 @@ Result<void> Engine::Initialize(const EngineConfig& config) {
                 spdlog::info("The Architect is online! (LLM ready in {} ms)", llmMs);
                 spdlog::info("Press T to enter text input mode for natural language commands");
 
-                // Run a small regression suite once after LLM is ready (logs only)
-                LLM::RunRegressionTests();
+                // Run a small regression suite once after LLM is ready (logs only).
+                // Skip it when a startup architect scene is supplied (generative render)
+                // or when explicitly disabled: the suite spawns test entities that would
+                // pollute a command-driven scene.
+                if (m_startupArchitectCommandJson.empty() &&
+                    std::getenv("CORTEX_DISABLE_REGRESSION") == nullptr) {
+                    LLM::RunRegressionTests();
+                }
             }
 
             m_llmInitializing = false;

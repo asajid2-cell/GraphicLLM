@@ -14,6 +14,7 @@
 
 #include <glm/glm.hpp>
 #include <spdlog/spdlog.h>
+#include <nlohmann/json.hpp>
 
 namespace Cortex::LLM {
 
@@ -87,13 +88,18 @@ const Scene::MeshData::EmbeddedPbrMaterial& GrassGroundMaterial() {
     return mat;
 }
 
+// How strongly a primitive's command colour tints its surface material. 0.25 keeps the
+// hand recipes' subtle palette; the generative recipe raises it so a "pink room" prompt
+// paints the walls/floor strongly (measurably) pink. Reset by BuildGenerative each build.
+static float g_primitiveTintStrength = 0.25f;
+
 void ApplyPrimitiveMaterial(AddEntityCommand& cmd,
                             const Scene::MeshData::EmbeddedPbrMaterial& material,
                             const glm::vec2& uvScale) {
     cmd.hasMaterialTextureSet = true;
     cmd.materialTextureSet = material;
     cmd.materialTextureSet.baseColorFactor = glm::vec4(
-        glm::mix(glm::vec3(material.baseColorFactor), glm::vec3(cmd.color), 0.25f),
+        glm::mix(glm::vec3(material.baseColorFactor), glm::vec3(cmd.color), g_primitiveTintStrength),
         cmd.color.a);
     cmd.materialTextureSet.baseColorFactor.a = cmd.color.a;
     cmd.uvScale = uvScale;
@@ -556,7 +562,9 @@ void PlaceExplicit(std::vector<std::shared_ptr<SceneCommand>>& out, const Scene:
 // doorway. Falls back to a bare floor if no wall asset is available.
 void BuildRoomShell(std::vector<std::shared_ptr<SceneCommand>>& out, const Scene::AssetCatalog& cat,
                     FootprintCache& c, float width, float depth, const glm::vec4& floorColor,
-                    bool tileFloor = false) {
+                    bool tileFloor = false,
+                    const glm::vec4& wallTint = glm::vec4(-1.0f),    // -1 = keep the default warm off-white
+                    const glm::vec4& accentTint = glm::vec4(-1.0f)) {// -1 = keep the default trim colour
     const bool showcase = []{ const char* v = std::getenv("CORTEX_SHOWCASE"); return v && v[0] && v[0] != '0'; }();
     // Night showcase variant (CORTEX_SHOWCASE_NIGHT): the sun is killed and the lamps
     // become the key lights, so the window goes dim/cool and the daylight injectors are
@@ -575,9 +583,11 @@ void BuildRoomShell(std::vector<std::shared_ptr<SceneCommand>>& out, const Scene
     // than tiled, gapped, untextured Kenney wall panels. The front (+Z) wall is
     // split around a central doorway so the room reads as enterable, and the
     // camera looks in through the front opening.
-    const glm::vec4 wallColor(0.84f, 0.81f, 0.76f, 1.0f);     // warm off-white
-    const glm::vec4 backWallColor(0.52f, 0.53f, 0.58f, 1.0f); // muted feature wall for depth
-    const glm::vec4 baseColor(0.24f, 0.20f, 0.17f, 1.0f);     // dark-wood baseboard + trim
+    const bool hasWallTint = (wallTint.r >= 0.0f);
+    const bool hasAccentTint = (accentTint.r >= 0.0f);
+    const glm::vec4 wallColor = hasWallTint ? wallTint : glm::vec4(0.84f, 0.81f, 0.76f, 1.0f);     // warm off-white / palette
+    const glm::vec4 backWallColor = hasWallTint ? wallTint : glm::vec4(0.52f, 0.53f, 0.58f, 1.0f); // feature wall / palette
+    const glm::vec4 baseColor = hasAccentTint ? accentTint : glm::vec4(0.24f, 0.20f, 0.17f, 1.0f); // baseboard + trim / accent
     const float wallH = 2.8f;
     const float wallTh = 0.16f;
     const float ceilingTh = 0.12f;
@@ -1108,6 +1118,64 @@ void BuildGarden(std::vector<std::shared_ptr<SceneCommand>>& out, const Scene::A
     Place(out, cat, c, "grass_bermuda_01", 0.95f, 0.4f, 3.0f, 45.0f);
 }
 
+// Generative recipe: build a scene from a model-composed + solver-placed IR passed in
+// CORTEX_SCENE_IR_JSON. Schema:
+//   {"room":{"w":6.6,"d":6.4,"floor":[r,g,b],"wall":[r,g,b],"accent":[r,g,b],"tile":false},
+//    "objects":[{"asset":"ModernSofa","x":0,"z":-2.2,"yaw":0,"foot":2.3,"tint":[r,g,b]}, ...],
+//    "lights":[{"type":"point","x":0,"y":2.6,"z":-0.5,"color":[r,g,b],"intensity":6,"range":9}, ...]}
+// The solver has already computed exact x,z,yaw,footprint; Place() ground-snaps + footprint-scales
+// + tints (reusing the same robust path as the hand recipes), so any valid IR yields a valid layout.
+// This is the ENGINE side of the prompt -> IR -> solve -> render generative pipeline.
+void BuildGenerative(std::vector<std::shared_ptr<SceneCommand>>& out, const Scene::AssetCatalog& cat,
+                     FootprintCache& c, const SceneStyle& /*style*/) {
+    const char* raw = std::getenv("CORTEX_SCENE_IR_JSON");
+    if (!raw || !*raw) { spdlog::warn("BuildGenerative: CORTEX_SCENE_IR_JSON not set"); return; }
+    nlohmann::json ir;
+    try { ir = nlohmann::json::parse(raw); }
+    catch (const std::exception& e) { spdlog::error("BuildGenerative: bad IR json: {}", e.what()); return; }
+
+    auto readVec4 = [](const nlohmann::json& j, const glm::vec4& dflt) -> glm::vec4 {
+        if (!j.is_array() || j.size() < 3) return dflt;
+        return glm::vec4((float)j[0], (float)j[1], (float)j[2], j.size() > 3 ? (float)j[3] : 1.0f);
+    };
+    auto num = [](const nlohmann::json& j, const char* k, float d) -> float {
+        return (j.contains(k) && j[k].is_number()) ? (float)j[k].get<double>() : d;
+    };
+
+    const nlohmann::json room = ir.value("room", nlohmann::json::object());
+    const float w = std::clamp(num(room, "w", 6.6f), 3.0f, 10.0f);
+    const float d = std::clamp(num(room, "d", 6.4f), 3.0f, 10.0f);
+    const glm::vec4 floorC  = room.contains("floor")  ? readVec4(room["floor"],  glm::vec4(0.50f, 0.43f, 0.36f, 1.0f)) : glm::vec4(0.50f, 0.43f, 0.36f, 1.0f);
+    const glm::vec4 wallC   = room.contains("wall")   ? readVec4(room["wall"],   glm::vec4(-1.0f)) : glm::vec4(-1.0f);
+    const glm::vec4 accentC = room.contains("accent") ? readVec4(room["accent"], glm::vec4(-1.0f)) : glm::vec4(-1.0f);
+    const bool tile = room.value("tile", false);
+    g_primitiveTintStrength = std::clamp(num(room, "tint_strength", 0.72f), 0.0f, 1.0f); // strong palette on shell + floor
+    BuildRoomShell(out, cat, c, w, d, floorC, tile, wallC, accentC);
+
+    int placed = 0, skipped = 0;
+    for (const auto& o : ir.value("objects", nlohmann::json::array())) {
+        const std::string asset = o.value("asset", std::string());
+        if (asset.empty()) { skipped++; continue; }
+        const float x = num(o, "x", 0.0f), z = num(o, "z", 0.0f);
+        const float yaw = num(o, "yaw", 0.0f);
+        const float foot = std::clamp(num(o, "foot", 1.0f), 0.15f, 4.0f);
+        const glm::vec4 tint = o.contains("tint") ? readVec4(o["tint"], glm::vec4(1.0f)) : glm::vec4(1.0f);
+        if (Place(out, cat, c, asset, foot, x, z, yaw, tint)) placed++; else skipped++;  // false = unresolved asset (robustness net)
+    }
+
+    int lightCount = 0;
+    for (const auto& l : ir.value("lights", nlohmann::json::array())) {
+        const float x = num(l, "x", 0.0f), y = num(l, "y", 2.4f), z = num(l, "z", 0.0f);
+        const glm::vec4 col4 = l.contains("color") ? readVec4(l["color"], glm::vec4(1.0f, 0.92f, 0.82f, 1.0f)) : glm::vec4(1.0f, 0.92f, 0.82f, 1.0f);
+        AddPointLight(out, x, y, z, glm::vec3(col4.r, col4.g, col4.b),
+                      num(l, "intensity", 4.0f), num(l, "range", 6.0f));
+        lightCount++;
+    }
+    g_primitiveTintStrength = 0.25f;  // restore the hand-recipe default
+    spdlog::info("BuildGenerative: room {:.1f}x{:.1f}, placed {}/{} objects, {} lights",
+                 w, d, placed, placed + skipped, lightCount);
+}
+
 std::vector<std::shared_ptr<SceneCommand>> BuildSceneRecipe(const std::string& recipeName,
                                                             const Scene::AssetCatalog& catalog,
                                                             std::uint32_t /*seed*/,
@@ -1118,7 +1186,9 @@ std::vector<std::shared_ptr<SceneCommand>> BuildSceneRecipe(const std::string& r
         return out;
     }
     FootprintCache cache;
-    if (recipeName == "living_room") {
+    if (recipeName == "generative") {
+        BuildGenerative(out, catalog, cache, style);
+    } else if (recipeName == "living_room") {
         BuildLivingRoom(out, catalog, cache, style);
     } else if (recipeName == "bedroom") {
         BuildBedroom(out, catalog, cache, style);

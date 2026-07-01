@@ -494,7 +494,8 @@ void PlaceFloor(std::vector<std::shared_ptr<SceneCommand>>& out,
                 const Scene::MeshData::EmbeddedPbrMaterial& material,
                 float tileMeters,
                 float roughnessFactorOverride = -1.0f,
-                const char* materialPreset = nullptr) {
+                const char* materialPreset = nullptr,
+                bool flatTint = false) {
     auto cmd = std::make_shared<AddEntityCommand>();
     cmd->entityType = AddEntityCommand::EntityType::Plane; // CreatePlane is 2x2 in XZ
     cmd->name = "Floor";
@@ -510,7 +511,12 @@ void PlaceFloor(std::vector<std::shared_ptr<SceneCommand>>& out,
     cmd->allowPlacementJitter = false;
     cmd->disableCollisionAvoidance = true;
     const float metersPerTile = std::max(tileMeters, 0.1f);
-    ApplyPrimitiveMaterial(*cmd, material, glm::vec2(width / metersPerTile, depth / metersPerTile));
+    // Strong-palette rooms ("all <colour> everywhere") skip the wood/tile texture so
+    // the floor reads as the requested solid colour instead of the texture multiplying
+    // it down to a muddy tint. Keep the glossy response for lit form + reflections.
+    if (!flatTint) {
+        ApplyPrimitiveMaterial(*cmd, material, glm::vec2(width / metersPerTile, depth / metersPerTile));
+    }
     if (roughnessFactorOverride >= 0.0f) {
         // Polished satin finish. The embedded floor material bakes roughnessFactor 1.0
         // (matte), which the textured path uses INSTEAD of cmd->roughness and so kills
@@ -574,8 +580,12 @@ void BuildRoomShell(std::vector<std::shared_ptr<SceneCommand>>& out, const Scene
     // room. The embedded floor material's matte roughnessFactor 1.0 otherwise kills it.
     const float floorGloss = showcase ? 0.22f : -1.0f;
     const char* floorPreset = showcase ? (tileFloor ? "ceramic_tile" : "polished_wood") : nullptr;
+    // A strong palette (bold colour + high tint strength, e.g. "all pink everywhere")
+    // renders the shell as FLAT tinted surfaces -- the plaster/wood textures otherwise
+    // multiply the tint down to a muddy grey. Subtle palettes keep the textured look.
+    const bool strongPalette = (wallTint.r >= 0.0f) && g_primitiveTintStrength > 0.6f;
     PlaceFloor(out, width, depth, floorColor, tileFloor ? TileFloorMaterial() : WoodFloorMaterial(),
-               tileFloor ? 0.82f : 1.15f, floorGloss, floorPreset);
+               tileFloor ? 0.82f : 1.15f, floorGloss, strongPalette ? nullptr : floorPreset, strongPalette);
     (void)cat;
     (void)c;
 
@@ -585,6 +595,7 @@ void BuildRoomShell(std::vector<std::shared_ptr<SceneCommand>>& out, const Scene
     // camera looks in through the front opening.
     const bool hasWallTint = (wallTint.r >= 0.0f);
     const bool hasAccentTint = (accentTint.r >= 0.0f);
+    // strongPalette computed above (before PlaceFloor); reused here for the walls/ceiling.
     const glm::vec4 wallColor = hasWallTint ? wallTint : glm::vec4(0.84f, 0.81f, 0.76f, 1.0f);     // warm off-white / palette
     const glm::vec4 backWallColor = hasWallTint ? wallTint : glm::vec4(0.52f, 0.53f, 0.58f, 1.0f); // feature wall / palette
     const glm::vec4 baseColor = hasAccentTint ? accentTint : glm::vec4(0.24f, 0.20f, 0.17f, 1.0f); // baseboard + trim / accent
@@ -619,7 +630,8 @@ void BuildRoomShell(std::vector<std::shared_ptr<SceneCommand>>& out, const Scene
     };
     auto wall = [&](const std::string& tag, float cx, float cz, float sx, float sz, const glm::vec4& col) {
         const float run = std::max(sx, sz);
-        box(tag, cx, wallH * 0.5f, cz, sx, wallH, sz, col, &PlasterWallMaterial(),
+        box(tag, cx, wallH * 0.5f, cz, sx, wallH, sz, col,
+            strongPalette ? nullptr : &PlasterWallMaterial(),
             glm::vec2(std::max(run / 1.35f, 1.0f), std::max(wallH / 1.35f, 1.0f))); // base on the floor
     };
 
@@ -638,7 +650,8 @@ void BuildRoomShell(std::vector<std::shared_ptr<SceneCommand>>& out, const Scene
     // A real plaster ceiling hides the procedural sky and completes the room box.
     // It slightly overlaps the wall thickness so there are no blue edge leaks.
     box("Ceiling", 0.0f, wallH + ceilingTh * 0.5f, 0.0f,
-        width + wallTh * 4.0f, ceilingTh, depth + wallTh * 4.0f, wallColor, &PlasterWallMaterial(),
+        width + wallTh * 4.0f, ceilingTh, depth + wallTh * 4.0f, wallColor,
+        strongPalette ? nullptr : &PlasterWallMaterial(),
         glm::vec2(std::max(width / 1.55f, 1.0f), std::max(depth / 1.55f, 1.0f)));
 
     // Baseboards along the foot of the walls make the floor/wall junction read

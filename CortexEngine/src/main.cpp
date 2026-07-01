@@ -12,6 +12,8 @@
 #include "Scene/SceneTransactionRuntime.h"
 #include "Scene/AuthoringInputRouter.h"
 #include "Scene/AssetCatalog.h"
+#include "Scene/Components.h"
+#include "Utils/GLTFLoader.h"
 #include "LLM/SceneRecipes.h"
 #include "LLM/SceneCommands.h"
 #include "Graphics/ManyLightReservoir.h"
@@ -1227,6 +1229,121 @@ int main(int argc, char* argv[]) {
             const nlohmann::json report = LauncherSceneOptionsReport();
             std::cout << report.dump(2) << std::endl;
             return report.value("status", std::string{}) == "LAUNCHER_SCENE_OPTIONS_READY" ? 0 : 1;
+        }
+
+        // Catalog dump for the generative composer: the real, resolvable asset
+        // library (id + coarse role + tags) so a model composes a Scene IR that
+        // references only assets that actually exist. Runs BEFORE any DX12 init so
+        // it is fast + headless. Prints JSON to stdout. --dump-catalog[=<role>]
+        // filters to one coarse role.
+        {
+            std::string dumpFilter;
+            bool wantDump = false;
+            bool measure = false;
+            for (int i = 1; i < argc; ++i) {
+                const std::string a = argv[i] ? argv[i] : "";
+                if (a == "--dump-catalog") { wantDump = true; }
+                else if (a.rfind("--dump-catalog=", 0) == 0) { wantDump = true; dumpFilter = a.substr(std::string("--dump-catalog=").size()); }
+                else if (a == "--measure") { measure = true; }
+            }
+            if (wantDump) {
+                Scene::AssetCatalog catalog;
+                auto loadRes = catalog.Load();
+                // Coarse role from id keywords, so kit meshes without registry tags
+                // still classify (mirrors ColorForKey's families). One primary role
+                // per asset -> the composer/solver can pick + fall back by role.
+                auto coarseRole = [](const std::string& idLower) -> std::string {
+                    auto has = [&](const char* n) { return idLower.find(n) != std::string::npos; };
+                    if (has("sofa") || has("couch") || has("loveseat")) return "sofa";
+                    if (has("armchair") || has("chair") || has("stool") || has("bench") || has("lounge") || has("ottoman")) return "seating";
+                    if (has("bed")) return "bed";
+                    if (has("desk")) return "desk";
+                    if (has("coffeetable") || has("coffee_table")) return "coffee_table";
+                    if (has("table") || has("nightstand") || has("sidetable") || has("side_table")) return "table";
+                    if (has("bookcase") || has("shelf") || has("cabinet") || has("dresser") || has("wardrobe") || has("drawer") || has("storage")) return "storage";
+                    if (has("rug") || has("doormat") || has("carpet")) return "rug";
+                    if (has("lamp") || has("lantern") || has("light") || has("chandelier") || has("sconce")) return "lamp";
+                    if (has("plant") || has("fern") || has("bush") || has("flower") || has("tree") || has("cactus") || has("monstera") || has("pot")) return "plant";
+                    if (has("television") || has("tv") || has("monitor") || has("screen") || has("computer") || has("laptop") || has("radio") || has("speaker")) return "electronics";
+                    if (has("fridge") || has("stove") || has("oven") || has("sink") || has("microwave") || has("dishwasher") || has("hood") || has("kettle") || has("toaster")) return "appliance";
+                    if (has("toilet") || has("bath") || has("shower") || has("faucet") || has("mirror")) return "bathroom";
+                    if (has("rock") || has("boulder") || has("stone") || has("log") || has("stump")) return "decor";
+                    if (has("painting") || has("frame") || has("vase") || has("book") || has("clock") || has("bottle") || has("cup") || has("mug") || has("bowl") || has("plate")) return "accessory";
+                    return "misc";
+                };
+                // Nominal real-world footprint (m, largest horizontal extent) per role,
+                // so the solver sizes objects sanely without measuring 142 glTFs. The
+                // engine still normalizes each mesh to the IR's per-object "foot".
+                auto roleFootprint = [](const std::string& role) -> float {
+                    if (role == "sofa") return 2.1f;
+                    if (role == "bed") return 2.0f;
+                    if (role == "storage") return 1.1f;
+                    if (role == "desk") return 1.4f;
+                    if (role == "table") return 1.1f;
+                    if (role == "coffee_table") return 1.0f;
+                    if (role == "seating") return 0.7f;
+                    if (role == "appliance") return 0.8f;
+                    if (role == "electronics") return 1.1f;
+                    if (role == "plant") return 0.6f;
+                    if (role == "lamp") return 0.4f;
+                    if (role == "rug") return 2.4f;
+                    if (role == "bathroom") return 0.7f;
+                    if (role == "decor") return 0.6f;
+                    if (role == "accessory") return 0.3f;
+                    return 0.8f;
+                };
+                nlohmann::json items = nlohmann::json::array();
+                std::unordered_map<std::string, int> roleCounts;
+                for (const auto& a : catalog.All()) {
+                    std::string idLower = a.id;
+                    std::transform(idLower.begin(), idLower.end(), idLower.begin(),
+                                   [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+                    const std::string role = coarseRole(idLower);
+                    if (!dumpFilter.empty() && role != dumpFilter) { continue; }
+                    roleCounts[role]++;
+                    nlohmann::json item = {
+                        {"id", a.id},
+                        {"role", role},
+                        {"nominal_footprint_m", roleFootprint(role)},
+                        {"semantic_roles", a.semanticRoles},
+                        {"scene_families", a.sceneFamilies},
+                        {"source", a.sourceClass},
+                    };
+                    // Real measured bounds (the same LoadGLTFMesh path Place() uses),
+                    // so the solver knows an asset's TRUE horizontal footprint + height
+                    // and can size it without blowing up oddly-proportioned meshes.
+                    if (measure) {
+                        if (auto path = catalog.ResolvePath(a.id)) {
+                            auto meshRes = Utils::LoadGLTFMesh(*path);
+                            if (!meshRes.IsErr() && meshRes.Value()) {
+                                auto mesh = meshRes.Value();
+                                if (!mesh->hasBounds) { mesh->UpdateBounds(); }
+                                glm::vec3 sz = mesh->boundsMax - mesh->boundsMin;
+                                item["native_size"] = {sz.x, sz.y, sz.z};
+                                item["native_horiz"] = std::max(std::abs(sz.x), std::abs(sz.z));
+                                item["native_height"] = std::abs(sz.y);
+                            } else {
+                                item["native_size"] = nullptr;
+                            }
+                        } else {
+                            item["native_size"] = nullptr;
+                        }
+                    }
+                    items.push_back(item);
+                }
+                nlohmann::json byRole = nlohmann::json::object();
+                for (const auto& [r, n] : roleCounts) { byRole[r] = n; }
+                nlohmann::json out = {
+                    {"schema", "cortex.catalog_dump.v1"},
+                    {"loaded", catalog.IsLoaded()},
+                    {"error", loadRes.IsErr() ? loadRes.Error() : std::string()},
+                    {"count", items.size()},
+                    {"roles", byRole},
+                    {"assets", items},
+                };
+                std::cout << out.dump(2) << std::endl;
+                return catalog.IsLoaded() && !items.empty() ? 0 : 1;
+            }
         }
 
         // Headless scene-recipe self-test. Runs BEFORE the launcher/window so it

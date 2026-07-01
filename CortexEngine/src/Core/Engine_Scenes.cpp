@@ -3068,6 +3068,15 @@ void Engine::BuildRecipeScene() {
             target = glm::vec3(0.0f, 1.62f, -3.0f); // the window high on the back wall
             camFov = 66.0f;
         }
+        // A generative (model-composed) scene fills the WHOLE room, not one hero
+        // subject, so it wants a wider establishing shot from the front doorway that
+        // takes in the full floor + furniture arrangement. The critique loop refines
+        // from here via the CORTEX_AUTOCAM_* overrides below.
+        if (showcaseCam && recipe == "generative") {
+            camPos = glm::vec3(0.1f, 1.5f, 2.95f);
+            target = glm::vec3(0.0f, 0.85f, -1.4f); // room centre, slightly low
+            camFov = 64.0f;
+        }
         // --- Autonomous compose->render->critique->FIX overrides ---
         // The critique loop (tools/auto_scene.mjs) sets these env vars to reframe a bad
         // composition (e.g. a desk blocking the hero camera) and correct exposure between

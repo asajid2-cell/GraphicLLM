@@ -29,18 +29,21 @@ ROOT = sg.ROOT
 LOGS = sg.LOGS
 LEDGER = ROOT.parent.parent / "tandem" / "GRAPHICS_LOOPS.md"
 
-# >=8 diverse prompts: varied room type, dominant colour, and mood.
+# Diverse untuned prompts: interiors (room type/colour/mood) AND exteriors
+# (novel open scenes -- the v2 self-authoring lane).
 BATTERY = [
+    "a well lit pink kitchen",
     "a modern living room that is all pink everywhere",
     "a cozy rustic bedroom in warm evening light",
-    "a minimalist home office in cool blue tones",
-    "an industrial kitchen with moody dark lighting",
     "a bright airy dining room for a family",
+    "a minimalist home office in cool blue tones",
     "a small green bathroom with plants",
-    "a luxurious living room in emerald and gold",
-    "a sunny mid-century studio apartment",
-    "a calm scandinavian bedroom in soft white",
-    "a warm study lined with wood and books",
+    "a sunny beach with palm trees, rocks and green water",
+    "a misty pine forest clearing with mossy boulders",
+    "a manicured garden with flower beds and a wooden fence",
+    "a campsite in a grassy meadow at sunset",
+    "a lakeside shore with trees and a canoe at golden hour",
+    "a desert of red sand with jagged rocks",
 ]
 
 
@@ -107,6 +110,38 @@ def robustness_tests(by_role, by_id):
     ok = png is not None and Path(png).exists()
     results.append(("unresolved_assets_no_crash", ok,
                     f"render of an all-unresolved IR -> {'ok: ' + Path(png).name if png else 'None (handled)'}"))
+
+    # 5. Asset ladder degrades gracefully with NO fetch available: an unmatchable
+    #    query must fall through every rung and drop -- never crash the plan.
+    import os
+    tok = os.environ.pop("SKETCHFAB_TOKEN", None)
+    try:
+        plan = {"setting": "exterior", "scene_type": "meadow",
+                "environment": {"ground": {"kind": "grass"}},
+                "objects": [
+                    {"query": "xyzzy unobtainium contraption", "zone": "midground", "count": 1},
+                    {"query": "tree", "zone": "background", "count": 2},
+                ], "lights": []}
+        p2, reps = sg.validate_plan(plan, by_role, by_id, verbose=False)
+        ir, _ = sg.solve(p2)
+        probs = sg.validity_check(ir)
+        ok = (len(p2["objects"]) >= 1 and not probs and
+              any("unobtainium" in r for r in reps))
+        results.append(("ladder_no_fetch_graceful_drop", ok,
+                        f"unmatchable query dropped ({len(reps)} notes), scene of "
+                        f"{len(ir['objects'])} objects still valid"))
+    finally:
+        if tok:
+            os.environ["SKETCHFAB_TOKEN"] = tok
+
+    # 6. Procgen rung: a rock-ish query no pack answers is GENERATED and loadable.
+    try:
+        import procgen
+        gen_id = procgen.ensure("battery test crag stone", verbose=False)
+        ok = bool(gen_id)
+        results.append(("procgen_generated_model", ok, f"generated + engine-verified: {gen_id}"))
+    except Exception as e:
+        results.append(("procgen_generated_model", False, f"error: {e}"))
 
     return results
 
@@ -187,12 +222,19 @@ def main():
                            "validity": ["pipeline_error"], "png": None, "crit": None})
             continue
         best = res.get("best") or {}
+        crit = best.get("crit")
+        if crit is None and best.get("png") and backends != ["offline"]:
+            # dedicated intent-check pass (with retries) so every scene gets a verdict
+            print("  [intent] re-running the vision check...")
+            crit = sg.critique(best["png"], prompt)
         scenes.append({
             "prompt": prompt, "name": name, "backend": res.get("backend"),
+            "setting": res.get("setting"),
             "room_type": res.get("room_type"), "objects": res.get("objects"),
             "dropped": res.get("dropped"), "validity": res.get("validity"),
-            "png": best.get("png"), "crit": best.get("crit"),
+            "png": best.get("png"), "crit": crit,
         })
+        time.sleep(6)   # spacing keeps claude -p under its burst rate limit
 
     print("\n\n========== ROBUSTNESS ==========")
     robust = robustness_tests(by_role, by_id)
@@ -243,7 +285,7 @@ def main():
     print(f"report           : {report_path}")
     print(f"elapsed          : {dt/60:.1f} min")
 
-    done = all_valid and robust_pass and intent_pass >= 8
+    done = all_valid and robust_pass and intent_pass >= max(8, round(len(scenes) * 0.75))
     print(f"\nBATTERY {'COMPLETE (goal criteria 2-5 met)' if done else 'INCOMPLETE'}")
 
     append_ledger(report, montage, done)

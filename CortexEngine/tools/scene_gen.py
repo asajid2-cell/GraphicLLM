@@ -154,6 +154,9 @@ INTERIOR rules:
 - Pick assets ONLY from the catalog menu (use the exact ids). Put each asset's role in "role".
 - Choose a sensible room_type and a plausible set of 6-10 FLOOR-STANDING objects for it:
   a focal piece against a wall (sofa/bed/desk), seating, tables, storage, a rug, 1-2 plants, a floor lamp.
+- The room must be IDENTIFIABLE at a glance: a kitchen = a counter RUN of 3-4 appliances
+  (fridge/stove/sink/counter, all anchor wall_back so they line up) + a small table; a bedroom = the
+  bed dominant; an office = desk + chair facing it. Pick the signature assets FIRST.
 - Arrange RELATIONALLY with anchors + facing; a solver computes exact coordinates, so you do NOT
   give x/z. Put the big focal piece on wall_back facing "in"; flank with seating; rug at center.
 - Do NOT place tabletop props (books, mugs, vases) -- only things that stand on the floor.
@@ -1246,10 +1249,40 @@ def critique(png, prompt, timeout=150, retries=3):
     return None
 
 
+def enforce_color_intent(plan, prompt):
+    """Deterministic backstop: 'all <colour> everywhere'-style prompts are HARD
+    constraints. If the composer under-tinted (model variance), saturate the palette
+    toward the named colour and tint the big soft pieces -- the draftsman's job is to
+    honour explicit constraints, not hope the designer felt like it."""
+    if plan.get("setting") == "exterior":
+        return plan
+    p = prompt.lower()
+    named = next((c for w, c in COLOR_WORDS.items() if w in p), None)
+    words = set(p.replace(",", " ").split())
+    strong = named is not None and bool(
+        {"everywhere", "all", "entirely", "fully", "throughout", "completely"} & words)
+    if not strong:
+        return plan
+    pal = plan["palette"]
+    if pal.get("tint_strength", 0) < 0.75:
+        pal["tint_strength"] = 0.88
+
+    def toward(v, c, k=0.75):
+        return [v[i] * (1 - k) + c[i] * k for i in range(3)]
+    pal["wall"] = toward(pal["wall"], [min(1.0, c * 1.06 + 0.04) for c in named])
+    pal["floor"] = toward(pal["floor"], [c * 0.9 for c in named])
+    pal["accent"] = toward(pal["accent"], [c * 0.7 for c in named])
+    for o in plan.get("objects", []):
+        if o.get("role") in ("sofa", "bed", "seating", "rug") and "tint" not in o:
+            o["tint"] = list(named)
+    return plan
+
+
 def run_pipeline(prompt, name, backends, iters=3, refresh_catalog=False, verbose=True):
     assets, by_role, by_id = load_catalog(refresh=refresh_catalog)
     plan = compose(prompt, by_role, backends, verbose=verbose)
     plan, repairs = validate_plan(plan, by_role, by_id, verbose=verbose)
+    plan = enforce_color_intent(plan, prompt)
     ir, dropped = solve(plan)
     if dropped and verbose:
         print(f"[solve] dropped {len(dropped)} un-placeable: {dropped}")
@@ -1281,8 +1314,14 @@ def run_pipeline(prompt, name, backends, iters=3, refresh_catalog=False, verbose
     for it in range(iters):
         png = render_ir(ir, f"{name}_{it}", camera=camera, night=night)
         if not png:
+            # transient GPU device-removal happens under heavy texture churn -- one retry
             if verbose:
-                print(f"[render] iter {it}: FAILED (gpu/timeout) -- keeping best so far")
+                print(f"[render] iter {it}: failed (gpu/timeout) -- retrying once")
+            time.sleep(4)
+            png = render_ir(ir, f"{name}_{it}", camera=camera, night=night)
+        if not png:
+            if verbose:
+                print(f"[render] iter {it}: FAILED twice -- keeping best so far")
             break
         crit = critique(png, prompt) if backends != ["offline"] else None
         score = crit.get("score") if crit else None

@@ -73,6 +73,9 @@ struct AddEntityCommand : public SceneCommand {
     // SSS / reflection-ownership) WITHOUT overriding its glTF albedo/PBR. Use this for
     // imported assets where hasPreset would desaturate the model's own materials.
     bool classifyOnly = false;
+    // Multiply an EXPLICITLY requested tint into a textured model's albedo (textured
+    // meshes otherwise ignore `color` entirely -- the "grey sofa" / "teal pine" gap).
+    bool tintTextured = false;
     std::string presetName;
     glm::vec3 positionOffset = glm::vec3(0.0f);
     bool hasPositionOffset = false;

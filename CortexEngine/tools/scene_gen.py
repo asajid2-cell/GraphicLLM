@@ -627,6 +627,11 @@ def resolve_query(query, by_role, by_id, rng, verbose=True):
     if q in by_id:
         return by_id[q], "exact"
     words = [w for w in "".join(c if c.isalnum() else " " for c in q).split() if len(w) > 2]
+    # colour adjectives describe, they don't name the object: "eroded red rock" must
+    # match rock_*, never flower_redB
+    non_color = [w for w in words if w not in COLOR_WORDS]
+    if non_color:
+        words = non_color
     # keyword scoring over ids (nature sources preferred for exterior scenes)
     best, best_score = [], 0
     for a in by_id.values():
@@ -760,7 +765,21 @@ def validate_plan_exterior(plan, by_role, by_id, verbose=True):
             t = _rgb(o.get("tint"), None)
             if t:
                 entry["tint"] = t
+        woodland = any(w in (plan.get("scene_type") or "").lower() + " " + query.lower()
+                       for w in ("pine", "oak", "birch", "spruce", "fir", "forest",
+                                 "willow", "woodland", "meadow", "garden", "lake"))
+        if "tint" not in entry and woodland and role in ("tree", "bush", "grass"):
+            # the Kenney kit's foliage greens are teal; woodland vegetation reads wrong
+            # without a deep green-shift (multiplies into the baked palette via tintTextured)
+            entry["tint"] = [0.45, 0.85, 0.35]
         good.append(entry)
+    # scene budget: enormous composed counts destabilize the GPU (texture churn) and
+    # add nothing compositionally -- scale group counts down to ~40 placements
+    total = sum(o["count"] for o in good)
+    if total > 40:
+        k = 40.0 / total
+        for o in good:
+            o["count"] = max(1, int(round(o["count"] * k)))
     plan["objects"] = good
     if verbose and repairs:
         print(f"[validate-ext] {len(repairs)} note(s):")
@@ -1278,11 +1297,52 @@ def enforce_color_intent(plan, prompt):
     return plan
 
 
+def enforce_mood_intent(plan, prompt):
+    """Deterministic mood backstop for interiors: evening/night prompts get the night
+    light rig (warm lamps as key), bright prompts get lifted exposure, moody dim ones
+    get dropped exposure -- explicit mood words are constraints, not suggestions."""
+    p = prompt.lower()
+    if plan.get("setting") == "exterior":
+        env = plan.get("environment") or {}
+        sun = env.setdefault("sun", {})
+        if any(w in p for w in ("sunset", "golden hour", "golden light", "dusk", "evening")):
+            sun["elevation_deg"] = min(float(sun.get("elevation_deg", 45) or 45), 13.0)
+            if _rgb(sun.get("color"), [1, 1, 1])[2] > 0.6:
+                sun["color"] = [1.0, 0.60, 0.32]
+            env["sky"] = "sky_sunset"
+        if any(w in p for w in ("misty", "foggy", "fog", "haze", "hazy")):
+            fog = env.setdefault("fog", {})
+            fog["density"] = max(float(fog.get("density", 0.003) or 0.003), 0.013)
+            env.setdefault("sky", "sky_partly_cloudy")
+        return plan
+    if any(w in p for w in ("evening", "night", "candlelit", "dusk", "warm evening")):
+        plan["night"] = True
+        lights = [l for l in plan.get("lights", []) or [] if isinstance(l, dict)]
+        for l in lights:
+            l["color"] = _rgb(l.get("color"), [1.0, 0.78, 0.52])
+            l["intensity"] = max(float(l.get("intensity", 6) or 6), 7.5)
+        while len(lights) < 2:
+            lights.append({"anchor": "ceiling_back" if len(lights) == 1 else "ceiling_center",
+                           "color": [1.0, 0.76, 0.50], "intensity": 8.0, "range": 8.0})
+        plan["lights"] = lights
+        pal = plan.get("palette") or {}
+        wall = pal.get("wall", [0.84, 0.81, 0.76])
+        if wall[2] >= wall[0]:   # cool wall for a warm prompt: blend toward warm plaster
+            pal["wall"] = [wall[0] * 0.5 + 0.62 * 0.5, wall[1] * 0.5 + 0.50 * 0.5, wall[2] * 0.5 + 0.36 * 0.5]
+            pal["tint_strength"] = max(pal.get("tint_strength", 0.35), 0.45)
+    elif any(w in p for w in ("bright", "airy", "well lit", "well-lit", "sun-drenched", "sunny")):
+        plan["exposure"] = max(float(plan.get("exposure", 1.0) or 1.0), 1.28)
+    elif any(w in p for w in ("moody", " dark", "dim ")):
+        plan["exposure"] = min(float(plan.get("exposure", 1.0) or 1.0), 0.85)
+    return plan
+
+
 def run_pipeline(prompt, name, backends, iters=3, refresh_catalog=False, verbose=True):
     assets, by_role, by_id = load_catalog(refresh=refresh_catalog)
     plan = compose(prompt, by_role, backends, verbose=verbose)
     plan, repairs = validate_plan(plan, by_role, by_id, verbose=verbose)
     plan = enforce_color_intent(plan, prompt)
+    plan = enforce_mood_intent(plan, prompt)
     ir, dropped = solve(plan)
     if dropped and verbose:
         print(f"[solve] dropped {len(dropped)} un-placeable: {dropped}")
@@ -1313,15 +1373,17 @@ def run_pipeline(prompt, name, backends, iters=3, refresh_catalog=False, verbose
     camera = f"0,0,0,0,{exposure}" if abs(exposure - 1.0) > 1e-3 else ""
     for it in range(iters):
         png = render_ir(ir, f"{name}_{it}", camera=camera, night=night)
-        if not png:
-            # transient GPU device-removal happens under heavy texture churn -- one retry
+        for retry in range(2):
+            if png:
+                break
+            # transient GPU device-removal under texture churn: cool down and retry
             if verbose:
-                print(f"[render] iter {it}: failed (gpu/timeout) -- retrying once")
-            time.sleep(4)
+                print(f"[render] iter {it}: failed (gpu/timeout) -- retry {retry + 1} after cooldown")
+            time.sleep(12)
             png = render_ir(ir, f"{name}_{it}", camera=camera, night=night)
         if not png:
             if verbose:
-                print(f"[render] iter {it}: FAILED twice -- keeping best so far")
+                print(f"[render] iter {it}: FAILED after retries -- keeping best so far")
             break
         crit = critique(png, prompt) if backends != ["offline"] else None
         score = crit.get("score") if crit else None

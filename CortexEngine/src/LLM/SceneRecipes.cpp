@@ -342,6 +342,10 @@ bool Place(std::vector<std::shared_ptr<SceneCommand>>& out,
     cmd->position = glm::vec3(x, std::min(0.0f, supportHeight), z);
     cmd->scale = glm::vec3(scale);
     const std::string lk = ToLower(key);
+    // An explicit caller colour is a real TINT request: it must land on textured
+    // models too (the executor multiplies it into the embedded albedo). The default
+    // ColorForKey guess stays untextured-only, as before.
+    cmd->tintTextured = (color != glm::vec4(1.0f));
     cmd->color = (color == glm::vec4(1.0f)) ? ColorForKey(lk) : color;
     // Deterministic per-instance tint so repeated items (a row of dining chairs,
     // stools, books) aren't identical clones. Hash of position -> small brightness

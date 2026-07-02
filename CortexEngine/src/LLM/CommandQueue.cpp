@@ -642,7 +642,9 @@ void CommandQueue::ExecuteAddEntity(AddEntityCommand* cmd, Scene::ECS_Registry* 
             : nullptr;
     const bool commandMaterialOverride = cmd->hasPreset && !cmd->presetName.empty();
     renderable.albedoColor = (embeddedMaterial && !commandMaterialOverride)
-                                  ? SanitizeColor(embeddedMaterial->baseColorFactor)
+                                  ? SanitizeColor(cmd->tintTextured
+                                                      ? embeddedMaterial->baseColorFactor * cmd->color
+                                                      : embeddedMaterial->baseColorFactor)
                                   : SanitizeColor(cmd->color);
 
     auto sanitizeChannel = [](float value, float defValue, const char* fieldName) {

@@ -3140,19 +3140,26 @@ void Engine::BuildRecipeScene() {
                 r.ao = 1.0f;
                 r.doubleSided = true;
                 r.presetName = genExt.groundKind == "sand" ? "sand" : "naturalistic";
+                // Explicitly requested SATURATED ground colours ("red sand") must
+                // actually paint the terrain: tint weight scales with how far the
+                // colour sits from neutral, so natural palettes stay texture-led.
+                const float maxc = std::max(gcol.r, std::max(gcol.g, gcol.b));
+                const float minc = std::min(gcol.r, std::min(gcol.g, gcol.b));
+                const float saturation = maxc > 1e-4f ? (maxc - minc) / maxc : 0.0f;
+                const float tintW = genExt.groundColorSet ? std::min(0.3f + saturation * 0.9f, 0.85f) : 0.28f;
                 if (genExt.groundKind == "sand") {
                     // aerial_beach_01 = BRIGHT dry sand (linear albedo ~0.25); the older
                     // coast_sand_05 set is dark wet shore (~0.05) and reads as mud.
                     r.textures.albedoPath = "assets/textures/polyhaven/aerial_beach_01/aerial_beach_01_diff_1k.jpg";
                     r.textures.normalPath = "assets/textures/polyhaven/aerial_beach_01/aerial_beach_01_nor_gl_1k.jpg";
                     r.textures.roughnessPath = "assets/textures/polyhaven/aerial_beach_01/aerial_beach_01_rough_1k.jpg";
-                    r.albedoColor = glm::vec4(glm::mix(glm::vec3(1.0f), gcol, 0.25f), 1.0f);
+                    r.albedoColor = glm::vec4(glm::mix(glm::vec3(1.0f), gcol, tintW), 1.0f);
                     r.normalScale = 0.65f;
                 } else if (genExt.groundKind == "grass") {
                     r.textures.albedoPath = "assets/textures/polyhaven/aerial_grass_rock/aerial_grass_rock_diff_1k.jpg";
                     r.textures.normalPath = "assets/textures/polyhaven/aerial_grass_rock/aerial_grass_rock_nor_gl_1k.jpg";
                     r.textures.roughnessPath = "assets/textures/polyhaven/aerial_grass_rock/aerial_grass_rock_rough_1k.jpg";
-                    r.albedoColor = glm::vec4(glm::mix(glm::vec3(1.0f), gcol, 0.30f), 1.0f);
+                    r.albedoColor = glm::vec4(glm::mix(glm::vec3(1.0f), gcol, std::max(tintW, 0.30f)), 1.0f);
                     r.normalScale = 0.75f;
                 }
             };
@@ -3217,10 +3224,14 @@ void Engine::BuildRecipeScene() {
                 r.ao = 1.0f;
                 r.presetName = "water";
                 Scene::WaterSurfaceComponent sea{};
+                const bool sunsetWater = genExt.skyPreset == "sky_sunset" ||
+                                         (genExt.skyPreset.empty() && genExt.sunEl < 18.0f);
                 sea.absorption = 0.72f;   // the sloped seabed gives real depth: let the tint saturate with it
                 sea.foamStrength = 0.62f;
-                sea.viscosity = 0.48f;    // Water.hlsl: reflectionWeight = lerp(0.68,0.24,viscosity)*... --
-                                          // damps the white sky-mirror at grazing so the green body reads
+                // Water.hlsl: reflectionWeight = lerp(0.68,0.24,viscosity)*... Daylight
+                // damps the white sky-mirror so the tinted body reads; golden hour KEEPS
+                // the mirror -- the warm sky reflecting off the lake IS the shot.
+                sea.viscosity = sunsetWater ? 0.22f : 0.48f;
                 sea.bodyThickness = 0.80f;
                 sea.meniscusStrength = 0.38f;
                 sea.flowSpeed = 0.46f;

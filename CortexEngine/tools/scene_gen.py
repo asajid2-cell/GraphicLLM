@@ -1280,10 +1280,21 @@ def enforce_color_intent(plan, prompt):
     constraints. If the composer under-tinted (model variance), saturate the palette
     toward the named colour and tint the big soft pieces -- the draftsman's job is to
     honour explicit constraints, not hope the designer felt like it."""
-    if plan.get("setting") == "exterior":
-        return plan
     p = prompt.lower()
     named = next((c for w, c in COLOR_WORDS.items() if w in p), None)
+    if plan.get("setting") == "exterior":
+        if named:
+            env = plan.get("environment") or {}
+            # "<colour> sand/desert/ground/grass": paint the terrain that colour
+            if any(f"{w} {g}" in p for w in COLOR_WORDS
+                   for g in ("sand", "desert", "ground", "grass", "dunes", "earth")):
+                env.setdefault("ground", {})["color"] = list(named)
+            # "<colour> water/sea/lake": already handled by composers usually; enforce
+            if any(f"{w} {g}" in p for w in COLOR_WORDS for g in ("water", "sea", "ocean", "lake", "lagoon")):
+                w0 = env.setdefault("water", {})
+                w0["shallow"] = [named[0] * 0.55 + 0.05, named[1] * 0.8 + 0.08, named[2] * 0.7 + 0.06]
+                w0["deep"] = [named[0] * 0.15, named[1] * 0.35, named[2] * 0.3]
+        return plan
     words = set(p.replace(",", " ").split())
     strong = named is not None and bool(
         {"everywhere", "all", "entirely", "fully", "throughout", "completely"} & words)
@@ -1324,6 +1335,9 @@ def enforce_mood_intent(plan, prompt):
         return plan
     if any(w in p for w in ("evening", "night", "candlelit", "dusk", "warm evening")):
         plan["night"] = True
+        # the night rig's fixed exposure (0.55) is tuned for moody-dark; a "warm
+        # evening" should stay READABLE -- lift through the exposure multiplier
+        plan["exposure"] = max(float(plan.get("exposure", 1.0) or 1.0), 1.3)
         lights = [l for l in plan.get("lights", []) or [] if isinstance(l, dict)]
         for l in lights:
             l["color"] = _rgb(l.get("color"), [1.0, 0.78, 0.52])
@@ -1341,6 +1355,15 @@ def enforce_mood_intent(plan, prompt):
         plan["exposure"] = max(float(plan.get("exposure", 1.0) or 1.0), 1.28)
     elif any(w in p for w in ("moody", " dark", "dim ")):
         plan["exposure"] = min(float(plan.get("exposure", 1.0) or 1.0), 0.85)
+    if "kitchen" in p:
+        # identity backstop: a kitchen must SHOW a counter run, whatever the model rolled
+        objs = plan.get("objects", []) or []
+        appliances = [o for o in objs if o.get("role") == "appliance"]
+        if len(appliances) < 2:
+            for extra in ("kitchenFridge", "kitchenStove"):
+                objs.append({"asset": extra, "role": "appliance",
+                             "anchor": "wall_back", "facing": "in", "count": 1})
+        plan["objects"] = objs
     return plan
 
 

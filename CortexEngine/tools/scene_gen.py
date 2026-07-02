@@ -124,7 +124,7 @@ EXTERIOR_SCHEMA = """{
     "sky": "sky_day|sky_sunset|sky_partly_cloudy",          // match the mood
     "fog": {"density": 0.003, "start": 10.0},               // density 0.001 crisp .. 0.02 misty
     "exposure": 1.1,                    // 0.7 moody .. 1.4 bright airy
-    "ground": {"kind": "sand|grass|dirt|rock|snow", "extent": 34,   // metres, 24-50
+    "ground": {"kind": "sand|grass|dirt|rock|snow", "extent": 34,   // metres, 24-38
                "color": [r,g,b]},       // OPTIONAL tint
     "water": {"enabled": true,          // a sea/lake filling the far half of the scene
               "shallow": [0.10,0.52,0.36], "deep": [0.01,0.23,0.19],  // the water COLOUR (e.g. green water)
@@ -720,7 +720,9 @@ def validate_plan_exterior(plan, by_role, by_id, verbose=True):
         "exposure": _clamp(float(env.get("exposure", 1.1) or 1.1), 0.5, 1.6),
         "ground": {
             "kind": ground.get("kind") if ground.get("kind") in ("sand", "grass", "dirt", "rock", "snow") else "grass",
-            "extent": _clamp(float(ground.get("extent", 34) or 34), 22, 55),
+            # >40 m extents reproducibly fault the GPU (device removed) -- likely the
+            # shadow-cascade/culling scale at the 240 m far plane; 38 is proven safe
+            "extent": _clamp(float(ground.get("extent", 34) or 34), 22, 38),
         },
         "water": {
             "enabled": bool(water.get("enabled", False)),
@@ -751,6 +753,11 @@ def validate_plan_exterior(plan, by_role, by_id, verbose=True):
             repairs.append(f"'{query}' -> '{asset['id']}' ({how})")
         role = asset["role"]
         dflt_h, min_h, max_h = _EXT_SIZE.get(role, _EXT_SIZE["misc"])
+        # lying-down / low things classified under tall roles (a fallen LOG is role
+        # "tree") must not inherit tree heights
+        low_words = ("log", "stump", "campfire", "fallen", "branch", "root")
+        if any(w in asset["id"].lower() or w in query.lower() for w in low_words):
+            dflt_h, min_h, max_h = 0.55, 0.3, 1.0
         try:
             size_m = _clamp(float(o.get("size_m", dflt_h) or dflt_h), min_h, max_h)
         except Exception:
@@ -767,7 +774,7 @@ def validate_plan_exterior(plan, by_role, by_id, verbose=True):
                 entry["tint"] = t
         woodland = any(w in (plan.get("scene_type") or "").lower() + " " + query.lower()
                        for w in ("pine", "oak", "birch", "spruce", "fir", "forest",
-                                 "willow", "woodland", "meadow", "garden", "lake"))
+                                 "willow", "woodland", "meadow", "garden", "lake", "camp"))
         if "tint" not in entry and woodland and role in ("tree", "bush", "grass"):
             # the Kenney kit's foliage greens are teal; woodland vegetation reads wrong
             # without a deep green-shift (multiplies into the baked palette via tintTextured)

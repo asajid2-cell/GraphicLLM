@@ -3041,10 +3041,16 @@ void Engine::BuildRecipeScene() {
             renderer->SetIBLEnabled(true);
             // Poly Haven pure-sky HDRIs sit around 0.1 median linear luminance (vs the
             // ~1.0 sun-lit ground), so both the visible background and the IBL need a
-            // strong lift to read as a bright day.
-            renderer->SetIBLIntensity(3.2f, 1.8f); // NOTE: specular also drives the visible sky-background brightness
-            renderer->SetBackgroundPresentation(true, 4.0f, 0.0f);
-            renderer->SetEnvironmentRotation(genExt.sunAz);
+            // strong lift to read as a bright day. The sunset HDRI is brighter and
+            // saturated -- lifting it 4x washes it to pastel, so it gets its own curve.
+            const bool sunsetSky = skyPreset == "sky_sunset";
+            renderer->SetIBLIntensity(sunsetSky ? 2.1f : 3.2f,
+                                      sunsetSky ? 1.4f : 1.8f); // NOTE: specular also drives the visible sky-background brightness
+            renderer->SetBackgroundPresentation(true, sunsetSky ? 2.2f : 4.0f, 0.0f);
+            // Each HDRI's baked sun sits at its own azimuth in the file; the offset
+            // aligns the visible glow with the IR sun light/shadows (calibrated
+            // empirically: the sunset glow centres at rotation sunAz+150).
+            renderer->SetEnvironmentRotation(genExt.sunAz + (sunsetSky ? 150.0f : 0.0f));
             // Sun direction points TO the light: azimuth 0 = +Z (over the camera's
             // shoulder), 180 = -Z (backlit, over the water); elevation above horizon.
             const float az = glm::radians(genExt.sunAz);
@@ -3052,7 +3058,10 @@ void Engine::BuildRecipeScene() {
             const glm::vec3 sunDir(std::sin(az) * std::cos(el), std::sin(el), std::cos(az) * std::cos(el));
             renderer->SetSunDirection(glm::normalize(sunDir));
             renderer->SetSunColor(genExt.sunColor);
-            renderer->SetSunIntensity(genExt.sunInt * lightingBalance.sunScale);
+            // golden hour is a LOOK, not a dim field: the low warm key keeps enough
+            // punch to gild the scene
+            renderer->SetSunIntensity((sunsetSky ? std::max(genExt.sunInt, 2.9f) : genExt.sunInt) *
+                                      lightingBalance.sunScale);
             // Ambient = a sky-blue fill nudged toward the sun's colour so shade zones
             // read plausibly under any time-of-day the composer picks.
             const glm::vec3 skyFill = glm::mix(glm::vec3(0.16f, 0.19f, 0.24f),

@@ -2863,7 +2863,70 @@ void Engine::BuildRecipeScene() {
                      style.name.empty() ? "(brightness)" : style.name, style.warmth, style.brightness);
     }
 
-    const bool outdoor = (recipe == "garden");
+    const bool outdoor = (recipe == "garden") || (recipe == "generative_exterior");
+
+    // Generative exterior: the IR's "environment" block drives renderer state that
+    // scene commands cannot reach (sun, fog, exposure, the animated water surface).
+    // Parsed once here; applied after the outdoor defaults below so the IR wins.
+    struct GenExtEnv {
+        bool valid = false;
+        float sunAz = 160.0f, sunEl = 32.0f, sunInt = 2.4f;
+        glm::vec3 sunColor{1.0f, 0.94f, 0.82f};
+        float fogDensity = 0.0075f, fogStart = 4.0f;
+        float exposure = 1.0f;
+        bool waterOn = false;
+        float waterLevel = 0.05f, waterFromZ = -6.0f, waterRough = 0.055f, waterWave = 0.045f;
+        glm::vec3 waterShallow{0.15f, 0.42f, 0.30f}, waterDeep{0.020f, 0.10f, 0.09f};
+        float extent = 30.0f;
+        std::string groundKind = "grass";
+        glm::vec3 groundColor{0.24f, 0.34f, 0.16f};
+        bool groundColorSet = false;
+        std::string skyPreset;   // optional IR override: sky_day | sky_sunset | sky_partly_cloudy
+    } genExt;
+    if (recipe == "generative_exterior") {
+        if (const char* raw = std::getenv("CORTEX_SCENE_IR_JSON"); raw && *raw) {
+            try {
+                const nlohmann::json ir = nlohmann::json::parse(raw);
+                const nlohmann::json env = ir.value("environment", nlohmann::json::object());
+                auto num = [](const nlohmann::json& j, const char* k, float d) -> float {
+                    return (j.contains(k) && j[k].is_number()) ? (float)j[k].get<double>() : d;
+                };
+                auto vec3Of = [](const nlohmann::json& j, const char* k, const glm::vec3& d) -> glm::vec3 {
+                    if (!j.contains(k) || !j[k].is_array() || j[k].size() < 3) return d;
+                    return glm::vec3((float)j[k][0], (float)j[k][1], (float)j[k][2]);
+                };
+                const nlohmann::json sun = env.value("sun", nlohmann::json::object());
+                genExt.sunAz = num(sun, "azimuth_deg", genExt.sunAz);
+                genExt.sunEl = std::clamp(num(sun, "elevation_deg", genExt.sunEl), 3.0f, 80.0f);
+                genExt.sunColor = vec3Of(sun, "color", genExt.sunColor);
+                genExt.sunInt = std::clamp(num(sun, "intensity", genExt.sunInt), 0.3f, 6.0f);
+                const nlohmann::json fog = env.value("fog", nlohmann::json::object());
+                genExt.fogDensity = std::clamp(num(fog, "density", genExt.fogDensity), 0.0f, 0.06f);
+                genExt.fogStart = std::clamp(num(fog, "start", genExt.fogStart), 0.0f, 30.0f);
+                genExt.exposure = std::clamp(num(env, "exposure", 1.0f), 0.4f, 1.8f);
+                genExt.skyPreset = env.value("sky", std::string());
+                const nlohmann::json ground = env.value("ground", nlohmann::json::object());
+                genExt.extent = std::clamp(num(ground, "extent", genExt.extent), 12.0f, 80.0f);
+                genExt.groundKind = ground.value("kind", genExt.groundKind);
+                if (ground.contains("color") && ground["color"].is_array() && ground["color"].size() >= 3) {
+                    genExt.groundColor = vec3Of(ground, "color", genExt.groundColor);
+                    genExt.groundColorSet = true;
+                }
+                const nlohmann::json water = env.value("water", nlohmann::json::object());
+                genExt.waterOn = water.value("enabled", false);
+                genExt.waterLevel = std::clamp(num(water, "level", genExt.waterLevel), 0.02f, 0.4f);
+                genExt.waterFromZ = std::clamp(num(water, "from_z", genExt.waterFromZ),
+                                               -genExt.extent * 0.5f, genExt.extent * 0.35f);
+                genExt.waterRough = std::clamp(num(water, "roughness", genExt.waterRough), 0.02f, 0.4f);
+                genExt.waterWave = std::clamp(num(water, "wave", genExt.waterWave), 0.005f, 0.09f);
+                genExt.waterShallow = vec3Of(water, "shallow", genExt.waterShallow);
+                genExt.waterDeep = vec3Of(water, "deep", genExt.waterDeep);
+                genExt.valid = true;
+            } catch (const std::exception& e) {
+                spdlog::warn("generative_exterior: bad IR json for environment: {}", e.what());
+            }
+        }
+    }
     const RecipeLightingBalance lightingBalance = RecipeLightingBalanceFor(recipe);
     if (auto* renderer = m_renderer.get()) {
         ApplyRecipeVisualContract(renderer, recipe);
@@ -2963,6 +3026,50 @@ void Engine::BuildRecipeScene() {
             renderer->SetGodRayIntensity(0.0f);                                        // no sun shafts at night
             renderer->SetFogParams(0.115f, 0.15f, 0.42f, 0.0f);                        // denser air so the warm lamp light visibly scatters (halos/glow)
         }
+        if (genExt.valid) {
+            // IR-driven exterior environment (overrides the generic outdoor defaults).
+            // The deferred (visibility-buffer) path paints the ENVIRONMENT equirect as
+            // the sky background -- the forward procedural-sky pass never runs here --
+            // so the sky is a real HDRI: picked by IR override or sun elevation, and
+            // rotated so its baked sun sits at the IR sun azimuth. Its IBL doubles as
+            // physically-plausible sky ambient (blue fill in shade).
+            std::string skyPreset = genExt.skyPreset;
+            if (skyPreset.empty()) {
+                skyPreset = genExt.sunEl < 18.0f ? "sky_sunset" : "sky_day";
+            }
+            renderer->SetEnvironmentPreset(skyPreset);
+            renderer->SetIBLEnabled(true);
+            // Poly Haven pure-sky HDRIs sit around 0.1 median linear luminance (vs the
+            // ~1.0 sun-lit ground), so both the visible background and the IBL need a
+            // strong lift to read as a bright day.
+            renderer->SetIBLIntensity(3.2f, 1.8f); // NOTE: specular also drives the visible sky-background brightness
+            renderer->SetBackgroundPresentation(true, 4.0f, 0.0f);
+            renderer->SetEnvironmentRotation(genExt.sunAz);
+            // Sun direction points TO the light: azimuth 0 = +Z (over the camera's
+            // shoulder), 180 = -Z (backlit, over the water); elevation above horizon.
+            const float az = glm::radians(genExt.sunAz);
+            const float el = glm::radians(genExt.sunEl);
+            const glm::vec3 sunDir(std::sin(az) * std::cos(el), std::sin(el), std::cos(az) * std::cos(el));
+            renderer->SetSunDirection(glm::normalize(sunDir));
+            renderer->SetSunColor(genExt.sunColor);
+            renderer->SetSunIntensity(genExt.sunInt * lightingBalance.sunScale);
+            // Ambient = a sky-blue fill nudged toward the sun's colour so shade zones
+            // read plausibly under any time-of-day the composer picks.
+            const glm::vec3 skyFill = glm::mix(glm::vec3(0.16f, 0.19f, 0.24f),
+                                               genExt.sunColor * 0.22f, 0.35f);
+            renderer->SetAmbientLighting(skyFill, 1.0f);
+            renderer->SetFogParams(genExt.fogDensity, 0.05f, 0.34f, genExt.fogStart);
+            // FIXED exposure: auto-adaptation meters the bright sky (half the frame)
+            // and crushes the ground into mud. Deterministic base; the critique loop
+            // adjusts via CORTEX_AUTOEXPOSURE_MULT.
+            renderer->SetAutoExposureEnabled(false);
+            renderer->SetExposure(std::clamp(0.80f * genExt.exposure, 0.35f, 1.45f));
+            if (genExt.waterOn) {
+                renderer->SetWaterParams(genExt.waterLevel, genExt.waterWave, 9.5f, 0.42f,
+                                         0.12f, 0.92f, 0.020f, 0.44f); // gentle swell rolling toward the shore (+Z)
+                renderer->SetWaterOptics(genExt.waterRough, 0.55f); // weak fresnel: the tinted volume wins over the sky-mirror
+            }
+        }
         renderer->SetBloomShape(outdoor ? 1.05f : 1.02f, outdoor ? 0.45f : 0.50f, outdoor ? 2.0f : 0.82f);
         renderer->SetParticlesEnabled(true);
         renderer->SetParticleDensityScale(outdoor ? 0.90f : 1.05f);
@@ -2984,6 +3091,159 @@ void Engine::BuildRecipeScene() {
         probe.environmentIndex = 0;
         probe.enabled = 1;
         m_registry->AddComponent<Scene::ReflectionProbeComponent>(e, probe);
+    }
+
+    // Generative exterior ground + water: created DIRECTLY (the command executor's
+    // anti-z-fight rule lifts primitives to y>=0.5, which would raise the ground and
+    // bury a sea-level water plane). Mirrors BuildOutdoorSunsetBeachScene: a UV-tiled
+    // textured ground plane with its surface at exactly y=0 -- Place()'d objects
+    // ground-snap their bases to y=0, so everything rests on it -- plus an animated
+    // Gerstner sea covering z <= from_z, slightly ABOVE the ground so the seabed shows
+    // through the shallows and solver-placed rocks rise through the surface naturally.
+    if (genExt.valid) {
+        if (auto* renderer = m_renderer.get()) {
+            const float groundNear = genExt.extent * 0.5f + 10.0f;   // land runs behind the camera
+            const float groundFar = -(genExt.extent * 1.9f + 10.0f); // seabed past the water, into the fog
+            const float groundW = genExt.extent * 2.0f;
+            const float shoreZ = genExt.waterOn ? (genExt.waterFromZ + 0.5f) : groundFar;
+            // Land = flat plane with its surface at y=0. When there is water, a second
+            // gently TILTED plane continues from the shoreline down to -2.5 m at the far
+            // edge, so the water gains real depth with distance -- shallow green at the
+            // shore, deep tint further out -- instead of a uniform 5 cm film over sand.
+            const float landLen = groundNear - shoreZ;
+            auto groundPlane = Utils::MeshGenerator::CreatePlane(groundW, landLen);
+            const float uvTile = genExt.extent / 2.5f;
+            for (auto& uv : groundPlane->texCoords) {
+                uv *= glm::vec2(uvTile, uvTile * (landLen / groundW));
+            }
+            glm::vec3 gcol = genExt.groundColor;
+            if (!genExt.groundColorSet) {
+                gcol = genExt.groundKind == "sand" ? glm::vec3(0.85f, 0.77f, 0.58f)
+                     : genExt.groundKind == "dirt" ? glm::vec3(0.40f, 0.30f, 0.20f)
+                     : genExt.groundKind == "rock" ? glm::vec3(0.47f, 0.46f, 0.44f)
+                     : genExt.groundKind == "snow" ? glm::vec3(0.92f, 0.93f, 0.96f)
+                                                   : glm::vec3(0.30f, 0.42f, 0.20f); // grass
+            }
+            auto dressGround = [&](Scene::RenderableComponent& r) {
+                r.albedoColor = glm::vec4(gcol, 1.0f);
+                r.metallic = 0.0f;
+                r.roughness = 0.92f;
+                r.ao = 1.0f;
+                r.doubleSided = true;
+                r.presetName = genExt.groundKind == "sand" ? "sand" : "naturalistic";
+                if (genExt.groundKind == "sand") {
+                    // aerial_beach_01 = BRIGHT dry sand (linear albedo ~0.25); the older
+                    // coast_sand_05 set is dark wet shore (~0.05) and reads as mud.
+                    r.textures.albedoPath = "assets/textures/polyhaven/aerial_beach_01/aerial_beach_01_diff_1k.jpg";
+                    r.textures.normalPath = "assets/textures/polyhaven/aerial_beach_01/aerial_beach_01_nor_gl_1k.jpg";
+                    r.textures.roughnessPath = "assets/textures/polyhaven/aerial_beach_01/aerial_beach_01_rough_1k.jpg";
+                    r.albedoColor = glm::vec4(glm::mix(glm::vec3(1.0f), gcol, 0.25f), 1.0f);
+                    r.normalScale = 0.65f;
+                } else if (genExt.groundKind == "grass") {
+                    r.textures.albedoPath = "assets/textures/polyhaven/aerial_grass_rock/aerial_grass_rock_diff_1k.jpg";
+                    r.textures.normalPath = "assets/textures/polyhaven/aerial_grass_rock/aerial_grass_rock_nor_gl_1k.jpg";
+                    r.textures.roughnessPath = "assets/textures/polyhaven/aerial_grass_rock/aerial_grass_rock_rough_1k.jpg";
+                    r.albedoColor = glm::vec4(glm::mix(glm::vec3(1.0f), gcol, 0.30f), 1.0f);
+                    r.normalScale = 0.75f;
+                }
+            };
+            auto upG = renderer->UploadMesh(groundPlane);
+            if (upG.IsErr()) {
+                spdlog::warn("generative_exterior: ground mesh upload failed: {}", upG.Error());
+            } else {
+                entt::entity groundE = m_registry->CreateEntity();
+                m_registry->AddComponent<Scene::TagComponent>(groundE, "GenerativeExterior_Ground");
+                auto& t = m_registry->AddComponent<TransformComponent>(groundE);
+                t.position = glm::vec3(0.0f, 0.0f, (groundNear + shoreZ) * 0.5f);
+                auto& r = m_registry->AddComponent<Scene::RenderableComponent>(groundE);
+                r.mesh = groundPlane;
+                dressGround(r);
+            }
+            if (genExt.waterOn) {
+                // The seabed: a gently tilted plane running from the shoreline (y=0)
+                // down to -2.5 m at the far edge.
+                const float seaLen = shoreZ - groundFar;
+                const float depth = 2.5f;
+                auto seabedPlane = Utils::MeshGenerator::CreatePlane(groundW, seaLen);
+                for (auto& uv : seabedPlane->texCoords) {
+                    uv *= glm::vec2(uvTile, uvTile * (seaLen / groundW));
+                }
+                auto upS = renderer->UploadMesh(seabedPlane);
+                if (upS.IsErr()) {
+                    spdlog::warn("generative_exterior: seabed mesh upload failed: {}", upS.Error());
+                } else {
+                    const float alpha = std::asin(std::clamp(depth / seaLen, 0.0f, 0.5f));
+                    entt::entity seabedE = m_registry->CreateEntity();
+                    m_registry->AddComponent<Scene::TagComponent>(seabedE, "GenerativeExterior_Seabed");
+                    auto& t = m_registry->AddComponent<TransformComponent>(seabedE);
+                    t.position = glm::vec3(0.0f, -depth * 0.5f, (shoreZ + groundFar) * 0.5f);
+                    t.rotation = glm::quat(glm::vec3(-alpha, 0.0f, 0.0f)); // shore edge up to y=0, far edge down to -depth
+                    auto& r = m_registry->AddComponent<Scene::RenderableComponent>(seabedE);
+                    r.mesh = seabedPlane;
+                    dressGround(r);
+                }
+            }
+        }
+    }
+    if (genExt.valid && genExt.waterOn) {
+        if (auto* renderer = m_renderer.get()) {
+            const float farEdge = -(genExt.extent * 1.9f + 10.0f); // to the ground's far edge: no bare seabed strip at the horizon
+            const float waterLen = genExt.waterFromZ - farEdge;
+            const float waterMidZ = (genExt.waterFromZ + farEdge) * 0.5f;
+            auto waterPlane = Utils::MeshGenerator::CreatePlane(genExt.extent * 2.0f, waterLen);
+            auto up = renderer->UploadMesh(waterPlane);
+            if (up.IsErr()) {
+                spdlog::warn("generative_exterior: water mesh upload failed: {}", up.Error());
+            } else {
+                entt::entity water = m_registry->CreateEntity();
+                m_registry->AddComponent<Scene::TagComponent>(water, "GenerativeExterior_Water");
+                auto& t = m_registry->AddComponent<TransformComponent>(water);
+                t.position = glm::vec3(0.0f, genExt.waterLevel, waterMidZ);
+                t.scale = glm::vec3(1.0f);
+                auto& r = m_registry->AddComponent<Scene::RenderableComponent>(water);
+                r.mesh = waterPlane;
+                r.albedoColor = glm::vec4(genExt.waterShallow, 0.94f);
+                r.metallic = 0.0f;
+                r.roughness = genExt.waterRough;
+                r.ao = 1.0f;
+                r.presetName = "water";
+                Scene::WaterSurfaceComponent sea{};
+                sea.absorption = 0.72f;   // the sloped seabed gives real depth: let the tint saturate with it
+                sea.foamStrength = 0.62f;
+                sea.viscosity = 0.48f;    // Water.hlsl: reflectionWeight = lerp(0.68,0.24,viscosity)*... --
+                                          // damps the white sky-mirror at grazing so the green body reads
+                sea.bodyThickness = 0.80f;
+                sea.meniscusStrength = 0.38f;
+                sea.flowSpeed = 0.46f;
+                sea.shallowTint = genExt.waterShallow;
+                sea.deepTint = genExt.waterDeep;
+                m_registry->AddComponent<Scene::WaterSurfaceComponent>(water, sea);
+            }
+        }
+    }
+
+    if (genExt.valid) {
+        // The real SUN for generative exteriors: a shadow-casting directional light
+        // matching the IR sun (SetSunDirection only drives the sky/shadow state --
+        // direct surface lighting needs the ECS light, same as the interior window sun).
+        entt::entity e = m_registry->CreateEntity();
+        m_registry->AddComponent<Scene::TagComponent>(e, "GenerativeExterior_Sun");
+        auto& t = m_registry->AddComponent<TransformComponent>(e);
+        const float az = glm::radians(genExt.sunAz);
+        const float el = glm::radians(genExt.sunEl);
+        const glm::vec3 dirToLight = glm::normalize(
+            glm::vec3(std::sin(az) * std::cos(el), std::sin(el), std::cos(az) * std::cos(el)));
+        glm::vec3 up(0.0f, 1.0f, 0.0f);
+        const glm::vec3 lightTravelDirection = -dirToLight;
+        if (std::abs(glm::dot(up, lightTravelDirection)) > 0.98f) {
+            up = glm::vec3(0.0f, 0.0f, 1.0f);
+        }
+        t.rotation = glm::quatLookAtLH(lightTravelDirection, up);
+        auto& l = m_registry->AddComponent<Scene::LightComponent>(e);
+        l.type = Scene::LightType::Directional;
+        l.color = genExt.sunColor;
+        l.intensity = genExt.sunInt * 1.5f * lightingBalance.sunScale;
+        l.castsShadows = true;
     }
 
     if (!outdoor) {
@@ -3058,6 +3318,14 @@ void Engine::BuildRecipeScene() {
             camPos = glm::vec3(3.9f, 2.1f, 3.9f);  // outdoor 3/4 view centred on the patio set
             target = glm::vec3(0.2f, 0.35f, -0.9f);
             camFov = 52.0f;
+        } else if (recipe == "generative_exterior") {
+            // Open-world establishing shot: raised eye looking DOWN the -Z depth axis
+            // (foreground props -> midground -> water/horizon); the downward angle
+            // lets water read by transmission (green shallows) instead of pure sky
+            // mirror. The critique loop refines via the CORTEX_AUTOCAM_* overrides.
+            camPos = glm::vec3(0.0f, 3.0f, 10.5f);
+            target = glm::vec3(0.0f, 0.1f, -6.5f);
+            camFov = 58.0f;
         }
         // Showcase hero framing: low, front-centre, looking up at the blinded window so the
         // filtered volumetric daylight reads coming down past the furniture (avoids the
@@ -3113,8 +3381,11 @@ void Engine::BuildRecipeScene() {
         }
         if (auto* renderer = m_renderer.get()) {
             const float focusDistance = glm::length(target - camPos);
-            const float focalRange = outdoor ? 4.5f : (recipe == "bathroom" ? 1.05f : 1.25f);
-            const float dofAmount = outdoor ? 0.12f : 0.30f;
+            // Generative exteriors are wide establishing shots: keep everything crisp
+            // (heavy DoF turns near-flank trees into translucent smears).
+            const float focalRange = recipe == "generative_exterior" ? 12.0f
+                                     : outdoor ? 4.5f : (recipe == "bathroom" ? 1.05f : 1.25f);
+            const float dofAmount = recipe == "generative_exterior" ? 0.03f : (outdoor ? 0.12f : 0.30f);
             renderer->SetCinematicPostEffects(0.0f,
                                               dofAmount,
                                               focusDistance,
@@ -3126,7 +3397,9 @@ void Engine::BuildRecipeScene() {
         t.rotation = glm::quatLookAtLH(glm::normalize(target - t.position), glm::vec3(0.0f, 1.0f, 0.0f));
         auto& c = m_registry->AddComponent<Scene::CameraComponent>(cam);
         c.fov = camFov;
-        ConfigureShowcaseCameraClip(c, 120.0f);
+        // Exterior generative scenes see out to the fogged horizon (water/sky), so the
+        // far plane matches the beach showcase; rooms keep the tighter clip.
+        ConfigureShowcaseCameraClip(c, recipe == "generative_exterior" ? 240.0f : 120.0f);
         c.isActive = true;
         m_activeCameraEntity = cam;
     }

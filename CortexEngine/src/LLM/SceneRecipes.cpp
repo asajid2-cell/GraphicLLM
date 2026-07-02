@@ -88,6 +88,12 @@ const Scene::MeshData::EmbeddedPbrMaterial& GrassGroundMaterial() {
     return mat;
 }
 
+const Scene::MeshData::EmbeddedPbrMaterial& SandGroundMaterial() {
+    static const Scene::MeshData::EmbeddedPbrMaterial mat =
+        MakeSurfaceMaterial("coast_sand_05", glm::vec4(0.96f, 0.90f, 0.74f, 1.0f), 0.90f, 0.65f);
+    return mat;
+}
+
 // How strongly a primitive's command colour tints its surface material. 0.25 keeps the
 // hand recipes' subtle palette; the generative recipe raises it so a "pink room" prompt
 // paints the walls/floor strongly (measurably) pink. Reset by BuildGenerative each build.
@@ -330,7 +336,10 @@ bool Place(std::vector<std::shared_ptr<SceneCommand>>& out,
     cmd->entityType = AddEntityCommand::EntityType::Model;
     cmd->asset = key;
     cmd->name = key;
-    cmd->position = glm::vec3(x, 0.0f, z);
+    // Negative supportHeight = base BELOW the floor plane (an object standing on the
+    // sloped seabed under water); the executor takes max(supportHeight, position.y),
+    // so position.y must drop with it. Positive supportHeight (stacking) unchanged.
+    cmd->position = glm::vec3(x, std::min(0.0f, supportHeight), z);
     cmd->scale = glm::vec3(scale);
     const std::string lk = ToLower(key);
     cmd->color = (color == glm::vec4(1.0f)) ? ColorForKey(lk) : color;
@@ -1189,6 +1198,62 @@ void BuildGenerative(std::vector<std::shared_ptr<SceneCommand>>& out, const Scen
                  w, d, placed, placed + skipped, lightCount);
 }
 
+// Exterior generative recipe: an OPEN-SKY scene from CORTEX_SCENE_IR_JSON with
+// "setting":"exterior". No room shell -- the procedural sky is the backdrop. Emits the
+// ground slab (environment.ground: kind sand|grass|dirt|rock|snow + color + extent),
+// the solver-placed objects (same robust Place() ground-snap/footprint path as the
+// interiors) and point lights. Sun/fog/exposure/WATER are renderer state, not scene
+// commands -- the engine's exterior branch (Engine_Scenes.cpp) applies them from the
+// same IR's "environment" block.
+void BuildGenerativeExterior(std::vector<std::shared_ptr<SceneCommand>>& out, const Scene::AssetCatalog& cat,
+                             FootprintCache& c) {
+    const char* raw = std::getenv("CORTEX_SCENE_IR_JSON");
+    if (!raw || !*raw) { spdlog::warn("BuildGenerativeExterior: CORTEX_SCENE_IR_JSON not set"); return; }
+    nlohmann::json ir;
+    try { ir = nlohmann::json::parse(raw); }
+    catch (const std::exception& e) { spdlog::error("BuildGenerativeExterior: bad IR json: {}", e.what()); return; }
+
+    auto readVec4 = [](const nlohmann::json& j, const glm::vec4& dflt) -> glm::vec4 {
+        if (!j.is_array() || j.size() < 3) return dflt;
+        return glm::vec4((float)j[0], (float)j[1], (float)j[2], j.size() > 3 ? (float)j[3] : 1.0f);
+    };
+    auto num = [](const nlohmann::json& j, const char* k, float d) -> float {
+        return (j.contains(k) && j[k].is_number()) ? (float)j[k].get<double>() : d;
+    };
+
+    // NOTE: the ground plane + the water surface are created DIRECTLY by the engine's
+    // exterior branch (Engine_Scenes.cpp) from the same IR -- the command executor
+    // lifts primitives to y>=0.5 (CommandQueue anti-z-fight rule), which buries a
+    // ground-level water plane. Objects still flow through Place() below.
+    const nlohmann::json env = ir.value("environment", nlohmann::json::object());
+    const nlohmann::json ground = env.value("ground", nlohmann::json::object());
+    const float extent = std::clamp(num(ground, "extent", 30.0f), 12.0f, 80.0f);
+    const std::string kind = ground.value("kind", std::string("grass"));
+
+    int placed = 0, skipped = 0;
+    for (const auto& o : ir.value("objects", nlohmann::json::array())) {
+        const std::string asset = o.value("asset", std::string());
+        if (asset.empty()) { skipped++; continue; }
+        const float x = num(o, "x", 0.0f), z = num(o, "z", 0.0f);
+        const float yaw = num(o, "yaw", 0.0f);
+        const float foot = std::clamp(num(o, "foot", 1.0f), 0.15f, 9.0f); // trees run big
+        const float baseY = std::clamp(num(o, "y", 0.0f), -2.4f, 3.0f);  // <0 = on the seabed
+        const glm::vec4 tint = o.contains("tint") ? readVec4(o["tint"], glm::vec4(1.0f)) : glm::vec4(1.0f);
+        if (Place(out, cat, c, asset, foot, x, z, yaw, tint, baseY)) placed++; else skipped++;
+    }
+
+    int lightCount = 0;
+    for (const auto& l : ir.value("lights", nlohmann::json::array())) {
+        const float x = num(l, "x", 0.0f), y = num(l, "y", 2.4f), z = num(l, "z", 0.0f);
+        const glm::vec4 col4 = l.contains("color") ? readVec4(l["color"], glm::vec4(1.0f, 0.92f, 0.82f, 1.0f)) : glm::vec4(1.0f, 0.92f, 0.82f, 1.0f);
+        AddPointLight(out, x, y, z, glm::vec3(col4.r, col4.g, col4.b),
+                      num(l, "intensity", 4.0f), num(l, "range", 6.0f));
+        lightCount++;
+    }
+    spdlog::info("BuildGenerativeExterior: ground '{}' extent {:.0f}, placed {}/{} objects, {} lights",
+                 kind, extent, placed, placed + skipped, lightCount);
+}
+
 std::vector<std::shared_ptr<SceneCommand>> BuildSceneRecipe(const std::string& recipeName,
                                                             const Scene::AssetCatalog& catalog,
                                                             std::uint32_t /*seed*/,
@@ -1201,6 +1266,8 @@ std::vector<std::shared_ptr<SceneCommand>> BuildSceneRecipe(const std::string& r
     FootprintCache cache;
     if (recipeName == "generative") {
         BuildGenerative(out, catalog, cache, style);
+    } else if (recipeName == "generative_exterior") {
+        BuildGenerativeExterior(out, catalog, cache);
     } else if (recipeName == "living_room") {
         BuildLivingRoom(out, catalog, cache, style);
     } else if (recipeName == "bedroom") {

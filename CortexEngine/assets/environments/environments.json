@@ -3,7 +3,11 @@
   "default": "studio",
   "fallback": "procedural_sky",
   "policy": {
-    "runtime_format_preference": ["dds", "hdr", "exr"],
+    "runtime_format_preference": [
+      "dds",
+      "hdr",
+      "exr"
+    ],
     "normal_startup_downloads": false,
     "source_assets_optional": true,
     "legacy_scan_fallback": false,
@@ -53,7 +57,12 @@
       "default_diffuse": 1.05,
       "default_specular": 0.78,
       "max_runtime_dimension": 2048,
-      "tags": ["default", "studio", "material_review", "rt_showcase"]
+      "tags": [
+        "default",
+        "studio",
+        "material_review",
+        "rt_showcase"
+      ]
     },
     {
       "id": "warm_gallery",
@@ -66,7 +75,11 @@
       "default_diffuse": 0.9,
       "default_specular": 1.15,
       "max_runtime_dimension": 4096,
-      "tags": ["gallery", "warm", "showcase"]
+      "tags": [
+        "gallery",
+        "warm",
+        "showcase"
+      ]
     },
     {
       "id": "sunset_courtyard",
@@ -79,7 +92,11 @@
       "default_diffuse": 0.85,
       "default_specular": 0.9,
       "max_runtime_dimension": 4096,
-      "tags": ["sunset", "water", "glass"]
+      "tags": [
+        "sunset",
+        "water",
+        "glass"
+      ]
     },
     {
       "id": "cool_overcast",
@@ -92,7 +109,11 @@
       "default_diffuse": 0.95,
       "default_specular": 0.75,
       "max_runtime_dimension": 4096,
-      "tags": ["overcast", "neutral", "material_review"]
+      "tags": [
+        "overcast",
+        "neutral",
+        "material_review"
+      ]
     },
     {
       "id": "night_city",
@@ -105,7 +126,65 @@
       "default_diffuse": 0.55,
       "default_specular": 1.25,
       "max_runtime_dimension": 4096,
-      "tags": ["night", "emissive", "effects"]
+      "tags": [
+        "night",
+        "emissive",
+        "effects"
+      ]
+    },
+    {
+      "id": "sky_day",
+      "display_name": "Clear Day Sky (Poly Haven qwantani_puresky, CC0)",
+      "type": "equirectangular",
+      "budget_class": "small",
+      "enabled": true,
+      "required": false,
+      "runtime_path": "../SKY_qwantani_puresky_2k.hdr",
+      "source_path": "../SKY_qwantani_puresky_2k.hdr",
+      "default_diffuse": 0.95,
+      "default_specular": 0.55,
+      "max_runtime_dimension": 2048,
+      "tags": [
+        "sky",
+        "outdoor",
+        "day"
+      ]
+    },
+    {
+      "id": "sky_sunset",
+      "display_name": "Sunset Sky (Poly Haven qwantani_sunset_puresky, CC0)",
+      "type": "equirectangular",
+      "budget_class": "small",
+      "enabled": true,
+      "required": false,
+      "runtime_path": "../SKY_qwantani_sunset_puresky_2k.hdr",
+      "source_path": "../SKY_qwantani_sunset_puresky_2k.hdr",
+      "default_diffuse": 0.85,
+      "default_specular": 0.55,
+      "max_runtime_dimension": 2048,
+      "tags": [
+        "sky",
+        "outdoor",
+        "sunset"
+      ]
+    },
+    {
+      "id": "sky_partly_cloudy",
+      "display_name": "Partly Cloudy Sky (Poly Haven kloofendal_48d, CC0)",
+      "type": "equirectangular",
+      "budget_class": "small",
+      "enabled": true,
+      "required": false,
+      "runtime_path": "../SKY_kloofendal_48d_partly_cloudy_puresky_2k.hdr",
+      "source_path": "../SKY_kloofendal_48d_partly_cloudy_puresky_2k.hdr",
+      "default_diffuse": 0.9,
+      "default_specular": 0.5,
+      "max_runtime_dimension": 2048,
+      "tags": [
+        "sky",
+        "outdoor",
+        "clouds"
+      ]
     }
   ]
 }

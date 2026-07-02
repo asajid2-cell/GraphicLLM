@@ -1252,8 +1252,26 @@ int main(int argc, char* argv[]) {
                 // Coarse role from id keywords, so kit meshes without registry tags
                 // still classify (mirrors ColorForKey's families). One primary role
                 // per asset -> the composer/solver can pick + fall back by role.
-                auto coarseRole = [](const std::string& idLower) -> std::string {
+                auto coarseRole = [](const std::string& idLower, const std::string& source) -> std::string {
                     auto has = [&](const char* n) { return idLower.find(n) != std::string::npos; };
+                    // Nature packs classify by OUTDOOR roles first ("bed" in the nature
+                    // kit is a garden bed, not a bedroom bed; "bench"/"table" there are
+                    // still furniture-ish so those fall through to the shared buckets).
+                    const bool naturePack = source == "kenney_nature_kit" || source == "naturalistic_showcase" ||
+                                            source == "fetched";
+                    if (naturePack) {
+                        if (has("palm") || has("pine") || has("oak") || has("tree") || has("trunk") || has("stump")) return "tree";
+                        if (has("cliff") || has("rock") || has("boulder") || has("stone") || has("pebble")) return "rock";
+                        if (has("bush") || has("shrub") || has("hedge") || has("fern") || has("foliage") ||
+                            has("mushroom") || has("cactus") || has("branch") || has("root") || has("leaf")) return "bush";
+                        if (has("grass")) return "grass";
+                        if (has("flower") || has("lily") || has("plant")) return "flower";
+                        if (has("fence") || has("gate")) return "fence";
+                        if (has("path") || has("bridge") || has("platform")) return "path";
+                        if (has("bed")) return "flower";       // garden bed / flower bed
+                        if (has("log")) return "tree";
+                        if (has("tent") || has("campfire") || has("canoe") || has("boat")) return "camp";
+                    }
                     if (has("sofa") || has("couch") || has("loveseat")) return "sofa";
                     if (has("armchair") || has("chair") || has("stool") || has("bench") || has("lounge") || has("ottoman")) return "seating";
                     if (has("bed")) return "bed";
@@ -1290,6 +1308,14 @@ int main(int argc, char* argv[]) {
                     if (role == "bathroom") return 0.7f;
                     if (role == "decor") return 0.6f;
                     if (role == "accessory") return 0.3f;
+                    if (role == "tree") return 2.6f;   // canopy spread
+                    if (role == "rock") return 0.9f;
+                    if (role == "bush") return 0.9f;
+                    if (role == "grass") return 0.7f;
+                    if (role == "flower") return 0.5f;
+                    if (role == "fence") return 1.8f;
+                    if (role == "path") return 1.6f;
+                    if (role == "camp") return 1.6f;
                     return 0.8f;
                 };
                 nlohmann::json items = nlohmann::json::array();
@@ -1298,7 +1324,7 @@ int main(int argc, char* argv[]) {
                     std::string idLower = a.id;
                     std::transform(idLower.begin(), idLower.end(), idLower.begin(),
                                    [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
-                    const std::string role = coarseRole(idLower);
+                    const std::string role = coarseRole(idLower, a.sourceClass);
                     if (!dumpFilter.empty() && role != dumpFilter) { continue; }
                     roleCounts[role]++;
                     nlohmann::json item = {

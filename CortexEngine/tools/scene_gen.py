@@ -84,6 +84,7 @@ def role_menu(by_role, per_role=12):
 # ----------------------------------------------------------------------------
 
 PLAN_SCHEMA = """{
+  "setting": "interior",               // "interior" = a room; "exterior" = an OPEN outdoor scene
   "room_type": "living_room|bedroom|office|kitchen|dining_room|bathroom|garden|studio|...",
   "width": 6.6, "depth": 6.4,          // metres, 4.0-9.0
   "style": "modern|rustic|industrial|classic|minimal|...",
@@ -104,13 +105,52 @@ PLAN_SCHEMA = """{
   ],
   "lights": [                           // 1-3 warm point lights
     {"anchor":"ceiling_center|ceiling_back|ceiling_left|ceiling_right", "color":[1.0,0.9,0.8], "intensity":6.0, "range":9.0}
-  ]
+  ],
+  "night": false,                       // true for evening/night/moody-dark prompts: the warm
+                                        // lamps become the key light (set 2-3 of them!)
+  "exposure": 1.0                       // brightness of the shot: 1.2-1.4 "bright airy",
+                                        // 0.8 dim/moody, 1.0 neutral
 }"""
 
-COMPOSE_INSTRUCTIONS = """You are an interior designer. Compose ONE room for the prompt below.
-Return ONLY a single JSON object matching the schema -- no prose, no markdown fence.
+EXTERIOR_SCHEMA = """{
+  "setting": "exterior",
+  "scene_type": "beach|garden|forest|lake|desert|campsite|meadow|...",
+  "style": "lush|sparse|wild|manicured|...",
+  "mood": "short phrase, e.g. 'sunny tropical noon'",
+  "environment": {
+    "sun": {"azimuth_deg": 130,        // 0=behind camera, 180=backlit over the horizon; 110-145 = pleasing 3/4 light
+            "elevation_deg": 45,       // 8-15 sunset/golden hour, 35-60 midday
+            "color": [1.0,0.96,0.86], "intensity": 3.4},   // intensity 1.5 dim .. 4 blazing
+    "sky": "sky_day|sky_sunset|sky_partly_cloudy",          // match the mood
+    "fog": {"density": 0.003, "start": 10.0},               // density 0.001 crisp .. 0.02 misty
+    "exposure": 1.1,                    // 0.7 moody .. 1.4 bright airy
+    "ground": {"kind": "sand|grass|dirt|rock|snow", "extent": 34,   // metres, 24-50
+               "color": [r,g,b]},       // OPTIONAL tint
+    "water": {"enabled": true,          // a sea/lake filling the far half of the scene
+              "shallow": [0.10,0.52,0.36], "deep": [0.01,0.23,0.19],  // the water COLOUR (e.g. green water)
+              "roughness": 0.13, "wave": 0.04}
+  },
+  "objects": [                          // 6-14 entries; count>1 scatters variants
+    {"query": "palm tree",              // describe ANYTHING -- exact ids from the menu are used directly,
+                                        // other names are matched to the closest real/fetched/generated model
+     "zone": "water|shore|midground|background|foreground_edge",
+       // water: IN the sea (rocks/boats only). shore: the waterline. midground: the main
+       // dressing band. background: far flanks. foreground_edge: framing props near the camera.
+     "count": 3, "cluster": true,       // cluster=true -> a natural group; false -> spread out
+     "size_m": 5.5,                     // real-world HEIGHT of one instance, metres
+     "tint": [r,g,b]                    // OPTIONAL colour override
+    }
+  ],
+  "lights": []                          // usually empty outdoors; a campfire = one warm point light
+}"""
 
-Rules:
+COMPOSE_INSTRUCTIONS = """You are a scene designer. Compose ONE scene for the prompt below.
+Return ONLY a single JSON object -- no prose, no markdown fence.
+
+FIRST decide the SETTING: an enclosed room -> use the INTERIOR schema; an outdoor place
+(beach, garden, forest, lake, desert, campsite, park...) -> use the EXTERIOR schema.
+
+INTERIOR rules:
 - Pick assets ONLY from the catalog menu (use the exact ids). Put each asset's role in "role".
 - Choose a sensible room_type and a plausible set of 6-10 FLOOR-STANDING objects for it:
   a focal piece against a wall (sofa/bed/desk), seating, tables, storage, a rug, 1-2 plants, a floor lamp.
@@ -120,13 +160,32 @@ Rules:
 - HONOUR THE PROMPT'S COLOUR/MOOD. If it names a colour (e.g. "all pink everywhere"), set the palette
   to that colour with a HIGH tint_strength (0.8-0.95) AND tint the big soft furniture that colour too.
   If no colour is named, choose a tasteful palette with LOW tint_strength (0.25-0.4) and omit most tints.
+- MOOD drives light: "warm evening"/"cozy night" -> night=true + 2-3 warm lamps (intensity 7-9) +
+  a warm palette (walls toward [0.55,0.42,0.32], tint_strength 0.5). "bright airy"/"sun-drenched"
+  -> exposure 1.25-1.4 + near-white walls (tint_strength 0.5). "moody/dark" -> exposure 0.75-0.85.
+  "well lit" -> exposure 1.2 + 2-3 lights.
 - Keep the front-centre of the room open (that's where the camera looks in from).
+
+EXTERIOR rules:
+- Design the ENVIRONMENT to match the prompt: sun angle/warmth + sky + exposure carry the
+  mood (sunny = high warm sun + sky_day + exposure 1.1-1.3; sunset = low sun + sky_sunset;
+  misty = fog 0.01-0.02). If the prompt names a water colour (e.g. "green water"), put it in
+  water.shallow/deep saturated.
+- "query" may name ANYTHING ("palm tree", "boulder", "rowing boat", "beach umbrella") -- exact
+  menu ids are used directly, other names get matched or fetched. Prefer menu ids when they fit.
+- Compose in DEPTH: water/shore props far, the main dressing (trees, big rocks) midground on the
+  FLANKS (keep the centre view open to the horizon), a couple of framing props foreground_edge.
+  Vegetation stays on land; only rocks/boats go in the water. Use count 2-5 + cluster for natural
+  groups, with size variety.
 
 CATALOG MENU (role: ids):
 {menu}
 
-SCHEMA:
+INTERIOR SCHEMA:
 {schema}
+
+EXTERIOR SCHEMA:
+{ext_schema}
 
 PROMPT: {prompt}
 """
@@ -248,7 +307,91 @@ COLOR_WORDS = {
 STYLE_WORDS = ["modern", "rustic", "industrial", "classic", "minimal", "cozy", "luxury", "vintage"]
 
 
+# --- exterior offline heuristics -------------------------------------------
+
+EXTERIOR_WORDS = {"beach", "garden", "forest", "lake", "desert", "campsite", "camp",
+                  "meadow", "park", "outdoor", "outside", "island", "jungle", "woods",
+                  "shore", "coast", "seaside", "riverbank", "clearing", "backyard"}
+
+EXT_SCENE_KITS = {
+    # scene: (ground_kind, water, [(query, zone, count, cluster, size_m)])
+    "beach": ("sand", True, [
+        ("palm tree", "midground", 3, True, 5.5), ("palm tree", "midground", 2, True, 4.5),
+        ("large rock", "water", 3, True, 1.6), ("rock", "shore", 2, False, 0.7),
+        ("bush", "midground", 2, True, 1.1), ("grass tuft", "foreground_edge", 2, False, 0.6),
+    ]),
+    "garden": ("grass", False, [
+        ("tree", "background", 3, False, 5.0), ("bush", "midground", 4, True, 1.1),
+        ("flowers", "midground", 5, True, 0.45), ("fence", "background", 4, False, 1.0),
+        ("rock", "foreground_edge", 2, False, 0.6),
+    ]),
+    "forest": ("dirt", False, [
+        ("pine tree", "background", 4, True, 6.5), ("pine tree", "midground", 3, True, 5.5),
+        ("tree stump", "midground", 2, False, 0.7), ("mushroom", "foreground_edge", 3, True, 0.35),
+        ("rock", "midground", 3, True, 0.9), ("fern", "midground", 3, True, 0.8),
+    ]),
+    "lake": ("grass", True, [
+        ("tree", "midground", 4, True, 5.5), ("rock", "water", 2, True, 1.2),
+        ("bush", "midground", 3, True, 1.0), ("canoe", "shore", 1, False, 1.0),
+        ("grass tuft", "foreground_edge", 3, False, 0.6),
+    ]),
+    "desert": ("sand", False, [
+        ("large rock", "midground", 4, True, 1.8), ("rock", "foreground_edge", 3, False, 0.8),
+        ("dead tree", "midground", 2, False, 3.5), ("grass tuft", "midground", 3, False, 0.5),
+    ]),
+    "campsite": ("grass", False, [
+        ("tent", "midground", 1, False, 2.0), ("campfire", "midground", 1, False, 0.7),
+        ("log", "midground", 2, True, 0.6), ("pine tree", "background", 4, True, 6.0),
+        ("rock", "foreground_edge", 2, False, 0.7),
+    ]),
+    "meadow": ("grass", False, [
+        ("tree", "background", 3, False, 5.5), ("flowers", "midground", 6, True, 0.45),
+        ("grass tuft", "midground", 5, False, 0.6), ("rock", "midground", 2, False, 0.8),
+    ]),
+}
+
+
+def prompt_is_exterior(prompt):
+    words = set(w.strip(",.") for w in prompt.lower().split())
+    return bool(words & EXTERIOR_WORDS)
+
+
+def compose_offline_exterior(prompt, by_role):
+    p = prompt.lower()
+    scene = next((s for s in EXT_SCENE_KITS if s in p), None)
+    if scene is None:
+        scene = "beach" if ("water" in p or "sea" in p or "ocean" in p) else "meadow"
+    ground, water_on, kit = EXT_SCENE_KITS[scene]
+    named = next((COLOR_WORDS[w] for w in COLOR_WORDS if w in p), None)
+    sunset = any(w in p for w in ("sunset", "evening", "golden", "dusk"))
+    misty = any(w in p for w in ("fog", "mist", "misty", "hazy"))
+    env = {
+        "sun": {"azimuth_deg": 150 if sunset else 130,
+                "elevation_deg": 11 if sunset else 46,
+                "color": [1.0, 0.62, 0.34] if sunset else [1.0, 0.96, 0.86],
+                "intensity": 2.4 if sunset else 3.4},
+        "sky": "sky_sunset" if sunset else ("sky_partly_cloudy" if misty else "sky_day"),
+        "fog": {"density": 0.014 if misty else 0.003, "start": 6.0 if misty else 10.0},
+        "exposure": 0.95 if sunset else 1.1,
+        "ground": {"kind": ground, "extent": 34},
+        "water": {"enabled": water_on,
+                  "shallow": (named if (named and water_on) else [0.10, 0.52, 0.36]),
+                  "deep": [0.01, 0.23, 0.19], "roughness": 0.13, "wave": 0.04},
+    }
+    if named and water_on:
+        env["water"]["deep"] = [named[0] * 0.12, named[1] * 0.45, named[2] * 0.4]
+    objs = [{"query": q, "zone": z, "count": c, "cluster": cl, "size_m": s}
+            for (q, z, c, cl, s) in kit]
+    return {
+        "setting": "exterior", "scene_type": scene, "style": "natural",
+        "mood": "sunset" if sunset else ("misty" if misty else "sunny"),
+        "environment": env, "objects": objs, "lights": [],
+    }, "offline"
+
+
 def compose_offline(prompt, by_role):
+    if prompt_is_exterior(prompt):
+        return compose_offline_exterior(prompt, by_role)
     p = prompt.lower()
     room = "living_room"
     for rt in ["living_room", "bedroom", "office", "kitchen", "dining_room", "bathroom", "studio"]:
@@ -293,18 +436,28 @@ def compose_offline(prompt, by_role):
         if named and role in ("sofa", "bed", "seating", "rug"):
             obj["tint"] = c
         objs.append(obj)
+    night = any(w in p for w in ("evening", "night", "candlelit", "dusk"))
+    bright = any(w in p for w in ("bright", "airy", "sunny", "well lit", "well-lit", "light-filled"))
+    moody = any(w in p for w in ("moody", "dark", "dim"))
+    lights = [{"anchor": "ceiling_center", "color": [1.0, 0.92, 0.82], "intensity": 6.0, "range": 9.0}]
+    if night:
+        lights = [{"anchor": a, "color": [1.0, 0.78, 0.52], "intensity": 8.0, "range": 8.0}
+                  for a in ("ceiling_center", "ceiling_back", "ceiling_left")]
     return {
         "room_type": room, "width": 6.6, "depth": 6.4, "style": style,
         "mood": (f"{style} {list(COLOR_WORDS.keys())[0]}" if named else style),
         "palette": {"floor": floor, "wall": wall, "accent": accent, "tint_strength": ts},
+        "night": night,
+        "exposure": 1.3 if bright else (0.82 if moody else 1.0),
         "objects": objs,
-        "lights": [{"anchor": "ceiling_center", "color": [1.0, 0.92, 0.82], "intensity": 6.0, "range": 9.0}],
+        "lights": lights,
     }, "offline"
 
 
 def compose(prompt, by_role, backends, verbose=True):
     menu = role_menu(by_role)
-    prompt_text = COMPOSE_INSTRUCTIONS.format(menu=menu, schema=PLAN_SCHEMA, prompt=prompt)
+    prompt_text = COMPOSE_INSTRUCTIONS.format(menu=menu, schema=PLAN_SCHEMA,
+                                              ext_schema=EXTERIOR_SCHEMA, prompt=prompt)
     fns = {"codex": compose_codex, "claude": compose_claude, "deepseek": compose_deepseek}
     for b in backends:
         if b == "offline":
@@ -324,7 +477,8 @@ def compose(prompt, by_role, backends, verbose=True):
             print(f"[compose] {b} failed: {info}")
     plan, _ = compose_offline(prompt, by_role)
     if verbose:
-        print(f"[compose] offline heuristic ({plan['room_type']}, {len(plan['objects'])} objects)")
+        kind = plan.get("room_type") or plan.get("scene_type", "scene")
+        print(f"[compose] offline heuristic ({kind}, {len(plan['objects'])} objects)")
     plan["_backend"] = "offline"
     return plan
 
@@ -347,6 +501,14 @@ def _rgb(v, dflt):
 
 
 def validate_plan(plan, by_role, by_id, verbose=True):
+    if (plan.get("setting") or "").lower() == "exterior" or "environment" in plan:
+        plan["setting"] = "exterior"
+        return validate_plan_exterior(plan, by_role, by_id, verbose=verbose)
+    plan["setting"] = "interior"
+    return validate_plan_interior(plan, by_role, by_id, verbose=verbose)
+
+
+def validate_plan_interior(plan, by_role, by_id, verbose=True):
     repairs = []
     plan.setdefault("room_type", "living_room")
     plan["width"] = _clamp(float(plan.get("width", 6.6) or 6.6), 4.0, 9.0)
@@ -358,6 +520,11 @@ def validate_plan(plan, by_role, by_id, verbose=True):
         "accent": _rgb(pal.get("accent"), [0.24, 0.2, 0.17]),
         "tint_strength": _clamp(float(pal.get("tint_strength", 0.35) or 0.35), 0.0, 0.97),
     }
+    plan["night"] = bool(plan.get("night", False))
+    try:
+        plan["exposure"] = _clamp(float(plan.get("exposure", 1.0) or 1.0), 0.6, 1.5)
+    except Exception:
+        plan["exposure"] = 1.0
     good = []
     for o in plan.get("objects", []):
         if not isinstance(o, dict):
@@ -398,6 +565,202 @@ def validate_plan(plan, by_role, by_id, verbose=True):
     plan["objects"] = good
     if verbose and repairs:
         print(f"[validate] {len(repairs)} repair(s):")
+        for r in repairs[:12]:
+            print(f"    - {r}")
+    return plan, repairs
+
+
+# ----------------------------------------------------------------------------
+# Exterior validate: the asset-resolution LADDER. Every "query" becomes a real,
+# loadable model: exact id -> catalog keyword match -> role synonym -> fetched
+# cache / Sketchfab fetch -> procgen -> drop. Never crashes, always renders.
+# ----------------------------------------------------------------------------
+
+NATURE_SOURCES = {"kenney_nature_kit", "naturalistic_showcase", "fetched"}
+
+# query keyword -> (role, preferred id substring)
+QUERY_ROLE_MAP = [
+    (("palm",), ("tree", "palm")),
+    (("pine", "conifer", "fir", "spruce"), ("tree", "pine")),
+    (("tree", "trunk", "stump", "log", "driftwood"), ("tree", None)),
+    (("boulder", "rock", "stone", "pebble", "cliff"), ("rock", None)),
+    (("bush", "shrub", "hedge", "fern", "foliage", "plant"), ("bush", None)),
+    (("grass", "reed", "tuft"), ("grass", None)),
+    (("flower", "bloom", "tulip", "rose", "lily"), ("flower", None)),
+    (("fence", "gate", "wall"), ("fence", None)),
+    (("path", "bridge", "walkway"), ("path", None)),
+    (("tent", "campfire", "fire", "canoe", "boat", "kayak", "raft"), ("camp", None)),
+    (("mushroom", "toadstool"), ("bush", "mushroom")),
+    (("cactus",), ("bush", "cactus")),
+]
+
+_EXT_SIZE = {  # role -> (default height m, min h, max h)
+    "tree": (5.0, 2.5, 8.5), "rock": (0.9, 0.3, 2.6), "bush": (1.0, 0.4, 1.8),
+    "grass": (0.55, 0.3, 1.0), "flower": (0.45, 0.25, 0.9), "fence": (1.0, 0.6, 1.6),
+    "path": (0.3, 0.1, 0.6), "camp": (1.6, 0.5, 3.0), "plant": (1.2, 0.4, 2.2),
+    "decor": (0.8, 0.3, 1.8), "misc": (1.0, 0.3, 3.0),
+}
+
+# Max FOOTPRINT per role: flat meshes (a 0.26m-tall slab rock) would explode to 6m-wide
+# pancakes if only the target HEIGHT drove the scale.
+_EXT_FOOT_MAX = {
+    "tree": 5.5, "rock": 2.3, "bush": 1.9, "grass": 1.2, "flower": 0.9,
+    "fence": 2.6, "path": 2.2, "camp": 3.2, "plant": 2.2, "decor": 2.0, "misc": 2.6,
+}
+
+
+def _rng_for(*parts):
+    import hashlib
+    import random
+    h = hashlib.md5("|".join(str(p) for p in parts).encode()).hexdigest()
+    return random.Random(int(h[:12], 16))
+
+
+def resolve_query(query, by_role, by_id, rng, verbose=True):
+    """Ladder steps 1-3: match a free-text query to a real catalog asset."""
+    q = (query or "").lower().strip()
+    if not q:
+        return None, "empty"
+    if q in by_id:
+        return by_id[q], "exact"
+    words = [w for w in "".join(c if c.isalnum() else " " for c in q).split() if len(w) > 2]
+    # keyword scoring over ids (nature sources preferred for exterior scenes)
+    best, best_score = [], 0
+    for a in by_id.values():
+        idl = a["id"].lower()
+        score = sum(2 for w in words if w in idl)
+        if score and a.get("source") in NATURE_SOURCES:
+            score += 1
+        if score > best_score:
+            best, best_score = [a], score
+        elif score == best_score and score > 0:
+            best.append(a)
+    if best_score >= 2:
+        # shortest ids first: 'rock_largeA' over 'cliff_cornerInnerLarge_rock';
+        # rng picks among the ties for variety
+        shortest = min(len(a["id"]) for a in best)
+        best = [a for a in best if len(a["id"]) <= shortest + 2]
+        return rng.choice(best), f"keyword({best_score})"
+    # role synonyms
+    for keys, (role, sub) in QUERY_ROLE_MAP:
+        if any(k in q for k in keys):
+            cands = by_role.get(role, [])
+            if sub:
+                subbed = [a for a in cands if sub in a["id"].lower()]
+                cands = subbed or cands
+            cands = [a for a in cands if a.get("source") in NATURE_SOURCES] or cands
+            if cands:
+                return rng.choice(cands), f"role({role})"
+    return None, "unmatched"
+
+
+def resolve_query_ladder(query, by_role, by_id, rng, fetch_budget, verbose=True):
+    """Full ladder incl. fetch (Sketchfab) + procgen for out-of-corpus queries."""
+    asset, how = resolve_query(query, by_role, by_id, rng, verbose=verbose)
+    if asset is not None:
+        return asset, how
+    # ladder step 4: live fetch (tools/asset_fetch.py); refreshes the catalog on success
+    if fetch_budget.get("left", 0) > 0:
+        try:
+            import asset_fetch
+            fetched_id = asset_fetch.ensure(query, verbose=verbose)
+        except Exception as e:
+            fetched_id = None
+            if verbose:
+                print(f"[ladder] fetch '{query}' unavailable: {e}")
+        if fetched_id:
+            fetch_budget["left"] -= 1
+            fetch_budget["dirty"] = True
+            _, by_role2, by_id2 = load_catalog(refresh=True)
+            by_role.clear(); by_role.update(by_role2)
+            by_id.clear(); by_id.update(by_id2)
+            if fetched_id.lower() in by_id:
+                return by_id[fetched_id.lower()], "fetched"
+    # ladder step 5: procedural generation (rocks and other simple nature forms)
+    try:
+        import procgen
+        gen_id = procgen.ensure(query, verbose=verbose)
+    except Exception:
+        gen_id = None
+    if gen_id:
+        _, by_role2, by_id2 = load_catalog(refresh=True)
+        by_role.clear(); by_role.update(by_role2)
+        by_id.clear(); by_id.update(by_id2)
+        if gen_id.lower() in by_id:
+            return by_id[gen_id.lower()], "procgen"
+    return None, "dropped"
+
+
+def validate_plan_exterior(plan, by_role, by_id, verbose=True):
+    repairs = []
+    env = plan.get("environment") or {}
+    sun = env.get("sun") or {}
+    ground = env.get("ground") or {}
+    water = env.get("water") or {}
+    env = {
+        "sun": {
+            "azimuth_deg": _clamp(float(sun.get("azimuth_deg", 130) or 130), 0, 360),
+            "elevation_deg": _clamp(float(sun.get("elevation_deg", 45) or 45), 4, 75),
+            "color": _rgb(sun.get("color"), [1.0, 0.96, 0.86]),
+            "intensity": _clamp(float(sun.get("intensity", 3.2) or 3.2), 0.5, 5.0),
+        },
+        "sky": env.get("sky") if env.get("sky") in ("sky_day", "sky_sunset", "sky_partly_cloudy") else None,
+        "fog": {
+            "density": _clamp(float((env.get("fog") or {}).get("density", 0.003) or 0.003), 0.0, 0.05),
+            "start": _clamp(float((env.get("fog") or {}).get("start", 10.0) or 10.0), 0.0, 30.0),
+        },
+        "exposure": _clamp(float(env.get("exposure", 1.1) or 1.1), 0.5, 1.6),
+        "ground": {
+            "kind": ground.get("kind") if ground.get("kind") in ("sand", "grass", "dirt", "rock", "snow") else "grass",
+            "extent": _clamp(float(ground.get("extent", 34) or 34), 22, 55),
+        },
+        "water": {
+            "enabled": bool(water.get("enabled", False)),
+            "shallow": _rgb(water.get("shallow"), [0.10, 0.52, 0.36]),
+            "deep": _rgb(water.get("deep"), [0.01, 0.23, 0.19]),
+            "roughness": _clamp(float(water.get("roughness", 0.13) or 0.13), 0.03, 0.4),
+            "wave": _clamp(float(water.get("wave", 0.04) or 0.04), 0.01, 0.09),
+        },
+    }
+    if (plan.get("environment") or {}).get("ground", {}).get("color"):
+        env["ground"]["color"] = _rgb(plan["environment"]["ground"]["color"], None) or None
+    if env["sky"] is None:
+        env["sky"] = "sky_sunset" if env["sun"]["elevation_deg"] < 18 else "sky_day"
+    plan["environment"] = env
+
+    fetch_budget = {"left": 4, "dirty": False}
+    good = []
+    for i, o in enumerate(plan.get("objects", [])):
+        if not isinstance(o, dict):
+            continue
+        query = (o.get("query") or o.get("asset") or "").strip()
+        rng = _rng_for(plan.get("scene_type"), query, i)
+        asset, how = resolve_query_ladder(query, by_role, by_id, rng, fetch_budget, verbose=verbose)
+        if asset is None:
+            repairs.append(f"DROP unresolvable '{query}'")
+            continue
+        if how != "exact":
+            repairs.append(f"'{query}' -> '{asset['id']}' ({how})")
+        role = asset["role"]
+        dflt_h, min_h, max_h = _EXT_SIZE.get(role, _EXT_SIZE["misc"])
+        try:
+            size_m = _clamp(float(o.get("size_m", dflt_h) or dflt_h), min_h, max_h)
+        except Exception:
+            size_m = dflt_h
+        entry = {
+            "asset": asset["id"], "role": role, "zone": (o.get("zone") or "midground").lower(),
+            "count": int(_clamp(int(o.get("count", 1) or 1), 1, 8)),
+            "cluster": bool(o.get("cluster", False)), "size_m": size_m,
+            "native_horiz": asset.get("native_horiz"), "native_height": asset.get("native_height"),
+        }
+        if "tint" in o:
+            t = _rgb(o.get("tint"), None)
+            if t:
+                entry["tint"] = t
+        good.append(entry)
+    plan["objects"] = good
+    if verbose and repairs:
+        print(f"[validate-ext] {len(repairs)} note(s):")
         for r in repairs[:12]:
             print(f"    - {r}")
     return plan, repairs
@@ -507,6 +870,148 @@ def _in_cam_bay(x, z, r):
 
 
 def solve(plan):
+    if plan.get("setting") == "exterior":
+        return solve_exterior(plan)
+    return solve_interior(plan)
+
+
+# Exterior world frame: camera at (0, 3.0, 10.5) looking down -Z. Land surface y=0,
+# the sea (when enabled) fills z <= shoreline. Zones are depth bands; the CENTRE view
+# corridor (|x| small) stays clear of tall objects so the eye travels to the horizon.
+TALL_EXT_M = 2.2          # objects at least this tall count as view-blockers
+WATER_ROLES = {"rock", "camp"}   # the only things that belong IN the water
+
+
+def _ext_zones(E, shoreZ, water_on):
+    if water_on:
+        return {
+            "water": (shoreZ - 7.0, shoreZ - 1.2),
+            "shore": (shoreZ - 0.3, shoreZ + 2.2),
+            "midground": (shoreZ + 2.2, 1.5),             # ends well short of the camera
+            "background": (shoreZ + 1.0, shoreZ + 4.5),   # far flanks (x pushed wide below)
+            "foreground_edge": (3.0, 5.5),
+        }
+    return {
+        "water": (-0.30 * E, -0.5),                       # no sea: degrade to midground
+        "shore": (-0.30 * E, -0.5),
+        "midground": (-0.30 * E, -0.5),
+        "background": (-0.45 * E, -0.24 * E),
+        "foreground_edge": (3.0, 5.5),
+    }
+
+
+def solve_exterior(plan):
+    env = plan["environment"]
+    E = env["ground"]["extent"]
+    water_on = env["water"]["enabled"]
+    shoreZ = -0.15 * E if water_on else None
+    zones = _ext_zones(E, shoreZ if water_on else 0.0, water_on)
+    xmax = 0.44 * E
+    placed = []                     # (x, z, r)
+    ir_objects = []
+    dropped = []
+
+    def est_height(o, foot):
+        nh, nv = o.get("native_horiz"), o.get("native_height")
+        if nh and nv and nh > 1e-4:
+            return foot * (nv / nh)
+        return foot
+
+    def fits(x, z, r, tall, zone):
+        if abs(x) + r > xmax or z < -0.46 * E or z > 6.8:
+            return False
+        if tall and z > (shoreZ + 1.0 if water_on else -0.40 * E) and abs(x) < 0.10 * E and zone != "water":
+            return False                      # keep the centre corridor open to the horizon
+        for (px, pz, pr) in placed:
+            if (x - px) ** 2 + (z - pz) ** 2 < (r + pr) ** 2 * 0.92:
+                return False
+        return True
+
+    groups = sorted(plan["objects"], key=lambda o: -(o.get("size_m", 1.0)))
+    for gi, o in enumerate(groups):
+        zone = o["zone"] if o["zone"] in zones else "midground"
+        if zone == "water" and o["role"] not in WATER_ROLES:
+            zone = "shore"                    # vegetation etc. never goes in the sea
+        if zone == "foreground_edge" and o.get("size_m", 1.0) > 1.6:
+            zone = "midground"                # nothing huge right in front of the lens
+        z_lo, z_hi = zones[zone]
+        rng = _rng_for("solve", plan.get("scene_type"), o["asset"], gi)
+        side = 1 if (gi % 2 == 0) else -1
+        n = o["count"]
+
+        def pick_center():
+            if zone in ("midground", "background", "foreground_edge"):
+                return (side * rng.uniform(0.13 * E, 0.30 * E), rng.uniform(z_lo, z_hi))
+            return (rng.uniform(-0.30 * E, 0.30 * E), rng.uniform(z_lo, z_hi))
+        cx, cz = pick_center() if (o.get("cluster") and n > 1) else (0.0, 0.0)
+        for i in range(n):
+            size = o["size_m"] * rng.uniform(0.82, 1.18)
+            nh, nv = o.get("native_horiz"), o.get("native_height")
+            aspect = (nh / nv) if (nh and nv and nv > 1e-4) else 0.8
+            aspect = _clamp(aspect, 0.2, 5.0)
+            foot = _clamp(size * aspect, 0.25, _EXT_FOOT_MAX.get(o["role"], 2.6))
+            # trees collide by trunk, not canopy: fronds may naturally overlap
+            r = max(foot / 2.0, 0.3) * (0.55 if o["role"] == "tree" else 1.0)
+            tall = est_height(o, foot) >= TALL_EXT_M
+            ok = False
+            for attempt in range(22):
+                widen = 1.0 + attempt * 0.18       # progressively relax the search
+                if o.get("cluster") and n > 1:
+                    if attempt in (8, 15):
+                        cx, cz = pick_center()      # crowded cluster: try a new spot
+                    x = cx + rng.gauss(0, max(1.0, r * 1.6) * widen)
+                    z = _clamp(cz + rng.gauss(0, max(0.9, r * 1.2) * widen), z_lo, z_hi)
+                elif zone in ("midground", "background"):
+                    ax = rng.uniform(0.10 * E if tall else 0.02 * E, min(0.36 * E * widen, 0.42 * E))
+                    x = (side if rng.random() < 0.7 else -side) * ax
+                    z = rng.uniform(z_lo, z_hi)
+                elif zone == "foreground_edge":
+                    x = (side if i % 2 == 0 else -side) * rng.uniform(0.16 * E, 0.34 * E)
+                    z = rng.uniform(z_lo, z_hi)
+                else:   # water / shore: spread across the view
+                    x = rng.uniform(-0.34 * E, 0.34 * E)
+                    z = rng.uniform(z_lo, z_hi)
+                if water_on and o["role"] in VEGETATION_ROLES and z < shoreZ + 0.4:
+                    z = shoreZ + 0.4 + abs(rng.gauss(0, 0.8))   # plants stay on dry land
+                if fits(x, z, r, tall, zone):
+                    ok = True
+                    break
+            if not ok:
+                dropped.append(o["asset"])
+                continue
+            yaw = rng.uniform(-24, 24) if o["role"] == "camp" else rng.uniform(0, 360)
+            entry = {"asset": o["asset"], "x": round(x, 3), "z": round(z, 3),
+                     "yaw": round(yaw, 1), "foot": round(foot, 3)}
+            if water_on and z < shoreZ:
+                # under water the seabed ramps down (engine: shoreline y=0 -> -2.5 at the
+                # far ground edge); sink the base onto it so rocks sit IN the sea, not
+                # bobbing at the surface
+                ground_far = -(1.9 * E + 10.0)
+                slope = 2.5 / max(shoreZ - ground_far, 1e-3)
+                entry["y"] = round(-min((shoreZ - z) * slope + 0.04, 2.2), 3)
+            if "tint" in o:
+                entry["tint"] = o["tint"]
+            ir_objects.append(entry)
+            placed.append((x, z, r))
+
+    ir_env = json.loads(json.dumps(env))     # deep copy
+    if water_on:
+        ir_env["water"]["from_z"] = round(shoreZ, 2)
+        ir_env["water"]["level"] = 0.05
+    ir_lights = []
+    for l in plan.get("lights", []) or []:
+        if all(isinstance(l.get(k), (int, float)) for k in ("x", "y", "z")):
+            ir_lights.append({
+                "type": "point", "x": float(l["x"]), "y": float(l["y"]), "z": float(l["z"]),
+                "color": _rgb(l.get("color"), [1.0, 0.75, 0.45]),
+                "intensity": _clamp(float(l.get("intensity", 5.0) or 5.0), 1.0, 14.0),
+                "range": _clamp(float(l.get("range", 7.0) or 7.0), 2.0, 16.0),
+            })
+    ir = {"setting": "exterior", "environment": ir_env, "objects": ir_objects, "lights": ir_lights}
+    return ir, dropped
+
+
+def solve_interior(plan):
     """Turn the validated relational plan into the engine Scene IR.
     Guarantees: in-bounds, non-overlapping, camera bay clear (drops as last resort)."""
     W, D = plan["width"], plan["depth"]
@@ -600,6 +1105,8 @@ def solve(plan):
                  "floor": pal["floor"], "wall": pal["wall"], "accent": pal["accent"],
                  "tile": bool(plan.get("tile", plan["room_type"] in ("kitchen", "bathroom"))),
                  "tint_strength": pal["tint_strength"]},
+        "night": plan.get("night", False),
+        "exposure": plan.get("exposure", 1.0),
         "objects": ir_objects,
         "lights": ir_lights,
     }
@@ -611,6 +1118,54 @@ def solve(plan):
 # ----------------------------------------------------------------------------
 
 def validity_check(ir):
+    if ir.get("setting") == "exterior":
+        return validity_check_exterior(ir)
+    return validity_check_interior(ir)
+
+
+VEGETATION_ROLES = {"tree", "bush", "grass", "flower", "plant"}
+
+
+def validity_check_exterior(ir):
+    """Independent exterior gate: in-bounds, non-overlapping solids, no vegetation in
+    the sea, and the centre view corridor clear of tall blockers."""
+    problems = []
+    env = ir.get("environment") or {}
+    E = float((env.get("ground") or {}).get("extent", 34))
+    water = env.get("water") or {}
+    from_z = float(water.get("from_z", -0.15 * E)) if water.get("enabled") else None
+    try:
+        _, _, by_id = load_catalog()
+    except Exception:
+        by_id = {}
+    circles = []
+    for o in ir.get("objects", []):
+        x, z, foot = o["x"], o["z"], float(o["foot"])
+        r = max(foot / 2.0, 0.25)
+        a = by_id.get(o["asset"].lower(), {})
+        role = a.get("role", "misc")
+        nh, nv = a.get("native_horiz"), a.get("native_height")
+        est_h = foot * (nv / nh) if (nh and nv and nh > 1e-4) else foot
+        if abs(x) + r > 0.95 * E or z < -0.5 * E or z > 8.0:
+            problems.append(f"out_of_bounds: {o['asset']} at ({x:.1f},{z:.1f})")
+        if from_z is not None and role in VEGETATION_ROLES and z < from_z - 0.8:
+            problems.append(f"vegetation_in_water: {o['asset']} at z={z:.1f} (waterline {from_z:.1f})")
+        if est_h >= TALL_EXT_M and abs(x) < 0.085 * E and \
+           z > ((from_z + 1.0) if from_z is not None else -0.40 * E):
+            problems.append(f"blocks_view: {o['asset']} tall in the centre corridor ({x:.1f},{z:.1f})")
+        # trees collide by trunk (canopies may naturally interleave) -- same rule as the solver
+        circles.append((x, z, r * (0.55 if role == "tree" else 1.0), o["asset"]))
+    for i in range(len(circles)):
+        for j in range(i + 1, len(circles)):
+            x1, z1, r1, a1 = circles[i]
+            x2, z2, r2, a2 = circles[j]
+            d = math.hypot(x1 - x2, z1 - z2)
+            if d < (r1 + r2) * 0.72 - 0.05:      # natural clusters may touch; flag real interpenetration
+                problems.append(f"overlap: {a1} & {a2} (d={d:.2f} < {(r1+r2)*0.72:.2f})")
+    return problems
+
+
+def validity_check_interior(ir):
     problems = []
     W, D = ir["room"]["w"], ir["room"]["d"]
     cw = 0.30
@@ -662,7 +1217,7 @@ def render_ir(ir, out_name, camera="", night=False, timeout=220):
     return None
 
 
-CRITIC_PROMPT = """You are judging a rendered 3D interior for how well it matches an intent.
+CRITIC_PROMPT = """You are judging a rendered 3D scene for how well it matches an intent.
 INTENT: "{prompt}"
 
 Look at the image and return ONLY this JSON (no prose):
@@ -675,11 +1230,20 @@ Look at the image and return ONLY this JSON (no prose):
 Image: {img}"""
 
 
-def critique(png, prompt, timeout=150):
-    r = _run(["claude", "-p", CRITIC_PROMPT.format(prompt=prompt, img=png)], timeout)
-    if r.returncode != 0:
-        return None
-    return _extract_json(r.stdout)
+def critique(png, prompt, timeout=150, retries=3):
+    """Vision verdict with retries + backoff -- claude -p rate-limits under rapid
+    bursts (the cause of the None verdicts in early battery runs)."""
+    for attempt in range(retries):
+        try:
+            r = _run(["claude", "-p", CRITIC_PROMPT.format(prompt=prompt, img=png)], timeout)
+        except subprocess.TimeoutExpired:
+            r = None
+        crit = _extract_json(r.stdout) if (r and r.returncode == 0) else None
+        if crit and isinstance(crit.get("score"), (int, float)):
+            return crit
+        if attempt < retries - 1:
+            time.sleep(8 * (attempt + 1))
+    return None
 
 
 def run_pipeline(prompt, name, backends, iters=3, refresh_catalog=False, verbose=True):
@@ -692,22 +1256,30 @@ def run_pipeline(prompt, name, backends, iters=3, refresh_catalog=False, verbose
     problems = validity_check(ir)
     result = {
         "prompt": prompt, "name": name, "backend": plan.get("_backend"),
-        "room_type": plan.get("room_type"), "objects": len(ir["objects"]),
+        "setting": plan.get("setting", "interior"),
+        "room_type": plan.get("room_type") or plan.get("scene_type"),
+        "objects": len(ir["objects"]),
         "dropped": dropped, "repairs": repairs, "validity": problems, "ir": ir,
     }
     if verbose:
         status = "VALID" if not problems else f"{len(problems)} PROBLEM(S)"
-        print(f"[solve] {len(ir['objects'])} objects, room {ir['room']['w']}x{ir['room']['d']} -> {status}")
+        where = (f"room {ir['room']['w']}x{ir['room']['d']}" if "room" in ir
+                 else f"{ir['environment']['ground']['kind']} extent {ir['environment']['ground']['extent']}"
+                       + (" + water" if ir['environment']['water']['enabled'] else ""))
+        print(f"[solve] {len(ir['objects'])} objects, {where} -> {status}")
         for p in problems[:8]:
             print(f"    ! {p}")
 
     # render + critique loop (composition is already valid; the loop reframes)
-    camera = ""
     best = None
     dolly = lift = pan = fov = 0.0
-    exposure = 1.0
+    # the plan's mood exposure seeds the loop (interior: night flag uses the engine's
+    # night-showcase light rig; exterior exposure rides in the IR itself)
+    night = bool(ir.get("night", False))
+    exposure = float(ir.get("exposure", 1.0)) if ir.get("setting") != "exterior" else 1.0
+    camera = f"0,0,0,0,{exposure}" if abs(exposure - 1.0) > 1e-3 else ""
     for it in range(iters):
-        png = render_ir(ir, f"{name}_{it}", camera=camera)
+        png = render_ir(ir, f"{name}_{it}", camera=camera, night=night)
         if not png:
             if verbose:
                 print(f"[render] iter {it}: FAILED (gpu/timeout) -- keeping best so far")
@@ -747,7 +1319,8 @@ def main():
     args = ap.parse_args()
     name = args.name or "gen_" + "".join(c if c.isalnum() else "_" for c in args.prompt.lower())[:32]
     backends = ["offline"] if args.no_critic and args.backends == "offline" else args.backends.split(",")
-    res = run_pipeline(args.prompt, name, backends, iters=(1 if args.no_critic else args.iters))
+    res = run_pipeline(args.prompt, name, backends, iters=(1 if args.no_critic else args.iters),
+                       refresh_catalog=args.refresh_catalog)
     print("\n=== RESULT ===")
     print(json.dumps({k: v for k, v in res.items() if k not in ("ir", "best")}, indent=2))
     if res.get("best"):

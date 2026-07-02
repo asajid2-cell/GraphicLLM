@@ -702,9 +702,16 @@ Result<void> Engine::Initialize(const EngineConfig& config) {
     // Generative render: a model-composed + solver-placed IR (CORTEX_SCENE_IR_JSON) is built
     // onto a BLANK room via the "generative" recipe. Force the RecipeRoom preset + recipe and
     // skip the keyword prompt-router entirely -- this is the engine entry of the generative pipeline.
-    if (std::getenv("CORTEX_SCENE_IR_JSON") != nullptr) {
+    if (const char* irJson = std::getenv("CORTEX_SCENE_IR_JSON"); irJson != nullptr) {
         m_currentScenePreset = ScenePreset::RecipeRoom;
-        m_recipeName = "generative";
+        // Exterior IRs ("setting":"exterior") route to the open-sky exterior recipe
+        // (ground slab + procedural sky + IR-driven sun/fog/water); everything else
+        // stays on the interior room recipe. Substring check: the IR is machine-
+        // written (tools/scene_gen.py), so the key is always serialized one of two ways.
+        const std::string_view irView(irJson);
+        const bool exterior = irView.find("\"setting\": \"exterior\"") != std::string_view::npos ||
+                              irView.find("\"setting\":\"exterior\"") != std::string_view::npos;
+        m_recipeName = exterior ? "generative_exterior" : "generative";
         requestedScene.clear();
     } else if (requestedScene.empty()) {
         if (const char* prompt = std::getenv("CORTEX_SCENE_PROMPT"); prompt && *prompt) {

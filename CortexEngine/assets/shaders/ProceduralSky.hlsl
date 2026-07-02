@@ -121,15 +121,21 @@ float3 ComputeAtmosphericScattering(float3 viewDir, float3 sunDir) {
     sunColor = sunColor / sunLum;
 
     float lowSun = saturate(1.0f - sunY * 1.45f);
+    // High sun = clear day: the grey coastal haze gives way to a saturated blue so
+    // midday scenes read sunny; low-sun (sunset/golden hour) tones are unchanged.
+    float clearDay = saturate(sunY * 1.3f - 0.10f);
     float3 zenith = lerp(float3(0.18f, 0.31f, 0.47f),
                          float3(0.09f, 0.16f, 0.28f),
                          lowSun * 0.45f);
+    zenith = lerp(zenith, float3(0.15f, 0.33f, 0.62f), clearDay * 0.60f);
     float3 upperHaze = lerp(float3(0.47f, 0.57f, 0.63f),
                             float3(0.72f, 0.47f, 0.28f),
                             lowSun * 0.55f);
+    upperHaze = lerp(upperHaze, float3(0.33f, 0.52f, 0.74f), clearDay * 0.55f);
     float3 wetHorizon = lerp(float3(0.19f, 0.30f, 0.29f),
                              float3(0.42f, 0.27f, 0.16f),
                              lowSun * 0.50f);
+    wetHorizon = lerp(wetHorizon, float3(0.60f, 0.74f, 0.90f), clearDay * 0.70f);
     float3 belowHorizon = float3(0.035f, 0.075f, 0.068f);
 
     float3 skyColor = lerp(upperHaze, zenith, pow(up, 0.55f));
@@ -149,14 +155,15 @@ float3 ComputeAtmosphericScattering(float3 viewDir, float3 sunDir) {
     skyColor += sunColor * (sunDisk * 4.0f + sunCore + sunHalo + broadGlow) * atmosphereVisibility;
     skyColor += sunColor * miePhase * MIE_BETA * opticalDepth * 7000.0f * atmosphereVisibility;
 
-    float waterMist = horizon * saturate(0.75f - sunY * 0.25f);
+    float waterMist = horizon * saturate(0.75f - sunY * 0.25f) * (1.0f - clearDay * 0.65f);
     skyColor = lerp(skyColor, float3(0.55f, 0.61f, 0.55f), waterMist * 0.18f);
 
     float clouds = CloudMask(viewDir, horizon, up);
     float3 cloudColor = lerp(float3(0.50f, 0.56f, 0.52f),
                              float3(0.84f, 0.80f, 0.70f),
                              lowSun * 0.38f);
-    skyColor = lerp(skyColor, cloudColor, clouds * 0.42f);
+    cloudColor = lerp(cloudColor, float3(0.90f, 0.93f, 0.97f), clearDay * 0.75f); // bright fair-weather clouds
+    skyColor = lerp(skyColor, cloudColor, clouds * (0.42f - clearDay * 0.22f));
 
     float exposure = lerp(0.60f, 1.12f, saturate(sunY + 0.18f));
     return max(skyColor * exposure, 0.0f);

@@ -244,6 +244,28 @@ Escape: if surface overlays make scenes noisy or hurt water/color gates, reduce 
 
 Status: done
 
+### Loop 13: Mesh Silhouette Realism
+
+Invariant: generated exteriors must not rely only on flat cliff sheets and boxy hero props; canyon walls need faceted vertical mesh bands/overhangs, and campsite/cabin hero geometry needs bevel/eave/hem silhouette detail visible in the runtime path.
+
+Scope:
+
+- in: `tools/scene_graphics_gate.py`, `tools/scene_compiler.py`, `src/Core/Engine_Scenes.cpp`, focused ledgers.
+- out: `tools/scene_quality_gate.py`, forced DXR defaults, external asset downloads, unrelated interiors.
+
+Verifier:
+
+- Current Loop 20 campsite/desert/alpine artifacts fail strengthened graphics gate with `missing_mesh_silhouette_realism`.
+- New campsite/desert/alpine prompts render VALID and pass quality + strengthened graphics gates.
+- Runtime logs include `generative_exterior: created faceted cliff mesh` for canyon prompts and `generative_exterior: created hero silhouette bevel detail` for campsite/cabin prompts.
+- Release build, Director IR validation, known-bad oracles, and kitchen smoke remain green.
+
+Exit: all verifier commands green, with artifacts and logs recorded.
+
+Escape: if extra mesh bands or hero bevels destabilize captures, reduce counts before changing verifier thresholds.
+
+Status: done
+
 ## Progress Log
 
 2026-07-03:
@@ -393,6 +415,28 @@ Status: done
   - Known-bad graphics oracle `v3_campsite_ridge_test_0` with `--expect-fail` exited 0 and now also reports `missing_surface_material_richness`.
 - Visual inspection after Loop 12:
   - Surface detail is visible: ground breakup, tent/cabin line detail, vegetation/scrub clusters, and canyon-wall stains now show in the stills. The remaining gap is still source geometry/style: smooth low-poly cliffs, simplified props, and primitive tent/cabin forms. The next front should attack mesh silhouette and prop realism directly.
+- Loop 13 heartbeat proof:
+  - `node Z:\328\CMPUT328-A2\codexworks\301\heartbeat\bin\hb.mjs wait --label aaa_graphics_loop13_proof --timeout 1 --poll 1` exited by timeout after 1s.
+- Loop 13 red proof:
+  - Current Loop 20 campsite/desert/alpine artifacts failed the strengthened graphics gate with `missing_mesh_silhouette_realism`.
+- Loop 13 implementation:
+  - `tools\scene_graphics_gate.py` now requires `graphics_pass.mesh_silhouette_realism` plus runtime evidence for faceted cliff meshes and hero silhouette bevel/detail.
+  - `tools\scene_compiler.py` now emits bounded mesh silhouette counts: six canyon vertical bands, twelve canyon overhangs, eighteen hero bevel details, and nine prop depth layers for hero prompts.
+  - `src\Core\Engine_Scenes.cpp` now builds multi-band faceted canyon wall meshes with normals, adds canyon overhang blocks, and renders tent/cabin hero silhouette bevel/eave/hem/depth geometry.
+- Loop 13 verifier evidence:
+  - `python -m py_compile tools\scene_compiler.py tools\scene_graphics_gate.py tools\scene_quality_gate.py tools\scene_gen.py` exited 0.
+  - Release build exited 0: `[OK] Build complete in 9.4s`.
+  - Campsite `aaa_graphics_campsite_loop21` rendered VALID; quality gate exited 0 (`purple_fraction=0.741`, `nonblack_fraction=1.0`); graphics gate exited 0 using `build\bin\logs\aaa_graphics_campsite_loop21_0.out` with residual warning `weak_image_contact_metric`; Director IR validation exited 0. Runtime log shows `created hero silhouette bevel detail cabin=0 camp=18 prop_depth_layers=9`.
+  - Desert canyon `aaa_graphics_desert_loop21` rendered VALID; quality gate exited 0 (`turquoise_fraction=0.4215`, `nonblack_fraction=1.0`); graphics gate exited 0 using `build\bin\logs\aaa_graphics_desert_loop21_0.out` with residual warning `weak_image_contact_metric`; Director IR validation exited 0. Runtime log shows `created faceted cliff mesh vertical_bands=6 overhangs=12` and `created hero silhouette bevel detail cabin=0 camp=18 prop_depth_layers=9`.
+  - Alpine cabin `aaa_graphics_alpine_loop21` rendered VALID; quality gate exited 0 (`avg_luma=0.1344`, `cool_fraction=0.8593`, `nonblack_fraction=0.9998`); graphics gate exited 0 using `build\bin\logs\aaa_graphics_alpine_loop21_0.out`; Director IR validation exited 0. Runtime log shows `created hero silhouette bevel detail cabin=18 camp=0 prop_depth_layers=9`.
+  - Kitchen smoke `regression_kitchen_aaa_loop21` rendered VALID and quality gate exited 0 (`avg_luma=0.4466`, `nonblack_fraction=1.0`).
+  - Known-bad quality oracle `gen_a_foggy_mountain_campsite_beside_0` with `--expect-fail` exited 0 and still reports `forbidden_asset_class`, `missing_prompt_entity`, `focal_visibility_fail`, and `purple_water_roi_fail`.
+  - Known-bad graphics oracle `v3_campsite_ridge_test_0` with `--expect-fail` exited 0 and still reports the expected graphics-fidelity failures, including `missing_mesh_silhouette_realism`.
+- Visual inspection after Loop 13:
+  - Improvement is visible: canyon walls have faceted bands and ledges, tent hems/flap depth/gear depth show in the campsite still, and cabin eaves/porch/foundation silhouette detail show in the alpine still.
+  - Remaining `HUMAN-GATE` gap is still dominated by source/catalog stylization: repeated low-poly trees, simplified camp/cabin meshes, sparse close vegetation, and limited true shadowing/occlusion complexity.
+- Loop 13 learning:
+  - Fresh `scene_gen` outputs store runtime logs as `build\bin\logs\<out_name>_0.out` for iteration 0. Passing `build\bin\logs\<out_name>.out` to the graphics gate correctly fails because runtime evidence is absent.
 
 ## BLOCKED / Decisions
 

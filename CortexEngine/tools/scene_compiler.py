@@ -466,6 +466,19 @@ def compile_v3_to_v2(v3: dict[str, Any]) -> dict[str, Any]:
                 "fabric_wood_material_lines",
             ],
         },
+        "mesh_silhouette_realism": {
+            "enabled": True,
+            "cliff_mesh_vertical_bands": 6 if canyon else 0,
+            "cliff_overhang_count": 12 if canyon else 0,
+            "hero_bevel_detail_count": 18 if (campsite or cabin) else 10,
+            "prop_depth_layer_count": 9 if (campsite or cabin) else 6,
+            "systems": [
+                "faceted_cliff_wall_mesh",
+                "hero_beveled_edges",
+                "roof_eave_or_tent_hem_depth",
+                "prop_silhouette_breakup",
+            ],
+        },
         "asset_fidelity": {
             "enabled": True,
             "hero_detail_count": (18 if campsite else 6) + (24 if cabin else 0),

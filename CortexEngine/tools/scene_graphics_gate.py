@@ -224,6 +224,7 @@ def evaluate(prompt: str, ir: dict[str, Any], png: Path | None, log_text: str) -
     atmosphere_fidelity = graphics.get("atmosphere_fidelity") or {}
     geometry_realism = graphics.get("geometry_realism") or {}
     surface_material_richness = graphics.get("surface_material_richness") or {}
+    mesh_silhouette_realism = graphics.get("mesh_silhouette_realism") or {}
     lighting = graphics.get("lighting") or {}
     surface_detail = graphics.get("surface_detail") or {}
     occlusion = graphics.get("occlusion") or {}
@@ -378,6 +379,35 @@ def evaluate(prompt: str, ir: dict[str, Any], png: Path | None, log_text: str) -
                 hero_material_line_count=hero_lines,
                 runtime_material_breakup=has_runtime_material_breakup,
                 runtime_vegetation_clusters=has_runtime_vegetation_clusters,
+            )
+
+        try:
+            cliff_bands = int(mesh_silhouette_realism.get("cliff_mesh_vertical_bands", 0) or 0)
+            cliff_overhangs = int(mesh_silhouette_realism.get("cliff_overhang_count", 0) or 0)
+            hero_bevels = int(mesh_silhouette_realism.get("hero_bevel_detail_count", 0) or 0)
+            prop_depth_layers = int(mesh_silhouette_realism.get("prop_depth_layer_count", 0) or 0)
+        except Exception:
+            cliff_bands = cliff_overhangs = hero_bevels = prop_depth_layers = 0
+        has_runtime_faceted_cliff = "generative_exterior: created faceted cliff mesh" in log_text
+        has_runtime_hero_silhouette = "generative_exterior: created hero silhouette bevel detail" in log_text
+        hero_prompt = flags["campsite"] or "cabin" in prompt.lower()
+        canyon_prompt = flags["canyon"] or "canyon" in str((ir.get("director") or {}).get("scene_type", "")).lower()
+        if (
+            not isinstance(mesh_silhouette_realism, dict)
+            or not bool(mesh_silhouette_realism.get("enabled"))
+            or (hero_prompt and (hero_bevels < 10 or prop_depth_layers < 6 or not has_runtime_hero_silhouette))
+            or (canyon_prompt and (cliff_bands < 4 or cliff_overhangs < 8 or not has_runtime_faceted_cliff))
+        ):
+            fail(
+                "missing_mesh_silhouette_realism",
+                "Generated exterior lacks faceted cliff mesh bands or hero bevel/eave/hem silhouette detail",
+                mesh_silhouette_realism=mesh_silhouette_realism,
+                cliff_mesh_vertical_bands=cliff_bands,
+                cliff_overhang_count=cliff_overhangs,
+                hero_bevel_detail_count=hero_bevels,
+                prop_depth_layer_count=prop_depth_layers,
+                runtime_faceted_cliff=has_runtime_faceted_cliff,
+                runtime_hero_silhouette=has_runtime_hero_silhouette,
             )
 
         try:

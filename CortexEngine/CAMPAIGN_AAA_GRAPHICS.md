@@ -59,6 +59,7 @@ Unknown:
 | 10 | Atmosphere + cliff realism slice | Storm/moonlight/canyon prompts need authored atmosphere and non-planar cliff detail beyond color grading and wall counts. | Require atmospheric and cliff-realism IR/runtime evidence, prove Loop 13 artifacts fail, then add native controls/detail geometry. | Dead if overlays regress prompt semantics or image gates; reduce counts before changing gates. | won |
 | 11 | Catalog cliff asset slice | Existing Kenney nature cliff assets can add real silhouette mass to canyon prompts faster than more line overlays. | Require canyon IR to include several `cliff_*` catalog assets, prove Loop 14 fails, then scatter cliff assets on canyon flanks. | Dead if solver validity regresses or assets look worse than procedural fallback. | won |
 | 12 | Surface material richness slice | The current plateau is toy-like flat surfaces; native decal/cluster geometry can add readable dirt, lichen, wood grain, fabric wrinkle, and vegetation/scrub breakup without forcing DXR. | Require `surface_material_richness` IR plus runtime material-breakup and vegetation-cluster logs, prove Loop 17 artifacts fail, then render novel prompts. | Dead if overlays make scenes noisy, break water/color/visibility gates, or fail to show in pixels/logs after build. | won |
+| 13 | Mesh silhouette realism slice | The latest stills now fail on primitive silhouettes: flat cliff sheets, boxy cabin volumes, and simple tent props. Faceted cliff-wall meshes plus bounded hero bevel/eave/hem geometry should improve form without changing the asset catalog. | Require `mesh_silhouette_realism` IR plus runtime faceted-cliff and hero-silhouette logs, prove Loop 20 artifacts fail, then render campsite/desert/alpine. | Dead if extra mesh complexity destabilizes captures, crops heroes, or remains visually indistinct after build. | won |
 
 ## Fronts
 
@@ -72,6 +73,7 @@ Unknown:
 | Atmosphere/cliff realism | loops | done checkpoint | Loop 10 verified authored storm/moonlight atmosphere and canyon erosion detail on novel prompts |
 | Catalog cliff assets | loops | done checkpoint | Loop 11 verified six catalog cliff meshes in fresh canyon IR with campsite/alpine/kitchen regressions green |
 | Surface material richness | loops | done checkpoint | Loop 12 verified runtime material-breakup decals, vegetation/scrub clusters, and per-render logs on campsite/desert/alpine |
+| Mesh silhouette realism | loops | done checkpoint | Loop 13 verified faceted canyon mesh/overhangs and hero bevel/eave/hem details on campsite/desert/alpine |
 | Asset fidelity | self/HUMAN-GATE | residual | Catalog quality is now the dominant visible limit: low-poly silhouettes, simple cabin/camp meshes, coarse mountain backdrops |
 
 ## Beat Log
@@ -99,6 +101,7 @@ Unknown:
 - Loop 10 checkpoint: `aaa_graphics_alpine_loop14` passes with darker authored night/storm atmosphere and rain/haze runtime evidence; `aaa_graphics_desert_loop14` passes with cliff erosion detail runtime evidence; campsite regression, Director IR validation, known-bad oracles, Release build, Python compile, and kitchen smoke are green. Visual residual: cliff/wall mass and many props are still stylized and planar, so the next front needs richer mesh silhouettes or higher-fidelity assets.
 - Loop 11 checkpoint: proved `aaa_graphics_desert_loop14` fails only `missing_catalog_cliff_assets`, then generated `aaa_graphics_desert_loop17` with six `cliff_*` catalog assets. Desert, campsite, alpine, Director IR validation, known-bad oracles, Python compile, and kitchen smoke are green. Residual: catalog cliffs add silhouette mass but still read as stylized low-poly assets, so the next front must improve material/geometry realism rather than declare the AAA push complete.
 - Loop 12 checkpoint: proved current Loop 17 artifacts fail `missing_surface_material_richness`, added compiler/runtime material breakup decals, vegetation/scrub clusters, tent/cabin material lines, and per-artifact `scene_gen` log capture. Release build, Python compile, campsite/desert/alpine quality + graphics + Director IR validation, kitchen smoke, and known-bad oracles are green. Residual: the pass adds visible surface detail, but the underlying low-poly catalog/primitive geometry is still the next visible ceiling.
+- Loop 13 checkpoint: proved Loop 20 artifacts fail `missing_mesh_silhouette_realism`, added `mesh_silhouette_realism` IR, faceted cliff-wall vertical bands, canyon overhang blocks, and campsite/cabin hero silhouette bevel/eave/hem/depth geometry. Release build green (`[OK] Build complete in 9.4s`); Python compile green; Loop 21 campsite/desert/alpine quality, graphics, and Director IR validation green using the per-render `_0.out` logs; kitchen smoke green; both known-bad oracles still fail for the right reasons. Residual: form is less flat, but the source/catalog style is still visibly low-poly and repeated.
 
 ## Learnings
 
@@ -113,6 +116,7 @@ Unknown:
 - Loop 10 improved atmosphere and cliff breakup, but line overlays cannot substitute for real mesh silhouette complexity. The next serious slice should either use existing high-detail cliff/tree assets from the catalog/pretrained asset folders or add more volumetric/procedural mesh generation for rock faces and vegetation.
 - Loop 11 showed catalog cliff assets are stable in the solver and visible in IR/runtime outputs, but the visual ceiling is now material/mesh fidelity: low-poly cliff blocks, simplified props, and repeated stylized trees need richer surface treatment or procedural complexity.
 - Loop 12 improved material breakup and fixed a verifier-gauge issue: `scene_gen` now saves the engine harness log beside each render (`<out_name>.out`), so graphics gates no longer have to rely on stale `cortex_last_run.txt` fallback evidence.
+- Loop 13 improved cliff and hero silhouettes, but it also exposed that generated artifacts save runtime logs as `<out_name>_0.out` for iteration 0; graphics gates must use that path or they correctly fail for missing runtime evidence.
 
 ## BLOCKED / Decisions Needed
 

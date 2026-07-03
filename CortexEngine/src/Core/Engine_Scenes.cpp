@@ -142,6 +142,14 @@ namespace {
         int heroMaterialLineCount = 0;
     };
 
+    struct GenerativeMeshSilhouetteRealism {
+        bool enabled = false;
+        int cliffMeshVerticalBands = 0;
+        int cliffOverhangCount = 0;
+        int heroBevelDetailCount = 0;
+        int propDepthLayerCount = 0;
+    };
+
     struct GenerativeAssetFidelity {
         bool enabled = false;
         int heroDetailCount = 0;
@@ -298,13 +306,20 @@ namespace {
     std::shared_ptr<Scene::MeshData> CreateGenerativeCliffWallMesh(float length,
                                                                    float height,
                                                                    float roughness,
-                                                                   float phase) {
+                                                                   float phase,
+                                                                   uint32_t verticalBands = 1u) {
         auto mesh = std::make_shared<Scene::MeshData>();
         mesh->kind = Scene::MeshKind::Procedural;
         constexpr uint32_t kSegments = 36;
-        mesh->positions.reserve((kSegments + 1u) * 2u);
-        mesh->normals.reserve((kSegments + 1u) * 2u);
-        mesh->texCoords.reserve((kSegments + 1u) * 2u);
+        verticalBands = std::clamp(verticalBands, 1u, 10u);
+        const uint32_t rows = verticalBands + 1u;
+        mesh->positions.reserve((kSegments + 1u) * rows);
+        mesh->normals.resize((kSegments + 1u) * rows, glm::vec3(1.0f, 0.0f, 0.0f));
+        mesh->texCoords.reserve((kSegments + 1u) * rows);
+
+        auto idx = [rows](uint32_t seg, uint32_t row) {
+            return seg * rows + row;
+        };
 
         const float halfLen = length * 0.5f;
         for (uint32_t i = 0; i <= kSegments; ++i) {
@@ -312,24 +327,50 @@ namespace {
             const float z = -halfLen + u * length;
             const float ledge = std::sin(u * 23.0f + phase) * 0.35f +
                                 std::sin(u * 57.0f + phase * 1.9f) * 0.16f;
-            const float x = ledge * roughness;
             const float top = height * std::clamp(0.72f + std::sin(u * 11.0f + phase * 0.7f) * 0.18f,
                                                   0.48f,
                                                   1.02f);
             const float base = -0.18f + std::sin(u * 17.0f + phase) * 0.08f;
-            mesh->positions.emplace_back(x, base, z);
-            mesh->positions.emplace_back(x + ledge * 0.35f, top, z);
-            mesh->normals.emplace_back(1.0f, 0.0f, 0.0f);
-            mesh->normals.emplace_back(1.0f, 0.0f, 0.0f);
-            mesh->texCoords.emplace_back(u * 6.0f, 1.0f);
-            mesh->texCoords.emplace_back(u * 6.0f, 0.0f);
+            for (uint32_t row = 0; row < rows; ++row) {
+                const float v = static_cast<float>(row) / static_cast<float>(verticalBands);
+                const float terrace = std::floor(v * static_cast<float>(verticalBands)) / static_cast<float>(std::max(1u, verticalBands));
+                const float shelf = std::sin(v * 31.0f + u * 13.0f + phase) * 0.12f +
+                                    std::sin(v * 9.0f - u * 41.0f + phase * 0.33f) * 0.07f;
+                const float bandStep = (terrace - 0.5f) * roughness * 0.18f;
+                const float undercut = ((row % 2u) == 0u ? -0.08f : 0.06f) * roughness;
+                const float x = ledge * roughness + shelf * roughness + bandStep + undercut;
+                const float y = glm::mix(base, top, v);
+                mesh->positions.emplace_back(x, y, z);
+                mesh->texCoords.emplace_back(u * 6.0f, 1.0f - v);
+            }
         }
+
         for (uint32_t i = 0; i < kSegments; ++i) {
-            const uint32_t b0 = i * 2u;
-            const uint32_t t0 = b0 + 1u;
-            const uint32_t b1 = b0 + 2u;
-            const uint32_t t1 = b0 + 3u;
-            mesh->indices.insert(mesh->indices.end(), { b0, b1, t1, b0, t1, t0 });
+            for (uint32_t row = 0; row < verticalBands; ++row) {
+                const uint32_t a = idx(i, row);
+                const uint32_t b = idx(i + 1u, row);
+                const uint32_t c = idx(i, row + 1u);
+                const uint32_t d = idx(i + 1u, row + 1u);
+                mesh->indices.insert(mesh->indices.end(), { a, b, d, a, d, c });
+            }
+        }
+
+        for (uint32_t i = 0; i <= kSegments; ++i) {
+            for (uint32_t row = 0; row < rows; ++row) {
+                const uint32_t il = i > 0 ? i - 1u : i;
+                const uint32_t ir = i < kSegments ? i + 1u : i;
+                const uint32_t rd = row > 0 ? row - 1u : row;
+                const uint32_t ru = row < verticalBands ? row + 1u : row;
+                const glm::vec3 dz = mesh->positions[idx(ir, row)] - mesh->positions[idx(il, row)];
+                const glm::vec3 dy = mesh->positions[idx(i, ru)] - mesh->positions[idx(i, rd)];
+                glm::vec3 n = glm::cross(dz, dy);
+                if (glm::length(n) < 1e-5f) {
+                    n = glm::vec3(1.0f, 0.0f, 0.0f);
+                } else {
+                    n = glm::normalize(n);
+                }
+                mesh->normals[idx(i, row)] = n;
+            }
         }
         mesh->UpdateBounds();
         return mesh;
@@ -3238,6 +3279,7 @@ void Engine::BuildRecipeScene() {
         GenerativeWorldGeometry worldGeometry;
         GenerativeSurfaceDetail surfaceDetail;
         GenerativeSurfaceMaterialRichness surfaceMaterialRichness;
+        GenerativeMeshSilhouetteRealism meshSilhouetteRealism;
         GenerativeAssetFidelity assetFidelity;
         GenerativeAtmosphereFidelity atmosphereFidelity;
         GenerativeGeometryRealism geometryRealism;
@@ -3359,6 +3401,16 @@ void Engine::BuildRecipeScene() {
                     static_cast<int>(std::clamp(num(surfaceMaterialRichness, "vegetation_cluster_count", 0.0f), 0.0f, 32.0f));
                 genExt.surfaceMaterialRichness.heroMaterialLineCount =
                     static_cast<int>(std::clamp(num(surfaceMaterialRichness, "hero_material_line_count", 0.0f), 0.0f, 48.0f));
+                const nlohmann::json meshSilhouetteRealism = graphics.value("mesh_silhouette_realism", nlohmann::json::object());
+                genExt.meshSilhouetteRealism.enabled = meshSilhouetteRealism.value("enabled", false);
+                genExt.meshSilhouetteRealism.cliffMeshVerticalBands =
+                    static_cast<int>(std::clamp(num(meshSilhouetteRealism, "cliff_mesh_vertical_bands", 0.0f), 0.0f, 10.0f));
+                genExt.meshSilhouetteRealism.cliffOverhangCount =
+                    static_cast<int>(std::clamp(num(meshSilhouetteRealism, "cliff_overhang_count", 0.0f), 0.0f, 24.0f));
+                genExt.meshSilhouetteRealism.heroBevelDetailCount =
+                    static_cast<int>(std::clamp(num(meshSilhouetteRealism, "hero_bevel_detail_count", 0.0f), 0.0f, 48.0f));
+                genExt.meshSilhouetteRealism.propDepthLayerCount =
+                    static_cast<int>(std::clamp(num(meshSilhouetteRealism, "prop_depth_layer_count", 0.0f), 0.0f, 24.0f));
                 const nlohmann::json assetFidelity = graphics.value("asset_fidelity", nlohmann::json::object());
                 genExt.assetFidelity.enabled = assetFidelity.value("enabled", false);
                 genExt.assetFidelity.heroDetailCount =
@@ -3896,10 +3948,14 @@ void Engine::BuildRecipeScene() {
                 const float wallHeight = genExt.worldGeometry.wallHeightM > 1.0f
                     ? genExt.worldGeometry.wallHeightM
                     : std::max(5.5f, genExt.terrainRelief * 10.0f);
+                const uint32_t cliffBands = genExt.meshSilhouetteRealism.enabled
+                    ? static_cast<uint32_t>(std::max(1, genExt.meshSilhouetteRealism.cliffMeshVerticalBands))
+                    : 1u;
                 auto cliffMesh = CreateGenerativeCliffWallMesh(genExt.extent * 1.08f,
                                                                wallHeight,
-                                                               0.95f,
-                                                               4.31f);
+                                                               genExt.meshSilhouetteRealism.enabled ? 1.24f : 0.95f,
+                                                               4.31f,
+                                                               cliffBands);
                 auto shardMesh = CreateGenerativeRockShardMesh(2.17f);
                 auto cubeMesh = Utils::MeshGenerator::CreateCube();
                 const auto upCliff = renderer->UploadMesh(cliffMesh);
@@ -3974,6 +4030,35 @@ void Engine::BuildRecipeScene() {
                             : glm::vec3(0.36f, 0.13f, 0.09f);
                         dressRock(r, stripe, 0.82f, 0.45f, 0.56f);
                         strataCount++;
+                    }
+
+                    int overhangCount = 0;
+                    if (genExt.meshSilhouetteRealism.enabled && genExt.meshSilhouetteRealism.cliffOverhangCount > 0) {
+                        for (int i = 0; i < genExt.meshSilhouetteRealism.cliffOverhangCount; ++i) {
+                            const float side = (i % 2 == 0) ? -1.0f : 1.0f;
+                            const int band = (i / 2) % std::max(1, genExt.meshSilhouetteRealism.cliffMeshVerticalBands);
+                            entt::entity ledge = m_registry->CreateEntity();
+                            m_registry->AddComponent<Scene::TagComponent>(
+                                ledge, "GenerativeExterior_CliffSilhouetteOverhang" + std::to_string(i));
+                            auto& t = m_registry->AddComponent<TransformComponent>(ledge);
+                            t.position = glm::vec3(side * (canyonHalfWidth - 0.32f - 0.10f * static_cast<float>(i % 3)),
+                                                   0.95f + band * 0.54f,
+                                                   -5.2f - static_cast<float>((i * 4) % 24));
+                            t.rotation = glm::quat(glm::vec3(glm::radians(-3.0f + (i % 5) * 1.4f),
+                                                             side > 0.0f ? glm::pi<float>() : 0.0f,
+                                                             glm::radians(-5.0f + (i % 4) * 2.5f)));
+                            t.scale = glm::vec3(0.34f + 0.05f * static_cast<float>(i % 4),
+                                                0.095f + 0.014f * static_cast<float>(i % 3),
+                                                0.70f + 0.13f * static_cast<float>(i % 5));
+                            auto& r = m_registry->AddComponent<Scene::RenderableComponent>(ledge);
+                            r.mesh = cubeMesh;
+                            dressRock(r,
+                                      glm::mix(rockBase, glm::vec3(0.20f, 0.075f, 0.045f), 0.36f + 0.06f * (i % 4)),
+                                      0.88f,
+                                      0.64f,
+                                      0.66f);
+                            overhangCount++;
+                        }
                     }
 
                     int erosionCount = 0;
@@ -4093,6 +4178,11 @@ void Engine::BuildRecipeScene() {
                                  strataCount);
                     if (canyonWalls > 0) {
                         spdlog::info("generative_exterior: created canyon wall layer(s) {}", canyonWalls);
+                    }
+                    if (canyonWalls > 0 && genExt.meshSilhouetteRealism.enabled) {
+                        spdlog::info("generative_exterior: created faceted cliff mesh vertical_bands={} overhangs={}",
+                                     cliffBands,
+                                     overhangCount);
                     }
                     if (foregroundCount > 0) {
                         spdlog::info("generative_exterior: created foreground occluder(s) {}", foregroundCount);
@@ -5013,6 +5103,182 @@ void Engine::BuildRecipeScene() {
                 spdlog::info("generative_exterior: created hero asset detail cabin_facade=0 camp={} foreground={}",
                              campDetailCount,
                              foregroundCount);
+            }
+        }
+    }
+
+    if (genExt.valid && genExt.meshSilhouetteRealism.enabled && genExt.meshSilhouetteRealism.heroBevelDetailCount > 0) {
+        if (auto* renderer = m_renderer.get()) {
+            auto cubeMesh = Utils::MeshGenerator::CreateCube();
+            auto cylinderMesh = Utils::MeshGenerator::CreateCylinder(0.5f, 1.0f, 16);
+            const auto upCube = renderer->UploadMesh(cubeMesh);
+            const auto upCylinder = renderer->UploadMesh(cylinderMesh);
+            if (upCube.IsErr() || upCylinder.IsErr()) {
+                spdlog::warn("generative_exterior: hero silhouette mesh upload failed cube='{}' cylinder='{}'",
+                             upCube.IsErr() ? upCube.Error() : "ok",
+                             upCylinder.IsErr() ? upCylinder.Error() : "ok");
+            } else {
+                auto dressBevel = [&](Scene::RenderableComponent& r,
+                                      const glm::vec4& color,
+                                      const char* preset,
+                                      float roughness,
+                                      float normalScale) {
+                    r.albedoColor = color;
+                    r.metallic = 0.0f;
+                    r.roughness = roughness;
+                    r.ao = 0.86f;
+                    r.occlusionStrength = 0.74f;
+                    r.normalScale = normalScale;
+                    r.wetnessFactor = genExt.groundWetness * 0.18f;
+                    r.proceduralMaskStrength = 0.34f;
+                    r.specularFactor = 0.20f;
+                    r.clearcoatFactor = std::min(genExt.groundWetness * 0.16f, 0.09f);
+                    r.clearcoatRoughnessFactor = 0.72f;
+                    r.anisotropyStrength = std::string(preset) == "wood" ? 0.32f : 0.12f;
+                    r.sheenWeight = std::string(preset) == "fabric" ? 0.24f : 0.0f;
+                    r.presetName = preset;
+                };
+                auto addBevel = [&](const std::string& tag,
+                                    const std::shared_ptr<Scene::MeshData>& mesh,
+                                    const glm::vec3& position,
+                                    const glm::vec3& scale,
+                                    const glm::vec3& euler,
+                                    const glm::vec4& color,
+                                    const char* preset,
+                                    float roughness,
+                                    float normalScale) {
+                    entt::entity part = m_registry->CreateEntity();
+                    m_registry->AddComponent<Scene::TagComponent>(part, tag);
+                    auto& t = m_registry->AddComponent<TransformComponent>(part);
+                    t.position = position;
+                    t.scale = scale;
+                    t.rotation = glm::quat(euler);
+                    auto& r = m_registry->AddComponent<Scene::RenderableComponent>(part);
+                    r.mesh = mesh;
+                    dressBevel(r, color, preset, roughness, normalScale);
+                };
+
+                int cabinBevels = 0;
+                int campBevels = 0;
+                const int bevelTarget = genExt.meshSilhouetteRealism.heroBevelDetailCount;
+                if (!genExt.structures.empty()) {
+                    const auto& structure = genExt.structures.front();
+                    const float yawRad = glm::radians(structure.yawDeg);
+                    const float cs = std::cos(yawRad);
+                    const float sn = std::sin(yawRad);
+                    auto place = [&](float x, float y, float z) -> glm::vec3 {
+                        return structure.position + glm::vec3(cs * x + sn * z,
+                                                              y,
+                                                              -sn * x + cs * z);
+                    };
+                    const float w = structure.widthM;
+                    const float d = structure.depthM;
+                    const float h = structure.wallHeightM;
+                    const float roofY = h + structure.roofHeightM * 0.20f;
+                    const glm::vec4 darkWood(0.070f, 0.042f, 0.026f, 1.0f);
+                    for (int i = 0; i < bevelTarget; ++i) {
+                        if (i < 4) {
+                            const bool side = (i % 2) == 0;
+                            addBevel("GenerativeExterior_HeroSilhouette_CabinEave" + std::to_string(i),
+                                     cubeMesh,
+                                     place(side ? -w * 0.54f : w * 0.54f,
+                                           roofY + 0.08f * static_cast<float>(i / 2),
+                                           (i < 2) ? d * 0.28f : -d * 0.28f),
+                                     glm::vec3(0.10f, 0.10f, d * 0.58f),
+                                     glm::vec3(0.0f, yawRad, glm::radians(side ? -4.0f : 4.0f)),
+                                     darkWood,
+                                     "wood",
+                                     0.86f,
+                                     0.38f);
+                        } else if (i < 8) {
+                            const float x = (i % 2 == 0) ? -w * 0.43f : w * 0.43f;
+                            const float z = (i < 6) ? d * 0.64f : d * 0.38f;
+                            addBevel("GenerativeExterior_HeroSilhouette_CabinPorchPost" + std::to_string(i),
+                                     cubeMesh,
+                                     place(x, 0.58f, z),
+                                     glm::vec3(0.075f, 1.02f, 0.075f),
+                                     glm::vec3(0.0f, yawRad, glm::radians((i % 3 - 1) * 1.5f)),
+                                     glm::vec4(0.12f, 0.072f, 0.040f, 1.0f),
+                                     "wood",
+                                     0.82f,
+                                     0.34f);
+                        } else {
+                            const float col = static_cast<float>((i - 8) % 6);
+                            addBevel("GenerativeExterior_HeroSilhouette_CabinFoundationStone" + std::to_string(i),
+                                     cubeMesh,
+                                     place(-w * 0.44f + col * w * 0.18f,
+                                           0.10f,
+                                           d * 0.58f + 0.10f * static_cast<float>((i - 8) / 6)),
+                                     glm::vec3(0.22f, 0.14f, 0.16f),
+                                     glm::vec3(glm::radians(2.0f * static_cast<float>(i % 3 - 1)),
+                                               yawRad + glm::radians(7.0f * static_cast<float>(i % 5)),
+                                               glm::radians(-2.0f + static_cast<float>(i % 4))),
+                                     glm::vec4(0.18f, 0.16f, 0.14f, 1.0f),
+                                     "masonry",
+                                     0.90f,
+                                     0.42f);
+                        }
+                        cabinBevels++;
+                    }
+                } else {
+                    const glm::vec3 tentCenter(2.9f, 0.0f, 0.9f);
+                    const float tentYaw = glm::radians(-18.0f);
+                    const float cs = std::cos(tentYaw);
+                    const float sn = std::sin(tentYaw);
+                    auto tentPlace = [&](float x, float y, float z) -> glm::vec3 {
+                        return tentCenter + glm::vec3(cs * x + sn * z, y, -sn * x + cs * z);
+                    };
+                    for (int i = 0; i < bevelTarget; ++i) {
+                        if (i < 6) {
+                            const float side = (i % 2 == 0) ? -1.0f : 1.0f;
+                            addBevel("GenerativeExterior_HeroSilhouette_TentHem" + std::to_string(i),
+                                     cubeMesh,
+                                     tentPlace(side * 1.04f, 0.18f + 0.035f * static_cast<float>(i / 2), -0.84f + 0.42f * static_cast<float>(i / 2)),
+                                     glm::vec3(0.075f, 0.075f, 0.78f),
+                                     glm::vec3(glm::radians(1.5f * static_cast<float>(i % 3 - 1)),
+                                               tentYaw,
+                                               glm::radians(side * 5.0f)),
+                                     glm::vec4(0.085f, 0.045f, 0.055f, 1.0f),
+                                     "fabric",
+                                     0.78f,
+                                     0.36f);
+                        } else if (i < 12) {
+                            addBevel("GenerativeExterior_HeroSilhouette_TentFlapDepth" + std::to_string(i),
+                                     cubeMesh,
+                                     tentPlace(-0.55f + 0.22f * static_cast<float>((i - 6) % 6),
+                                               0.48f + 0.045f * static_cast<float>((i - 6) / 3),
+                                               1.18f),
+                                     glm::vec3(0.055f, 0.20f, 0.055f),
+                                     glm::vec3(glm::radians(6.0f),
+                                               tentYaw,
+                                               glm::radians(-6.0f + static_cast<float>(i % 4) * 3.0f)),
+                                     glm::vec4(0.11f, 0.060f, 0.070f, 1.0f),
+                                     "fabric",
+                                     0.76f,
+                                     0.34f);
+                        } else {
+                            addBevel("GenerativeExterior_HeroSilhouette_GearDepth" + std::to_string(i),
+                                     cylinderMesh,
+                                     glm::vec3(-2.70f + 0.26f * static_cast<float>((i - 12) % 6),
+                                               0.16f,
+                                               1.88f + 0.16f * static_cast<float>((i - 12) / 6)),
+                                     glm::vec3(0.16f, 0.42f, 0.16f),
+                                     glm::vec3(glm::radians(88.0f),
+                                               glm::radians(17.0f * static_cast<float>(i)),
+                                               glm::radians(4.0f * static_cast<float>(i % 3))),
+                                     glm::vec4(0.18f, 0.10f, 0.055f, 1.0f),
+                                     "wood",
+                                     0.84f,
+                                     0.38f);
+                        }
+                        campBevels++;
+                    }
+                }
+
+                spdlog::info("generative_exterior: created hero silhouette bevel detail cabin={} camp={} prop_depth_layers={}",
+                             cabinBevels,
+                             campBevels,
+                             genExt.meshSilhouetteRealism.propDepthLayerCount);
             }
         }
     }

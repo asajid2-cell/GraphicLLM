@@ -614,6 +614,20 @@ def compile_v3_to_v2(v3: dict[str, Any]) -> dict[str, Any]:
                 "hero_geometry_texture_assignment",
             ],
         },
+        "source_geometry_fidelity": {
+            "enabled": True,
+            "source_asset_set_count": 4,
+            "scanned_lantern_count": 2 if (campsite or cabin) else 0,
+            "scanned_utility_prop_count": 3 if campsite else (2 if cabin else 1),
+            "scanned_anchor_rock_count": 4 if water_on else 3,
+            "hero_anchor_count": 7 if campsite else (6 if cabin else 4),
+            "systems": [
+                "scanned_lantern_pbr_mesh",
+                "scanned_table_or_barrel_pbr_mesh",
+                "scanned_boulder_anchor_mesh",
+                "prompt_hero_source_mesh_anchors",
+            ],
+        },
         "atmosphere_fidelity": {
             "enabled": True,
             "night_sky_control": bool(moonlight),

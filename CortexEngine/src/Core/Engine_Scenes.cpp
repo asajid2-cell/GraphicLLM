@@ -216,6 +216,15 @@ namespace {
         int shoreSurfaceCount = 0;
     };
 
+    struct GenerativeSourceGeometryFidelity {
+        bool enabled = false;
+        int sourceAssetSetCount = 0;
+        int scannedLanternCount = 0;
+        int scannedUtilityPropCount = 0;
+        int scannedAnchorRockCount = 0;
+        int heroAnchorCount = 0;
+    };
+
     struct GenerativeTextureMaterialRuntimeCounts {
         int terrain = 0;
         int rock = 0;
@@ -3354,6 +3363,7 @@ void Engine::BuildRecipeScene() {
         GenerativeAssetFidelity assetFidelity;
         GenerativeHeroEnvironmentGeometry heroEnvironmentGeometry;
         GenerativeTextureMaterialFidelity textureMaterialFidelity;
+        GenerativeSourceGeometryFidelity sourceGeometryFidelity;
         GenerativeAtmosphereFidelity atmosphereFidelity;
         GenerativeGeometryRealism geometryRealism;
         int shoreLayerCount = 0;
@@ -3544,6 +3554,18 @@ void Engine::BuildRecipeScene() {
                     static_cast<int>(std::clamp(num(textureMaterialFidelity, "hero_surface_count", 0.0f), 0.0f, 160.0f));
                 genExt.textureMaterialFidelity.shoreSurfaceCount =
                     static_cast<int>(std::clamp(num(textureMaterialFidelity, "shore_surface_count", 0.0f), 0.0f, 64.0f));
+                const nlohmann::json sourceGeometryFidelity = graphics.value("source_geometry_fidelity", nlohmann::json::object());
+                genExt.sourceGeometryFidelity.enabled = sourceGeometryFidelity.value("enabled", false);
+                genExt.sourceGeometryFidelity.sourceAssetSetCount =
+                    static_cast<int>(std::clamp(num(sourceGeometryFidelity, "source_asset_set_count", 0.0f), 0.0f, 12.0f));
+                genExt.sourceGeometryFidelity.scannedLanternCount =
+                    static_cast<int>(std::clamp(num(sourceGeometryFidelity, "scanned_lantern_count", 0.0f), 0.0f, 6.0f));
+                genExt.sourceGeometryFidelity.scannedUtilityPropCount =
+                    static_cast<int>(std::clamp(num(sourceGeometryFidelity, "scanned_utility_prop_count", 0.0f), 0.0f, 8.0f));
+                genExt.sourceGeometryFidelity.scannedAnchorRockCount =
+                    static_cast<int>(std::clamp(num(sourceGeometryFidelity, "scanned_anchor_rock_count", 0.0f), 0.0f, 10.0f));
+                genExt.sourceGeometryFidelity.heroAnchorCount =
+                    static_cast<int>(std::clamp(num(sourceGeometryFidelity, "hero_anchor_count", 0.0f), 0.0f, 16.0f));
                 const nlohmann::json atmosphereFidelity = graphics.value("atmosphere_fidelity", nlohmann::json::object());
                 genExt.atmosphereFidelity.enabled = atmosphereFidelity.value("enabled", false);
                 genExt.atmosphereFidelity.nightSkyControl = atmosphereFidelity.value("night_sky_control", false);
@@ -5539,6 +5561,198 @@ void Engine::BuildRecipeScene() {
                                  rockInstances);
                 } else {
                     spdlog::warn("generative_exterior: naturalistic ecology assets requested but no scanned instances were created");
+                }
+            }
+        }
+    }
+
+    if (genExt.valid && genExt.sourceGeometryFidelity.enabled) {
+        if (auto* renderer = m_renderer.get()) {
+            auto lanternMesh = LoadNaturalisticShowcaseMesh("Lantern_01/Lantern_01_1k.gltf");
+            auto tableMesh = LoadNaturalisticShowcaseMesh("WoodenTable_01/WoodenTable_01_1k.gltf");
+            auto barrelMesh = LoadNaturalisticShowcaseMesh("Barrel_01/Barrel_01_1k.gltf");
+            auto boulderMesh = LoadNaturalisticShowcaseMesh("boulder_01/boulder_01_1k.gltf");
+
+            const bool uploadsOk =
+                UploadAssetLedMesh(renderer, lanternMesh, "source-bound Lantern_01") &&
+                UploadAssetLedMesh(renderer, tableMesh, "source-bound WoodenTable_01") &&
+                UploadAssetLedMesh(renderer, barrelMesh, "source-bound Barrel_01") &&
+                UploadAssetLedMesh(renderer, boulderMesh, "source-bound boulder_01");
+            if (!uploadsOk) {
+                spdlog::warn("generative_exterior: source-bound hero geometry mesh upload failed");
+            } else {
+                const bool hasCabin = !genExt.structures.empty();
+                const float shoreZ = genExt.waterOn ? genExt.waterFromZ : -genExt.extent * 0.30f;
+                const float wetness = std::clamp(genExt.groundWetness, 0.0f, 1.0f);
+                const bool desertSurface = genExt.groundKind.find("dirt") != std::string::npos ||
+                                           genExt.worldGeometry.canyonWallLayers > 0;
+
+                const AssetLedMaterialSettings warmBrass{
+                    glm::vec4(0.54f, 0.38f, 0.20f, 1.0f),
+                    0.26f,
+                    0.30f,
+                    0.0f,
+                    1.5f,
+                    glm::vec3(1.0f, 0.58f, 0.26f),
+                    0.70f,
+                    wetness * 0.18f,
+                    0.42f,
+                    false,
+                    Scene::RenderableComponent::AlphaMode::Opaque,
+                    Scene::RenderableComponent::RenderLayer::Opaque,
+                    "brass"
+                };
+                const AssetLedMaterialSettings wetWood{
+                    glm::vec4(0.26f, 0.15f, 0.070f, 1.0f),
+                    0.0f,
+                    0.50f,
+                    0.0f,
+                    1.5f,
+                    glm::vec3(0.0f),
+                    1.0f,
+                    std::min(0.64f, wetness + 0.12f),
+                    0.48f,
+                    false,
+                    Scene::RenderableComponent::AlphaMode::Opaque,
+                    Scene::RenderableComponent::RenderLayer::Opaque,
+                    "wood"
+                };
+                const AssetLedMaterialSettings darkUtility{
+                    glm::vec4(0.24f, 0.20f, 0.16f, 1.0f),
+                    0.16f,
+                    0.42f,
+                    0.0f,
+                    1.5f,
+                    glm::vec3(0.0f),
+                    1.0f,
+                    wetness * 0.18f,
+                    0.36f,
+                    false,
+                    Scene::RenderableComponent::AlphaMode::Opaque,
+                    Scene::RenderableComponent::RenderLayer::Opaque,
+                    "masonry"
+                };
+                const AssetLedMaterialSettings anchorStone{
+                    glm::vec4(desertSurface ? glm::vec3(0.50f, 0.31f, 0.20f) : glm::vec3(0.16f, 0.19f, 0.15f), 1.0f),
+                    0.0f,
+                    desertSurface ? 0.74f : 0.58f,
+                    0.0f,
+                    1.5f,
+                    glm::vec3(0.0f),
+                    1.0f,
+                    desertSurface ? 0.04f : std::min(0.68f, wetness + 0.18f),
+                    desertSurface ? 0.38f : 0.62f,
+                    false,
+                    Scene::RenderableComponent::AlphaMode::Opaque,
+                    Scene::RenderableComponent::RenderLayer::Opaque,
+                    "mossy_masonry"
+                };
+
+                auto sourceSets = 0;
+                sourceSets += (lanternMesh && lanternMesh->gpuBuffers) ? 1 : 0;
+                sourceSets += (tableMesh && tableMesh->gpuBuffers) ? 1 : 0;
+                sourceSets += (barrelMesh && barrelMesh->gpuBuffers) ? 1 : 0;
+                sourceSets += (boulderMesh && boulderMesh->gpuBuffers) ? 1 : 0;
+
+                auto addSource = [&](const std::string& tag,
+                                     const char* assetId,
+                                     const std::shared_ptr<Scene::MeshData>& mesh,
+                                     const glm::vec3& position,
+                                     const glm::vec3& scale,
+                                     const glm::vec3& euler,
+                                     const AssetLedMaterialSettings& material,
+                                     int& counter) {
+                    if (!mesh || !mesh->gpuBuffers) {
+                        return;
+                    }
+                    AddAssetLedNaturalisticRenderable(*m_registry,
+                                                      tag.c_str(),
+                                                      assetId,
+                                                      mesh,
+                                                      position,
+                                                      scale,
+                                                      euler,
+                                                      material);
+                    counter++;
+                };
+
+                auto cabinPlace = [&](float x, float y, float z) -> glm::vec3 {
+                    if (!hasCabin) {
+                        return glm::vec3(x, y, z);
+                    }
+                    const auto& structure = genExt.structures.front();
+                    const float yawRad = glm::radians(structure.yawDeg);
+                    const float cs = std::cos(yawRad);
+                    const float sn = std::sin(yawRad);
+                    return structure.position + glm::vec3(cs * x + sn * z,
+                                                          y,
+                                                          -sn * x + cs * z);
+                };
+
+                int lanterns = 0;
+                int utilityProps = 0;
+                int anchorRocks = 0;
+
+                for (int i = 0; i < genExt.sourceGeometryFidelity.scannedLanternCount; ++i) {
+                    const glm::vec3 pos = hasCabin
+                        ? cabinPlace(-1.15f + 2.30f * static_cast<float>(i % 2), 0.42f, 2.28f + 0.18f * static_cast<float>(i / 2))
+                        : glm::vec3(0.94f + 0.46f * static_cast<float>(i), 0.38f, 1.18f + 0.16f * static_cast<float>(i % 2));
+                    addSource("GenerativeExterior_SourceLantern" + std::to_string(i),
+                              "Lantern_01",
+                              lanternMesh,
+                              pos,
+                              glm::vec3(hasCabin ? 0.32f : 0.28f),
+                              glm::vec3(0.0f, glm::radians(-18.0f + 24.0f * static_cast<float>(i)), 0.0f),
+                              warmBrass,
+                              lanterns);
+                }
+
+                for (int i = 0; i < genExt.sourceGeometryFidelity.scannedUtilityPropCount; ++i) {
+                    const bool useTable = (i == 0);
+                    const auto& mesh = useTable ? tableMesh : barrelMesh;
+                    const char* assetId = useTable ? "WoodenTable_01" : "Barrel_01";
+                    const glm::vec3 scale = useTable
+                        ? glm::vec3(hasCabin ? 0.48f : 0.42f)
+                        : glm::vec3(hasCabin ? 0.34f : 0.30f);
+                    const glm::vec3 pos = hasCabin
+                        ? cabinPlace(-0.48f + 0.72f * static_cast<float>(i), useTable ? 0.30f : 0.34f, 2.50f + 0.22f * static_cast<float>(i % 2))
+                        : glm::vec3(-0.85f + 0.72f * static_cast<float>(i), useTable ? 0.28f : 0.33f, 1.52f - 0.24f * static_cast<float>(i % 2));
+                    addSource("GenerativeExterior_SourceUtilityProp" + std::to_string(i),
+                              assetId,
+                              mesh,
+                              pos,
+                              scale,
+                              glm::vec3(0.0f, glm::radians(-20.0f + 22.0f * static_cast<float>(i)), 0.0f),
+                              useTable ? wetWood : darkUtility,
+                              utilityProps);
+                }
+
+                for (int i = 0; i < genExt.sourceGeometryFidelity.scannedAnchorRockCount; ++i) {
+                    const float side = (i % 2 == 0) ? -1.0f : 1.0f;
+                    const float x = side * (2.2f + 1.25f * static_cast<float>(i / 2));
+                    const float z = shoreZ + 0.62f + 0.58f * static_cast<float>(i % 3);
+                    addSource("GenerativeExterior_SourceAnchorRock" + std::to_string(i),
+                              "boulder_01",
+                              boulderMesh,
+                              glm::vec3(x, 0.055f, z),
+                              glm::vec3(0.20f + 0.035f * static_cast<float>(i % 3)),
+                              glm::vec3(glm::radians(-2.0f + 3.0f * static_cast<float>(i % 2)),
+                                        glm::radians(31.0f * static_cast<float>(i)),
+                                        glm::radians(-4.0f + 5.0f * static_cast<float>(i % 3))),
+                              anchorStone,
+                              anchorRocks);
+                }
+
+                const int heroAnchors = lanterns + utilityProps + anchorRocks;
+                if (heroAnchors > 0) {
+                    spdlog::info("generative_exterior: source-bound hero geometry lanterns={} utility_props={} anchor_rocks={} hero_anchors={} source_sets={}",
+                                 lanterns,
+                                 utilityProps,
+                                 anchorRocks,
+                                 heroAnchors,
+                                 sourceSets);
+                } else {
+                    spdlog::warn("generative_exterior: source-bound hero geometry requested but no scanned hero meshes were created");
                 }
             }
         }

@@ -250,6 +250,7 @@ def evaluate(prompt: str, ir: dict[str, Any], png: Path | None, log_text: str) -
     soft_occlusion = graphics.get("soft_occlusion") or {}
     hero_environment_geometry = graphics.get("hero_environment_geometry") or {}
     texture_material_fidelity = graphics.get("texture_material_fidelity") or {}
+    source_geometry_fidelity = graphics.get("source_geometry_fidelity") or {}
     image = _image_metrics(png)
 
     failures: list[dict[str, Any]] = []
@@ -593,6 +594,38 @@ def evaluate(prompt: str, ir: dict[str, Any], png: Path | None, log_text: str) -
                 shore_surface_count=shore_surfaces,
                 runtime_texture_counts=runtime_texture_counts,
                 runtime_texture_materials=runtime_texture_ok,
+            )
+
+        try:
+            source_sets = int(source_geometry_fidelity.get("source_asset_set_count", 0) or 0)
+            scanned_lanterns = int(source_geometry_fidelity.get("scanned_lantern_count", 0) or 0)
+            scanned_utility_props = int(source_geometry_fidelity.get("scanned_utility_prop_count", 0) or 0)
+            scanned_anchor_rocks = int(source_geometry_fidelity.get("scanned_anchor_rock_count", 0) or 0)
+            source_hero_anchors = int(source_geometry_fidelity.get("hero_anchor_count", 0) or 0)
+        except Exception:
+            source_sets = scanned_lanterns = scanned_utility_props = scanned_anchor_rocks = source_hero_anchors = 0
+        has_runtime_source_geometry = "generative_exterior: source-bound hero geometry" in log_text
+        hero_prompt = flags["campsite"] or "cabin" in prompt.lower()
+        if (
+            not isinstance(source_geometry_fidelity, dict)
+            or not bool(source_geometry_fidelity.get("enabled"))
+            or source_sets < 3
+            or scanned_anchor_rocks < 3
+            or source_hero_anchors < 4
+            or (hero_prompt and scanned_lanterns < 1)
+            or (hero_prompt and scanned_utility_props < 2)
+            or not has_runtime_source_geometry
+        ):
+            fail(
+                "missing_source_bound_hero_geometry",
+                "Generated exterior lacks source-bound scanned hero meshes for prompt anchors, props, and grounding rocks",
+                source_geometry_fidelity=source_geometry_fidelity,
+                source_asset_set_count=source_sets,
+                scanned_lantern_count=scanned_lanterns,
+                scanned_utility_prop_count=scanned_utility_props,
+                scanned_anchor_rock_count=scanned_anchor_rocks,
+                hero_anchor_count=source_hero_anchors,
+                runtime_source_geometry=has_runtime_source_geometry,
             )
 
         if flags["moonlight"] or "storm" in prompt.lower():

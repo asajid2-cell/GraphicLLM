@@ -378,6 +378,28 @@ Escape: if local texture sets cannot be loaded safely in the generated path, fal
 
 Status: done
 
+### Loop 19: Source-Bound Hero Geometry
+
+Invariant: generated exterior hero setpieces use real loaded local source meshes for close prompt anchors and props instead of only primitive/detail overlays.
+
+Scope:
+
+- in: `tools/scene_graphics_gate.py`, `tools/scene_compiler.py`, `src/Core/Engine_Scenes.cpp`, focused local scanned-asset placement, ledgers.
+- out: weakening semantic/graphics gates, external downloads, forced DXR defaults, broad asset-registry rewrites.
+
+Verifier:
+
+- Current Loop 18 campsite/desert/alpine artifacts fail strengthened graphics gate with `missing_source_bound_hero_geometry`.
+- New campsite/desert/alpine prompts render VALID and pass quality + strengthened graphics gates.
+- Runtime logs prove scanned/source hero meshes were loaded and placed for lanterns, utility props, anchor rocks, and hero anchors.
+- Release build, Python compile, Director IR validation, known-bad oracles, and kitchen smoke remain green.
+
+Exit: all verifier commands green, with artifacts/logs recorded and checkpoint committed.
+
+Escape: if scanned assets crop the water/color ROI or make prompt heroes unreadable, move/scale the source anchors before changing gate thresholds.
+
+Status: done
+
 ## Progress Log
 
 2026-07-03:
@@ -406,6 +428,27 @@ Status: done
 - Loop 18 visual/regression notes:
   - Texture-backed materials are objectively bound and visible in runtime receipts/counts, and the worst pale/black receiver-disc artifacts from the first Loop 18 candidates were reduced.
   - The final images are still `HUMAN-GATE` short of AAA: low-poly silhouettes, kit-like tent/cabin/props, stylized water/terrain, and visible overlay construction remain. The next front should climb another layer: source-bound hero geometry, better asset selection/ingest, or renderer-level occlusion/shadowing with a density budget rather than more decorative clutter.
+- Loop 19 heartbeat proof:
+  - `node Z:\328\CMPUT328-A2\codexworks\301\heartbeat\bin\hb.mjs wait --label aaa-loop19-proof --timeout 1 --poll 1` exited by timeout after 1s.
+- Loop 19 red proof:
+  - `aaa_graphics_campsite_loop18d`, `aaa_graphics_desert_loop18b`, and `aaa_graphics_alpine_loop18b` failed the strengthened graphics gate with only `missing_source_bound_hero_geometry`.
+- Loop 19 implementation:
+  - `tools\scene_compiler.py` now emits `graphics_pass.source_geometry_fidelity` with source asset set, scanned lantern, utility prop, anchor rock, and hero-anchor counts.
+  - `tools\scene_graphics_gate.py` now requires source-bound scanned hero mesh IR/runtime evidence for generated exteriors.
+  - `src\Core\Engine_Scenes.cpp` now loads and places local scanned `Lantern_01`, `WoodenTable_01`, `Barrel_01`, and `boulder_01` meshes in generated exterior hero areas using the existing naturalistic PBR texture hook.
+- Loop 19 verifier evidence:
+  - `python -m py_compile tools\scene_compiler.py tools\scene_graphics_gate.py tools\scene_quality_gate.py tools\scene_gen.py` exited 0.
+  - Release rebuild exited 0 after compiling `Engine_Scenes.cpp`: `[OK] Build complete in 214.5s`.
+  - `git diff --check` exited 0.
+  - Campsite `aaa_graphics_campsite_loop19` rendered VALID; quality gate exited 0 (`purple_fraction=0.8841`, `nonblack_fraction=1.0`); graphics gate exited 0 (`dark_contact_fraction=0.0051`, `dark_contact_area_fraction=0.0326`); Director IR validation exited 0. Runtime log shows `source-bound hero geometry lanterns=2 utility_props=3 anchor_rocks=4 hero_anchors=9 source_sets=4`.
+  - Desert canyon `aaa_graphics_desert_loop19` rendered VALID; quality gate exited 0 (`turquoise_fraction=0.4194`, `nonblack_fraction=1.0`); graphics gate exited 0 (`dark_contact_area_fraction=0.0827`); Director IR validation exited 0. Runtime log shows `source-bound hero geometry lanterns=2 utility_props=3 anchor_rocks=4 hero_anchors=9 source_sets=4`.
+  - Alpine cabin `aaa_graphics_alpine_loop19` rendered VALID; quality gate exited 0 (`avg_luma=0.1225`, `cool_fraction=0.8607`, `nonblack_fraction=0.9956`); graphics gate exited 0 (`dark_contact_fraction=0.0222`); Director IR validation exited 0. Runtime log shows `source-bound hero geometry lanterns=2 utility_props=2 anchor_rocks=4 hero_anchors=8 source_sets=4`.
+  - Kitchen smoke `regression_kitchen_aaa_loop19` rendered VALID and quality gate exited 0 (`avg_luma=0.3059`, `nonblack_fraction=1.0`).
+  - Known-bad quality oracle `gen_a_foggy_mountain_campsite_beside_0` with `--expect-fail` exited 0 and still reports forbidden fridge, missing mountain/ridge, focal visibility, and purple-water failures.
+  - Known-bad graphics oracle `v3_campsite_ridge_test_0` with explicit empty log and `--expect-fail` exited 0 and now includes `missing_source_bound_hero_geometry`.
+- Loop 19 visual/regression notes:
+  - Source-scanned meshes are visible in the campsite/desert hero camp and on the alpine porch, and they use existing PBR texture paths instead of new procedural primitive overlays.
+  - The remaining `HUMAN-GATE` gap is still large: base terrain/water/backdrop and many hero silhouettes remain stylized. The next front should target renderer-level shadow/occlusion budgets, asset-selection quality, or a stronger generated-scene source asset planner.
 - Loop 17 opened after Loop 16 visual inspection and user pushback: the next hard ceiling is source/hero/environment geometry fidelity rather than more overlay layers. Heartbeat proof `aaa-graphics-loop17-proof` fired by timeout after 1s.
 - Loop 17 red proof:
   - Strengthened `tools\scene_graphics_gate.py` to require `graphics_pass.hero_environment_geometry` plus runtime logs for high-detail camp/cabin kits, mountain massing, and irregular tree silhouettes where prompt-relevant.

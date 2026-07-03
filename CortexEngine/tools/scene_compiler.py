@@ -304,9 +304,9 @@ def compile_v3_to_v2(v3: dict[str, Any]) -> dict[str, Any]:
             "color": ground_color,
             "terrain": {
                 "mode": "heightfield",
-                "grid": 72,
-                "relief_m": 0.42 if not desert else 0.30,
-                "micro_relief_m": 0.075 if not desert else 0.045,
+                "grid": 96,
+                "relief_m": 0.56 if moonlight else (0.64 if not desert else 0.48),
+                "micro_relief_m": 0.105 if not desert else 0.078,
                 "shore_flatten_m": 5.5,
             },
         },
@@ -497,6 +497,13 @@ def compile_v3_to_v2(v3: dict[str, Any]) -> dict[str, Any]:
         "hero_material_shadow_readability",
         "local_fill_and_rim_light_shaping",
         "hero_contact_shadow_receivers",
+    ])
+    material_zone_names.extend([
+        "structural_displaced_terrain_tiles",
+        "integrated_hero_foundation_geometry",
+        "triplanar_material_blend_patches",
+        "shadow_caster_scene_structure",
+        "nonplanar_shore_bank_geometry",
     ])
     if water_on:
         material_zone_names.append("texture_source_wet_shore")
@@ -853,6 +860,29 @@ def compile_v3_to_v2(v3: dict[str, Any]) -> dict[str, Any]:
                 "hero_contact_shadow_receivers",
                 "bounded_exposure_lift",
                 "no_visible_light_cards",
+            ],
+        },
+        "structural_scene_fidelity": {
+            "enabled": True,
+            "terrain_tessellation_grid": env["ground"]["terrain"]["grid"],
+            "terrain_relief_m": env["ground"]["terrain"]["relief_m"],
+            "terrain_displacement_tile_count": 18 if (campsite or cabin) else 16,
+            "terrain_displacement_layer_count": 5 if not desert else 4,
+            "hero_foundation_count": 18 if campsite else (16 if cabin else 10),
+            "shadow_caster_count": 14 if not moonlight else 10,
+            "material_blend_patch_count": 24 if not desert else 18,
+            "light_volume_count": 3 if not moonlight else 2,
+            "nonplanar_shore_segment_count": 10 if water_on else 0,
+            "foundation_family": "embedded_tent_pad_and_fire_ring" if campsite else (
+                "stone_cabin_foundation_and_deck_contact" if cabin else "canyon_bank_embedded_camp"
+            ),
+            "systems": [
+                "raised_tessellated_heightfield_relief",
+                "opaque_displaced_terrain_tiles_not_flat_cards",
+                "hero_foundation_geometry_embeds_props",
+                "material_blend_patches_with_texture_hooks",
+                "real_shadow_caster_geometry_and_local_lights",
+                "nonplanar_shore_bank_transition",
             ],
         },
         "renderer_shadow_occlusion_budget": {

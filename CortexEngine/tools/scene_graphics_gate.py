@@ -314,6 +314,30 @@ def _hero_material_shadow_runtime(log_text: str) -> dict[str, float | int] | Non
     }
 
 
+def _structural_scene_runtime(log_text: str) -> dict[str, float | int] | None:
+    m = re.search(
+        r"generative_exterior: structural scene fidelity "
+        r"terrain_tiles=(\d+) displacement_layers=(\d+) "
+        r"hero_foundations=(\d+) shadow_casters=(\d+) "
+        r"material_blends=(\d+) light_volumes=(\d+) shore_segments=(\d+) "
+        r"terrain_grid=(\d+) relief=([0-9.]+)",
+        log_text,
+    )
+    if not m:
+        return None
+    return {
+        "terrain_tiles": int(m.group(1)),
+        "displacement_layers": int(m.group(2)),
+        "hero_foundations": int(m.group(3)),
+        "shadow_casters": int(m.group(4)),
+        "material_blends": int(m.group(5)),
+        "light_volumes": int(m.group(6)),
+        "shore_segments": int(m.group(7)),
+        "terrain_grid": int(m.group(8)),
+        "relief": float(m.group(9)),
+    }
+
+
 def _asset_counts(ir: dict[str, Any]) -> dict[str, int]:
     counts = {
         "trees": 0,
@@ -418,6 +442,7 @@ def evaluate(prompt: str, ir: dict[str, Any], png: Path | None, log_text: str) -
     environment_fidelity = graphics.get("environment_fidelity") or {}
     source_environment_assets = graphics.get("source_environment_assets") or {}
     hero_material_shadow_readability = graphics.get("hero_material_shadow_readability") or {}
+    structural_scene_fidelity = graphics.get("structural_scene_fidelity") or {}
     image = _image_metrics(png)
 
     failures: list[dict[str, Any]] = []
@@ -1250,6 +1275,82 @@ def evaluate(prompt: str, ir: dict[str, Any], png: Path | None, log_text: str) -
                 exposure_lift=exposure_lift,
                 runtime_hero_material_shadow_readability=runtime_hero_readability,
                 runtime_hero_material_shadow_readability_ok=runtime_hero_readability_ok,
+            )
+
+        try:
+            structural_terrain_tiles = int(structural_scene_fidelity.get("terrain_displacement_tile_count", 0) or 0)
+            structural_displacement_layers = int(structural_scene_fidelity.get("terrain_displacement_layer_count", 0) or 0)
+            structural_hero_foundations = int(structural_scene_fidelity.get("hero_foundation_count", 0) or 0)
+            structural_shadow_casters = int(structural_scene_fidelity.get("shadow_caster_count", 0) or 0)
+            structural_material_blends = int(structural_scene_fidelity.get("material_blend_patch_count", 0) or 0)
+            structural_light_volumes = int(structural_scene_fidelity.get("light_volume_count", 0) or 0)
+            structural_shore_segments = int(structural_scene_fidelity.get("nonplanar_shore_segment_count", 0) or 0)
+            structural_min_grid = int(structural_scene_fidelity.get("terrain_tessellation_grid", 0) or 0)
+            structural_relief = float(structural_scene_fidelity.get("terrain_relief_m", 0.0) or 0.0)
+        except Exception:
+            structural_terrain_tiles = structural_displacement_layers = structural_hero_foundations = 0
+            structural_shadow_casters = structural_material_blends = structural_light_volumes = 0
+            structural_shore_segments = structural_min_grid = 0
+            structural_relief = 0.0
+        terrain_grid = int(terrain.get("grid", 0) or 0) if isinstance(terrain, dict) else 0
+        try:
+            terrain_micro = float(terrain.get("micro_relief_m", 0.0) or 0.0) if isinstance(terrain, dict) else 0.0
+        except Exception:
+            terrain_micro = 0.0
+        runtime_structural_scene = _structural_scene_runtime(log_text)
+        min_tiles = 10
+        min_layers = 4
+        min_foundations = 8 if (flags["campsite"] or "cabin" in prompt.lower()) else 5
+        min_shadow_casters = 8
+        min_material_blends = 10
+        min_light_volumes = 2
+        min_shore_segments = 6 if flags["water"] else 0
+        min_grid = 88
+        min_relief = 0.42 if flags["desert"] else 0.52
+        min_micro = 0.070 if flags["desert"] else 0.095
+        runtime_structural_ok = (
+            isinstance(runtime_structural_scene, dict)
+            and runtime_structural_scene.get("terrain_tiles", 0) >= max(structural_terrain_tiles - 2, min_tiles)
+            and runtime_structural_scene.get("displacement_layers", 0) >= max(structural_displacement_layers - 1, min_layers)
+            and runtime_structural_scene.get("hero_foundations", 0) >= max(structural_hero_foundations - 2, min_foundations)
+            and runtime_structural_scene.get("shadow_casters", 0) >= max(structural_shadow_casters - 2, min_shadow_casters)
+            and runtime_structural_scene.get("material_blends", 0) >= max(structural_material_blends - 3, min_material_blends)
+            and runtime_structural_scene.get("light_volumes", 0) >= max(structural_light_volumes - 1, min_light_volumes)
+            and runtime_structural_scene.get("shore_segments", 0) >= max(structural_shore_segments - 2, min_shore_segments)
+            and runtime_structural_scene.get("terrain_grid", 0) >= max(structural_min_grid, min_grid)
+            and runtime_structural_scene.get("relief", 0.0) >= max(structural_relief - 0.03, min_relief)
+        )
+        if (
+            not isinstance(structural_scene_fidelity, dict)
+            or not bool(structural_scene_fidelity.get("enabled"))
+            or structural_terrain_tiles < min_tiles
+            or structural_displacement_layers < min_layers
+            or structural_hero_foundations < min_foundations
+            or structural_shadow_casters < min_shadow_casters
+            or structural_material_blends < min_material_blends
+            or structural_light_volumes < min_light_volumes
+            or structural_shore_segments < min_shore_segments
+            or terrain_grid < max(structural_min_grid, min_grid)
+            or relief < max(structural_relief - 0.03, min_relief)
+            or terrain_micro < min_micro
+            or not runtime_structural_ok
+        ):
+            fail(
+                "missing_structural_scene_fidelity",
+                "Generated exterior still reads as flat stage geometry instead of displaced terrain, integrated hero foundations, material blends, and real shadow-casting scene structure",
+                structural_scene_fidelity=structural_scene_fidelity,
+                terrain_grid=terrain_grid,
+                terrain_relief=relief,
+                terrain_micro_relief=terrain_micro,
+                terrain_displacement_tile_count=structural_terrain_tiles,
+                terrain_displacement_layer_count=structural_displacement_layers,
+                hero_foundation_count=structural_hero_foundations,
+                shadow_caster_count=structural_shadow_casters,
+                material_blend_patch_count=structural_material_blends,
+                light_volume_count=structural_light_volumes,
+                nonplanar_shore_segment_count=structural_shore_segments,
+                runtime_structural_scene_fidelity=runtime_structural_scene,
+                runtime_structural_scene_fidelity_ok=runtime_structural_ok,
             )
 
         if flags["moonlight"] or "storm" in prompt.lower():

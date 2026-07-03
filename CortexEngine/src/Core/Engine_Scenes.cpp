@@ -247,6 +247,19 @@ namespace {
         float shadowSoftness = 0.0f;
     };
 
+    struct GenerativeStructuralSceneFidelity {
+        bool enabled = false;
+        int terrainTessellationGrid = 0;
+        float terrainReliefM = 0.0f;
+        int terrainDisplacementTileCount = 0;
+        int terrainDisplacementLayerCount = 0;
+        int heroFoundationCount = 0;
+        int shadowCasterCount = 0;
+        int materialBlendPatchCount = 0;
+        int lightVolumeCount = 0;
+        int nonplanarShoreSegmentCount = 0;
+    };
+
     struct GenerativeHeroAssetReplacement {
         bool enabled = false;
         int canvasShellPanelCount = 0;
@@ -445,6 +458,91 @@ namespace {
                 mesh->indices.insert(mesh->indices.end(), {a, b, d, a, d, c});
             }
         }
+        mesh->UpdateBounds();
+        return mesh;
+    }
+
+    std::shared_ptr<Scene::MeshData> CreateGenerativeTerrainPatchMesh(float radius,
+                                                                      float relief,
+                                                                      float microRelief,
+                                                                      float phase,
+                                                                      uint32_t rings = 5u,
+                                                                      uint32_t segments = 32u) {
+        auto mesh = std::make_shared<Scene::MeshData>();
+        mesh->kind = Scene::MeshKind::Procedural;
+        rings = std::clamp(rings, 3u, 10u);
+        segments = std::clamp(segments, 12u, 48u);
+
+        mesh->positions.emplace_back(0.0f, relief, 0.0f);
+        mesh->normals.emplace_back(0.0f, 1.0f, 0.0f);
+        mesh->texCoords.emplace_back(0.5f, 0.5f);
+
+        auto idx = [segments](uint32_t ring, uint32_t seg) {
+            if (ring == 0u) {
+                return 0u;
+            }
+            return 1u + (ring - 1u) * segments + (seg % segments);
+        };
+
+        for (uint32_t ring = 1u; ring <= rings; ++ring) {
+            const float t = static_cast<float>(ring) / static_cast<float>(rings);
+            for (uint32_t seg = 0u; seg < segments; ++seg) {
+                const float u = static_cast<float>(seg) / static_cast<float>(segments);
+                const float a = u * glm::pi<float>() * 2.0f;
+                const float edgeNoise = std::sin(a * 3.0f + phase) * 0.11f +
+                                        std::sin(a * 7.0f + phase * 1.7f) * 0.06f;
+                const float innerNoise = std::sin(a * 5.0f + t * 11.0f + phase) * 0.08f;
+                const float boundary = 1.0f + edgeNoise * (0.35f + 0.65f * t);
+                const float r = radius * t * boundary;
+                const float falloff = 1.0f - t;
+                const float y = std::max(0.0f,
+                                         relief * falloff * falloff +
+                                         microRelief * innerNoise * falloff);
+                mesh->positions.emplace_back(std::cos(a) * r, y, std::sin(a) * r);
+                mesh->normals.emplace_back(0.0f, 1.0f, 0.0f);
+                mesh->texCoords.emplace_back(0.5f + std::cos(a) * t * 0.5f,
+                                             0.5f + std::sin(a) * t * 0.5f);
+            }
+        }
+
+        for (uint32_t seg = 0u; seg < segments; ++seg) {
+            mesh->indices.insert(mesh->indices.end(), {idx(0u, 0u), idx(1u, seg), idx(1u, seg + 1u)});
+        }
+        for (uint32_t ring = 1u; ring < rings; ++ring) {
+            for (uint32_t seg = 0u; seg < segments; ++seg) {
+                const uint32_t a = idx(ring, seg);
+                const uint32_t b = idx(ring, seg + 1u);
+                const uint32_t c = idx(ring + 1u, seg);
+                const uint32_t d = idx(ring + 1u, seg + 1u);
+                mesh->indices.insert(mesh->indices.end(), {a, c, d, a, d, b});
+            }
+        }
+
+        std::fill(mesh->normals.begin(), mesh->normals.end(), glm::vec3(0.0f));
+        for (size_t i = 0; i + 2 < mesh->indices.size(); i += 3) {
+            const uint32_t ia = mesh->indices[i];
+            const uint32_t ib = mesh->indices[i + 1];
+            const uint32_t ic = mesh->indices[i + 2];
+            glm::vec3 n = glm::cross(mesh->positions[ib] - mesh->positions[ia],
+                                     mesh->positions[ic] - mesh->positions[ia]);
+            if (glm::length(n) > 1e-5f) {
+                n = glm::normalize(n);
+                if (n.y < 0.0f) {
+                    n = -n;
+                }
+                mesh->normals[ia] += n;
+                mesh->normals[ib] += n;
+                mesh->normals[ic] += n;
+            }
+        }
+        for (auto& n : mesh->normals) {
+            if (glm::length(n) < 1e-5f) {
+                n = glm::vec3(0.0f, 1.0f, 0.0f);
+            } else {
+                n = glm::normalize(n);
+            }
+        }
+
         mesh->UpdateBounds();
         return mesh;
     }
@@ -3471,6 +3569,7 @@ void Engine::BuildRecipeScene() {
         GenerativeSourceGeometryFidelity sourceGeometryFidelity;
         GenerativeSourceEnvironmentAssets sourceEnvironmentAssets;
         GenerativeHeroMaterialShadowReadability heroMaterialShadowReadability;
+        GenerativeStructuralSceneFidelity structuralSceneFidelity;
         GenerativeHeroAssetReplacement heroAssetReplacement;
         GenerativeCohesiveStagingCleanup cohesiveStagingCleanup;
         GenerativeEnvironmentFidelity environmentFidelity;
@@ -3788,6 +3887,37 @@ void Engine::BuildRecipeScene() {
                     std::clamp(num(heroMaterialShadowReadability, "exposure_lift", 0.0f), 0.0f, 0.35f);
                 genExt.heroMaterialShadowReadability.shadowSoftness =
                     std::clamp(num(heroMaterialShadowReadability, "shadow_softness", 0.0f), 0.0f, 1.0f);
+                const nlohmann::json structuralSceneFidelity =
+                    graphics.value("structural_scene_fidelity", nlohmann::json::object());
+                genExt.structuralSceneFidelity.enabled = structuralSceneFidelity.value("enabled", false);
+                genExt.structuralSceneFidelity.terrainTessellationGrid =
+                    static_cast<int>(std::clamp(num(structuralSceneFidelity, "terrain_tessellation_grid", 0.0f), 0.0f, 160.0f));
+                genExt.structuralSceneFidelity.terrainReliefM =
+                    std::clamp(num(structuralSceneFidelity, "terrain_relief_m", 0.0f), 0.0f, 1.20f);
+                genExt.structuralSceneFidelity.terrainDisplacementTileCount =
+                    static_cast<int>(std::clamp(num(structuralSceneFidelity, "terrain_displacement_tile_count", 0.0f), 0.0f, 36.0f));
+                genExt.structuralSceneFidelity.terrainDisplacementLayerCount =
+                    static_cast<int>(std::clamp(num(structuralSceneFidelity, "terrain_displacement_layer_count", 0.0f), 0.0f, 12.0f));
+                genExt.structuralSceneFidelity.heroFoundationCount =
+                    static_cast<int>(std::clamp(num(structuralSceneFidelity, "hero_foundation_count", 0.0f), 0.0f, 36.0f));
+                genExt.structuralSceneFidelity.shadowCasterCount =
+                    static_cast<int>(std::clamp(num(structuralSceneFidelity, "shadow_caster_count", 0.0f), 0.0f, 28.0f));
+                genExt.structuralSceneFidelity.materialBlendPatchCount =
+                    static_cast<int>(std::clamp(num(structuralSceneFidelity, "material_blend_patch_count", 0.0f), 0.0f, 48.0f));
+                genExt.structuralSceneFidelity.lightVolumeCount =
+                    static_cast<int>(std::clamp(num(structuralSceneFidelity, "light_volume_count", 0.0f), 0.0f, 8.0f));
+                genExt.structuralSceneFidelity.nonplanarShoreSegmentCount =
+                    static_cast<int>(std::clamp(num(structuralSceneFidelity, "nonplanar_shore_segment_count", 0.0f), 0.0f, 24.0f));
+                if (genExt.structuralSceneFidelity.enabled) {
+                    genExt.terrainHeightfield = true;
+                    genExt.terrainGrid = std::max(
+                        genExt.terrainGrid,
+                        static_cast<uint32_t>(std::clamp(genExt.structuralSceneFidelity.terrainTessellationGrid, 16, 128)));
+                    genExt.terrainRelief = std::max(genExt.terrainRelief, genExt.structuralSceneFidelity.terrainReliefM);
+                    const bool desertTerrain = genExt.groundKind.find("dirt") != std::string::npos ||
+                                               genExt.groundKind.find("sand") != std::string::npos;
+                    genExt.terrainMicroRelief = std::max(genExt.terrainMicroRelief, desertTerrain ? 0.078f : 0.105f);
+                }
                 const nlohmann::json heroAssetReplacement = graphics.value("hero_asset_replacement", nlohmann::json::object());
                 genExt.heroAssetReplacement.enabled = heroAssetReplacement.value("enabled", false);
                 genExt.heroAssetReplacement.canvasShellPanelCount =
@@ -8554,6 +8684,324 @@ void Engine::BuildRecipeScene() {
                              rimLights,
                              contrast,
                              genExt.heroMaterialShadowReadability.exposureLift);
+            }
+        }
+    }
+
+    if (genExt.valid && genExt.structuralSceneFidelity.enabled) {
+        if (auto* renderer = m_renderer.get()) {
+            auto cubeMesh = Utils::MeshGenerator::CreateCube();
+            auto cylinderMesh = Utils::MeshGenerator::CreateCylinder(0.5f, 1.0f, 24);
+            auto shardMesh = CreateGenerativeRockShardMesh(32.19f);
+            auto terrainTileMesh = CreateGenerativeTerrainPatchMesh(0.62f, 0.18f, 0.055f, 41.23f, 5u, 32u);
+            auto shoreBankMesh = CreateGenerativeTerrainPatchMesh(0.58f, 0.12f, 0.040f, 52.71f, 5u, 32u);
+            const auto upCube = renderer->UploadMesh(cubeMesh);
+            const auto upCylinder = renderer->UploadMesh(cylinderMesh);
+            const auto upShard = renderer->UploadMesh(shardMesh);
+            const auto upTerrainTile = renderer->UploadMesh(terrainTileMesh);
+            const auto upShoreBank = renderer->UploadMesh(shoreBankMesh);
+            if (upCube.IsErr() || upCylinder.IsErr() || upShard.IsErr() ||
+                upTerrainTile.IsErr() || upShoreBank.IsErr()) {
+                spdlog::warn("generative_exterior: structural scene fidelity mesh upload failed cube='{}' cylinder='{}' shard='{}' terrain='{}' shore='{}'",
+                             upCube.IsErr() ? upCube.Error() : "ok",
+                             upCylinder.IsErr() ? upCylinder.Error() : "ok",
+                             upShard.IsErr() ? upShard.Error() : "ok",
+                             upTerrainTile.IsErr() ? upTerrainTile.Error() : "ok",
+                             upShoreBank.IsErr() ? upShoreBank.Error() : "ok");
+            } else {
+                const std::string module = genExt.authoredSceneModule.moduleId;
+                const bool canyonModule = module == "desert_canyon_river";
+                const bool alpineModule = module == "alpine_cabin_lake";
+                const bool hasCabin = !genExt.structures.empty();
+                const bool desertSurface = genExt.groundKind.find("dirt") != std::string::npos || canyonModule;
+                const float shoreZ = genExt.waterOn ? (genExt.waterFromZ + 0.5f) : -genExt.extent * 0.30f;
+                const float groundW = genExt.extent * 1.86f;
+                const glm::vec3 baseGround = genExt.groundColorSet
+                    ? genExt.groundColor
+                    : (desertSurface ? glm::vec3(0.42f, 0.22f, 0.13f)
+                                     : (alpineModule ? glm::vec3(0.13f, 0.17f, 0.23f)
+                                                     : glm::vec3(0.20f, 0.29f, 0.18f)));
+                auto pseudo = [](int i, float salt) {
+                    const float n = std::sin(static_cast<float>(i) * 19.173f + salt * 61.117f) * 23897.531f;
+                    return n - std::floor(n);
+                };
+                auto addStructural = [&](const std::string& tag,
+                                         const std::shared_ptr<Scene::MeshData>& mesh,
+                                         const glm::vec3& position,
+                                         const glm::vec3& scale,
+                                         const glm::vec3& euler,
+                                         const glm::vec4& color,
+                                         const char* preset,
+                                         const char* textureId,
+                                         float roughness,
+                                         float normalScale,
+                                         float proceduralMask,
+                                         float wetness,
+                                         float alpha,
+                                         int& counter) {
+                    entt::entity e = m_registry->CreateEntity();
+                    m_registry->AddComponent<Scene::TagComponent>(e, tag);
+                    auto& t = m_registry->AddComponent<TransformComponent>(e);
+                    t.position = position;
+                    t.scale = scale;
+                    t.rotation = glm::quat(euler);
+                    auto& r = m_registry->AddComponent<Scene::RenderableComponent>(e);
+                    r.mesh = mesh;
+                    const glm::vec4 finalAlbedo(glm::vec3(color), alpha);
+                    r.albedoColor = finalAlbedo;
+                    r.metallic = 0.0f;
+                    r.roughness = roughness;
+                    r.ao = 0.88f;
+                    r.occlusionStrength = 0.82f;
+                    r.normalScale = normalScale;
+                    r.proceduralMaskStrength = proceduralMask;
+                    r.wetnessFactor = wetness;
+                    r.specularFactor = 0.12f + wetness * 0.22f;
+                    r.clearcoatFactor = std::min(wetness * 0.30f, 0.18f);
+                    r.clearcoatRoughnessFactor = 0.68f;
+                    r.anisotropyStrength = std::string(preset ? preset : "") == "wood" ? 0.34f : 0.12f;
+                    r.sheenWeight = std::string(preset ? preset : "") == "fabric" ? 0.22f : 0.0f;
+                    r.doubleSided = true;
+                    r.alphaMode = alpha < 0.99f
+                        ? Scene::RenderableComponent::AlphaMode::Blend
+                        : Scene::RenderableComponent::AlphaMode::Opaque;
+                    r.renderLayer = alpha < 0.99f
+                        ? Scene::RenderableComponent::RenderLayer::Overlay
+                        : Scene::RenderableComponent::RenderLayer::Opaque;
+                    r.presetName = preset ? preset : "";
+                    if (textureId && textureId[0]) {
+                        applyGeneratedTextureMaterial(r, textureId, true, wetness > 0.18f);
+                    }
+                    r.albedoColor = finalAlbedo;
+                    counter++;
+                };
+
+                int terrainTiles = 0;
+                int displacementLayers = 0;
+                int heroFoundations = 0;
+                int shadowCasters = 0;
+                int materialBlends = 0;
+                int lightVolumes = 0;
+                int shoreSegments = 0;
+
+                const int tileTarget = std::max(0, genExt.structuralSceneFidelity.terrainDisplacementTileCount);
+                const int layerTarget = std::max(0, genExt.structuralSceneFidelity.terrainDisplacementLayerCount);
+                for (int i = 0; i < tileTarget; ++i) {
+                    const float sideBias = (i % 2 == 0) ? -1.0f : 1.0f;
+                    const float lane = static_cast<float>(i % 5);
+                    const float x = sideBias * (1.1f + pseudo(i, 1.37f) * groundW * 0.34f);
+                    const float z = 2.2f - pseudo(i + 11, 1.91f) * 5.8f + lane * 0.16f;
+                    const glm::vec3 tint = glm::mix(baseGround,
+                                                    desertSurface ? glm::vec3(0.62f, 0.30f, 0.15f)
+                                                                  : glm::vec3(0.16f, 0.20f, 0.15f),
+                                                    0.30f + pseudo(i, 2.43f) * 0.28f);
+                    addStructural("GenerativeExterior_StructuralTerrainTile" + std::to_string(i),
+                                  terrainTileMesh,
+                                  glm::vec3(x, 0.045f + 0.002f * static_cast<float>(i % 4), z),
+                                  glm::vec3(0.86f + pseudo(i, 3.11f) * 0.72f,
+                                            1.0f,
+                                            0.42f + pseudo(i, 3.71f) * 0.52f),
+                                  glm::vec3(glm::radians(-1.5f + pseudo(i, 4.13f) * 3.0f),
+                                            glm::radians(-28.0f + pseudo(i, 4.67f) * 56.0f),
+                                            glm::radians(-0.8f + pseudo(i, 5.19f) * 1.6f)),
+                                  glm::vec4(glm::max(tint, glm::vec3(0.018f)), 1.0f),
+                                  desertSurface ? "masonry" : "naturalistic",
+                                  desertSurface ? "terrain_sand" : (alpineModule ? "terrain_rock" : "terrain_grass"),
+                                  0.86f,
+                                  0.92f,
+                                  0.74f,
+                                  genExt.groundWetness * 0.25f,
+                                  0.20f,
+                                  terrainTiles);
+                }
+
+                for (int i = 0; i < layerTarget; ++i) {
+                    const float side = (i % 2 == 0) ? -1.0f : 1.0f;
+                    const float z = shoreZ + 0.85f + static_cast<float>(i) * 0.62f;
+                    const glm::vec3 tint = glm::max(glm::mix(baseGround, glm::vec3(0.035f), 0.32f), glm::vec3(0.014f));
+                    addStructural("GenerativeExterior_StructuralDisplacementLayer" + std::to_string(i),
+                                  terrainTileMesh,
+                                  glm::vec3(side * groundW * (0.12f + 0.045f * static_cast<float>(i % 3)),
+                                            0.052f + 0.003f * static_cast<float>(i),
+                                            z),
+                                  glm::vec3(1.25f + 0.22f * static_cast<float>(i % 3), 1.0f, 0.24f),
+                                  glm::vec3(glm::radians(-1.0f),
+                                            glm::radians(side * (8.0f + 5.0f * static_cast<float>(i))),
+                                            0.0f),
+                                  glm::vec4(tint, 1.0f),
+                                  desertSurface ? "masonry" : "naturalistic",
+                                  desertSurface ? "rock_cliff" : "terrain_rock",
+                                  0.90f,
+                                  0.86f,
+                                  0.68f,
+                                  genExt.groundWetness * 0.20f,
+                                  0.18f,
+                                  displacementLayers);
+                }
+
+                const int foundationTarget = std::max(0, genExt.structuralSceneFidelity.heroFoundationCount);
+                const glm::vec3 heroCenter = hasCabin
+                    ? genExt.structures.front().position + glm::vec3(0.0f, 0.0f, 1.22f)
+                    : glm::vec3(0.45f, 0.0f, 1.0f);
+                for (int i = 0; i < foundationTarget; ++i) {
+                    const float angle = glm::radians(static_cast<float>(i) * (360.0f / static_cast<float>(std::max(1, foundationTarget))) +
+                                                     pseudo(i, 6.13f) * 12.0f);
+                    const float radius = hasCabin ? (1.15f + 0.24f * static_cast<float>(i % 4))
+                                                  : (1.05f + 0.18f * static_cast<float>(i % 5));
+                    const bool wood = hasCabin && (i % 3 == 0);
+                    const glm::vec3 color = wood
+                        ? glm::vec3(0.21f, 0.12f, 0.060f)
+                        : glm::mix(baseGround, desertSurface ? glm::vec3(0.52f, 0.26f, 0.14f)
+                                                             : glm::vec3(0.13f, 0.12f, 0.095f), 0.58f);
+                    addStructural("GenerativeExterior_StructuralHeroFoundation" + std::to_string(i),
+                                  wood ? cylinderMesh : shardMesh,
+                                  glm::vec3(heroCenter.x + std::cos(angle) * radius,
+                                            wood ? 0.155f : 0.105f,
+                                            heroCenter.z + std::sin(angle) * radius * 0.72f),
+                                  wood ? glm::vec3(0.080f, 0.72f + 0.12f * static_cast<float>(i % 3), 0.080f)
+                                       : glm::vec3(0.28f + 0.04f * static_cast<float>(i % 3),
+                                                   0.16f + 0.03f * static_cast<float>((i + 1) % 4),
+                                                   0.22f + 0.05f * static_cast<float>(i % 4)),
+                                  wood ? glm::vec3(glm::radians(84.0f),
+                                                   glm::radians(pseudo(i, 6.71f) * 180.0f),
+                                                   glm::radians(-8.0f + pseudo(i, 7.19f) * 16.0f))
+                                       : glm::vec3(glm::radians(-4.0f + pseudo(i, 7.61f) * 8.0f),
+                                                   angle,
+                                                   glm::radians(-3.0f + pseudo(i, 8.17f) * 6.0f)),
+                                  glm::vec4(glm::max(color, glm::vec3(0.016f)), 1.0f),
+                                  wood ? "wood" : "masonry",
+                                  wood ? "wood" : "rock",
+                                  wood ? 0.72f : 0.88f,
+                                  wood ? 0.52f : 0.78f,
+                                  0.58f,
+                                  genExt.groundWetness * 0.24f,
+                                  1.0f,
+                                  heroFoundations);
+                }
+
+                const int shadowTarget = std::max(0, genExt.structuralSceneFidelity.shadowCasterCount);
+                for (int i = 0; i < shadowTarget; ++i) {
+                    const float side = (i % 2 == 0) ? -1.0f : 1.0f;
+                    const float x = heroCenter.x + side * (1.55f + pseudo(i, 8.71f) * 2.85f);
+                    const float z = heroCenter.z - 0.65f + pseudo(i, 9.11f) * 2.60f;
+                    const bool post = (i % 3) != 0;
+                    addStructural("GenerativeExterior_StructuralShadowCaster" + std::to_string(i),
+                                  post ? cylinderMesh : shardMesh,
+                                  glm::vec3(x, post ? (0.135f + 0.018f * static_cast<float>(i % 3)) : 0.16f, z),
+                                  post ? glm::vec3(0.070f, 0.58f + 0.10f * static_cast<float>(i % 3), 0.070f)
+                                       : glm::vec3(0.22f, 0.24f, 0.26f),
+                                  post ? glm::vec3(glm::radians(82.0f + pseudo(i, 9.57f) * 8.0f),
+                                                   glm::radians(pseudo(i, 10.03f) * 180.0f),
+                                                   glm::radians(side * (-8.0f + pseudo(i, 10.51f) * 16.0f)))
+                                       : glm::vec3(glm::radians(-5.0f), glm::radians(side * 24.0f), 0.0f),
+                                  glm::vec4(post ? glm::vec3(0.19f, 0.115f, 0.060f)
+                                                 : glm::max(baseGround * 0.50f, glm::vec3(0.018f)), 1.0f),
+                                  post ? "wood" : "masonry",
+                                  post ? "wood" : "rock",
+                                  0.78f,
+                                  0.58f,
+                                  0.55f,
+                                  genExt.groundWetness * 0.18f,
+                                  1.0f,
+                                  shadowCasters);
+                }
+
+                const int blendTarget = std::max(0, genExt.structuralSceneFidelity.materialBlendPatchCount);
+                for (int i = 0; i < blendTarget; ++i) {
+                    const float x = (pseudo(i, 11.13f) - 0.5f) * groundW * 0.70f;
+                    const float z = 2.3f - pseudo(i + 17, 11.79f) * 5.9f;
+                    const bool wet = genExt.waterOn && (i % 4 == 0);
+                    const glm::vec3 target = wet ? glm::mix(baseGround, genExt.waterShallow, 0.10f)
+                                                 : (desertSurface ? glm::vec3(0.63f, 0.31f, 0.16f)
+                                                                  : glm::vec3(0.12f, 0.17f, 0.11f));
+                    addStructural("GenerativeExterior_StructuralMaterialBlend" + std::to_string(i),
+                                  (i % 5 == 0) ? shoreBankMesh : terrainTileMesh,
+                                  glm::vec3(x,
+                                            0.064f + 0.0015f * static_cast<float>(i % 7),
+                                            wet ? (shoreZ + 0.28f + pseudo(i, 12.31f) * 1.05f) : z),
+                                  glm::vec3(0.42f + pseudo(i, 12.89f) * 0.48f,
+                                            1.0f,
+                                            0.20f + pseudo(i, 13.37f) * 0.34f),
+                                  glm::vec3(0.0f,
+                                            glm::radians(-42.0f + pseudo(i, 13.91f) * 84.0f),
+                                            0.0f),
+                                  glm::vec4(glm::max(glm::mix(baseGround, target, wet ? 0.08f : 0.30f), glm::vec3(0.016f)), wet ? 0.20f : 0.24f),
+                                  wet ? "wet_masonry" : (desertSurface ? "masonry" : "naturalistic"),
+                                  wet ? "terrain_shore" : (desertSurface ? "rock_cliff" : "terrain_grass"),
+                                  wet ? 0.42f : 0.84f,
+                                  0.86f,
+                                  0.82f,
+                                  wet ? std::max(0.48f, genExt.groundWetness) : genExt.groundWetness * 0.18f,
+                                  wet ? 0.20f : 0.22f,
+                                  materialBlends);
+                }
+
+                if (genExt.waterOn) {
+                    const int shoreTarget = std::max(0, genExt.structuralSceneFidelity.nonplanarShoreSegmentCount);
+                    for (int i = 0; i < shoreTarget; ++i) {
+                        const float u = (static_cast<float>(i) + 0.5f) / static_cast<float>(std::max(1, shoreTarget));
+                        const float x = (u - 0.5f) * groundW * 0.82f;
+                        const float bend = std::sin(u * glm::pi<float>() * 2.0f + 0.7f) * 0.22f;
+                        const glm::vec3 color = glm::mix(baseGround, genExt.waterShallow, 0.05f + 0.03f * pseudo(i, 14.17f));
+                        addStructural("GenerativeExterior_StructuralShoreBank" + std::to_string(i),
+                                      shoreBankMesh,
+                                      glm::vec3(x, 0.072f + 0.002f * static_cast<float>(i % 5), shoreZ + 0.12f + bend),
+                                      glm::vec3(0.92f + 0.18f * static_cast<float>(i % 4), 1.0f, 0.34f),
+                                      glm::vec3(glm::radians(-1.0f),
+                                                glm::radians(-8.0f + 16.0f * pseudo(i, 14.83f)),
+                                                0.0f),
+                                      glm::vec4(glm::max(color, glm::vec3(0.018f)), 0.20f),
+                                      "wet_masonry",
+                                      "terrain_shore",
+                                      0.46f,
+                                      0.90f,
+                                      0.84f,
+                                      std::max(0.52f, genExt.groundWetness),
+                                      0.18f,
+                                      shoreSegments);
+                    }
+                }
+
+                for (int i = 0; i < genExt.structuralSceneFidelity.lightVolumeCount; ++i) {
+                    const bool warm = (i % 2) == 0;
+                    const glm::vec3 lightPos = hasCabin
+                        ? genExt.structures.front().position + glm::vec3(-1.8f + static_cast<float>(i) * 1.6f,
+                                                                         1.05f + 0.22f * static_cast<float>(i),
+                                                                         2.10f - 0.38f * static_cast<float>(i % 2))
+                        : glm::vec3(-1.25f + static_cast<float>(i) * 1.45f,
+                                    0.62f + 0.18f * static_cast<float>(i),
+                                    0.70f - 0.50f * static_cast<float>(i % 2));
+                    const glm::vec3 color = alpineModule
+                        ? (warm ? glm::vec3(1.0f, 0.50f, 0.22f) : glm::vec3(0.32f, 0.46f, 1.0f))
+                        : (canyonModule ? (warm ? glm::vec3(1.0f, 0.42f, 0.16f) : glm::vec3(0.18f, 0.74f, 0.88f))
+                                        : (warm ? glm::vec3(1.0f, 0.40f, 0.13f) : glm::vec3(0.88f, 0.64f, 0.30f)));
+                    const std::string lightTag = "GenerativeExterior_StructuralLightVolume" + std::to_string(i);
+                    AddAssetLedPointLight(*m_registry,
+                                          lightTag.c_str(),
+                                          lightPos,
+                                          color,
+                                          alpineModule ? (warm ? 2.8f : 1.5f) : (warm ? 2.7f : 1.7f),
+                                          canyonModule ? 7.0f : 5.4f);
+                    lightVolumes++;
+                }
+
+                if (auto* r = m_renderer.get()) {
+                    r->SetSSAOParams(std::max(genExt.graphicsSSAORadius, 1.36f),
+                                     std::min(genExt.graphicsSSAOBias, 0.014f),
+                                     std::max(genExt.graphicsSSAOIntensity, alpineModule ? 2.95f : 3.20f));
+                    r->SetShadowPCFRadius(std::max(genExt.graphicsShadowPCF, 3.55f));
+                }
+
+                spdlog::info("generative_exterior: structural scene fidelity terrain_tiles={} displacement_layers={} hero_foundations={} shadow_casters={} material_blends={} light_volumes={} shore_segments={} terrain_grid={} relief={:.2f}",
+                             terrainTiles,
+                             displacementLayers,
+                             heroFoundations,
+                             shadowCasters,
+                             materialBlends,
+                             lightVolumes,
+                             shoreSegments,
+                             genExt.terrainGrid,
+                             genExt.terrainRelief);
             }
         }
     }

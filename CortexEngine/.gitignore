@@ -42,6 +42,7 @@ cmake_install.cmake
 
 # Logs
 *.log
+.hb/
 
 # OS files
 .DS_Store

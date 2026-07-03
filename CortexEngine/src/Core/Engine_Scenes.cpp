@@ -25,6 +25,7 @@
 #include <fstream>
 #include <optional>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 #include <glm/geometric.hpp>
@@ -202,6 +203,27 @@ namespace {
         int shorelinePropCount = 0;
         int irregularTreeSilhouetteCount = 0;
         int supportPropCount = 0;
+    };
+
+    struct GenerativeTextureMaterialFidelity {
+        bool enabled = false;
+        int textureSetCount = 0;
+        int terrainSurfaceCount = 0;
+        int rockSurfaceCount = 0;
+        int woodSurfaceCount = 0;
+        int fabricSurfaceCount = 0;
+        int heroSurfaceCount = 0;
+        int shoreSurfaceCount = 0;
+    };
+
+    struct GenerativeTextureMaterialRuntimeCounts {
+        int terrain = 0;
+        int rock = 0;
+        int wood = 0;
+        int fabric = 0;
+        int hero = 0;
+        int shore = 0;
+        std::unordered_set<std::string> sets;
     };
 
     struct GenerativeAtmosphereFidelity {
@@ -3331,6 +3353,7 @@ void Engine::BuildRecipeScene() {
         GenerativeNaturalisticEcology naturalisticEcology;
         GenerativeAssetFidelity assetFidelity;
         GenerativeHeroEnvironmentGeometry heroEnvironmentGeometry;
+        GenerativeTextureMaterialFidelity textureMaterialFidelity;
         GenerativeAtmosphereFidelity atmosphereFidelity;
         GenerativeGeometryRealism geometryRealism;
         int shoreLayerCount = 0;
@@ -3505,6 +3528,22 @@ void Engine::BuildRecipeScene() {
                     static_cast<int>(std::clamp(num(heroEnvironmentGeometry, "irregular_tree_silhouette_count", 0.0f), 0.0f, 24.0f));
                 genExt.heroEnvironmentGeometry.supportPropCount =
                     static_cast<int>(std::clamp(num(heroEnvironmentGeometry, "support_prop_count", 0.0f), 0.0f, 24.0f));
+                const nlohmann::json textureMaterialFidelity = graphics.value("texture_material_fidelity", nlohmann::json::object());
+                genExt.textureMaterialFidelity.enabled = textureMaterialFidelity.value("enabled", false);
+                genExt.textureMaterialFidelity.textureSetCount =
+                    static_cast<int>(std::clamp(num(textureMaterialFidelity, "texture_set_count", 0.0f), 0.0f, 16.0f));
+                genExt.textureMaterialFidelity.terrainSurfaceCount =
+                    static_cast<int>(std::clamp(num(textureMaterialFidelity, "terrain_surface_count", 0.0f), 0.0f, 64.0f));
+                genExt.textureMaterialFidelity.rockSurfaceCount =
+                    static_cast<int>(std::clamp(num(textureMaterialFidelity, "rock_surface_count", 0.0f), 0.0f, 128.0f));
+                genExt.textureMaterialFidelity.woodSurfaceCount =
+                    static_cast<int>(std::clamp(num(textureMaterialFidelity, "wood_surface_count", 0.0f), 0.0f, 128.0f));
+                genExt.textureMaterialFidelity.fabricSurfaceCount =
+                    static_cast<int>(std::clamp(num(textureMaterialFidelity, "fabric_surface_count", 0.0f), 0.0f, 96.0f));
+                genExt.textureMaterialFidelity.heroSurfaceCount =
+                    static_cast<int>(std::clamp(num(textureMaterialFidelity, "hero_surface_count", 0.0f), 0.0f, 160.0f));
+                genExt.textureMaterialFidelity.shoreSurfaceCount =
+                    static_cast<int>(std::clamp(num(textureMaterialFidelity, "shore_surface_count", 0.0f), 0.0f, 64.0f));
                 const nlohmann::json atmosphereFidelity = graphics.value("atmosphere_fidelity", nlohmann::json::object());
                 genExt.atmosphereFidelity.enabled = atmosphereFidelity.value("enabled", false);
                 genExt.atmosphereFidelity.nightSkyControl = atmosphereFidelity.value("night_sky_control", false);
@@ -3619,6 +3658,106 @@ void Engine::BuildRecipeScene() {
             }
         }
     }
+    GenerativeTextureMaterialRuntimeCounts textureMaterialCounts;
+    auto applyGeneratedTextureMaterial = [&](Scene::RenderableComponent& r,
+                                             const char* materialClass,
+                                             bool heroSurface = false,
+                                             bool shoreSurface = false) {
+        const std::string cls = materialClass ? materialClass : "";
+        auto applySet = [&](const char* setName,
+                            const char* albedo,
+                            const char* normal,
+                            const char* roughness,
+                            float normalScale,
+                            float occlusion = 0.74f) {
+            textureMaterialCounts.sets.insert(setName);
+            r.textures.albedoPath = albedo;
+            r.textures.normalPath = normal;
+            r.textures.roughnessPath = roughness;
+            r.normalScale = std::max(r.normalScale, normalScale);
+            r.occlusionStrength = std::min(r.occlusionStrength, occlusion);
+            r.proceduralMaskStrength = std::max(r.proceduralMaskStrength, 0.36f);
+        };
+
+        if (cls == "terrain_sand") {
+            applySet("polyhaven/aerial_beach_01",
+                     "assets/textures/polyhaven/aerial_beach_01/aerial_beach_01_diff_1k.jpg",
+                     "assets/textures/polyhaven/aerial_beach_01/aerial_beach_01_nor_gl_1k.jpg",
+                     "assets/textures/polyhaven/aerial_beach_01/aerial_beach_01_rough_1k.jpg",
+                     0.66f);
+            textureMaterialCounts.terrain++;
+        } else if (cls == "terrain_shore") {
+            applySet("polyhaven/coast_sand_05",
+                     "assets/textures/polyhaven/coast_sand_05/coast_sand_05_diff_1k.jpg",
+                     "assets/textures/polyhaven/coast_sand_05/coast_sand_05_nor_gl_1k.jpg",
+                     "assets/textures/polyhaven/coast_sand_05/coast_sand_05_rough_1k.jpg",
+                     0.72f,
+                     0.66f);
+            textureMaterialCounts.terrain++;
+            textureMaterialCounts.shore++;
+        } else if (cls == "terrain_grass" || cls == "terrain_rock") {
+            applySet("polyhaven/aerial_grass_rock",
+                     "assets/textures/polyhaven/aerial_grass_rock/aerial_grass_rock_diff_1k.jpg",
+                     "assets/textures/polyhaven/aerial_grass_rock/aerial_grass_rock_nor_gl_1k.jpg",
+                     "assets/textures/polyhaven/aerial_grass_rock/aerial_grass_rock_rough_1k.jpg",
+                     cls == "terrain_rock" ? 0.78f : 0.74f);
+            textureMaterialCounts.terrain++;
+        } else if (cls == "rock" || cls == "rock_cliff") {
+            const bool mossy = cls == "rock";
+            applySet(mossy ? "naturalistic/rock_moss_set_01" : "naturalistic/boulder_01",
+                     mossy
+                         ? "assets/models/naturalistic_showcase/rock_moss_set_01/textures/rock_moss_set_01_diff_1k.jpg"
+                         : "assets/models/naturalistic_showcase/boulder_01/textures/boulder_01_diff_1k.jpg",
+                     mossy
+                         ? "assets/models/naturalistic_showcase/rock_moss_set_01/textures/rock_moss_set_01_nor_gl_1k.jpg"
+                         : "assets/models/naturalistic_showcase/boulder_01/textures/boulder_01_nor_gl_1k.jpg",
+                     mossy
+                         ? "assets/models/naturalistic_showcase/rock_moss_set_01/textures/rock_moss_set_01_rough_1k.jpg"
+                         : "assets/models/naturalistic_showcase/boulder_01/textures/boulder_01_arm_1k.jpg",
+                     cls == "rock_cliff" ? 0.86f : 0.72f,
+                     0.60f);
+            if (!mossy) {
+                r.textures.metallicPath = "assets/models/naturalistic_showcase/boulder_01/textures/boulder_01_arm_1k.jpg";
+                r.textures.occlusionPath = "assets/models/naturalistic_showcase/boulder_01/textures/boulder_01_arm_1k.jpg";
+            }
+            textureMaterialCounts.rock++;
+        } else if (cls == "wood" || cls == "driftwood") {
+            if (cls == "driftwood") {
+                applySet("naturalistic/dead_tree_trunk",
+                         "assets/models/naturalistic_showcase/dead_tree_trunk/textures/dead_tree_trunk_diff_1k.jpg",
+                         "assets/models/naturalistic_showcase/dead_tree_trunk/textures/dead_tree_trunk_nor_gl_1k.jpg",
+                         "assets/models/naturalistic_showcase/dead_tree_trunk/textures/dead_tree_trunk_arm_1k.jpg",
+                         0.64f,
+                         0.64f);
+                r.textures.metallicPath = "assets/models/naturalistic_showcase/dead_tree_trunk/textures/dead_tree_trunk_arm_1k.jpg";
+                r.textures.occlusionPath = "assets/models/naturalistic_showcase/dead_tree_trunk/textures/dead_tree_trunk_arm_1k.jpg";
+            } else {
+                applySet("polyhaven/wood_floor_deck",
+                         "assets/textures/polyhaven/wood_floor_deck/wood_floor_deck_diff_1k.jpg",
+                         "assets/textures/polyhaven/wood_floor_deck/wood_floor_deck_nor_gl_1k.jpg",
+                         "assets/textures/polyhaven/wood_floor_deck/wood_floor_deck_rough_1k.jpg",
+                         0.58f,
+                         0.68f);
+            }
+            textureMaterialCounts.wood++;
+        } else if (cls == "fabric") {
+            applySet("polyhaven/plastered_wall",
+                     "assets/textures/polyhaven/plastered_wall/plastered_wall_diff_1k.jpg",
+                     "assets/textures/polyhaven/plastered_wall/plastered_wall_nor_gl_1k.jpg",
+                     "assets/textures/polyhaven/plastered_wall/plastered_wall_rough_1k.jpg",
+                     0.46f,
+                     0.72f);
+            textureMaterialCounts.fabric++;
+            r.sheenWeight = std::max(r.sheenWeight, 0.18f);
+        }
+
+        if (heroSurface) {
+            textureMaterialCounts.hero++;
+        }
+        if (shoreSurface) {
+            textureMaterialCounts.shore++;
+        }
+    };
     const RecipeLightingBalance lightingBalance = RecipeLightingBalanceFor(recipe);
     if (auto* renderer = m_renderer.get()) {
         ApplyRecipeVisualContract(renderer, recipe);
@@ -3888,6 +4027,11 @@ void Engine::BuildRecipeScene() {
                      : genExt.groundKind == "snow" ? glm::vec3(0.92f, 0.93f, 0.96f)
                                                    : glm::vec3(0.30f, 0.42f, 0.20f); // grass
             }
+            const glm::vec3 receiverBase = genExt.groundKind == "dirt"
+                ? glm::vec3(0.155f, 0.105f, 0.080f)
+                : genExt.groundKind == "sand"
+                    ? glm::vec3(0.185f, 0.165f, 0.125f)
+                    : glm::vec3(0.105f, 0.118f, 0.105f);
             auto dressGround = [&](Scene::RenderableComponent& r) {
                 r.albedoColor = glm::vec4(gcol, 1.0f);
                 r.metallic = 0.0f;
@@ -3914,17 +4058,19 @@ void Engine::BuildRecipeScene() {
                 if (genExt.groundKind == "sand") {
                     // aerial_beach_01 = BRIGHT dry sand (linear albedo ~0.25); the older
                     // coast_sand_05 set is dark wet shore (~0.05) and reads as mud.
-                    r.textures.albedoPath = "assets/textures/polyhaven/aerial_beach_01/aerial_beach_01_diff_1k.jpg";
-                    r.textures.normalPath = "assets/textures/polyhaven/aerial_beach_01/aerial_beach_01_nor_gl_1k.jpg";
-                    r.textures.roughnessPath = "assets/textures/polyhaven/aerial_beach_01/aerial_beach_01_rough_1k.jpg";
+                    applyGeneratedTextureMaterial(r, "terrain_sand");
                     r.albedoColor = glm::vec4(glm::mix(glm::vec3(1.0f), gcol, tintW), 1.0f);
                     r.normalScale = 0.65f;
                 } else if (genExt.groundKind == "grass") {
-                    r.textures.albedoPath = "assets/textures/polyhaven/aerial_grass_rock/aerial_grass_rock_diff_1k.jpg";
-                    r.textures.normalPath = "assets/textures/polyhaven/aerial_grass_rock/aerial_grass_rock_nor_gl_1k.jpg";
-                    r.textures.roughnessPath = "assets/textures/polyhaven/aerial_grass_rock/aerial_grass_rock_rough_1k.jpg";
+                    applyGeneratedTextureMaterial(r, "terrain_grass");
                     r.albedoColor = glm::vec4(glm::mix(glm::vec3(1.0f), gcol, std::max(tintW, 0.30f)), 1.0f);
                     r.normalScale = 0.75f;
+                } else if (genExt.groundKind == "rock") {
+                    applyGeneratedTextureMaterial(r, "terrain_rock");
+                } else if (genExt.groundKind == "dirt") {
+                    applyGeneratedTextureMaterial(r, "terrain_sand");
+                } else {
+                    applyGeneratedTextureMaterial(r, "terrain_grass");
                 }
             };
             auto upG = renderer->UploadMesh(groundPlane);
@@ -3967,6 +4113,7 @@ void Engine::BuildRecipeScene() {
                     auto& r = m_registry->AddComponent<Scene::RenderableComponent>(seabedE);
                     r.mesh = seabedPlane;
                     dressGround(r);
+                    applyGeneratedTextureMaterial(r, "terrain_shore", false, true);
                 }
             }
             if (genExt.graphicsMaterials && genExt.waterOn && genExt.shoreLayerCount > 0) {
@@ -4027,11 +4174,11 @@ void Engine::BuildRecipeScene() {
                                                0.018f + static_cast<float>(contactCount % 5) * 0.0015f,
                                                patch.position.y);
                         const float squash = 0.56f + 0.18f * std::sin(patch.position.x * 1.7f + patch.position.y * 0.6f);
-                        t.scale = glm::vec3(patch.radius * 0.78f, 1.0f, patch.radius * squash * 0.78f);
+                        t.scale = glm::vec3(patch.radius * 0.26f, 1.0f, patch.radius * squash * 0.20f);
                         auto& r = m_registry->AddComponent<Scene::RenderableComponent>(contact);
                         r.mesh = contactMesh;
-                        const glm::vec3 dark = glm::max(gcol * (1.0f - patch.darkness * 1.05f), glm::vec3(0.010f));
-                        r.albedoColor = glm::vec4(dark, 0.24f);
+                        const glm::vec3 receiver = glm::max(receiverBase * (0.90f - patch.darkness * 0.08f), glm::vec3(0.020f));
+                        r.albedoColor = glm::vec4(receiver, 0.055f);
                         r.metallic = 0.0f;
                         r.roughness = 0.88f;
                         r.ao = 0.52f;
@@ -4052,7 +4199,7 @@ void Engine::BuildRecipeScene() {
                 }
             }
             if (genExt.graphicsMaterials && genExt.imageContactOcclusion.enabled && !genExt.contactPatches.empty()) {
-                auto deepContactMesh = Utils::MeshGenerator::CreatePlane(1.0f, 1.0f);
+                auto deepContactMesh = Utils::MeshGenerator::CreateDisk(1.0f, 32);
                 auto upDeepContact = renderer->UploadMesh(deepContactMesh);
                 if (upDeepContact.IsErr()) {
                     spdlog::warn("generative_exterior: image contact occluder mesh upload failed: {}", upDeepContact.Error());
@@ -4076,12 +4223,13 @@ void Engine::BuildRecipeScene() {
                                                pz);
                         t.rotation = glm::quat(glm::vec3(0.0f, glm::radians(17.0f * static_cast<float>(i)), 0.0f));
                         const float radius = std::clamp(patch.radius, 0.26f, 1.45f);
-                        t.scale = glm::vec3(radius * (0.76f + 0.06f * static_cast<float>(i % 3)),
+                        t.scale = glm::vec3(radius * (0.26f + 0.03f * static_cast<float>(i % 3)),
                                             1.0f,
-                                            radius * (0.22f + 0.028f * static_cast<float>((i + 1) % 3)));
+                                            radius * (0.095f + 0.014f * static_cast<float>((i + 1) % 3)));
                         auto& r = m_registry->AddComponent<Scene::RenderableComponent>(contact);
                         r.mesh = deepContactMesh;
-                        r.albedoColor = glm::vec4(0.0012f, 0.0010f, 0.0008f, 1.0f);
+                        const glm::vec3 contactColor = glm::max(receiverBase * 0.72f, glm::vec3(0.014f));
+                        r.albedoColor = glm::vec4(contactColor, 1.0f);
                         r.metallic = 0.0f;
                         r.roughness = 0.96f;
                         r.ao = 0.22f;
@@ -4120,10 +4268,11 @@ void Engine::BuildRecipeScene() {
                             auto& t = m_registry->AddComponent<TransformComponent>(contact);
                             t.position = glm::vec3(anchorData[i][0], 0.074f + static_cast<float>(i % 5) * 0.001f, anchorData[i][1]);
                             t.rotation = glm::quat(glm::vec3(0.0f, glm::radians(-18.0f + 13.0f * static_cast<float>(i)), 0.0f));
-                            t.scale = glm::vec3(anchorData[i][2], 1.0f, anchorData[i][3]);
+                            t.scale = glm::vec3(anchorData[i][2] * 0.26f, 1.0f, anchorData[i][3] * 0.52f);
                             auto& r = m_registry->AddComponent<Scene::RenderableComponent>(contact);
                             r.mesh = deepContactMesh;
-                            r.albedoColor = glm::vec4(0.0010f, 0.0009f, 0.0007f, 1.0f);
+                            const glm::vec3 anchorColor = glm::max(receiverBase * 0.66f, glm::vec3(0.013f));
+                            r.albedoColor = glm::vec4(anchorColor, 1.0f);
                             r.metallic = 0.0f;
                             r.roughness = 0.96f;
                             r.ao = 0.18f;
@@ -4171,7 +4320,7 @@ void Engine::BuildRecipeScene() {
                         t.scale = glm::vec3(sx, 1.0f, sz);
                         auto& r = m_registry->AddComponent<Scene::RenderableComponent>(soft);
                         r.mesh = softMesh;
-                        const glm::vec3 softColor = glm::max(glm::mix(gcol, glm::vec3(0.025f), 0.42f), glm::vec3(0.020f));
+                        const glm::vec3 softColor = glm::max(glm::mix(receiverBase, glm::vec3(0.030f), 0.10f), glm::vec3(0.020f));
                         r.albedoColor = glm::vec4(softColor, alpha);
                         r.metallic = 0.0f;
                         r.roughness = 0.98f;
@@ -4194,17 +4343,17 @@ void Engine::BuildRecipeScene() {
                     for (int i = 0; i < patchLimit; ++i) {
                         const int layer = i % layerCount;
                         const auto& patch = genExt.contactPatches[static_cast<size_t>(i / layerCount) % genExt.contactPatches.size()];
-                        const float spread = 1.0f + static_cast<float>(layer) * 0.72f;
-                        const float radius = std::clamp(patch.radius * (0.82f + 0.12f * pseudo(i + 1001, 1.37f)), 0.28f, 1.65f);
-                        const float alpha = std::clamp(0.055f - static_cast<float>(layer) * 0.012f +
-                                                       genExt.softOcclusion.targetSoftContactFraction * 0.35f,
-                                                       0.018f,
-                                                       0.068f);
+                        const float spread = 1.0f + static_cast<float>(layer) * 0.24f;
+                        const float radius = std::clamp(patch.radius * (0.34f + 0.06f * pseudo(i + 1001, 1.37f)), 0.14f, 0.70f);
+                        const float alpha = std::clamp(0.014f - static_cast<float>(layer) * 0.003f +
+                                                       genExt.softOcclusion.targetSoftContactFraction * 0.05f,
+                                                       0.006f,
+                                                       0.018f);
                         addSoftPatch("GenerativeExterior_SoftContactPenumbra" + std::to_string(i),
                                      patch.position.x + (pseudo(i + 1013, 2.17f) - 0.5f) * patch.radius * 0.18f,
                                      patch.position.y + (pseudo(i + 1021, 2.61f) - 0.5f) * patch.radius * 0.16f,
-                                     radius * (1.08f + 0.16f * pseudo(i, 1.71f)) * spread,
-                                     radius * (0.48f + 0.08f * pseudo(i, 1.93f)) * spread,
+                                     radius * (0.42f + 0.08f * pseudo(i, 1.71f)) * spread,
+                                     radius * (0.18f + 0.04f * pseudo(i, 1.93f)) * spread,
                                      -18.0f + 57.0f * pseudo(i, 2.37f),
                                      alpha,
                                      i);
@@ -4224,14 +4373,14 @@ void Engine::BuildRecipeScene() {
                                 return glm::vec2(p.x, p.z);
                             };
                             const std::array<glm::vec4, 8> cabinAnchors = {
-                                glm::vec4(0.0f, 0.0f, structure.widthM * 0.50f, structure.depthM * 0.38f),
-                                glm::vec4(0.0f, structure.depthM * 0.54f, structure.widthM * 0.38f, 0.34f),
-                                glm::vec4(-structure.widthM * 0.34f, structure.depthM * 0.34f, 0.28f, 0.28f),
-                                glm::vec4(structure.widthM * 0.34f, structure.depthM * 0.34f, 0.28f, 0.28f),
-                                glm::vec4(-structure.widthM * 0.48f, -structure.depthM * 0.32f, 0.26f, 0.24f),
-                                glm::vec4(structure.widthM * 0.48f, -structure.depthM * 0.32f, 0.26f, 0.24f),
-                                glm::vec4(-structure.widthM * 0.18f, structure.depthM * 0.62f, 0.24f, 0.22f),
-                                glm::vec4(structure.widthM * 0.18f, structure.depthM * 0.62f, 0.24f, 0.22f),
+                                glm::vec4(0.0f, 0.0f, structure.widthM * 0.22f, structure.depthM * 0.15f),
+                                glm::vec4(0.0f, structure.depthM * 0.54f, structure.widthM * 0.18f, 0.14f),
+                                glm::vec4(-structure.widthM * 0.34f, structure.depthM * 0.34f, 0.13f, 0.12f),
+                                glm::vec4(structure.widthM * 0.34f, structure.depthM * 0.34f, 0.13f, 0.12f),
+                                glm::vec4(-structure.widthM * 0.48f, -structure.depthM * 0.32f, 0.12f, 0.11f),
+                                glm::vec4(structure.widthM * 0.48f, -structure.depthM * 0.32f, 0.12f, 0.11f),
+                                glm::vec4(-structure.widthM * 0.18f, structure.depthM * 0.62f, 0.11f, 0.10f),
+                                glm::vec4(structure.widthM * 0.18f, structure.depthM * 0.62f, 0.11f, 0.10f),
                             };
                             for (size_t i = 0; i < cabinAnchors.size() && heroAnchorCount < genExt.softOcclusion.heroAnchorCount; ++i) {
                                 const glm::vec2 p = place(cabinAnchors[i].x, cabinAnchors[i].y);
@@ -4241,25 +4390,25 @@ void Engine::BuildRecipeScene() {
                                              cabinAnchors[i].z,
                                              cabinAnchors[i].w,
                                              structure.yawDeg,
-                                             0.044f,
+                                             0.014f,
                                              100 + heroAnchorCount);
                                 heroAnchorCount++;
                             }
                         }
                     } else {
                         const float anchorData[][4] = {
-                            { 2.90f, 0.90f, 1.24f, 0.48f },
-                            { -0.35f, 0.35f, 0.72f, 0.38f },
-                            { -1.05f, 0.86f, 0.54f, 0.30f },
-                            { 0.48f, -0.18f, 0.56f, 0.30f },
-                            { -2.25f, 1.35f, 0.70f, 0.34f },
-                            { 1.25f, 2.35f, 0.68f, 0.34f },
-                            { -0.35f, 2.85f, 0.70f, 0.34f },
-                            { 3.85f, 1.55f, 0.64f, 0.32f },
-                            { -3.70f, 2.05f, 0.62f, 0.30f },
-                            { 5.60f, 2.65f, 0.60f, 0.30f },
-                            { -5.30f, 3.10f, 0.58f, 0.28f },
-                            { 0.90f, 3.35f, 0.58f, 0.28f },
+                            { 2.90f, 0.90f, 0.40f, 0.16f },
+                            { -0.35f, 0.35f, 0.26f, 0.14f },
+                            { -1.05f, 0.86f, 0.22f, 0.12f },
+                            { 0.48f, -0.18f, 0.22f, 0.12f },
+                            { -2.25f, 1.35f, 0.26f, 0.13f },
+                            { 1.25f, 2.35f, 0.25f, 0.12f },
+                            { -0.35f, 2.85f, 0.25f, 0.12f },
+                            { 3.85f, 1.55f, 0.23f, 0.11f },
+                            { -3.70f, 2.05f, 0.23f, 0.11f },
+                            { 5.60f, 2.65f, 0.22f, 0.11f },
+                            { -5.30f, 3.10f, 0.22f, 0.10f },
+                            { 0.90f, 3.35f, 0.22f, 0.10f },
                         };
                         constexpr int anchorCount = static_cast<int>(sizeof(anchorData) / sizeof(anchorData[0]));
                         for (int i = 0; i < std::min(anchorCount, genExt.softOcclusion.heroAnchorCount); ++i) {
@@ -4269,7 +4418,7 @@ void Engine::BuildRecipeScene() {
                                          anchorData[i][2],
                                          anchorData[i][3],
                                          -20.0f + 17.0f * static_cast<float>(i),
-                                         0.040f,
+                                         0.022f,
                                          140 + i);
                             heroAnchorCount++;
                         }
@@ -4493,6 +4642,7 @@ void Engine::BuildRecipeScene() {
                         r.anisotropyStrength = 0.10f;
                         r.doubleSided = true;
                         r.presetName = "masonry";
+                        applyGeneratedTextureMaterial(r, "rock_cliff");
                     };
 
                     int canyonWalls = 0;
@@ -5491,6 +5641,12 @@ void Engine::BuildRecipeScene() {
                         r.emissiveColor = emissive;
                         r.emissiveStrength = emissiveStrength;
                         r.emissiveBloomFactor = glm::length(emissive) > 0.0f ? 0.42f : 0.0f;
+                        const std::string presetName = preset ? preset : "";
+                        if (presetName == "wood") {
+                            applyGeneratedTextureMaterial(r, "wood", true);
+                        } else if (presetName == "masonry") {
+                            applyGeneratedTextureMaterial(r, "rock", true);
+                        }
                     };
 
                     const float w = structure.widthM;
@@ -5552,6 +5708,7 @@ void Engine::BuildRecipeScene() {
                         r.ao = 1.0f;
                         r.doubleSided = true;
                         r.presetName = "wood";
+                        applyGeneratedTextureMaterial(r, "wood", true);
                     }
 
                     if (genExt.assetFidelity.enabled && genExt.assetFidelity.cabinFacadeDetailCount > 0) {
@@ -5903,7 +6060,9 @@ void Engine::BuildRecipeScene() {
                                       float roughness,
                                       float normalScale,
                                       float proceduralMask,
-                                      float wetness = 0.0f) {
+                                      float wetness = 0.0f,
+                                      bool heroSurface = true,
+                                      bool shoreSurface = false) {
                     r.albedoColor = color;
                     r.metallic = 0.0f;
                     r.roughness = roughness;
@@ -5919,6 +6078,14 @@ void Engine::BuildRecipeScene() {
                     r.sheenWeight = std::string(preset) == "fabric" ? 0.24f : 0.0f;
                     r.doubleSided = true;
                     r.presetName = preset;
+                    const std::string presetName = preset ? preset : "";
+                    if (presetName == "wood") {
+                        applyGeneratedTextureMaterial(r, shoreSurface ? "driftwood" : "wood", heroSurface, shoreSurface);
+                    } else if (presetName == "fabric") {
+                        applyGeneratedTextureMaterial(r, "fabric", heroSurface, shoreSurface);
+                    } else if (presetName == "masonry") {
+                        applyGeneratedTextureMaterial(r, shoreSurface ? "rock" : "rock_cliff", heroSurface, shoreSurface);
+                    }
                 };
                 auto addPart = [&](const std::string& tag,
                                    const std::shared_ptr<Scene::MeshData>& mesh,
@@ -5930,7 +6097,8 @@ void Engine::BuildRecipeScene() {
                                    float roughness,
                                    float normalScale,
                                    float proceduralMask,
-                                   float wetness = 0.0f) {
+                                   float wetness = 0.0f,
+                                   bool shoreSurface = false) {
                     entt::entity part = m_registry->CreateEntity();
                     m_registry->AddComponent<Scene::TagComponent>(part, tag);
                     auto& t = m_registry->AddComponent<TransformComponent>(part);
@@ -5939,7 +6107,7 @@ void Engine::BuildRecipeScene() {
                     t.rotation = glm::quat(euler);
                     auto& r = m_registry->AddComponent<Scene::RenderableComponent>(part);
                     r.mesh = mesh;
-                    dressSolid(r, color, preset, roughness, normalScale, proceduralMask, wetness);
+                    dressSolid(r, color, preset, roughness, normalScale, proceduralMask, wetness, true, shoreSurface);
                 };
 
                 int mountainLayers = 0;
@@ -6045,7 +6213,8 @@ void Engine::BuildRecipeScene() {
                                     0.82f,
                                     0.46f,
                                     0.48f,
-                                    std::min(0.42f, genExt.groundWetness + 0.12f));
+                                    std::min(0.42f, genExt.groundWetness + 0.12f),
+                                    true);
                         } else {
                             const float s = 0.22f + pseudo(i, 4.57f) * 0.26f;
                             addPart("GenerativeExterior_Shoreline_WetStone" + std::to_string(i),
@@ -6062,7 +6231,8 @@ void Engine::BuildRecipeScene() {
                                     0.76f,
                                     0.74f,
                                     0.62f,
-                                    std::min(0.55f, genExt.groundWetness + 0.20f));
+                                    std::min(0.55f, genExt.groundWetness + 0.20f),
+                                    true);
                         }
                         shorelineProps++;
                     }
@@ -6377,6 +6547,14 @@ void Engine::BuildRecipeScene() {
                     r.anisotropyStrength = std::string(preset) == "wood" ? 0.32f : 0.12f;
                     r.sheenWeight = std::string(preset) == "fabric" ? 0.24f : 0.0f;
                     r.presetName = preset;
+                    const std::string presetName = preset ? preset : "";
+                    if (presetName == "wood") {
+                        applyGeneratedTextureMaterial(r, "wood", true);
+                    } else if (presetName == "fabric") {
+                        applyGeneratedTextureMaterial(r, "fabric", true);
+                    } else if (presetName == "masonry") {
+                        applyGeneratedTextureMaterial(r, "rock", true);
+                    }
                 };
                 auto addBevel = [&](const std::string& tag,
                                     const std::shared_ptr<Scene::MeshData>& mesh,
@@ -6521,6 +6699,17 @@ void Engine::BuildRecipeScene() {
                              genExt.meshSilhouetteRealism.propDepthLayerCount);
             }
         }
+    }
+
+    if (genExt.valid && genExt.textureMaterialFidelity.enabled) {
+        spdlog::info("generative_exterior: texture material fidelity terrain={} rock={} wood={} fabric={} hero={} shore={} texture_sets={}",
+                     textureMaterialCounts.terrain,
+                     textureMaterialCounts.rock,
+                     textureMaterialCounts.wood,
+                     textureMaterialCounts.fabric,
+                     textureMaterialCounts.hero,
+                     textureMaterialCounts.shore,
+                     textureMaterialCounts.sets.size());
     }
 
     if (genExt.valid && genExt.atmosphereFidelity.enabled) {

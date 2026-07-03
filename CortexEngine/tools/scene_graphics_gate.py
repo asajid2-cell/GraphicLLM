@@ -4,8 +4,8 @@
 This complements scene_quality_gate.py. It does not claim an image is AAA; it
 rejects the obvious blockout class: flat generated exteriors with disconnected
 props, no terrain/contact/material/shader pass, weak occlusion layering, weak
-surface material breakup, and no runtime evidence that the high-quality
-exterior graphics path ran.
+surface material breakup, weak texture-backed material coverage, and no runtime
+evidence that the high-quality exterior graphics path ran.
 """
 
 from __future__ import annotations
@@ -143,6 +143,18 @@ def _material_zone_count(zones: Any) -> int:
     return 0
 
 
+def _texture_runtime_counts(log_text: str) -> dict[str, int] | None:
+    m = re.search(
+        r"generative_exterior: texture material fidelity "
+        r"terrain=(\d+) rock=(\d+) wood=(\d+) fabric=(\d+) hero=(\d+) shore=(\d+) texture_sets=(\d+)",
+        log_text,
+    )
+    if not m:
+        return None
+    keys = ("terrain", "rock", "wood", "fabric", "hero", "shore", "texture_sets")
+    return {key: int(value) for key, value in zip(keys, m.groups())}
+
+
 def _asset_counts(ir: dict[str, Any]) -> dict[str, int]:
     counts = {
         "trees": 0,
@@ -237,6 +249,7 @@ def evaluate(prompt: str, ir: dict[str, Any], png: Path | None, log_text: str) -
     water_shore_integration = graphics.get("water_shore_integration") or {}
     soft_occlusion = graphics.get("soft_occlusion") or {}
     hero_environment_geometry = graphics.get("hero_environment_geometry") or {}
+    texture_material_fidelity = graphics.get("texture_material_fidelity") or {}
     image = _image_metrics(png)
 
     failures: list[dict[str, Any]] = []
@@ -528,6 +541,58 @@ def evaluate(prompt: str, ir: dict[str, Any], png: Path | None, log_text: str) -
                 runtime_high_detail_cabin_kit=has_runtime_cabin_kit,
                 runtime_mountain_massing_geometry=has_runtime_mountain_mass,
                 runtime_irregular_tree_silhouette_geometry=has_runtime_tree_silhouette,
+            )
+
+        try:
+            texture_set_count = int(texture_material_fidelity.get("texture_set_count", 0) or 0)
+            terrain_surfaces = int(texture_material_fidelity.get("terrain_surface_count", 0) or 0)
+            rock_surfaces = int(texture_material_fidelity.get("rock_surface_count", 0) or 0)
+            wood_surfaces = int(texture_material_fidelity.get("wood_surface_count", 0) or 0)
+            fabric_surfaces = int(texture_material_fidelity.get("fabric_surface_count", 0) or 0)
+            hero_surfaces = int(texture_material_fidelity.get("hero_surface_count", 0) or 0)
+            shore_surfaces = int(texture_material_fidelity.get("shore_surface_count", 0) or 0)
+        except Exception:
+            texture_set_count = terrain_surfaces = rock_surfaces = wood_surfaces = 0
+            fabric_surfaces = hero_surfaces = shore_surfaces = 0
+        needs_fabric = flags["campsite"]
+        needs_wood = flags["campsite"] or "cabin" in prompt.lower() or flags["water"]
+        min_terrain_surfaces = 2 if flags["water"] else 1
+        runtime_texture_counts = _texture_runtime_counts(log_text)
+        runtime_texture_ok = (
+            isinstance(runtime_texture_counts, dict)
+            and runtime_texture_counts.get("texture_sets", 0) >= 4
+            and runtime_texture_counts.get("terrain", 0) >= min_terrain_surfaces
+            and runtime_texture_counts.get("rock", 0) >= 6
+            and runtime_texture_counts.get("hero", 0) >= 10
+            and (not needs_wood or runtime_texture_counts.get("wood", 0) >= 8)
+            and (not needs_fabric or runtime_texture_counts.get("fabric", 0) >= 4)
+            and (not flags["water"] or runtime_texture_counts.get("shore", 0) >= 4)
+        )
+        if (
+            not isinstance(texture_material_fidelity, dict)
+            or not bool(texture_material_fidelity.get("enabled"))
+            or texture_set_count < 4
+            or terrain_surfaces < min_terrain_surfaces
+            or rock_surfaces < 6
+            or hero_surfaces < 10
+            or (needs_wood and wood_surfaces < 8)
+            or (needs_fabric and fabric_surfaces < 4)
+            or (flags["water"] and shore_surfaces < 4)
+            or not runtime_texture_ok
+        ):
+            fail(
+                "missing_texture_material_fidelity",
+                "Generated exterior lacks texture-backed material binding for terrain, rock/cliff, wood, fabric, or hero surfaces",
+                texture_material_fidelity=texture_material_fidelity,
+                texture_set_count=texture_set_count,
+                terrain_surface_count=terrain_surfaces,
+                rock_surface_count=rock_surfaces,
+                wood_surface_count=wood_surfaces,
+                fabric_surface_count=fabric_surfaces,
+                hero_surface_count=hero_surfaces,
+                shore_surface_count=shore_surfaces,
+                runtime_texture_counts=runtime_texture_counts,
+                runtime_texture_materials=runtime_texture_ok,
             )
 
         if flags["moonlight"] or "storm" in prompt.lower():

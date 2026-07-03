@@ -414,6 +414,14 @@ def compile_v3_to_v2(v3: dict[str, Any]) -> dict[str, Any]:
             "submerged_edge_rock_wetlines",
         ])
     material_zone_names.extend(["hero_environment_geometry", "mountain_cliff_massing", "shoreline_prop_geometry"])
+    material_zone_names.extend([
+        "texture_source_terrain",
+        "texture_source_rock_cliff",
+        "texture_source_wood",
+        "texture_source_fabric",
+    ])
+    if water_on:
+        material_zone_names.append("texture_source_wet_shore")
     if not desert:
         material_zone_names.append("irregular_tree_silhouettes")
     env["shot"] = {
@@ -577,6 +585,33 @@ def compile_v3_to_v2(v3: dict[str, Any]) -> dict[str, Any]:
                 "mountain_massing_meshes",
                 "shoreline_driftwood_and_stones",
                 "irregular_tree_silhouette_meshes",
+            ],
+        },
+        "texture_material_fidelity": {
+            "enabled": True,
+            "texture_set_count": 7,
+            "terrain_surface_count": 3 if water_on else 2,
+            "rock_surface_count": 18 if canyon else 10,
+            "wood_surface_count": (18 if campsite else 8) + (18 if cabin else 0) + (6 if water_on else 0),
+            "fabric_surface_count": 10 if campsite else 2,
+            "hero_surface_count": (24 if campsite else 8) + (24 if cabin else 0),
+            "shore_surface_count": 10 if water_on else 0,
+            "texture_sets": [
+                "polyhaven/aerial_grass_rock",
+                "polyhaven/aerial_beach_01",
+                "polyhaven/coast_sand_05",
+                "polyhaven/wood_floor_deck",
+                "polyhaven/plastered_wall",
+                "naturalistic/boulder_01",
+                "naturalistic/rock_moss_set_01",
+            ],
+            "systems": [
+                "terrain_albedo_normal_roughness",
+                "rock_cliff_albedo_normal_arm",
+                "wood_albedo_normal_roughness",
+                "fabric_albedo_normal_roughness",
+                "wet_shore_texture_binding",
+                "hero_geometry_texture_assignment",
             ],
         },
         "atmosphere_fidelity": {

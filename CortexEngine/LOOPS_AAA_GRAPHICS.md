@@ -8,6 +8,7 @@ All criteria below must be true for the autonomous portion to be complete:
 - New campsite render passes both `scene_quality_gate.py` and the new graphics gate.
 - At least two novel exterior prompts pass the graphics gate without per-prompt code edits.
 - Strengthened graphics gate requires advanced shader material terms, surface/occlusion layering, and runtime shot-camera evidence.
+- Generated exterior graphics gate requires texture-backed material fidelity evidence for terrain/ground, rock/cliff, wood, fabric, and hero surfaces, not only colored procedural overlays.
 - Regression bundle stays green: C++ Release build, Python compile, v3 campsite/alpine/desert gates, and legacy kitchen smoke.
 - `HUMAN-GATE`: user decides whether the new stills are sufficiently AA/AAA.
 
@@ -355,11 +356,56 @@ Escape: if added geometry causes capture timeouts, visual clutter, or object vis
 
 Status: done
 
+### Loop 18: Texture-Backed Material Fidelity
+
+Invariant: generated exteriors bind real local texture/PBR material sources to major visible surfaces instead of relying only on flat colors, line overlays, and procedural metadata.
+
+Scope:
+
+- in: `tools/scene_graphics_gate.py`, `tools/scene_compiler.py`, `src/Core/Engine_Scenes.cpp`, focused asset/material path wiring if needed, ledgers.
+- out: weakening `tools/scene_quality_gate.py`, forced DXR defaults, unrelated scene families, external downloads.
+
+Verifier:
+
+- Current Loop 17 campsite/desert/alpine artifacts fail strengthened graphics gate with `missing_texture_material_fidelity`.
+- New campsite/desert/alpine prompts render VALID and pass quality + strengthened graphics gates.
+- Runtime logs prove texture-backed material binding for terrain/ground, rock/cliff, wood/fabric/hero pieces, and water/shore-adjacent surfaces where applicable.
+- Release build, Python compile, Director IR validation, known-bad oracles, and kitchen smoke remain green.
+
+Exit: all verifier commands green, with artifacts/logs recorded, heartbeat retired or rearmed for the next loop, and checkpoint committed.
+
+Escape: if local texture sets cannot be loaded safely in the generated path, fall back to a narrower source-bound material contract that proves existing runtime texture hooks are used for at least terrain/rock/wood; do not weaken color or graphics gates.
+
+Status: done
+
 ## Progress Log
 
 2026-07-03:
 
 - Created this separate loop ledger to avoid contaminating the Director IR v3 ledger.
+- Loop 18 opened after Loop 17 checkpoint and renewed user pushback against early stopping. Heartbeat proof `aaa-loop18-proof` fired by timeout after 1s; self-owned Codex heartbeat `aaa-loop18` armed with resume id from `CODEX_THREAD_ID`. Next action: recon local texture/PBR assets and runtime material APIs, then strengthen the graphics gate so Loop 17 artifacts fail `missing_texture_material_fidelity`.
+- Loop 18 red proof:
+  - `python tools\scene_graphics_gate.py --prompt "a foggy mountain campsite beside a purple lake at dawn" --ir build\bin\logs\aaa_graphics_campsite_loop17b_0_ir.json --png build\bin\logs\aaa_graphics_campsite_loop17b_0.png --log build\bin\logs\aaa_graphics_campsite_loop17b_0.out` exited 1 with `missing_texture_material_fidelity`.
+  - `python tools\scene_graphics_gate.py --prompt "a sunny desert canyon campsite with red rocks and a turquoise river" --ir build\bin\logs\aaa_graphics_desert_loop17b_0_ir.json --png build\bin\logs\aaa_graphics_desert_loop17b_0.png --log build\bin\logs\aaa_graphics_desert_loop17b_0.out` exited 1 with `missing_texture_material_fidelity`.
+  - `python tools\scene_graphics_gate.py --prompt "a stormy alpine lake with a small cabin and blue moonlight" --ir build\bin\logs\aaa_graphics_alpine_loop17_0_ir.json --png build\bin\logs\aaa_graphics_alpine_loop17_0.png --log build\bin\logs\aaa_graphics_alpine_loop17_0.out` exited 1 with `missing_texture_material_fidelity`.
+- Loop 18 implementation:
+  - `tools\scene_compiler.py` now emits `graphics_pass.texture_material_fidelity` counts for terrain/ground, rock/cliff, wood, fabric, hero, and shore surfaces.
+  - `tools\scene_graphics_gate.py` now requires the IR contract plus parsed runtime texture-material evidence, and the old graphics oracle with an explicit empty log now fails with `missing_texture_material_fidelity`.
+  - `src\Core\Engine_Scenes.cpp` now binds existing local Polyhaven/naturalistic texture sources into generated terrain, shore, rock, wood, fabric, and hero surfaces and logs texture-backed material counts.
+  - The visible contact/receiver artifact fix was kept in the runtime path by neutralizing receiver colors toward terrain materials and shrinking hard contact patches instead of weakening graphics or semantic gates.
+- Loop 18 verifier evidence:
+  - `python -m py_compile tools\scene_compiler.py tools\scene_graphics_gate.py tools\scene_quality_gate.py tools\scene_gen.py` exited 0.
+  - Release rebuild exited 0: `[OK] Build complete in 4.4s` (`ninja: no work to do` after prior rebuild).
+  - `git diff --check` exited 0.
+  - Campsite `aaa_graphics_campsite_loop18d` rendered VALID; quality gate exited 0 (`purple_fraction=0.8836`, `nonblack_fraction=1.0`); graphics gate exited 0 (`dark_contact_fraction=0.0044`, `dark_contact_area_fraction=0.0298`); Director IR validation exited 0. Runtime texture log: `terrain=3 rock=31 wood=34 fabric=29 hero=79 shore=12 texture_sets=7`.
+  - Desert canyon `aaa_graphics_desert_loop18b` rendered VALID; quality gate exited 0 (`turquoise_fraction=0.4212`, `nonblack_fraction=1.0`); graphics gate exited 0 (`dark_contact_area_fraction=0.0128`); Director IR validation exited 0. Runtime texture log: `terrain=3 rock=106 wood=22 fabric=29 hero=81 shore=12 texture_sets=7`.
+  - Alpine cabin `aaa_graphics_alpine_loop18b` rendered VALID; quality gate exited 0 (`avg_luma=0.1408`, `cool_fraction=0.889`, `nonblack_fraction=0.9976`); graphics gate exited 0 (`dark_contact_fraction=0.0117`); Director IR validation exited 0. Runtime texture log: `terrain=3 rock=43 wood=81 fabric=0 hero=109 shore=12 texture_sets=6`.
+  - Kitchen smoke `regression_kitchen_aaa_loop18b` rendered VALID and quality gate exited 0 (`avg_luma=0.4742`, `nonblack_fraction=1.0`).
+  - Known-bad quality oracle `gen_a_foggy_mountain_campsite_beside_0` with `--expect-fail` exited 0 and still reports forbidden fridge, missing mountain/ridge, focal visibility, and purple-water failures.
+  - Known-bad graphics oracle `v3_campsite_ridge_test_0` with explicit empty log and `--expect-fail` exited 0 and now includes `missing_texture_material_fidelity`.
+- Loop 18 visual/regression notes:
+  - Texture-backed materials are objectively bound and visible in runtime receipts/counts, and the worst pale/black receiver-disc artifacts from the first Loop 18 candidates were reduced.
+  - The final images are still `HUMAN-GATE` short of AAA: low-poly silhouettes, kit-like tent/cabin/props, stylized water/terrain, and visible overlay construction remain. The next front should climb another layer: source-bound hero geometry, better asset selection/ingest, or renderer-level occlusion/shadowing with a density budget rather than more decorative clutter.
 - Loop 17 opened after Loop 16 visual inspection and user pushback: the next hard ceiling is source/hero/environment geometry fidelity rather than more overlay layers. Heartbeat proof `aaa-graphics-loop17-proof` fired by timeout after 1s.
 - Loop 17 red proof:
   - Strengthened `tools\scene_graphics_gate.py` to require `graphics_pass.hero_environment_geometry` plus runtime logs for high-detail camp/cabin kits, mountain massing, and irregular tree silhouettes where prompt-relevant.

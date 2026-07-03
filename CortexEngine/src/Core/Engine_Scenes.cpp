@@ -225,6 +225,21 @@ namespace {
         int heroAnchorCount = 0;
     };
 
+    struct GenerativeRendererShadowOcclusionBudget {
+        bool enabled = false;
+        bool rendererSSAO = false;
+        bool shadowMaps = false;
+        bool dxrRequired = false;
+        float ssaoRadius = 0.75f;
+        float ssaoBias = 0.018f;
+        float ssaoIntensity = 1.35f;
+        float shadowBias = 0.0035f;
+        float shadowPCFRadius = 2.5f;
+        int contactReceiverPatchBudget = 0;
+        int softPenumbraPatchBudget = 0;
+        float rendererContactBlend = 0.0f;
+    };
+
     struct GenerativeTextureMaterialRuntimeCounts {
         int terrain = 0;
         int rock = 0;
@@ -3364,6 +3379,7 @@ void Engine::BuildRecipeScene() {
         GenerativeHeroEnvironmentGeometry heroEnvironmentGeometry;
         GenerativeTextureMaterialFidelity textureMaterialFidelity;
         GenerativeSourceGeometryFidelity sourceGeometryFidelity;
+        GenerativeRendererShadowOcclusionBudget rendererShadowOcclusionBudget;
         GenerativeAtmosphereFidelity atmosphereFidelity;
         GenerativeGeometryRealism geometryRealism;
         int shoreLayerCount = 0;
@@ -3444,6 +3460,35 @@ void Engine::BuildRecipeScene() {
                 genExt.graphicsSSAOIntensity = std::clamp(num(graphicsRenderer, "ssao_intensity", genExt.graphicsSSAOIntensity), 0.5f, 4.5f);
                 genExt.graphicsShadowBias = std::clamp(num(graphicsRenderer, "shadow_bias", genExt.graphicsShadowBias), 0.0003f, 0.010f);
                 genExt.graphicsShadowPCF = std::clamp(num(graphicsRenderer, "shadow_pcf_radius", genExt.graphicsShadowPCF), 0.25f, 5.0f);
+                const nlohmann::json rendererShadowBudget =
+                    graphics.value("renderer_shadow_occlusion_budget", nlohmann::json::object());
+                genExt.rendererShadowOcclusionBudget.enabled = rendererShadowBudget.value("enabled", false);
+                genExt.rendererShadowOcclusionBudget.rendererSSAO = rendererShadowBudget.value("renderer_ssao", false);
+                genExt.rendererShadowOcclusionBudget.shadowMaps = rendererShadowBudget.value("shadow_maps", false);
+                genExt.rendererShadowOcclusionBudget.dxrRequired = rendererShadowBudget.value("dxr_required", false);
+                genExt.rendererShadowOcclusionBudget.ssaoRadius =
+                    std::clamp(num(rendererShadowBudget, "ssao_radius", genExt.graphicsSSAORadius), 0.20f, 2.5f);
+                genExt.rendererShadowOcclusionBudget.ssaoBias =
+                    std::clamp(num(rendererShadowBudget, "ssao_bias", genExt.graphicsSSAOBias), 0.0005f, 0.05f);
+                genExt.rendererShadowOcclusionBudget.ssaoIntensity =
+                    std::clamp(num(rendererShadowBudget, "ssao_intensity", genExt.graphicsSSAOIntensity), 0.5f, 4.5f);
+                genExt.rendererShadowOcclusionBudget.shadowBias =
+                    std::clamp(num(rendererShadowBudget, "shadow_bias", genExt.graphicsShadowBias), 0.0003f, 0.010f);
+                genExt.rendererShadowOcclusionBudget.shadowPCFRadius =
+                    std::clamp(num(rendererShadowBudget, "shadow_pcf_radius", genExt.graphicsShadowPCF), 0.25f, 5.0f);
+                genExt.rendererShadowOcclusionBudget.contactReceiverPatchBudget =
+                    static_cast<int>(std::clamp(num(rendererShadowBudget, "contact_receiver_patch_budget", 0.0f), 0.0f, 96.0f));
+                genExt.rendererShadowOcclusionBudget.softPenumbraPatchBudget =
+                    static_cast<int>(std::clamp(num(rendererShadowBudget, "soft_penumbra_patch_budget", 0.0f), 0.0f, 64.0f));
+                genExt.rendererShadowOcclusionBudget.rendererContactBlend =
+                    std::clamp(num(rendererShadowBudget, "renderer_contact_blend", 0.0f), 0.0f, 1.0f);
+                if (genExt.rendererShadowOcclusionBudget.enabled) {
+                    genExt.graphicsSSAORadius = genExt.rendererShadowOcclusionBudget.ssaoRadius;
+                    genExt.graphicsSSAOBias = genExt.rendererShadowOcclusionBudget.ssaoBias;
+                    genExt.graphicsSSAOIntensity = genExt.rendererShadowOcclusionBudget.ssaoIntensity;
+                    genExt.graphicsShadowBias = genExt.rendererShadowOcclusionBudget.shadowBias;
+                    genExt.graphicsShadowPCF = genExt.rendererShadowOcclusionBudget.shadowPCFRadius;
+                }
                 const nlohmann::json worldGeometry = graphics.value("world_geometry", nlohmann::json::object());
                 genExt.worldGeometry.enabled = worldGeometry.value("enabled", false);
                 genExt.worldGeometry.foregroundOccluderCount =
@@ -4220,6 +4265,8 @@ void Engine::BuildRecipeScene() {
                     spdlog::info("generative_exterior: created contact grounding {} patch(es)", contactCount);
                 }
             }
+            int rendererBudgetContactPatches = 0;
+            int rendererBudgetSoftPenumbra = 0;
             if (genExt.graphicsMaterials && genExt.imageContactOcclusion.enabled && !genExt.contactPatches.empty()) {
                 auto deepContactMesh = Utils::MeshGenerator::CreateDisk(1.0f, 32);
                 auto upDeepContact = renderer->UploadMesh(deepContactMesh);
@@ -4314,6 +4361,7 @@ void Engine::BuildRecipeScene() {
                     spdlog::info("generative_exterior: created image contact occluders patches={} target_dark_contact={:.4f}",
                                  deepContactCount,
                                  genExt.imageContactOcclusion.targetDarkContactFraction);
+                    rendererBudgetContactPatches = deepContactCount;
                 }
             }
             if (genExt.graphicsMaterials && genExt.softOcclusion.enabled && !genExt.contactPatches.empty()) {
@@ -4450,7 +4498,24 @@ void Engine::BuildRecipeScene() {
                                  layerCount,
                                  heroAnchorCount,
                                  genExt.softOcclusion.targetSoftContactFraction);
+                    rendererBudgetSoftPenumbra = penumbraCount + heroAnchorCount;
                 }
+            }
+            if (genExt.rendererShadowOcclusionBudget.enabled) {
+                const auto features = renderer->GetFeatureState();
+                const auto quality = renderer->GetQualityState();
+                spdlog::info("generative_exterior: renderer shadow occlusion budget ssao={} shadows={} ssao_radius={:.2f} ssao_bias={:.3f} ssao_intensity={:.2f} shadow_bias={:.4f} shadow_pcf={:.2f} contact_patches={} soft_penumbra={} overlay_budget={} dxr_required={}",
+                             features.ssaoEnabled ? "on" : "off",
+                             quality.shadowsEnabled ? "on" : "off",
+                             features.ssaoRadius,
+                             features.ssaoBias,
+                             features.ssaoIntensity,
+                             quality.shadowBias,
+                             quality.shadowPCFRadius,
+                             rendererBudgetContactPatches,
+                             rendererBudgetSoftPenumbra,
+                             rendererBudgetContactPatches + rendererBudgetSoftPenumbra,
+                             genExt.rendererShadowOcclusionBudget.dxrRequired ? 1 : 0);
             }
             if (genExt.waterOn && genExt.waterShoreIntegration.enabled) {
                 auto ribbonMesh = Utils::MeshGenerator::CreatePlane(1.0f, 1.0f);

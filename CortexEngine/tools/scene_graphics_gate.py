@@ -155,6 +155,33 @@ def _texture_runtime_counts(log_text: str) -> dict[str, int] | None:
     return {key: int(value) for key, value in zip(keys, m.groups())}
 
 
+def _renderer_shadow_runtime(log_text: str) -> dict[str, Any] | None:
+    m = re.search(
+        r"generative_exterior: renderer shadow occlusion budget "
+        r"ssao=(on|off) shadows=(on|off) "
+        r"ssao_radius=([0-9.]+) ssao_bias=([0-9.]+) ssao_intensity=([0-9.]+) "
+        r"shadow_bias=([0-9.]+) shadow_pcf=([0-9.]+) "
+        r"contact_patches=(\d+) soft_penumbra=(\d+) "
+        r"overlay_budget=(\d+) dxr_required=(0|1)",
+        log_text,
+    )
+    if not m:
+        return None
+    return {
+        "ssao": m.group(1) == "on",
+        "shadows": m.group(2) == "on",
+        "ssao_radius": float(m.group(3)),
+        "ssao_bias": float(m.group(4)),
+        "ssao_intensity": float(m.group(5)),
+        "shadow_bias": float(m.group(6)),
+        "shadow_pcf_radius": float(m.group(7)),
+        "contact_patches": int(m.group(8)),
+        "soft_penumbra": int(m.group(9)),
+        "overlay_budget": int(m.group(10)),
+        "dxr_required": m.group(11) == "1",
+    }
+
+
 def _asset_counts(ir: dict[str, Any]) -> dict[str, int]:
     counts = {
         "trees": 0,
@@ -251,6 +278,7 @@ def evaluate(prompt: str, ir: dict[str, Any], png: Path | None, log_text: str) -
     hero_environment_geometry = graphics.get("hero_environment_geometry") or {}
     texture_material_fidelity = graphics.get("texture_material_fidelity") or {}
     source_geometry_fidelity = graphics.get("source_geometry_fidelity") or {}
+    renderer_shadow_occlusion_budget = graphics.get("renderer_shadow_occlusion_budget") or {}
     image = _image_metrics(png)
 
     failures: list[dict[str, Any]] = []
@@ -626,6 +654,62 @@ def evaluate(prompt: str, ir: dict[str, Any], png: Path | None, log_text: str) -
                 scanned_anchor_rock_count=scanned_anchor_rocks,
                 hero_anchor_count=source_hero_anchors,
                 runtime_source_geometry=has_runtime_source_geometry,
+            )
+
+        try:
+            budget_ssao_radius = float(renderer_shadow_occlusion_budget.get("ssao_radius", 0.0) or 0.0)
+            budget_ssao_bias = float(renderer_shadow_occlusion_budget.get("ssao_bias", 1.0) or 1.0)
+            budget_ssao_intensity = float(renderer_shadow_occlusion_budget.get("ssao_intensity", 0.0) or 0.0)
+            budget_shadow_bias = float(renderer_shadow_occlusion_budget.get("shadow_bias", 1.0) or 1.0)
+            budget_shadow_pcf = float(renderer_shadow_occlusion_budget.get("shadow_pcf_radius", 0.0) or 0.0)
+            contact_patch_budget = int(renderer_shadow_occlusion_budget.get("contact_receiver_patch_budget", 0) or 0)
+            soft_penumbra_budget = int(renderer_shadow_occlusion_budget.get("soft_penumbra_patch_budget", 0) or 0)
+            renderer_contact_blend = float(renderer_shadow_occlusion_budget.get("renderer_contact_blend", 0.0) or 0.0)
+        except Exception:
+            budget_ssao_radius = budget_ssao_intensity = budget_shadow_pcf = renderer_contact_blend = 0.0
+            budget_ssao_bias = budget_shadow_bias = 1.0
+            contact_patch_budget = soft_penumbra_budget = 0
+        runtime_shadow_budget = _renderer_shadow_runtime(log_text)
+        runtime_shadow_budget_ok = (
+            isinstance(runtime_shadow_budget, dict)
+            and runtime_shadow_budget.get("ssao") is True
+            and runtime_shadow_budget.get("shadows") is True
+            and runtime_shadow_budget.get("dxr_required") is False
+            and runtime_shadow_budget.get("ssao_radius", 0.0) >= 1.05
+            and runtime_shadow_budget.get("ssao_bias", 1.0) <= 0.025
+            and runtime_shadow_budget.get("ssao_intensity", 0.0) >= 2.10
+            and runtime_shadow_budget.get("shadow_bias", 1.0) <= 0.0030
+            and runtime_shadow_budget.get("shadow_pcf_radius", 0.0) >= 2.40
+            and runtime_shadow_budget.get("contact_patches", 0) >= 12
+            and runtime_shadow_budget.get("contact_patches", 9999) <= max(contact_patch_budget, 1)
+            and runtime_shadow_budget.get("soft_penumbra", 9999) <= max(soft_penumbra_budget, 1)
+            and runtime_shadow_budget.get("overlay_budget", 9999) <= max(contact_patch_budget + soft_penumbra_budget, 1)
+            and abs(runtime_shadow_budget.get("ssao_radius", 0.0) - budget_ssao_radius) <= 0.18
+            and abs(runtime_shadow_budget.get("ssao_intensity", 0.0) - budget_ssao_intensity) <= 0.20
+            and abs(runtime_shadow_budget.get("shadow_pcf_radius", 0.0) - budget_shadow_pcf) <= 0.20
+        )
+        if (
+            not isinstance(renderer_shadow_occlusion_budget, dict)
+            or not bool(renderer_shadow_occlusion_budget.get("enabled"))
+            or not bool(renderer_shadow_occlusion_budget.get("renderer_ssao"))
+            or not bool(renderer_shadow_occlusion_budget.get("shadow_maps"))
+            or bool(renderer_shadow_occlusion_budget.get("dxr_required"))
+            or budget_ssao_radius < 1.05
+            or budget_ssao_bias > 0.025
+            or budget_ssao_intensity < 2.10
+            or budget_shadow_bias > 0.0030
+            or budget_shadow_pcf < 2.40
+            or contact_patch_budget < 24
+            or soft_penumbra_budget < 18
+            or renderer_contact_blend < 0.60
+            or not runtime_shadow_budget_ok
+        ):
+            fail(
+                "missing_renderer_shadow_occlusion_budget",
+                "Generated exterior lacks bounded renderer-level SSAO/shadow-map contact budget evidence",
+                renderer_shadow_occlusion_budget=renderer_shadow_occlusion_budget,
+                runtime_shadow_occlusion_budget=runtime_shadow_budget,
+                runtime_shadow_occlusion_budget_ok=runtime_shadow_budget_ok,
             )
 
         if flags["moonlight"] or "storm" in prompt.lower():

@@ -420,7 +420,7 @@ Exit: all verifier commands green, with artifacts/logs recorded and checkpoint c
 
 Escape: if true renderer-level controls cannot be isolated without enabling unsafe DXR defaults, narrow to SSAO/shadow-map/contact telemetry first; do not fake the pass with more decorative overlays.
 
-Status: running
+Status: done
 
 ## Progress Log
 
@@ -472,6 +472,27 @@ Status: running
   - Source-scanned meshes are visible in the campsite/desert hero camp and on the alpine porch, and they use existing PBR texture paths instead of new procedural primitive overlays.
   - The remaining `HUMAN-GATE` gap is still large: base terrain/water/backdrop and many hero silhouettes remain stylized. The next front should target renderer-level shadow/occlusion budgets, asset-selection quality, or a stronger generated-scene source asset planner.
 - Loop 20 opened after Loop 19 checkpoint. Local-loop check: source props help the close hero read, but the stills still lack convincing renderer-integrated shadowing and occlusion. Next action: strengthen the graphics gate so Loop 19 artifacts fail a renderer-level shadow/occlusion-budget requirement, then implement the narrowest runtime control/telemetry pass that satisfies it without forcing DXR defaults.
+- Loop 20 heartbeat:
+  - Previous `aaa-loop20` heartbeat had timed out after the long Release build; proof `aaa-loop20-proof` fired by timeout after 1s, and `aaa-loop20` was rearmed as a Codex serve heartbeat with PID `82588`.
+- Loop 20 red proof:
+  - `aaa_graphics_campsite_loop19`, `aaa_graphics_desert_loop19`, and `aaa_graphics_alpine_loop19` failed the strengthened graphics gate with only `missing_renderer_shadow_occlusion_budget`.
+- Loop 20 implementation:
+  - `tools\scene_graphics_gate.py` now requires `graphics_pass.renderer_shadow_occlusion_budget` plus parsed runtime readback for SSAO, shadow maps, shadow bias/PCF, bounded receiver-contact counts, and `dxr_required=0`.
+  - `tools\scene_compiler.py` now emits a generated-exterior renderer shadow/occlusion budget tied to the same SSAO/shadow values used by the renderer path.
+  - `src\Core\Engine_Scenes.cpp` now parses that budget, applies it through the existing renderer setters, reads back `GetFeatureState()`/`GetQualityState()`, and logs `generative_exterior: renderer shadow occlusion budget ...`.
+- Loop 20 verifier evidence:
+  - `python -m py_compile tools\scene_compiler.py tools\scene_graphics_gate.py tools\scene_quality_gate.py tools\scene_gen.py` exited 0.
+  - Release rebuild exited 0 after compiling and linking `Engine_Scenes.cpp`: `[OK] Build complete in 191.1s`.
+  - `git diff --check` exited 0 with only line-ending warnings from the working tree.
+  - Campsite `aaa_graphics_campsite_loop20` rendered VALID; quality gate exited 0 (`purple_fraction=0.8813`, `nonblack_fraction=1.0`); graphics gate exited 0 (`dark_contact_fraction=0.0051`, `dark_contact_area_fraction=0.0329`); Director IR validation exited 0. Runtime readback shows `ssao=on shadows=on ssao_radius=1.26 ssao_bias=0.018 ssao_intensity=2.70 shadow_bias=0.0020 shadow_pcf=3.10 contact_patches=56 soft_penumbra=32 overlay_budget=88 dxr_required=0`.
+  - Desert canyon `aaa_graphics_desert_loop20` rendered VALID; quality gate exited 0 (`turquoise_fraction=0.4198`, `nonblack_fraction=1.0`); graphics gate exited 0 (`dark_contact_area_fraction=0.0829`); Director IR validation exited 0. Runtime readback shows the same non-DXR renderer shadow/SSAO budget with 56 receiver-contact patches and 32 soft penumbra patches.
+  - Alpine cabin `aaa_graphics_alpine_loop20` rendered VALID; quality gate exited 0 (`avg_luma=0.122`, `cool_fraction=0.8606`, `nonblack_fraction=0.9957`); graphics gate exited 0 (`dark_contact_fraction=0.0222`); Director IR validation exited 0. Runtime readback shows `ssao=on shadows=on ssao_radius=1.18 ssao_bias=0.018 ssao_intensity=2.28 shadow_bias=0.0020 shadow_pcf=2.60 contact_patches=18 soft_penumbra=22 overlay_budget=40 dxr_required=0`.
+  - Kitchen smoke `regression_kitchen_aaa_loop20` rendered VALID and quality gate exited 0 (`avg_luma=0.4697`, `nonblack_fraction=1.0`).
+  - Known-bad quality oracle `gen_a_foggy_mountain_campsite_beside_0` with `--expect-fail` exited 0 and still reports forbidden fridge, missing mountain/ridge, focal visibility, and purple-water failures.
+  - Known-bad graphics oracle `v3_campsite_ridge_test_0` with an explicit empty runtime log and `--expect-fail` exited 0 and now includes `missing_renderer_shadow_occlusion_budget`.
+- Loop 20 visual/regression notes:
+  - Renderer-level SSAO/shadow settings are now separately contract-gated and runtime-readback verified. This is still a bounded SSAO/shadow-map/contact budget, not forced DXR/RT; final AAA quality remains `HUMAN-GATE`.
+  - Remaining `HUMAN-GATE` gap: scene planning and asset staging still read kit-like in places. The next high-leverage front should target generated-scene asset planning/composition quality or terrain/water/backdrop fidelity, not another generic receipt.
 - Loop 17 opened after Loop 16 visual inspection and user pushback: the next hard ceiling is source/hero/environment geometry fidelity rather than more overlay layers. Heartbeat proof `aaa-graphics-loop17-proof` fired by timeout after 1s.
 - Loop 17 red proof:
   - Strengthened `tools\scene_graphics_gate.py` to require `graphics_pass.hero_environment_geometry` plus runtime logs for high-detail camp/cabin kits, mountain massing, and irregular tree silhouettes where prompt-relevant.

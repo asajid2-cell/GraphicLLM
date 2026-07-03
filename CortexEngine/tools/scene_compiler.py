@@ -431,6 +431,12 @@ def compile_v3_to_v2(v3: dict[str, Any]) -> dict[str, Any]:
         "clear_view_corridor": True,
         "camera_role": "balanced_cabin_hero_water_horizon" if cabin else "closer_midground_hero_water_horizon",
     }
+    renderer_ssao_radius = 1.26 if not moonlight else 1.18
+    renderer_ssao_intensity = 2.70 if not moonlight else 2.28
+    renderer_shadow_pcf = 3.10 if not moonlight else 2.60
+    renderer_shadow_bias = 0.0020
+    contact_receiver_patch_budget = 72 if not moonlight else 40
+    soft_penumbra_patch_budget = 40 if not moonlight else 32
     env["graphics_pass"] = {
         "version": 2,
         "terrain": {
@@ -628,6 +634,28 @@ def compile_v3_to_v2(v3: dict[str, Any]) -> dict[str, Any]:
                 "prompt_hero_source_mesh_anchors",
             ],
         },
+        "renderer_shadow_occlusion_budget": {
+            "enabled": True,
+            "renderer_ssao": True,
+            "shadow_maps": True,
+            "ssr_contact_support": True,
+            "dxr_required": False,
+            "ssao_radius": renderer_ssao_radius,
+            "ssao_bias": 0.018,
+            "ssao_intensity": renderer_ssao_intensity,
+            "shadow_bias": renderer_shadow_bias,
+            "shadow_pcf_radius": renderer_shadow_pcf,
+            "contact_receiver_patch_budget": contact_receiver_patch_budget,
+            "soft_penumbra_patch_budget": soft_penumbra_patch_budget,
+            "renderer_contact_blend": 0.72 if not moonlight else 0.64,
+            "shadow_caster_policy": "sun_shadow_maps_plus_ssao",
+            "systems": [
+                "readback_verified_ssao_controls",
+                "readback_verified_shadow_map_controls",
+                "bounded_receiver_contact_support",
+                "generated_dxr_opt_in_only",
+            ],
+        },
         "atmosphere_fidelity": {
             "enabled": True,
             "night_sky_control": bool(moonlight),
@@ -674,10 +702,10 @@ def compile_v3_to_v2(v3: dict[str, Any]) -> dict[str, Any]:
             "ssao": True,
             "ssr": True,
             "shadows": True,
-            "ssao_radius": 1.26 if not moonlight else 1.18,
-            "ssao_intensity": 2.70 if not moonlight else 2.28,
-            "shadow_pcf_radius": 3.10 if not moonlight else 2.60,
-            "shadow_bias": 0.0020,
+            "ssao_radius": renderer_ssao_radius,
+            "ssao_intensity": renderer_ssao_intensity,
+            "shadow_pcf_radius": renderer_shadow_pcf,
+            "shadow_bias": renderer_shadow_bias,
         },
     }
 

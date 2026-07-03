@@ -216,6 +216,7 @@ def evaluate(prompt: str, ir: dict[str, Any], png: Path | None, log_text: str) -
     world_geometry = graphics.get("world_geometry") or {}
     shot = graphics.get("shot") or {}
     material_zones = graphics.get("material_zones") or {}
+    asset_fidelity = graphics.get("asset_fidelity") or {}
     lighting = graphics.get("lighting") or {}
     surface_detail = graphics.get("surface_detail") or {}
     occlusion = graphics.get("occlusion") or {}
@@ -337,6 +338,33 @@ def evaluate(prompt: str, ir: dict[str, Any], png: Path | None, log_text: str) -
                 "Scene lacks enough distinct authored material zones for terrain/shore/rocks/water/vegetation",
                 material_zones=material_zones,
                 material_zone_count=material_zone_count,
+            )
+
+        try:
+            hero_detail_count = int(asset_fidelity.get("hero_detail_count", 0) or 0)
+            camp_detail_count = int(asset_fidelity.get("camp_detail_count", 0) or 0)
+            cabin_facade_count = int(asset_fidelity.get("cabin_facade_detail_count", 0) or 0)
+            backdrop_detail_layers = int(asset_fidelity.get("backdrop_detail_layers", 0) or 0)
+        except Exception:
+            hero_detail_count = camp_detail_count = cabin_facade_count = backdrop_detail_layers = 0
+        prompt_has_cabin = "cabin" in prompt.lower()
+        has_runtime_asset_fidelity = "generative_exterior: created hero asset detail" in log_text
+        has_runtime_backdrop_detail = "generative_exterior: created backdrop silhouette detail" in log_text
+        if (
+            not isinstance(asset_fidelity, dict)
+            or not bool(asset_fidelity.get("enabled"))
+            or hero_detail_count < 12
+            or backdrop_detail_layers < 3
+            or (flags["campsite"] and camp_detail_count < 10)
+            or (prompt_has_cabin and cabin_facade_count < 14)
+            or not (has_runtime_asset_fidelity and has_runtime_backdrop_detail)
+        ):
+            fail(
+                "missing_asset_fidelity_detail",
+                "Generated exterior lacks close-range hero asset construction detail and richer backdrop silhouettes",
+                asset_fidelity=asset_fidelity,
+                runtime_asset_fidelity=has_runtime_asset_fidelity,
+                runtime_backdrop_detail=has_runtime_backdrop_detail,
             )
 
         camera_role = str(shot.get("camera_role", "") if isinstance(shot, dict) else "").lower()

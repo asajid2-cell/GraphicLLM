@@ -332,8 +332,11 @@ def compile_v3_to_v2(v3: dict[str, Any]) -> dict[str, Any]:
     if campsite:
         _add(objects, "tent_detailedOpen", 2.9, 0.9, -18.0, 2.55, placed=placed)
         _add(objects, "campfire_bricks", -0.35, 0.35, 0.0, 1.05, placed=placed)
+        _add(objects, "campfire_logs", -1.05, 0.86, 31.0, 0.56, placed=placed)
+        _add(objects, "campfire_stones", 0.48, -0.18, -12.0, 0.62, placed=placed)
         _add(objects, "log_stack", -2.25, 1.35, 28.0, 1.25, placed=placed)
         _add(objects, "log_stack", 1.25, 2.35, -34.0, 1.18, placed=placed)
+        _add(objects, "Lantern_01", 1.15, 1.42, -22.0, 0.50, tint=[0.72, 0.46, 0.22])
         _add(objects, "dead_tree_trunk", -0.35, 2.85, 88.0, 1.55, tint=[0.40, 0.28, 0.18], placed=placed)
     elif cabin:
         env["structures"].append({
@@ -367,12 +370,13 @@ def compile_v3_to_v2(v3: dict[str, Any]) -> dict[str, Any]:
                       foot=1.55, seed=scene_type + ":snags", tint=[0.34, 0.22, 0.13],
                       placed=placed)
     else:
-        _scatter_ring(objects, "tree_pineTallA", 14, radius_x=18.0, z_base=-1.3, z_jitter=3.8,
+        _scatter_ring(objects, "tree_pineTallA_detailed", 14, radius_x=18.0, z_base=-1.3, z_jitter=3.8,
                       foot=3.0, seed=scene_type + ":trees", tint=foliage_tint,
                       placed=placed)
 
     if waterbody.get("type") == "lake" and not desert:
         _add(objects, "canoe", -5.2, -5.9, 16.0, 2.7, placed=placed)
+        _add(objects, "canoe_paddle", -6.8, -5.15, -18.0, 0.82, tint=[0.46, 0.27, 0.12], placed=placed)
 
     _attach_materials(objects, desert=desert, moonlight=moonlight)
     contact_patches = _contact_patches(objects, water_from_z)
@@ -436,6 +440,24 @@ def compile_v3_to_v2(v3: dict[str, Any]) -> dict[str, Any]:
             "terrain_crease_count": 10 if not canyon else 12,
             "shore_foam_segment_count": 6 if water_on else 0,
             "wet_glint_count": 6 if water_on else 2,
+        },
+        "asset_fidelity": {
+            "enabled": True,
+            "hero_detail_count": (18 if campsite else 6) + (24 if cabin else 0),
+            "camp_detail_count": 18 if campsite else 0,
+            "cabin_facade_detail_count": 24 if cabin else 0,
+            "backdrop_detail_layers": 5 if canyon else 4,
+            "foreground_dressing_clusters": 6 if campsite or cabin else 4,
+            "detail_systems": [
+                "tent_seams",
+                "guy_lines",
+                "stakes",
+                "ember_bed",
+                "cabin_siding",
+                "cabin_trim",
+                "porch_steps",
+                "ridge_silhouette_breakup",
+            ],
         },
         "material_zones": {
             "count": len(material_zone_names),

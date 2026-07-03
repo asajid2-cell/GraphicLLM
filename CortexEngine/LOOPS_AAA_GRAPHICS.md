@@ -156,6 +156,28 @@ Verifier:
 
 Status: done
 
+### Loop 9: Procedural Asset Fidelity Detail
+
+Invariant: generated exteriors render visible close-range hero construction and richer backdrop silhouettes, not just valid catalog props plus material metadata.
+
+Scope:
+
+- in: `tools/scene_graphics_gate.py`, `tools/scene_compiler.py`, `src/Core/Engine_Scenes.cpp`, focused ledgers.
+- out: `tools/scene_quality_gate.py`, forced DXR defaults, broad renderer architecture, unrelated interior scenes.
+
+Verifier:
+
+- Current Loop 9 campsite/desert/alpine artifacts fail strengthened graphics gate with `missing_asset_fidelity_detail`.
+- New campsite, desert, and alpine/cabin prompts render and pass quality + strengthened graphics gates.
+- Runtime logs include `created hero asset detail` and `created backdrop silhouette detail`.
+- Kitchen smoke remains valid and nonblank.
+
+Exit: all verifier commands green, with artifacts and logs recorded.
+
+Escape: if dense procedural detail destabilizes generated captures, reduce mesh counts and keep the fidelity contract focused on visible hero/backdrop detail; do not re-enable forced DXR.
+
+Status: done
+
 ## Progress Log
 
 2026-07-03:
@@ -230,6 +252,26 @@ Status: done
 - The v3 campsite ridge artifact is a graphics-fidelity known-bad, not a semantic/color quality known-bad. The original `gen_a_foggy_mountain_campsite_beside_0` artifact remains the correct quality oracle for the user-reported fridge/gray-water failure.
 - One global closer camera profile improves campsite/desert stills but breaks cabin prompts by cropping the cabin into a wall; generated exteriors need adaptive shot profiles.
 - Native procedural/shader passes can improve staging and evidence, but the remaining gap is now visibly asset/geometry fidelity: low-poly silhouettes, simple cabin/camp meshes, and coarse mountain backdrops.
+- Loop 9 red proof:
+  - `python tools\scene_graphics_gate.py --prompt "a foggy mountain campsite beside a purple lake at dawn" --ir build\bin\logs\aaa_graphics_campsite_loop9_0_ir.json --png build\bin\logs\aaa_graphics_campsite_loop9_0.png --log build\bin\logs\aaa_graphics_campsite_loop9.out` exited 1 with `missing_asset_fidelity_detail`.
+  - The same new failure was observed for `aaa_graphics_desert_loop9` and `aaa_graphics_alpine_loop10`; old green artifacts lacked `asset_fidelity` IR and runtime hero/backdrop detail logs.
+- Loop 9 implementation:
+  - `tools\scene_compiler.py` now emits `graphics_pass.asset_fidelity`, uses detailed pine variants, and adds conservative catalog dressing for campsite/canoe prompts without invalid solver overlaps.
+  - `src\Core\Engine_Scenes.cpp` now parses asset fidelity metadata and renders procedural campsite seams/guy-lines/stakes/embers/tripod/foreground twigs, cabin siding/trim/mullions/porch/steps/chimney/warm spill, and extra backdrop silhouette layers.
+  - `tools\scene_graphics_gate.py` now requires `asset_fidelity` evidence and runtime logs `created hero asset detail` plus `created backdrop silhouette detail`.
+- Loop 9 verifier evidence:
+  - `python -m py_compile tools\scene_compiler.py tools\scene_graphics_gate.py tools\scene_quality_gate.py tools\scene_gen.py` exited 0.
+  - Release build exited 0: `[OK] Build complete in 14.9s` after the final refinement.
+  - Campsite `aaa_graphics_campsite_loop13` rendered VALID with 58 objects; quality gate exited 0 with purple ROI `purple_fraction=0.7642`; graphics gate exited 0 with residual warning `weak_image_contact_metric`; runtime log shows `created hero asset detail cabin_facade=0 camp=27 foreground=6` and `created backdrop silhouette detail layers=4`.
+  - Desert canyon `aaa_graphics_desert_loop13` rendered VALID with 48 objects; quality gate exited 0 with turquoise ROI `turquoise_fraction=0.4219`; graphics gate exited 0 with residual warning `weak_image_contact_metric`; runtime log shows canyon walls/strata plus `camp=27` and `backdrop silhouette detail layers=5`.
+  - Alpine cabin `aaa_graphics_alpine_loop13` rendered VALID with 50 objects; quality gate exited 0 (`cool_fraction=0.872`, `nonblack_fraction=1.0`); graphics gate exited 0 with no warnings; runtime log shows `created hero asset detail cabin_facade=32 camp=0 foreground=0` and `backdrop silhouette detail layers=4`.
+  - Director IR validation exited 0 for campsite/desert/alpine Loop 13 packets.
+  - Known-bad quality oracle `gen_a_foggy_mountain_campsite_beside_0` with `--expect-fail` exited 0 and still reports the fridge/missing-ridge/purple-water failures.
+  - Known-bad graphics oracle `v3_campsite_ridge_test_0` with `--expect-fail` exited 0 and now also reports `missing_asset_fidelity_detail`.
+  - Kitchen smoke `regression_kitchen_aaa_loop13` rendered VALID and quality gate exited 0 (`avg_luma=0.4585`, `nonblack_fraction=1.0`).
+- Visual inspection after Loop 9:
+  - Improvement is real: visible tent ropes/stakes/embers/tripod, cabin siding/trim/porch/chimney, and denser ridge silhouettes are present in captures.
+  - Remaining `HUMAN-GATE` gap is still large: canyon walls are planar/low-poly, trees and camp props are visibly stylized, some overlay geometry reads too flat, and moonlight/storm prompts still need stronger sky/time-of-day coherence. Next front should target geometry/material realism and atmospheric time-of-day, not another metadata-only gate.
 
 ## BLOCKED / Decisions
 

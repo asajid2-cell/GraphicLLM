@@ -133,6 +133,15 @@ namespace {
         float contactShadowStrength = 0.0f;
     };
 
+    struct GenerativeAssetFidelity {
+        bool enabled = false;
+        int heroDetailCount = 0;
+        int campDetailCount = 0;
+        int cabinFacadeDetailCount = 0;
+        int backdropDetailLayers = 0;
+        int foregroundDressingClusters = 0;
+    };
+
     float GenerativeTerrainNoise(float x, float z, float phase) {
         const float a = std::sin(x * 0.33f + z * 0.17f + phase) * 0.48f;
         const float b = std::sin(x * 0.91f - z * 0.27f + phase * 1.73f) * 0.22f;
@@ -3201,6 +3210,7 @@ void Engine::BuildRecipeScene() {
         std::vector<GenerativeContactPatch> contactPatches;
         GenerativeWorldGeometry worldGeometry;
         GenerativeSurfaceDetail surfaceDetail;
+        GenerativeAssetFidelity assetFidelity;
         int shoreLayerCount = 0;
         int rimLightCount = 0;
         int advancedShaderTermCount = 0;
@@ -3307,6 +3317,18 @@ void Engine::BuildRecipeScene() {
                     static_cast<int>(std::clamp(num(surfaceDetail, "shore_foam_segment_count", 0.0f), 0.0f, 16.0f));
                 genExt.surfaceDetail.wetGlintCount =
                     static_cast<int>(std::clamp(num(surfaceDetail, "wet_glint_count", 0.0f), 0.0f, 16.0f));
+                const nlohmann::json assetFidelity = graphics.value("asset_fidelity", nlohmann::json::object());
+                genExt.assetFidelity.enabled = assetFidelity.value("enabled", false);
+                genExt.assetFidelity.heroDetailCount =
+                    static_cast<int>(std::clamp(num(assetFidelity, "hero_detail_count", 0.0f), 0.0f, 80.0f));
+                genExt.assetFidelity.campDetailCount =
+                    static_cast<int>(std::clamp(num(assetFidelity, "camp_detail_count", 0.0f), 0.0f, 48.0f));
+                genExt.assetFidelity.cabinFacadeDetailCount =
+                    static_cast<int>(std::clamp(num(assetFidelity, "cabin_facade_detail_count", 0.0f), 0.0f, 64.0f));
+                genExt.assetFidelity.backdropDetailLayers =
+                    static_cast<int>(std::clamp(num(assetFidelity, "backdrop_detail_layers", 0.0f), 0.0f, 10.0f));
+                genExt.assetFidelity.foregroundDressingClusters =
+                    static_cast<int>(std::clamp(num(assetFidelity, "foreground_dressing_clusters", 0.0f), 0.0f, 16.0f));
                 const nlohmann::json occlusion = graphics.value("occlusion", nlohmann::json::object());
                 genExt.surfaceDetail.occlusionRibbonCount =
                     static_cast<int>(std::clamp(num(occlusion, "ground_shadow_ribbon_count", 0.0f), 0.0f, 18.0f));
@@ -3771,7 +3793,7 @@ void Engine::BuildRecipeScene() {
                         auto& r = m_registry->AddComponent<Scene::RenderableComponent>(contact);
                         r.mesh = contactMesh;
                         const glm::vec3 dark = glm::max(gcol * (1.0f - patch.darkness * 1.05f), glm::vec3(0.010f));
-                        r.albedoColor = glm::vec4(dark, 0.34f);
+                        r.albedoColor = glm::vec4(dark, 0.24f);
                         r.metallic = 0.0f;
                         r.roughness = 0.88f;
                         r.ao = 0.52f;
@@ -4108,13 +4130,13 @@ void Engine::BuildRecipeScene() {
                         auto& r = m_registry->AddComponent<Scene::RenderableComponent>(glint);
                         r.mesh = ribbonMesh;
                         const glm::vec3 glintColor = genExt.waterOn
-                            ? glm::mix(genExt.waterShallow, glm::vec3(1.0f), 0.34f)
-                            : glm::mix(gcol, glm::vec3(1.0f), 0.20f);
-                        dressOverlay(r, glm::vec4(glintColor, 0.10f),
+                            ? glm::mix(genExt.waterShallow, glm::vec3(1.0f), 0.18f)
+                            : glm::mix(gcol, glm::vec3(1.0f), 0.08f);
+                        dressOverlay(r, glm::vec4(glintColor, 0.055f),
                                      0.30f,
                                      0.05f,
                                      0.46f,
-                                     0.34f);
+                                     0.24f);
                         wetGlintCount++;
                     }
 
@@ -4191,6 +4213,7 @@ void Engine::BuildRecipeScene() {
                 spdlog::warn("generative_exterior: cabin cube mesh upload failed: {}", upCube.Error());
             } else {
                 int cabinCount = 0;
+                int cabinDetailCount = 0;
                 for (const auto& structure : genExt.structures) {
                     if (structure.type != "cabin") {
                         continue;
@@ -4300,6 +4323,111 @@ void Engine::BuildRecipeScene() {
                         r.presetName = "wood";
                     }
 
+                    if (genExt.assetFidelity.enabled && genExt.assetFidelity.cabinFacadeDetailCount > 0) {
+                        const glm::vec4 trimWood(0.18f, 0.11f, 0.060f, 1.0f);
+                        const glm::vec4 sidingA(0.39f, 0.255f, 0.145f, 1.0f);
+                        const glm::vec4 sidingB(0.27f, 0.165f, 0.090f, 1.0f);
+                        for (int i = 0; i < 8; ++i) {
+                            const float y = 0.32f + static_cast<float>(i) * (h * 0.092f);
+                            addCubePart("GenerativeExterior_Cabin_SidingBand" + std::to_string(i),
+                                        glm::vec3(0.0f, y, frontZ + 0.045f),
+                                        glm::vec3(w + 0.10f, 0.032f, 0.045f),
+                                        (i % 2 == 0) ? sidingA : sidingB,
+                                        "wood",
+                                        0.78f);
+                            cabinDetailCount++;
+                        }
+
+                        const std::array<float, 2> cornerXs{-w * 0.515f, w * 0.515f};
+                        for (float x : cornerXs) {
+                            addCubePart("GenerativeExterior_Cabin_CornerTrim" + std::to_string(cabinDetailCount),
+                                        glm::vec3(x, h * 0.50f, frontZ + 0.075f),
+                                        glm::vec3(0.085f, h * 0.96f, 0.08f),
+                                        trimWood,
+                                        "wood",
+                                        0.70f);
+                            cabinDetailCount++;
+                        }
+
+                        const float doorX = -w * 0.20f;
+                        const float doorH = h * 0.64f;
+                        const float doorW = w * 0.28f;
+                        for (int i = 0; i < 4; ++i) {
+                            const bool vertical = i < 2;
+                            const float sx = vertical ? 0.055f : doorW;
+                            const float sy = vertical ? doorH : 0.055f;
+                            const float x = doorX + (vertical ? (i == 0 ? -doorW * 0.50f : doorW * 0.50f) : 0.0f);
+                            const float y = 0.58f + (vertical ? 0.0f : (i == 2 ? -doorH * 0.50f : doorH * 0.50f));
+                            addCubePart("GenerativeExterior_Cabin_DoorTrim" + std::to_string(i),
+                                        glm::vec3(x, y, frontZ + 0.105f),
+                                        glm::vec3(sx, sy, 0.060f),
+                                        trimWood,
+                                        "wood",
+                                        0.68f);
+                            cabinDetailCount++;
+                        }
+
+                        auto addWindowTrim = [&](const char* baseTag, float cx, float cy, float ww, float wh) {
+                            for (int i = 0; i < 6; ++i) {
+                                const bool vertical = i < 2 || i == 4;
+                                const bool mullion = i >= 4;
+                                const float sx = vertical ? 0.040f : ww;
+                                const float sy = vertical ? wh : 0.040f;
+                                const float x = cx + (mullion ? 0.0f : (vertical ? (i == 0 ? -ww * 0.54f : ww * 0.54f) : 0.0f));
+                                const float y = cy + (mullion ? 0.0f : (vertical ? 0.0f : (i == 2 ? -wh * 0.54f : wh * 0.54f)));
+                                addCubePart(std::string(baseTag) + std::to_string(i),
+                                            glm::vec3(x, y, frontZ + 0.120f),
+                                            glm::vec3(sx, sy, 0.055f),
+                                            trimWood,
+                                            "wood",
+                                            0.66f);
+                                cabinDetailCount++;
+                            }
+                        };
+                        addWindowTrim("GenerativeExterior_Cabin_WindowTrimL_", w * 0.22f, h * 0.64f, w * 0.22f, h * 0.29f);
+                        addWindowTrim("GenerativeExterior_Cabin_WindowTrimR_", w * 0.41f, h * 0.64f, w * 0.20f, h * 0.27f);
+
+                        addCubePart("GenerativeExterior_Cabin_PorchDeck",
+                                    glm::vec3(0.02f, 0.085f, d * 0.5f + 0.62f),
+                                    glm::vec3(w * 0.70f, 0.16f, 0.82f),
+                                    glm::vec4(0.22f, 0.13f, 0.075f, 1.0f),
+                                    "wood",
+                                    0.82f);
+                        cabinDetailCount++;
+                        for (int i = 0; i < 2; ++i) {
+                            addCubePart("GenerativeExterior_Cabin_PorchStep" + std::to_string(i),
+                                        glm::vec3(0.02f, 0.035f + i * 0.045f, d * 0.5f + 1.12f + i * 0.18f),
+                                        glm::vec3(w * (0.56f - i * 0.10f), 0.070f, 0.23f),
+                                        glm::vec4(0.19f, 0.115f, 0.065f, 1.0f),
+                                        "wood",
+                                        0.84f);
+                            cabinDetailCount++;
+                        }
+                        addCubePart("GenerativeExterior_Cabin_Chimney",
+                                    glm::vec3(-w * 0.34f, h + structure.roofHeightM * 0.55f, -d * 0.17f),
+                                    glm::vec3(0.34f, structure.roofHeightM * 0.92f, 0.34f),
+                                    glm::vec4(0.20f, 0.11f, 0.080f, 1.0f),
+                                    "masonry",
+                                    0.90f);
+                        cabinDetailCount++;
+                        addCubePart("GenerativeExterior_Cabin_RoofRidgeCap",
+                                    glm::vec3(0.0f, h + structure.roofHeightM + 0.035f, 0.0f),
+                                    glm::vec3(0.12f, 0.07f, d + 0.62f),
+                                    glm::vec4(0.055f, 0.040f, 0.036f, 1.0f),
+                                    "wood",
+                                    0.88f);
+                        cabinDetailCount++;
+                        addCubePart("GenerativeExterior_Cabin_WarmLightSpill",
+                                    glm::vec3(w * 0.18f, 0.030f, d * 0.5f + 1.12f),
+                                    glm::vec3(w * 0.52f, 0.030f, 0.52f),
+                                    glm::vec4(1.0f, 0.48f, 0.16f, 0.54f),
+                                    "naturalistic",
+                                    0.56f,
+                                    structure.litWindows ? glm::vec3(1.0f, 0.32f, 0.10f) : glm::vec3(0.0f),
+                                    structure.litWindows ? 1.8f : 1.0f);
+                        cabinDetailCount++;
+                    }
+
                     if (structure.litWindows) {
                         entt::entity lamp = m_registry->CreateEntity();
                         m_registry->AddComponent<Scene::TagComponent>(lamp, "GenerativeExterior_Cabin_WindowGlow");
@@ -4316,7 +4444,185 @@ void Engine::BuildRecipeScene() {
                 }
                 if (cabinCount > 0) {
                     spdlog::info("generative_exterior: created {} procedural cabin structure(s)", cabinCount);
+                    if (cabinDetailCount > 0) {
+                        spdlog::info("generative_exterior: created hero asset detail cabin_facade={} camp=0 foreground=0",
+                                     cabinDetailCount);
+                    }
                 }
+            }
+        }
+    }
+
+    if (genExt.valid && genExt.assetFidelity.enabled && genExt.assetFidelity.campDetailCount > 0) {
+        if (auto* renderer = m_renderer.get()) {
+            auto cubeMesh = Utils::MeshGenerator::CreateCube();
+            auto cylinderMesh = Utils::MeshGenerator::CreateCylinder(0.5f, 1.0f, 16);
+            const auto upCube = renderer->UploadMesh(cubeMesh);
+            const auto upCylinder = renderer->UploadMesh(cylinderMesh);
+            if (upCube.IsErr() || upCylinder.IsErr()) {
+                spdlog::warn("generative_exterior: camp detail mesh upload failed cube='{}' cylinder='{}'",
+                             upCube.IsErr() ? upCube.Error() : "ok",
+                             upCylinder.IsErr() ? upCylinder.Error() : "ok");
+            } else {
+                auto dressDetail = [&](Scene::RenderableComponent& r,
+                                       const glm::vec4& color,
+                                       const char* preset,
+                                       float roughness,
+                                       const glm::vec3& emissive = glm::vec3(0.0f),
+                                       float emissiveStrength = 1.0f) {
+                    r.albedoColor = color;
+                    r.metallic = 0.0f;
+                    r.roughness = roughness;
+                    r.ao = 1.0f;
+                    r.occlusionStrength = 0.70f;
+                    r.normalScale = 0.22f;
+                    r.wetnessFactor = genExt.groundWetness * 0.18f;
+                    r.proceduralMaskStrength = 0.30f;
+                    r.specularFactor = 0.22f;
+                    r.clearcoatFactor = std::min(genExt.groundWetness * 0.12f, 0.08f);
+                    r.clearcoatRoughnessFactor = 0.74f;
+                    r.anisotropyStrength = std::string(preset) == "wood" ? 0.30f : 0.08f;
+                    r.sheenWeight = std::string(preset) == "fabric" ? 0.26f : 0.0f;
+                    r.presetName = preset;
+                    r.emissiveColor = emissive;
+                    r.emissiveStrength = emissiveStrength;
+                    r.emissiveBloomFactor = glm::length(emissive) > 0.0f ? 0.55f : 0.0f;
+                };
+                auto addPart = [&](const std::string& tag,
+                                   const std::shared_ptr<Scene::MeshData>& mesh,
+                                   const glm::vec3& position,
+                                   const glm::vec3& scale,
+                                   const glm::vec3& euler,
+                                   const glm::vec4& color,
+                                   const char* preset,
+                                   float roughness,
+                                   const glm::vec3& emissive = glm::vec3(0.0f),
+                                   float emissiveStrength = 1.0f) {
+                    entt::entity part = m_registry->CreateEntity();
+                    m_registry->AddComponent<Scene::TagComponent>(part, tag);
+                    auto& t = m_registry->AddComponent<TransformComponent>(part);
+                    t.position = position;
+                    t.scale = scale;
+                    t.rotation = glm::quat(euler);
+                    auto& r = m_registry->AddComponent<Scene::RenderableComponent>(part);
+                    r.mesh = mesh;
+                    dressDetail(r, color, preset, roughness, emissive, emissiveStrength);
+                };
+
+                int campDetailCount = 0;
+                int foregroundCount = 0;
+                const glm::vec3 tentCenter(2.9f, 0.0f, 0.9f);
+                const float tentYaw = glm::radians(-18.0f);
+                const float cs = std::cos(tentYaw);
+                const float sn = std::sin(tentYaw);
+                auto tentPlace = [&](float x, float y, float z) -> glm::vec3 {
+                    return tentCenter + glm::vec3(cs * x + sn * z, y, -sn * x + cs * z);
+                };
+                const glm::vec4 ropeColor(0.78f, 0.66f, 0.46f, 1.0f);
+                const glm::vec4 seamColor(0.035f, 0.040f, 0.048f, 1.0f);
+                addPart("GenerativeExterior_Tent_RidgeSeam", cubeMesh, tentPlace(0.0f, 1.18f, 0.0f),
+                        glm::vec3(0.055f, 0.040f, 2.35f), glm::vec3(0.0f, tentYaw, 0.0f),
+                        seamColor, "fabric", 0.78f);
+                campDetailCount++;
+                for (int i = 0; i < 4; ++i) {
+                    const float sx = (i < 2) ? -1.18f : 1.18f;
+                    const float sz = (i % 2 == 0) ? -0.92f : 0.92f;
+                    addPart("GenerativeExterior_Tent_GuyLine" + std::to_string(i),
+                            cubeMesh,
+                            tentPlace(sx * 1.12f, 0.12f, sz * 1.18f),
+                            glm::vec3(0.035f, 0.028f, 1.22f),
+                            glm::vec3(0.0f, tentYaw + glm::radians(24.0f * (i - 1.5f)), 0.0f),
+                            ropeColor,
+                            "fabric",
+                            0.70f);
+                    campDetailCount++;
+                    addPart("GenerativeExterior_Tent_Stake" + std::to_string(i),
+                            cylinderMesh,
+                            tentPlace(sx * 1.72f, 0.18f, sz * 1.58f),
+                            glm::vec3(0.065f, 0.36f, 0.065f),
+                            glm::vec3(glm::radians(7.0f), tentYaw, glm::radians((i % 2 == 0) ? -5.0f : 5.0f)),
+                            glm::vec4(0.24f, 0.14f, 0.075f, 1.0f),
+                            "wood",
+                            0.82f);
+                    campDetailCount++;
+                }
+                for (int i = 0; i < 5; ++i) {
+                    addPart("GenerativeExterior_Tent_SeamPatch" + std::to_string(i),
+                            cubeMesh,
+                            tentPlace(-0.74f + i * 0.37f, 0.70f + (i % 2) * 0.08f, 1.04f),
+                            glm::vec3(0.22f, 0.035f, 0.035f),
+                            glm::vec3(0.0f, tentYaw, 0.0f),
+                            glm::vec4(0.055f, 0.065f, 0.070f, 1.0f),
+                            "fabric",
+                            0.76f);
+                    campDetailCount++;
+                }
+
+                const glm::vec3 fireCenter(-0.35f, 0.0f, 0.35f);
+                for (int i = 0; i < 9; ++i) {
+                    const float a = static_cast<float>(i) * 0.698f;
+                    const float r = 0.16f + 0.035f * static_cast<float>(i % 3);
+                    addPart("GenerativeExterior_Fire_Ember" + std::to_string(i),
+                            cubeMesh,
+                            fireCenter + glm::vec3(std::cos(a) * r, 0.075f + (i % 2) * 0.025f, std::sin(a) * r),
+                            glm::vec3(0.075f, 0.045f, 0.075f),
+                            glm::vec3(0.0f, a, 0.0f),
+                            glm::vec4(1.0f, 0.32f, 0.08f, 1.0f),
+                            "naturalistic",
+                            0.48f,
+                            glm::vec3(1.0f, 0.24f, 0.06f),
+                            3.0f);
+                    campDetailCount++;
+                }
+                for (int i = 0; i < 3; ++i) {
+                    const float yaw = glm::radians(120.0f * i + 18.0f);
+                    addPart("GenerativeExterior_Fire_TripodLeg" + std::to_string(i),
+                            cylinderMesh,
+                            fireCenter + glm::vec3(std::cos(yaw) * 0.22f, 0.62f, std::sin(yaw) * 0.22f),
+                            glm::vec3(0.045f, 1.18f, 0.045f),
+                            glm::vec3(glm::radians(18.0f), yaw, glm::radians((i - 1) * 8.0f)),
+                            glm::vec4(0.16f, 0.095f, 0.055f, 1.0f),
+                            "wood",
+                            0.82f);
+                    campDetailCount++;
+                }
+                addPart("GenerativeExterior_Fire_HangingKettle", cubeMesh,
+                        fireCenter + glm::vec3(0.0f, 0.64f, 0.02f),
+                        glm::vec3(0.24f, 0.18f, 0.20f),
+                        glm::vec3(0.0f, glm::radians(18.0f), 0.0f),
+                        glm::vec4(0.055f, 0.050f, 0.048f, 1.0f),
+                        "masonry",
+                        0.64f);
+                campDetailCount++;
+
+                entt::entity lanternLight = m_registry->CreateEntity();
+                m_registry->AddComponent<Scene::TagComponent>(lanternLight, "GenerativeExterior_Lantern_Practical");
+                auto& lanternT = m_registry->AddComponent<TransformComponent>(lanternLight);
+                lanternT.position = glm::vec3(1.15f, 0.62f, 1.42f);
+                auto& lanternL = m_registry->AddComponent<Scene::LightComponent>(lanternLight);
+                lanternL.type = Scene::LightType::Point;
+                lanternL.color = glm::vec3(1.0f, 0.49f, 0.16f);
+                lanternL.intensity = 2.8f;
+                lanternL.range = 4.4f;
+                lanternL.castsShadows = false;
+
+                for (int i = 0; i < genExt.assetFidelity.foregroundDressingClusters; ++i) {
+                    const float side = (i % 2 == 0) ? -1.0f : 1.0f;
+                    const float yaw = glm::radians(31.0f * static_cast<float>(i));
+                    addPart("GenerativeExterior_Foreground_Twig" + std::to_string(i),
+                            cubeMesh,
+                            glm::vec3(side * (2.2f + 0.35f * i), 0.075f, 4.25f - 0.28f * i),
+                            glm::vec3(0.72f, 0.050f, 0.065f),
+                            glm::vec3(0.0f, yaw, glm::radians(2.0f * (i % 3 - 1))),
+                            glm::vec4(0.17f, 0.095f, 0.045f, 1.0f),
+                            "wood",
+                            0.86f);
+                    foregroundCount++;
+                }
+
+                spdlog::info("generative_exterior: created hero asset detail cabin_facade=0 camp={} foreground={}",
+                             campDetailCount,
+                             foregroundCount);
             }
         }
     }
@@ -4355,6 +4661,47 @@ void Engine::BuildRecipeScene() {
             }
             if (ridgeCount > 0) {
                 spdlog::info("generative_exterior: created {} procedural ridge layer(s)", ridgeCount);
+            }
+            if (genExt.assetFidelity.enabled && genExt.assetFidelity.backdropDetailLayers > 0) {
+                int backdropDetailCount = 0;
+                for (int i = 0; i < genExt.assetFidelity.backdropDetailLayers; ++i) {
+                    const auto& source = genExt.ridgeLayers[static_cast<std::size_t>(i) % genExt.ridgeLayers.size()];
+                    const float width = genExt.extent * (1.85f + static_cast<float>(i) * 0.18f);
+                    const float height = std::max(3.0f, source.heightM * (0.32f + 0.04f * static_cast<float>(i % 3)));
+                    const float baseY = -0.62f - static_cast<float>(i) * 0.20f;
+                    auto detailMesh = CreateGenerativeRidgeMesh(width,
+                                                                height,
+                                                                baseY,
+                                                                9.37f + static_cast<float>(i) * 3.41f);
+                    auto up = renderer->UploadMesh(detailMesh);
+                    if (up.IsErr()) {
+                        spdlog::warn("generative_exterior: backdrop detail ridge upload failed: {}", up.Error());
+                        continue;
+                    }
+                    entt::entity detail = m_registry->CreateEntity();
+                    m_registry->AddComponent<Scene::TagComponent>(
+                        detail, "GenerativeExterior_BackdropSilhouetteDetail" + std::to_string(i));
+                    auto& t = m_registry->AddComponent<TransformComponent>(detail);
+                    t.position = glm::vec3((i % 2 == 0 ? -1.0f : 1.0f) * (1.4f + i * 0.22f),
+                                           0.0f,
+                                           -source.distanceM + 4.5f + static_cast<float>(i) * 2.15f);
+                    auto& r = m_registry->AddComponent<Scene::RenderableComponent>(detail);
+                    r.mesh = detailMesh;
+                    const glm::vec3 notchColor = glm::mix(source.color, glm::vec3(0.025f, 0.030f, 0.040f), 0.24f + 0.08f * (i % 2));
+                    r.albedoColor = glm::vec4(glm::max(notchColor, glm::vec3(0.030f)), 1.0f);
+                    r.metallic = 0.0f;
+                    r.roughness = 0.99f;
+                    r.ao = 1.0f;
+                    r.normalScale = 0.18f;
+                    r.proceduralMaskStrength = 0.18f;
+                    r.doubleSided = true;
+                    r.presetName = "naturalistic";
+                    backdropDetailCount++;
+                }
+                if (backdropDetailCount > 0) {
+                    spdlog::info("generative_exterior: created backdrop silhouette detail layers={}",
+                                 backdropDetailCount);
+                }
             }
         }
     }

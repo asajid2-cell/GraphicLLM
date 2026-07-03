@@ -400,6 +400,28 @@ Escape: if scanned assets crop the water/color ROI or make prompt heroes unreada
 
 Status: done
 
+### Loop 20: Renderer-Level Shadow/Occlusion Budget
+
+Invariant: generated exteriors prove a bounded renderer-level shadow/occlusion budget instead of relying mainly on receiver decals and overlay geometry for contact depth.
+
+Scope:
+
+- in: `tools/scene_graphics_gate.py`, `tools/scene_compiler.py`, `src/Core/Engine_Scenes.cpp`, renderer control plumbing and runtime telemetry already present in the generated-exterior path.
+- out: weakening image/color gates, forcing DXR/RT by default for generated captures, broad renderer rewrites, external downloads.
+
+Verifier:
+
+- Current Loop 19 campsite/desert/alpine artifacts fail a strengthened graphics gate with a new renderer-shadow/occlusion-budget failure.
+- New campsite/desert/alpine prompts render VALID and pass quality + graphics gates.
+- Runtime logs prove bounded renderer-level shadow/AO/contact settings reached the engine, plus image contact metrics remain above the existing thresholds.
+- Release build, Python compile, Director IR validation, known-bad oracles, and kitchen smoke remain green.
+
+Exit: all verifier commands green, with artifacts/logs recorded and checkpoint committed.
+
+Escape: if true renderer-level controls cannot be isolated without enabling unsafe DXR defaults, narrow to SSAO/shadow-map/contact telemetry first; do not fake the pass with more decorative overlays.
+
+Status: running
+
 ## Progress Log
 
 2026-07-03:
@@ -449,6 +471,7 @@ Status: done
 - Loop 19 visual/regression notes:
   - Source-scanned meshes are visible in the campsite/desert hero camp and on the alpine porch, and they use existing PBR texture paths instead of new procedural primitive overlays.
   - The remaining `HUMAN-GATE` gap is still large: base terrain/water/backdrop and many hero silhouettes remain stylized. The next front should target renderer-level shadow/occlusion budgets, asset-selection quality, or a stronger generated-scene source asset planner.
+- Loop 20 opened after Loop 19 checkpoint. Local-loop check: source props help the close hero read, but the stills still lack convincing renderer-integrated shadowing and occlusion. Next action: strengthen the graphics gate so Loop 19 artifacts fail a renderer-level shadow/occlusion-budget requirement, then implement the narrowest runtime control/telemetry pass that satisfies it without forcing DXR defaults.
 - Loop 17 opened after Loop 16 visual inspection and user pushback: the next hard ceiling is source/hero/environment geometry fidelity rather than more overlay layers. Heartbeat proof `aaa-graphics-loop17-proof` fired by timeout after 1s.
 - Loop 17 red proof:
   - Strengthened `tools\scene_graphics_gate.py` to require `graphics_pass.hero_environment_geometry` plus runtime logs for high-detail camp/cabin kits, mountain massing, and irregular tree silhouettes where prompt-relevant.

@@ -4,8 +4,9 @@
 This complements scene_quality_gate.py. It does not claim an image is AAA; it
 rejects the obvious blockout class: flat generated exteriors with disconnected
 props, no terrain/contact/material/shader pass, weak occlusion layering, weak
-surface material breakup, weak texture-backed material coverage, and no runtime
-evidence that the high-quality exterior graphics path ran.
+surface material breakup, weak texture-backed material coverage, weak
+source-backed environment assets, and no runtime evidence that the high-quality
+exterior graphics path ran.
 """
 
 from __future__ import annotations
@@ -271,6 +272,28 @@ def _environment_fidelity_runtime(log_text: str) -> dict[str, float | int] | Non
     return values
 
 
+def _source_environment_runtime(log_text: str) -> dict[str, int] | None:
+    m = re.search(
+        r"generative_exterior: source environment assets "
+        r"fetched_rocks=(\d+) kenney_cliffs=(\d+) detailed_trees=(\d+) "
+        r"naturalistic_anchors=(\d+) terrain_replacements=(\d+) "
+        r"backdrop_anchors=(\d+) source_sets=(\d+)",
+        log_text,
+    )
+    if not m:
+        return None
+    keys = (
+        "fetched_rocks",
+        "kenney_cliffs",
+        "detailed_trees",
+        "naturalistic_anchors",
+        "terrain_replacements",
+        "backdrop_anchors",
+        "source_sets",
+    )
+    return {key: int(value) for key, value in zip(keys, m.groups())}
+
+
 def _asset_counts(ir: dict[str, Any]) -> dict[str, int]:
     counts = {
         "trees": 0,
@@ -373,6 +396,7 @@ def evaluate(prompt: str, ir: dict[str, Any], png: Path | None, log_text: str) -
     hero_asset_replacement = graphics.get("hero_asset_replacement") or {}
     cohesive_staging_cleanup = graphics.get("cohesive_staging_cleanup") or {}
     environment_fidelity = graphics.get("environment_fidelity") or {}
+    source_environment_assets = graphics.get("source_environment_assets") or {}
     image = _image_metrics(png)
 
     failures: list[dict[str, Any]] = []
@@ -1107,6 +1131,57 @@ def evaluate(prompt: str, ir: dict[str, Any], png: Path | None, log_text: str) -
                 shadow_directionality=shadow_directionality,
                 runtime_environment_fidelity=runtime_environment,
                 runtime_environment_fidelity_ok=runtime_environment_ok,
+            )
+
+        try:
+            source_sets = int(source_environment_assets.get("source_asset_set_count", 0) or 0)
+            fetched_rocks = int(source_environment_assets.get("fetched_rock_mass_count", 0) or 0)
+            kenney_cliffs = int(source_environment_assets.get("kenney_cliff_backdrop_count", 0) or 0)
+            detailed_trees = int(source_environment_assets.get("detailed_tree_backdrop_count", 0) or 0)
+            naturalistic_anchors = int(source_environment_assets.get("naturalistic_anchor_count", 0) or 0)
+            terrain_replacements = int(source_environment_assets.get("terrain_replacement_layer_count", 0) or 0)
+            backdrop_anchors = int(source_environment_assets.get("backdrop_anchor_count", 0) or 0)
+        except Exception:
+            source_sets = fetched_rocks = kenney_cliffs = detailed_trees = 0
+            naturalistic_anchors = terrain_replacements = backdrop_anchors = 0
+        runtime_source_environment = _source_environment_runtime(log_text)
+        min_trees = 0 if flags["desert"] else 6
+        min_cliffs = 6 if flags["canyon"] else 3
+        runtime_source_environment_ok = (
+            isinstance(runtime_source_environment, dict)
+            and runtime_source_environment.get("source_sets", 0) >= max(source_sets - 1, 6)
+            and runtime_source_environment.get("fetched_rocks", 0) >= max(fetched_rocks - 2, 6)
+            and runtime_source_environment.get("kenney_cliffs", 0) >= max(kenney_cliffs - 1, min_cliffs)
+            and runtime_source_environment.get("detailed_trees", 0) >= max(detailed_trees - 2, min_trees)
+            and runtime_source_environment.get("naturalistic_anchors", 0) >= max(naturalistic_anchors - 1, 4)
+            and runtime_source_environment.get("terrain_replacements", 0) >= max(terrain_replacements - 1, 4)
+            and runtime_source_environment.get("backdrop_anchors", 0) >= max(backdrop_anchors - 2, 8)
+        )
+        if (
+            not isinstance(source_environment_assets, dict)
+            or not bool(source_environment_assets.get("enabled"))
+            or source_sets < 6
+            or fetched_rocks < 8
+            or kenney_cliffs < min_cliffs
+            or detailed_trees < min_trees
+            or naturalistic_anchors < 5
+            or terrain_replacements < 5
+            or backdrop_anchors < 10
+            or not runtime_source_environment_ok
+        ):
+            fail(
+                "missing_source_environment_assets",
+                "Generated exterior still relies on low-poly/stage-like backdrop terrain instead of source-bound environmental assets",
+                source_environment_assets=source_environment_assets,
+                source_asset_set_count=source_sets,
+                fetched_rock_mass_count=fetched_rocks,
+                kenney_cliff_backdrop_count=kenney_cliffs,
+                detailed_tree_backdrop_count=detailed_trees,
+                naturalistic_anchor_count=naturalistic_anchors,
+                terrain_replacement_layer_count=terrain_replacements,
+                backdrop_anchor_count=backdrop_anchors,
+                runtime_source_environment_assets=runtime_source_environment,
+                runtime_source_environment_assets_ok=runtime_source_environment_ok,
             )
 
         if flags["moonlight"] or "storm" in prompt.lower():

@@ -691,6 +691,28 @@ Status: running
   - Verifier: inventory suitable local source assets; strengthen `scene_graphics_gate.py` so Loop 25 campsite/desert/alpine fail `missing_source_environment_assets`; then require new IR/runtime source-environment evidence and run the standard build/render/gate/oracle suite.
   - Exit: verifier green plus visual inspection shows the low-poly backdrop/source terrain read is reduced without new strip/card artifacts; final AAA call remains `HUMAN-GATE`.
   - Escape: stop if suitable assets are not present locally, if placement worsens prompt semantics, or if the pass becomes disconnected clutter instead of backdrop/source replacement.
+- Loop 26 verifier evidence:
+  - Heartbeat proof `aaa-loop26-proof` fired by timeout after 1s.
+  - Asset inventory confirmed local source meshes: `naturalistic_showcase/boulder_01`, `rock_moss_set_01`, `fetched/gen_weathered_grey_boulder`, `gen_jagged_volcanic_monolith`, `gen_battery_test_crag_stone`, Kenney `cliff_large_rock`, `cliff_cornerLarge_rock`, `cliff_blockSlope_rock`, and detailed pine meshes.
+  - Red proof: `aaa_environment_campsite_loop25c`, `aaa_environment_desert_loop25c`, and `aaa_environment_alpine_loop25c` all failed the strengthened graphics gate with exactly `missing_source_environment_assets`.
+  - Implementation: `tools/scene_compiler.py` emits `graphics_pass.source_environment_assets`; `tools/scene_graphics_gate.py` requires IR plus runtime source-environment receipts; `src/Core/Engine_Scenes.cpp` parses the contract, loads fetched/Kenney/naturalistic source meshes, places them in water-ROI-preserving flank/backdrop lanes, and logs source counts.
+  - Python compile exited 0.
+  - Release build exited 0: `[OK] Build complete in 57.5s`; final no-work rebuild exited 0: `[OK] Build complete in 3.0s`.
+  - `git diff --check` exited 0 except expected CRLF warnings.
+  - Campsite `aaa_source_env_campsite_loop26` rendered VALID; quality green (`purple_fraction=0.8101`, `nonblack_fraction=0.9871`); graphics green (`dark_contact_area_fraction=0.2982`); Director validation green; runtime `fetched_rocks=9 kenney_cliffs=4 detailed_trees=9 naturalistic_anchors=7 terrain_replacements=5 backdrop_anchors=27 source_sets=10`.
+  - Desert `aaa_source_env_desert_loop26` rendered VALID; quality green (`turquoise_fraction=0.389`, `nonblack_fraction=0.9442`); graphics green (`dark_contact_area_fraction=0.3553`); Director validation green; runtime `fetched_rocks=12 kenney_cliffs=8 detailed_trees=0 naturalistic_anchors=7 terrain_replacements=6 backdrop_anchors=26 source_sets=10`.
+  - Alpine `aaa_source_env_alpine_loop26` rendered VALID; quality green (`avg_luma=0.1254`, `cool_fraction=0.9087`, `nonblack_fraction=0.9326`); graphics green (`dark_contact_area_fraction=0.7362`); Director validation green; runtime `fetched_rocks=9 kenney_cliffs=4 detailed_trees=9 naturalistic_anchors=7 terrain_replacements=5 backdrop_anchors=27 source_sets=10`.
+  - Kitchen smoke `regression_kitchen_aaa_loop26` rendered VALID and quality gate exited 0 (`avg_luma=0.4692`, `nonblack_fraction=1.0`).
+  - Known-bad quality oracle `gen_a_foggy_mountain_campsite_beside_0` with `--expect-fail` still reports forbidden fridge assets, missing ridge, focal visibility, and purple-water failures. Known-bad graphics oracle `v3_campsite_ridge_test_0` with `--expect-fail` still fails and now includes `missing_source_environment_assets`.
+  - Visual inspection: source flank/backdrop assets are visible and do not block the violet/turquoise/cool ROIs or introduce strip/card artifacts. Residual remains large: scenes still read stylized, dark/flat around hero surfaces, and kit-like. Next loop should target hero material/shadow readability rather than adding more scatter.
+- Loop 27 contract:
+  - Invariant: generated exteriors must stop presenting dominant hero surfaces as crushed black/flat kit silhouettes; tent/cabin/canyon hero regions need readable material response, directional fill/rim shaping, and contact shadow coherence without global washout.
+  - Entry: Loop 26 checkpoint is green, but visual inspection shows the tent, cabin, and canyon hero faces remain too flat/dark and disconnected from lighting/material detail.
+  - Scope in: `tools/scene_compiler.py`, `tools/scene_graphics_gate.py`, `src/Core/Engine_Scenes.cpp`, campaign ledgers, novel generated exterior artifacts.
+  - Scope out: weakening `tools/scene_quality_gate.py`, forcing generated DXR by default, global exposure-only fixes, visible light cards, hiding water/color ROIs, unrelated interior scenes.
+  - Verifier: strengthen `scene_graphics_gate.py` so Loop 26 campsite/desert/alpine fail `missing_hero_material_shadow_readability`; then require new IR/runtime readability evidence and run the standard build/render/gate/oracle suite.
+  - Exit: verifier green plus visual inspection shows less black-sheet tent/cabin/canyon read and stronger local material/shadow separation; final AAA call remains `HUMAN-GATE`.
+  - Escape: stop if the pass washes out night/desert/campsite color gates, creates visible glow cards/bands, or only changes metadata without visible hero-region improvement.
 - Image metrics alone cannot certify AAA quality; this loop uses them only to catch obvious flat/blockout failures and relies on runtime evidence for deterministic features.
 - Generated validation renders now intentionally use SSAO/SSR/shadows instead of forced DXR. Re-enable DXR only behind a separate density/BLAS budget gate.
 - Objective graphics gates are green, but visual inspection still shows asset/shot-fidelity limits: low-poly tree silhouettes, generic canyon composition, and remaining stage-like flatness. This is the next asset-fidelity front, not a blocker for this graphics-pass checkpoint.

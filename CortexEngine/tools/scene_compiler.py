@@ -488,6 +488,11 @@ def compile_v3_to_v2(v3: dict[str, Any]) -> dict[str, Any]:
         "cinematic_shadow_caster_receivers",
         "cinematic_volumetric_light_slices",
     ])
+    material_zone_names.extend([
+        "source_environment_replacement",
+        "source_crag_cliff_backdrop",
+        "source_tree_and_boulder_terrain_anchors",
+    ])
     if water_on:
         material_zone_names.append("texture_source_wet_shore")
         material_zone_names.append("authored_curved_shore_water_corridor")
@@ -801,6 +806,27 @@ def compile_v3_to_v2(v3: dict[str, Any]) -> dict[str, Any]:
                 "water_depth_and_reflection_banding",
                 "directional_shadow_lanes_from_key_light",
                 "single_environment_lighting_contract",
+            ],
+        },
+        "source_environment_assets": {
+            "enabled": True,
+            "source_asset_set_count": 9 if canyon else 8,
+            "fetched_rock_mass_count": 12 if canyon else 9,
+            "kenney_cliff_backdrop_count": 8 if canyon else 4,
+            "detailed_tree_backdrop_count": 0 if desert else 9,
+            "naturalistic_anchor_count": 7 if water_on else 5,
+            "terrain_replacement_layer_count": 6 if canyon else 5,
+            "backdrop_anchor_count": 15 if canyon else 12,
+            "replacement_family": "source_canyon_wall_backdrop" if canyon else (
+                "source_alpine_tree_rock_backdrop" if cabin else "source_lake_mountain_backdrop"
+            ),
+            "systems": [
+                "fetched_crag_and_monolith_backdrop_masses",
+                "kenney_cliff_mesh_backdrop_replacement",
+                "detailed_pine_background_silhouettes",
+                "naturalistic_boulder_and_moss_rock_terrain_anchors",
+                "source_asset_terrain_to_backdrop_transition",
+                "water_color_roi_preserving_flank_layout",
             ],
         },
         "renderer_shadow_occlusion_budget": {

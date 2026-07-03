@@ -512,6 +512,13 @@ def compile_v3_to_v2(v3: dict[str, Any]) -> dict[str, Any]:
         "cabin_cladding_roof_shingles",
         "canyon_hero_mesh_overbuild",
     ])
+    material_zone_names.extend([
+        "shadowed_key_light_material_response",
+        "ambient_clamped_contact_shadows",
+        "local_probe_volume_material_grade",
+        "raking_shadow_band_field",
+        "scene_wide_pbr_response_tuning",
+    ])
     if water_on:
         material_zone_names.append("texture_source_wet_shore")
         material_zone_names.append("authored_curved_shore_water_corridor")
@@ -909,6 +916,29 @@ def compile_v3_to_v2(v3: dict[str, Any]) -> dict[str, Any]:
                 "lowpoly_silhouette_masking_without_light_cards",
                 "prompt_family_hero_cladding",
                 "shadow_casting_hero_forms",
+            ],
+        },
+        "lighting_shadow_material_field": {
+            "enabled": True,
+            "shadowed_spot_light_count": 3 if not moonlight else 2,
+            "material_response_surface_count": 34 if not desert else 30,
+            "contact_shadow_band_count": 20 if not cabin else 16,
+            "local_probe_volume_count": 2 if water_on else 1,
+            "key_fill_ratio": 3.35 if campsite else (3.55 if desert else 2.65),
+            "ambient_intensity_ceiling": 0.50 if campsite else (0.54 if desert else 0.46),
+            "ssao_intensity_target": 3.35 if not moonlight else 3.05,
+            "shadow_bias_target": 0.0011 if not moonlight else 0.0013,
+            "shadow_pcf_radius_target": 3.85 if not moonlight else 3.55,
+            "response_family": "dawn_campfire_raking_key" if campsite else (
+                "sandstone_river_shadow_field" if desert else "moonlit_cabin_shadow_field"
+            ),
+            "systems": [
+                "bounded_shadowed_spot_lights",
+                "ambient_clamped_key_fill_ratio",
+                "renderer_ssao_shadow_bias_pcf_targets",
+                "existing_surface_pbr_response_tuning",
+                "local_probe_volume_material_grade",
+                "contact_shadow_band_field",
             ],
         },
         "renderer_shadow_occlusion_budget": {

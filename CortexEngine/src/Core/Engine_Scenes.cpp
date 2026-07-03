@@ -270,6 +270,19 @@ namespace {
         int lowpolySilhouetteMaskCount = 0;
     };
 
+    struct GenerativeLightingShadowMaterialField {
+        bool enabled = false;
+        int shadowedSpotLightCount = 0;
+        int materialResponseSurfaceCount = 0;
+        int contactShadowBandCount = 0;
+        int localProbeVolumeCount = 0;
+        float keyFillRatio = 0.0f;
+        float ambientIntensityCeiling = 1.0f;
+        float ssaoIntensityTarget = 0.0f;
+        float shadowBiasTarget = 0.0035f;
+        float shadowPCFRadiusTarget = 2.5f;
+    };
+
     struct GenerativeHeroAssetReplacement {
         bool enabled = false;
         int canvasShellPanelCount = 0;
@@ -3581,6 +3594,7 @@ void Engine::BuildRecipeScene() {
         GenerativeHeroMaterialShadowReadability heroMaterialShadowReadability;
         GenerativeStructuralSceneFidelity structuralSceneFidelity;
         GenerativeHeroMeshMaterialOverhaul heroMeshMaterialOverhaul;
+        GenerativeLightingShadowMaterialField lightingShadowMaterialField;
         GenerativeHeroAssetReplacement heroAssetReplacement;
         GenerativeCohesiveStagingCleanup cohesiveStagingCleanup;
         GenerativeEnvironmentFidelity environmentFidelity;
@@ -3944,6 +3958,27 @@ void Engine::BuildRecipeScene() {
                     static_cast<int>(std::clamp(num(heroMeshMaterialOverhaul, "pbr_material_layer_count", 0.0f), 0.0f, 16.0f));
                 genExt.heroMeshMaterialOverhaul.lowpolySilhouetteMaskCount =
                     static_cast<int>(std::clamp(num(heroMeshMaterialOverhaul, "lowpoly_silhouette_mask_count", 0.0f), 0.0f, 16.0f));
+                const nlohmann::json lightingShadowMaterialField =
+                    graphics.value("lighting_shadow_material_field", nlohmann::json::object());
+                genExt.lightingShadowMaterialField.enabled = lightingShadowMaterialField.value("enabled", false);
+                genExt.lightingShadowMaterialField.shadowedSpotLightCount =
+                    static_cast<int>(std::clamp(num(lightingShadowMaterialField, "shadowed_spot_light_count", 0.0f), 0.0f, 3.0f));
+                genExt.lightingShadowMaterialField.materialResponseSurfaceCount =
+                    static_cast<int>(std::clamp(num(lightingShadowMaterialField, "material_response_surface_count", 0.0f), 0.0f, 64.0f));
+                genExt.lightingShadowMaterialField.contactShadowBandCount =
+                    static_cast<int>(std::clamp(num(lightingShadowMaterialField, "contact_shadow_band_count", 0.0f), 0.0f, 40.0f));
+                genExt.lightingShadowMaterialField.localProbeVolumeCount =
+                    static_cast<int>(std::clamp(num(lightingShadowMaterialField, "local_probe_volume_count", 0.0f), 0.0f, 4.0f));
+                genExt.lightingShadowMaterialField.keyFillRatio =
+                    std::clamp(num(lightingShadowMaterialField, "key_fill_ratio", 0.0f), 0.0f, 6.0f);
+                genExt.lightingShadowMaterialField.ambientIntensityCeiling =
+                    std::clamp(num(lightingShadowMaterialField, "ambient_intensity_ceiling", 1.0f), 0.18f, 0.75f);
+                genExt.lightingShadowMaterialField.ssaoIntensityTarget =
+                    std::clamp(num(lightingShadowMaterialField, "ssao_intensity_target", genExt.graphicsSSAOIntensity), 0.5f, 4.5f);
+                genExt.lightingShadowMaterialField.shadowBiasTarget =
+                    std::clamp(num(lightingShadowMaterialField, "shadow_bias_target", genExt.graphicsShadowBias), 0.0003f, 0.010f);
+                genExt.lightingShadowMaterialField.shadowPCFRadiusTarget =
+                    std::clamp(num(lightingShadowMaterialField, "shadow_pcf_radius_target", genExt.graphicsShadowPCF), 0.25f, 5.0f);
                 const nlohmann::json heroAssetReplacement = graphics.value("hero_asset_replacement", nlohmann::json::object());
                 genExt.heroAssetReplacement.enabled = heroAssetReplacement.value("enabled", false);
                 genExt.heroAssetReplacement.canvasShellPanelCount =
@@ -10106,6 +10141,239 @@ void Engine::BuildRecipeScene() {
                                  backdropDetailCount);
                 }
             }
+        }
+    }
+
+    if (genExt.valid && genExt.lightingShadowMaterialField.enabled) {
+        if (auto* renderer = m_renderer.get()) {
+            const std::string module = genExt.authoredSceneModule.moduleId;
+            const bool campsiteModule = module == "campsite_lake_dawn";
+            const bool canyonModule = module == "desert_canyon_river";
+            const bool alpineModule = module == "alpine_cabin_lake";
+            const float ambientCeiling = std::clamp(genExt.lightingShadowMaterialField.ambientIntensityCeiling,
+                                                    0.24f,
+                                                    0.62f);
+            const float appliedAmbient = std::min(ambientCeiling + (alpineModule ? 0.04f : 0.05f), 0.61f);
+
+            int materialSurfaces = 0;
+            auto surfaceView = m_registry->View<Scene::TagComponent, Scene::RenderableComponent>();
+            for (auto entity : surfaceView) {
+                if (materialSurfaces >= genExt.lightingShadowMaterialField.materialResponseSurfaceCount) {
+                    break;
+                }
+                const auto& tag = surfaceView.get<Scene::TagComponent>(entity).tag;
+                auto& r = surfaceView.get<Scene::RenderableComponent>(entity);
+                if (tag.rfind("GenerativeExterior_", 0) != 0 ||
+                    tag.find("Water") != std::string::npos ||
+                    tag.find("Glow") != std::string::npos ||
+                    tag.find("Light") != std::string::npos ||
+                    tag.find("ShadowReceiver") != std::string::npos ||
+                    tag.find("Soft") != std::string::npos ||
+                    tag.find("Ridge") != std::string::npos ||
+                    tag.find("Backdrop") != std::string::npos) {
+                    continue;
+                }
+
+                const bool terrainLike = tag.find("Ground") != std::string::npos ||
+                                         tag.find("Terrain") != std::string::npos ||
+                                         tag.find("Foundation") != std::string::npos ||
+                                         tag.find("Shore") != std::string::npos;
+                const bool woodLike = tag.find("Cabin") != std::string::npos ||
+                                      tag.find("Log") != std::string::npos ||
+                                      tag.find("Wood") != std::string::npos ||
+                                      tag.find("Cladding") != std::string::npos ||
+                                      tag.find("Roof") != std::string::npos;
+                const bool fabricLike = tag.find("Tent") != std::string::npos ||
+                                        tag.find("Canvas") != std::string::npos ||
+                                        tag.find("Fabric") != std::string::npos;
+                const bool rockLike = tag.find("Rock") != std::string::npos ||
+                                      tag.find("Cliff") != std::string::npos ||
+                                      tag.find("Canyon") != std::string::npos ||
+                                      tag.find("Ridge") != std::string::npos ||
+                                      tag.find("Boulder") != std::string::npos;
+
+                r.occlusionStrength = std::min(r.occlusionStrength, terrainLike ? 0.52f : 0.58f);
+                r.normalScale = std::max(r.normalScale, rockLike ? 1.02f : (fabricLike ? 0.94f : 0.86f));
+                r.proceduralMaskStrength = std::max(r.proceduralMaskStrength, terrainLike ? 0.62f : 0.54f);
+                r.roughness = std::clamp(r.roughness * (rockLike ? 0.92f : 0.96f), 0.38f, 0.88f);
+                r.specularFactor = std::max(r.specularFactor, (terrainLike || rockLike) ? 0.24f : 0.20f);
+                r.clearcoatFactor = std::max(r.clearcoatFactor, terrainLike ? 0.045f : 0.030f);
+                r.clearcoatRoughnessFactor = std::max(r.clearcoatRoughnessFactor, 0.58f);
+                r.sheenWeight = std::max(r.sheenWeight, fabricLike ? 0.36f : 0.05f);
+                r.anisotropyStrength = std::max(r.anisotropyStrength, woodLike ? 0.38f : 0.12f);
+                r.albedoColor = glm::vec4(glm::max(glm::vec3(r.albedoColor) * (alpineModule ? 1.05f : 1.08f),
+                                                   glm::vec3(0.030f)),
+                                          r.albedoColor.a);
+                if (r.textures.albedoPath.empty()) {
+                    if (fabricLike) {
+                        applyGeneratedTextureMaterial(r, "fabric", true, false);
+                    } else if (woodLike) {
+                        applyGeneratedTextureMaterial(r, "wood", true, false);
+                    } else if (rockLike) {
+                        applyGeneratedTextureMaterial(r, "rock_cliff", false, false);
+                    } else if (terrainLike) {
+                        applyGeneratedTextureMaterial(r, canyonModule ? "terrain_sand" : "terrain_grass", false, false);
+                    }
+                }
+                materialSurfaces++;
+            }
+
+            int shadowBands = 0;
+            auto bandMesh = Utils::MeshGenerator::CreateDisk(1.0f, 48);
+            const auto upBand = renderer->UploadMesh(bandMesh);
+            if (upBand.IsErr()) {
+                spdlog::warn("generative_exterior: lighting shadow material field band mesh upload failed: {}",
+                             upBand.Error());
+            } else {
+                const glm::vec3 bandColor = alpineModule
+                    ? glm::vec3(0.025f, 0.034f, 0.052f)
+                    : (canyonModule ? glm::vec3(0.048f, 0.041f, 0.036f) : glm::vec3(0.030f, 0.044f, 0.040f));
+                const float shoreZ = genExt.waterOn ? genExt.waterFromZ : -genExt.extent * 0.30f;
+                for (int i = 0; i < genExt.lightingShadowMaterialField.contactShadowBandCount; ++i) {
+                    const float side = (i % 2 == 0) ? -1.0f : 1.0f;
+                    const float lane = static_cast<float>(i / 2);
+                    const float x = side * (0.55f + 0.22f * static_cast<float>(i % 6)) +
+                                    (canyonModule ? side * 1.65f : 0.0f);
+                    const float z = (canyonModule ? (shoreZ - 1.8f - lane * 0.42f)
+                                                   : (0.82f + lane * 0.18f));
+                    entt::entity e = m_registry->CreateEntity();
+                    m_registry->AddComponent<Scene::TagComponent>(
+                        e, "GenerativeExterior_LightingShadowFieldBand" + std::to_string(i));
+                    auto& t = m_registry->AddComponent<TransformComponent>(e);
+                    t.position = glm::vec3(x, 0.118f + 0.001f * static_cast<float>(i % 5), z);
+                    t.scale = glm::vec3(0.28f + 0.025f * static_cast<float>(i % 4),
+                                        1.0f,
+                                        0.060f + 0.010f * static_cast<float>((i + 2) % 4));
+                    t.rotation = glm::quat(glm::vec3(0.0f,
+                                                     glm::radians(-36.0f + 13.0f * static_cast<float>(i)),
+                                                     0.0f));
+                    auto& r = m_registry->AddComponent<Scene::RenderableComponent>(e);
+                    r.mesh = bandMesh;
+                    r.albedoColor = glm::vec4(bandColor, alpineModule ? 0.10f : 0.085f);
+                    r.metallic = 0.0f;
+                    r.roughness = 0.98f;
+                    r.ao = 0.55f;
+                    r.occlusionStrength = 0.50f;
+                    r.normalScale = 0.04f;
+                    r.alphaMode = Scene::RenderableComponent::AlphaMode::Blend;
+                    r.renderLayer = Scene::RenderableComponent::RenderLayer::Overlay;
+                    r.doubleSided = true;
+                    r.castsSunShadow = false;
+                    r.presetName = "shadow";
+                    shadowBands++;
+                }
+            }
+
+            int probeVolumes = 0;
+            const int requestedProbes = std::max(1, genExt.lightingShadowMaterialField.localProbeVolumeCount);
+            for (int i = 0; i < requestedProbes; ++i) {
+                entt::entity probe = m_registry->CreateEntity();
+                m_registry->AddComponent<Scene::TagComponent>(
+                    probe, "GenerativeExterior_LightingMaterialProbe" + std::to_string(i));
+                auto& t = m_registry->AddComponent<TransformComponent>(probe);
+                t.position = glm::vec3((i == 0 ? 0.0f : (i % 2 == 0 ? -4.2f : 4.2f)),
+                                       1.2f,
+                                       i == 0 ? 0.5f : (genExt.waterOn ? genExt.waterFromZ - 1.8f : -2.0f));
+                Scene::ReflectionProbeComponent rp{};
+                rp.extents = glm::vec3(i == 0 ? 7.0f : 4.5f, 3.2f, i == 0 ? 5.8f : 3.6f);
+                rp.blendDistance = 1.6f;
+                rp.environmentIndex = 0;
+                rp.enabled = 1;
+                m_registry->AddComponent<Scene::ReflectionProbeComponent>(probe, rp);
+                probeVolumes++;
+            }
+
+            const glm::vec3 heroTarget = genExt.structures.empty()
+                ? glm::vec3(0.9f, 0.62f, 0.7f)
+                : genExt.structures.front().position + glm::vec3(0.0f, 0.85f, 1.1f);
+            int shadowedLights = 0;
+            const int requestedLights = std::min(3, std::max(2, genExt.lightingShadowMaterialField.shadowedSpotLightCount));
+            for (int i = 0; i < requestedLights; ++i) {
+                const float side = (i % 2 == 0) ? -1.0f : 1.0f;
+                glm::vec3 pos;
+                glm::vec3 color;
+                float intensity = 3.0f;
+                float range = 18.0f;
+                if (alpineModule) {
+                    pos = glm::vec3(side * (4.8f + 0.5f * static_cast<float>(i)),
+                                    4.0f + 0.25f * static_cast<float>(i),
+                                    -2.8f + 0.8f * static_cast<float>(i % 2));
+                    color = (i == 0) ? glm::vec3(0.36f, 0.50f, 1.0f) : glm::vec3(1.0f, 0.56f, 0.25f);
+                    intensity = (i == 0) ? 3.4f : 2.4f;
+                    range = 17.0f;
+                } else if (canyonModule) {
+                    pos = glm::vec3(side * (6.6f + 0.7f * static_cast<float>(i)),
+                                    4.2f + 0.20f * static_cast<float>(i),
+                                    (genExt.waterOn ? genExt.waterFromZ : -3.0f) - 2.8f);
+                    color = (i == 1) ? glm::vec3(0.22f, 0.88f, 0.92f) : glm::vec3(1.0f, 0.52f, 0.20f);
+                    intensity = (i == 1) ? 2.6f : 4.2f;
+                    range = 22.0f;
+                } else {
+                    pos = glm::vec3(side * (4.8f + 0.4f * static_cast<float>(i)),
+                                    3.5f + 0.22f * static_cast<float>(i),
+                                    -1.8f + 0.65f * static_cast<float>(i % 2));
+                    color = (i == 1) ? glm::vec3(0.32f, 0.42f, 0.95f) : glm::vec3(1.0f, 0.44f, 0.16f);
+                    intensity = (i == 1) ? 2.1f : 4.8f;
+                    range = 17.5f;
+                }
+                const std::string tag = "GenerativeExterior_LightingShadowFieldSpot" + std::to_string(i);
+                AddAssetLedSpotLight(*m_registry,
+                                     tag.c_str(),
+                                     pos,
+                                     heroTarget,
+                                     color,
+                                     intensity,
+                                     range,
+                                     true);
+                shadowedLights++;
+            }
+
+            if (campsiteModule) {
+                renderer->SetSunDirection(glm::normalize(glm::vec3(0.84f, 0.16f, -0.52f)));
+                renderer->SetSunIntensity(4.85f * lightingBalance.sunScale);
+                renderer->SetSunColor(glm::vec3(1.0f, 0.50f, 0.20f));
+                    renderer->SetAmbientLighting(glm::vec3(0.022f, 0.030f, 0.050f), appliedAmbient);
+                renderer->SetExposure(std::clamp(std::max(renderer->GetExposure(), 0.90f), 0.72f, 1.08f));
+            } else if (canyonModule) {
+                renderer->SetSunDirection(glm::normalize(glm::vec3(0.88f, 0.18f, -0.46f)));
+                renderer->SetSunIntensity(4.65f * lightingBalance.sunScale);
+                renderer->SetSunColor(glm::vec3(1.0f, 0.56f, 0.24f));
+                    renderer->SetAmbientLighting(glm::vec3(0.054f, 0.040f, 0.030f), appliedAmbient);
+                renderer->SetExposure(std::clamp(std::max(renderer->GetExposure(), 0.88f), 0.70f, 1.06f));
+            } else {
+                renderer->SetSunDirection(glm::normalize(glm::vec3(-0.42f, 0.26f, -0.86f)));
+                renderer->SetSunIntensity(1.55f * lightingBalance.sunScale);
+                renderer->SetSunColor(glm::vec3(0.46f, 0.58f, 1.0f));
+                    renderer->SetAmbientLighting(glm::vec3(0.014f, 0.024f, 0.058f), appliedAmbient);
+                renderer->SetExposure(std::clamp(std::max(renderer->GetExposure(), 0.76f), 0.52f, 0.94f));
+            }
+            renderer->SetIBLIntensity(alpineModule ? 0.38f : (canyonModule ? 1.18f : 0.96f),
+                                      alpineModule ? 0.82f : 0.94f);
+            renderer->SetSSAOParams(std::max(genExt.graphicsSSAORadius, 1.42f),
+                                    std::min(genExt.graphicsSSAOBias, 0.012f),
+                                    std::max(genExt.graphicsSSAOIntensity,
+                                             genExt.lightingShadowMaterialField.ssaoIntensityTarget));
+            renderer->SetShadowBias(std::min(genExt.graphicsShadowBias,
+                                             genExt.lightingShadowMaterialField.shadowBiasTarget));
+            renderer->SetShadowPCFRadius(std::max(genExt.graphicsShadowPCF,
+                                                  genExt.lightingShadowMaterialField.shadowPCFRadiusTarget));
+            renderer->SetToneGrade(alpineModule ? 1.20f : 1.28f, alpineModule ? 1.02f : 1.12f);
+            renderer->SetCinematicPostEnabled(true);
+            renderer->SetCinematicPost(alpineModule ? 0.12f : 0.10f, 0.03f);
+            renderer->SetGodRayIntensity(alpineModule ? 0.14f : (canyonModule ? 0.18f : 0.28f));
+
+            const auto features = renderer->GetFeatureState();
+            const auto quality = renderer->GetQualityState();
+            spdlog::info("generative_exterior: lighting shadow material field shadowed_lights={} material_surfaces={} shadow_bands={} probe_volumes={} key_fill={:.2f} ambient={:.2f} ssao={:.2f} shadow_bias={:.4f} shadow_pcf={:.2f}",
+                         shadowedLights,
+                         materialSurfaces,
+                         shadowBands,
+                         probeVolumes,
+                         genExt.lightingShadowMaterialField.keyFillRatio,
+                         appliedAmbient,
+                         features.ssaoIntensity,
+                         quality.shadowBias,
+                         quality.shadowPCFRadius);
         }
     }
 

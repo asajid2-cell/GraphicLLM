@@ -351,6 +351,29 @@ def _hero_mesh_material_runtime(log_text: str) -> dict[str, int] | None:
     return {key: int(value) for key, value in zip(keys, m.groups())}
 
 
+def _lighting_shadow_material_field_runtime(log_text: str) -> dict[str, float | int] | None:
+    m = re.search(
+        r"generative_exterior: lighting shadow material field "
+        r"shadowed_lights=(\d+) material_surfaces=(\d+) shadow_bands=(\d+) "
+        r"probe_volumes=(\d+) key_fill=([0-9.]+) ambient=([0-9.]+) "
+        r"ssao=([0-9.]+) shadow_bias=([0-9.]+) shadow_pcf=([0-9.]+)",
+        log_text,
+    )
+    if not m:
+        return None
+    return {
+        "shadowed_lights": int(m.group(1)),
+        "material_surfaces": int(m.group(2)),
+        "shadow_bands": int(m.group(3)),
+        "probe_volumes": int(m.group(4)),
+        "key_fill": float(m.group(5)),
+        "ambient": float(m.group(6)),
+        "ssao": float(m.group(7)),
+        "shadow_bias": float(m.group(8)),
+        "shadow_pcf": float(m.group(9)),
+    }
+
+
 def _asset_counts(ir: dict[str, Any]) -> dict[str, int]:
     counts = {
         "trees": 0,
@@ -457,6 +480,7 @@ def evaluate(prompt: str, ir: dict[str, Any], png: Path | None, log_text: str) -
     hero_material_shadow_readability = graphics.get("hero_material_shadow_readability") or {}
     structural_scene_fidelity = graphics.get("structural_scene_fidelity") or {}
     hero_mesh_material_overhaul = graphics.get("hero_mesh_material_overhaul") or {}
+    lighting_shadow_material_field = graphics.get("lighting_shadow_material_field") or {}
     image = _image_metrics(png)
 
     failures: list[dict[str, Any]] = []
@@ -1415,6 +1439,64 @@ def evaluate(prompt: str, ir: dict[str, Any], png: Path | None, log_text: str) -
                 lowpoly_silhouette_mask_count=silhouette_masks,
                 runtime_hero_mesh_material_overhaul=runtime_hero_mesh_material,
                 runtime_hero_mesh_material_overhaul_ok=runtime_hero_mesh_material_ok,
+            )
+
+        try:
+            shadowed_lights = int(lighting_shadow_material_field.get("shadowed_spot_light_count", 0) or 0)
+            material_surfaces = int(lighting_shadow_material_field.get("material_response_surface_count", 0) or 0)
+            shadow_bands = int(lighting_shadow_material_field.get("contact_shadow_band_count", 0) or 0)
+            probe_volumes = int(lighting_shadow_material_field.get("local_probe_volume_count", 0) or 0)
+            key_fill = float(lighting_shadow_material_field.get("key_fill_ratio", 0.0) or 0.0)
+            ambient_ceiling = float(lighting_shadow_material_field.get("ambient_intensity_ceiling", 1.0) or 1.0)
+            ssao_target = float(lighting_shadow_material_field.get("ssao_intensity_target", 0.0) or 0.0)
+            shadow_bias_target = float(lighting_shadow_material_field.get("shadow_bias_target", 1.0) or 1.0)
+            shadow_pcf_target = float(lighting_shadow_material_field.get("shadow_pcf_radius_target", 0.0) or 0.0)
+        except Exception:
+            shadowed_lights = material_surfaces = shadow_bands = probe_volumes = 0
+            key_fill = ssao_target = shadow_pcf_target = 0.0
+            ambient_ceiling = shadow_bias_target = 1.0
+        runtime_lighting_field = _lighting_shadow_material_field_runtime(log_text)
+        runtime_lighting_field_ok = (
+            isinstance(runtime_lighting_field, dict)
+            and runtime_lighting_field.get("shadowed_lights", 0) >= max(2, shadowed_lights - 1)
+            and runtime_lighting_field.get("material_surfaces", 0) >= max(18, material_surfaces - 4)
+            and runtime_lighting_field.get("shadow_bands", 0) >= max(12, shadow_bands - 2)
+            and runtime_lighting_field.get("probe_volumes", 0) >= max(1, probe_volumes)
+            and runtime_lighting_field.get("key_fill", 0.0) >= max(2.2, key_fill - 0.20)
+            and runtime_lighting_field.get("ambient", 1.0) <= min(0.62, ambient_ceiling + 0.06)
+            and runtime_lighting_field.get("ssao", 0.0) >= max(2.85, ssao_target - 0.15)
+            and runtime_lighting_field.get("shadow_bias", 1.0) <= min(0.0018, shadow_bias_target + 0.0003)
+            and runtime_lighting_field.get("shadow_pcf", 0.0) >= max(3.35, shadow_pcf_target - 0.20)
+        )
+        if (
+            not isinstance(lighting_shadow_material_field, dict)
+            or not bool(lighting_shadow_material_field.get("enabled"))
+            or shadowed_lights < 2
+            or material_surfaces < 18
+            or shadow_bands < 12
+            or probe_volumes < 1
+            or key_fill < 2.2
+            or ambient_ceiling > 0.62
+            or ssao_target < 2.85
+            or shadow_bias_target > 0.0018
+            or shadow_pcf_target < 3.35
+            or not runtime_lighting_field_ok
+        ):
+            fail(
+                "missing_lighting_shadow_material_field",
+                "Generated exterior lacks scene-wide material response, bounded shadowed lights, ambient clamp, and renderer shadow-field evidence",
+                lighting_shadow_material_field=lighting_shadow_material_field,
+                shadowed_spot_light_count=shadowed_lights,
+                material_response_surface_count=material_surfaces,
+                contact_shadow_band_count=shadow_bands,
+                local_probe_volume_count=probe_volumes,
+                key_fill_ratio=key_fill,
+                ambient_intensity_ceiling=ambient_ceiling,
+                ssao_intensity_target=ssao_target,
+                shadow_bias_target=shadow_bias_target,
+                shadow_pcf_radius_target=shadow_pcf_target,
+                runtime_lighting_shadow_material_field=runtime_lighting_field,
+                runtime_lighting_shadow_material_field_ok=runtime_lighting_field_ok,
             )
 
         if flags["moonlight"] or "storm" in prompt.lower():

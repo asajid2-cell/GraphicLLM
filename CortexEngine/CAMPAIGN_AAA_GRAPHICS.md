@@ -56,6 +56,7 @@ Unknown:
 | 7 | Shader material + occlusion slice | Existing material constants and overlay geometry can make the pass materially richer without unsafe DXR defaults. | Require advanced shader terms, occlusion ribbons, terrain creases, pebbles, shore foam/wet glints, and runtime logs. | Dead if pixels/logs show no visible change or if quality gates regress. | won |
 | 8 | Adaptive shot camera slice | One closer camera improves campsites but can crop cabins; scene-type camera profiles should improve both. | Require shot-camera runtime evidence and render campsite/desert/alpine. | Dead if camera changes break water/color/visibility gates or crop a prompt class. | won |
 | 9 | Asset/procedural fidelity slice | The remaining ceiling is visible hero/backdrop construction detail: cabin facade parts, campsite ropes/stakes/embers, and layered ridge silhouettes. | Require `asset_fidelity` IR + runtime logs, prove old green artifacts fail, then add native procedural detail. | Dead if dense procedural detail destabilizes captures or remains invisible after render/log A/B. | won |
+| 10 | Atmosphere + cliff realism slice | Storm/moonlight/canyon prompts need authored atmosphere and non-planar cliff detail beyond color grading and wall counts. | Require atmospheric and cliff-realism IR/runtime evidence, prove Loop 13 artifacts fail, then add native controls/detail geometry. | Dead if overlays regress prompt semantics or image gates; reduce counts before changing gates. | won |
 
 ## Fronts
 
@@ -66,6 +67,7 @@ Unknown:
 | Regression synthesis | loops | done | Release build, Python compile, known-bad gates, novel prompts, and kitchen smoke green |
 | World/shot/material fidelity | loops | done checkpoint | World geometry, shader materials, occlusion/surface layers, and adaptive cameras verified on campsite/desert/alpine |
 | Asset/procedural fidelity | loops | done checkpoint | Loop 9 verified campsite/desert/alpine with close-range hero construction and richer backdrop silhouettes |
+| Atmosphere/cliff realism | loops | done checkpoint | Loop 10 verified authored storm/moonlight atmosphere and canyon erosion detail on novel prompts |
 | Asset fidelity | self/HUMAN-GATE | residual | Catalog quality is now the dominant visible limit: low-poly silhouettes, simple cabin/camp meshes, coarse mountain backdrops |
 
 ## Beat Log
@@ -89,6 +91,8 @@ Unknown:
 - Final checkpoint evidence: Python compile green; Release build green (`[OK] Build complete in 17.2s`); campsite loop9, desert loop9, and alpine loop10 render valid and pass quality + strengthened graphics gates; Director IR validation green for all three; kitchen smoke green; known-bad quality oracle `gen_a_foggy_mountain_campsite_beside_0` still fails for the right semantic/color reasons; known-bad graphics oracle `v3_campsite_ridge_test_0` still fails the graphics gate.
 - Reopened again after user called out underscoping. Local-loop check: prior Loop 8 green proved renderer/material/camera controls but did not attack the visible asset ceiling. New highest-leverage front is Loop 9, a procedural asset fidelity slice with a red-first gate for hero construction detail and backdrop silhouette density.
 - Loop 9 checkpoint: old loop9 artifacts failed the strengthened graphics gate with `missing_asset_fidelity_detail`; new `aaa_graphics_campsite_loop13`, `aaa_graphics_desert_loop13`, and `aaa_graphics_alpine_loop13` all render valid and pass quality + graphics gates. Release build, Python compile, Director IR validation, known-bad oracles, and kitchen smoke are green. Visual inspection confirms added hero/backdrop detail, but the overall AAA target remains open: geometry is still stylized/planar and atmospheric time-of-day is not strong enough.
+- Opened Loop 10 after visual inspection: the cabin facade reads better, but alpine moonlight still looks like daytime cloud sky with a cool grade, and desert canyon walls are visibly planar. Next red-first gate targets atmosphere and cliff geometry realism.
+- Loop 10 checkpoint: `aaa_graphics_alpine_loop14` passes with darker authored night/storm atmosphere and rain/haze runtime evidence; `aaa_graphics_desert_loop14` passes with cliff erosion detail runtime evidence; campsite regression, Director IR validation, known-bad oracles, Release build, Python compile, and kitchen smoke are green. Visual residual: cliff/wall mass and many props are still stylized and planar, so the next front needs richer mesh silhouettes or higher-fidelity assets.
 
 ## Learnings
 
@@ -100,6 +104,7 @@ Unknown:
 - The `v3_campsite_ridge_test` artifact is no longer a semantic/color quality oracle; it is a graphics-fidelity oracle. The original user-bad `gen_a_foggy_mountain_campsite_beside_0` artifact remains the quality oracle for fridge/missing-ridge/non-purple-water failures.
 - Procedural shader/occlusion/camera passes improve the stills, but they do not solve the asset-fidelity ceiling. The next serious front is better hero/environment assets or richer procedural meshes/textures, not another semantic gate.
 - Loop 9 improved visible asset construction, but the next plateau is now geometry/material realism: canyon/cliff meshes need more believable form, close props need less cube/cylinder obviousness, and moonlight/storm skies need to read as authored atmosphere instead of daytime sky with a cool grade.
+- Loop 10 improved atmosphere and cliff breakup, but line overlays cannot substitute for real mesh silhouette complexity. The next serious slice should either use existing high-detail cliff/tree assets from the catalog/pretrained asset folders or add more volumetric/procedural mesh generation for rock faces and vegetation.
 
 ## BLOCKED / Decisions Needed
 

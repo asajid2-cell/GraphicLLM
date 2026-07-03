@@ -459,6 +459,22 @@ def compile_v3_to_v2(v3: dict[str, Any]) -> dict[str, Any]:
                 "ridge_silhouette_breakup",
             ],
         },
+        "atmosphere_fidelity": {
+            "enabled": True,
+            "night_sky_control": bool(moonlight),
+            "storm_layer_count": 4 if stormy else (2 if fog else 1),
+            "rain_streak_count": 28 if stormy else 0,
+            "haze_depth_layers": 4 if (stormy or moonlight or fog) else 2,
+            "moonlight_exposure": 0.72 if moonlight else 0.0,
+            "sky_background_lift": 0.38 if moonlight else 1.0,
+        },
+        "geometry_realism": {
+            "enabled": True,
+            "cliff_erosion_ridge_count": 18 if canyon else 6,
+            "strata_breakup_count": 14 if canyon else 0,
+            "wall_normal_breakup": 0.82 if canyon else 0.36,
+            "foreground_relief_clusters": 8 if canyon else 4,
+        },
         "material_zones": {
             "count": len(material_zone_names),
             "zones": material_zone_names,

@@ -142,6 +142,24 @@ namespace {
         int foregroundDressingClusters = 0;
     };
 
+    struct GenerativeAtmosphereFidelity {
+        bool enabled = false;
+        bool nightSkyControl = false;
+        int stormLayerCount = 0;
+        int rainStreakCount = 0;
+        int hazeDepthLayers = 0;
+        float moonlightExposure = 0.0f;
+        float skyBackgroundLift = 1.0f;
+    };
+
+    struct GenerativeGeometryRealism {
+        bool enabled = false;
+        int cliffErosionRidgeCount = 0;
+        int strataBreakupCount = 0;
+        int foregroundReliefClusters = 0;
+        float wallNormalBreakup = 0.0f;
+    };
+
     float GenerativeTerrainNoise(float x, float z, float phase) {
         const float a = std::sin(x * 0.33f + z * 0.17f + phase) * 0.48f;
         const float b = std::sin(x * 0.91f - z * 0.27f + phase * 1.73f) * 0.22f;
@@ -3211,6 +3229,8 @@ void Engine::BuildRecipeScene() {
         GenerativeWorldGeometry worldGeometry;
         GenerativeSurfaceDetail surfaceDetail;
         GenerativeAssetFidelity assetFidelity;
+        GenerativeAtmosphereFidelity atmosphereFidelity;
+        GenerativeGeometryRealism geometryRealism;
         int shoreLayerCount = 0;
         int rimLightCount = 0;
         int advancedShaderTermCount = 0;
@@ -3329,6 +3349,29 @@ void Engine::BuildRecipeScene() {
                     static_cast<int>(std::clamp(num(assetFidelity, "backdrop_detail_layers", 0.0f), 0.0f, 10.0f));
                 genExt.assetFidelity.foregroundDressingClusters =
                     static_cast<int>(std::clamp(num(assetFidelity, "foreground_dressing_clusters", 0.0f), 0.0f, 16.0f));
+                const nlohmann::json atmosphereFidelity = graphics.value("atmosphere_fidelity", nlohmann::json::object());
+                genExt.atmosphereFidelity.enabled = atmosphereFidelity.value("enabled", false);
+                genExt.atmosphereFidelity.nightSkyControl = atmosphereFidelity.value("night_sky_control", false);
+                genExt.atmosphereFidelity.stormLayerCount =
+                    static_cast<int>(std::clamp(num(atmosphereFidelity, "storm_layer_count", 0.0f), 0.0f, 8.0f));
+                genExt.atmosphereFidelity.rainStreakCount =
+                    static_cast<int>(std::clamp(num(atmosphereFidelity, "rain_streak_count", 0.0f), 0.0f, 80.0f));
+                genExt.atmosphereFidelity.hazeDepthLayers =
+                    static_cast<int>(std::clamp(num(atmosphereFidelity, "haze_depth_layers", 0.0f), 0.0f, 8.0f));
+                genExt.atmosphereFidelity.moonlightExposure =
+                    std::clamp(num(atmosphereFidelity, "moonlight_exposure", 0.0f), 0.0f, 1.5f);
+                genExt.atmosphereFidelity.skyBackgroundLift =
+                    std::clamp(num(atmosphereFidelity, "sky_background_lift", 1.0f), 0.05f, 4.0f);
+                const nlohmann::json geometryRealism = graphics.value("geometry_realism", nlohmann::json::object());
+                genExt.geometryRealism.enabled = geometryRealism.value("enabled", false);
+                genExt.geometryRealism.cliffErosionRidgeCount =
+                    static_cast<int>(std::clamp(num(geometryRealism, "cliff_erosion_ridge_count", 0.0f), 0.0f, 64.0f));
+                genExt.geometryRealism.strataBreakupCount =
+                    static_cast<int>(std::clamp(num(geometryRealism, "strata_breakup_count", 0.0f), 0.0f, 48.0f));
+                genExt.geometryRealism.foregroundReliefClusters =
+                    static_cast<int>(std::clamp(num(geometryRealism, "foreground_relief_clusters", 0.0f), 0.0f, 24.0f));
+                genExt.geometryRealism.wallNormalBreakup =
+                    std::clamp(num(geometryRealism, "wall_normal_breakup", 0.0f), 0.0f, 1.0f);
                 const nlohmann::json occlusion = graphics.value("occlusion", nlohmann::json::object());
                 genExt.surfaceDetail.occlusionRibbonCount =
                     static_cast<int>(std::clamp(num(occlusion, "ground_shadow_ribbon_count", 0.0f), 0.0f, 18.0f));
@@ -3524,6 +3567,9 @@ void Engine::BuildRecipeScene() {
             const bool moonlightLook = timeLower == "moonlight" ||
                                        gradeLower.find("moon") != std::string::npos ||
                                        skyLower.find("night") != std::string::npos;
+            const bool authoredNightAtmosphere = moonlightLook &&
+                                                 genExt.atmosphereFidelity.enabled &&
+                                                 genExt.atmosphereFidelity.nightSkyControl;
             renderer->SetEnvironmentPreset(skyPreset);
             renderer->SetIBLEnabled(true);
             // Poly Haven pure-sky HDRIs sit around 0.1 median linear luminance (vs the
@@ -3531,10 +3577,11 @@ void Engine::BuildRecipeScene() {
             // strong lift to read as a bright day. The sunset HDRI is brighter and
             // saturated -- lifting it 4x washes it to pastel, so it gets its own curve.
             const bool sunsetSky = skyPreset == "sky_sunset";
-            renderer->SetIBLIntensity(moonlightLook ? 0.72f : (sunsetSky ? 2.1f : 3.2f),
-                                      moonlightLook ? 1.15f : (sunsetSky ? 1.4f : 1.8f)); // NOTE: specular also drives the visible sky-background brightness
-            renderer->SetBackgroundPresentation(true, moonlightLook ? 1.05f : (sunsetSky ? 2.2f : 4.0f),
-                                                moonlightLook ? 0.10f : 0.0f);
+            renderer->SetIBLIntensity(authoredNightAtmosphere ? 0.34f : (moonlightLook ? 0.72f : (sunsetSky ? 2.1f : 3.2f)),
+                                      authoredNightAtmosphere ? 0.58f : (moonlightLook ? 1.15f : (sunsetSky ? 1.4f : 1.8f))); // NOTE: specular also drives the visible sky-background brightness
+            renderer->SetBackgroundPresentation(true,
+                                                authoredNightAtmosphere ? genExt.atmosphereFidelity.skyBackgroundLift : (moonlightLook ? 1.05f : (sunsetSky ? 2.2f : 4.0f)),
+                                                moonlightLook ? 0.14f : 0.0f);
             // Each HDRI's baked sun sits at its own azimuth in the file; the offset
             // aligns the visible glow with the IR sun light/shadows (calibrated
             // empirically: the sunset glow centres at rotation sunAz+150).
@@ -3556,8 +3603,12 @@ void Engine::BuildRecipeScene() {
                 ? glm::vec3(0.035f, 0.050f, 0.095f)
                 : glm::mix(glm::vec3(0.16f, 0.19f, 0.24f),
                            genExt.sunColor * 0.22f, 0.35f);
-            renderer->SetAmbientLighting(skyFill, moonlightLook ? 0.92f : 1.0f);
-            renderer->SetFogParams(genExt.fogDensity, 0.05f, 0.34f, genExt.fogStart);
+            renderer->SetAmbientLighting(skyFill, authoredNightAtmosphere ? 0.58f : (moonlightLook ? 0.92f : 1.0f));
+            const float authoredFog = genExt.atmosphereFidelity.enabled
+                ? std::max(genExt.fogDensity,
+                           genExt.atmosphereFidelity.stormLayerCount >= 2 ? 0.024f : 0.016f)
+                : genExt.fogDensity;
+            renderer->SetFogParams(authoredFog, 0.05f, 0.34f, genExt.fogStart);
             if (moonlightLook) {
                 renderer->SetColorGrade(0.02f, 0.30f);
                 renderer->SetToneGrade(1.085f, 0.96f);
@@ -3567,7 +3618,10 @@ void Engine::BuildRecipeScene() {
             // and crushes the ground into mud. Deterministic base; the critique loop
             // adjusts via CORTEX_AUTOEXPOSURE_MULT.
             renderer->SetAutoExposureEnabled(false);
-            renderer->SetExposure(std::clamp((moonlightLook ? 0.98f : 0.80f) * genExt.exposure, 0.35f, 1.45f));
+            const float exteriorExposure = authoredNightAtmosphere
+                ? std::max(0.48f, genExt.atmosphereFidelity.moonlightExposure)
+                : (moonlightLook ? 0.98f : 0.80f);
+            renderer->SetExposure(std::clamp(exteriorExposure * genExt.exposure, 0.35f, 1.45f));
             renderer->SetSSAOEnabled(true);
             renderer->SetSSAOParams(genExt.graphicsSSAORadius,
                                     genExt.graphicsSSAOBias,
@@ -3900,6 +3954,65 @@ void Engine::BuildRecipeScene() {
                         strataCount++;
                     }
 
+                    int erosionCount = 0;
+                    int breakupCount = 0;
+                    if (genExt.geometryRealism.enabled &&
+                        (genExt.geometryRealism.cliffErosionRidgeCount > 0 ||
+                         genExt.geometryRealism.strataBreakupCount > 0)) {
+                        for (int i = 0; i < genExt.geometryRealism.cliffErosionRidgeCount; ++i) {
+                            const float side = (i % 2 == 0) ? -1.0f : 1.0f;
+                            const int band = (i / 2) % 6;
+                            entt::entity ridge = m_registry->CreateEntity();
+                            m_registry->AddComponent<Scene::TagComponent>(
+                                ridge, "GenerativeExterior_CliffErosionRidge" + std::to_string(i));
+                            auto& t = m_registry->AddComponent<TransformComponent>(ridge);
+                            t.position = glm::vec3(side * (canyonHalfWidth - 0.08f - 0.04f * (i % 3)),
+                                                   0.72f + band * (wallHeight * 0.105f),
+                                                   -7.0f - static_cast<float>((i * 7) % 19));
+                            t.rotation = glm::quat(glm::vec3(glm::radians(-2.0f + (i % 5) * 0.8f),
+                                                             side > 0.0f ? glm::pi<float>() : 0.0f,
+                                                             glm::radians(-3.0f + (i % 4) * 1.5f)));
+                            t.scale = glm::vec3(0.070f,
+                                                0.035f + 0.006f * static_cast<float>(i % 3),
+                                                2.1f + 0.22f * static_cast<float>(i % 5));
+                            auto& r = m_registry->AddComponent<Scene::RenderableComponent>(ridge);
+                            r.mesh = cubeMesh;
+                            const glm::vec3 ridgeColor = (i % 2 == 0)
+                                ? glm::vec3(0.80f, 0.42f, 0.20f)
+                                : glm::vec3(0.30f, 0.11f, 0.075f);
+                            dressRock(r,
+                                      glm::mix(rockBase, ridgeColor, 0.55f),
+                                      0.86f,
+                                      0.50f + genExt.geometryRealism.wallNormalBreakup * 0.28f,
+                                      0.64f);
+                            erosionCount++;
+                        }
+                        for (int i = 0; i < genExt.geometryRealism.strataBreakupCount; ++i) {
+                            const float side = (i % 2 == 0) ? -1.0f : 1.0f;
+                            entt::entity crack = m_registry->CreateEntity();
+                            m_registry->AddComponent<Scene::TagComponent>(
+                                crack, "GenerativeExterior_CliffVerticalCrack" + std::to_string(i));
+                            auto& t = m_registry->AddComponent<TransformComponent>(crack);
+                            t.position = glm::vec3(side * (canyonHalfWidth - 0.055f),
+                                                   1.05f + static_cast<float>(i % 5) * 0.72f,
+                                                   -5.8f - static_cast<float>((i * 5) % 23));
+                            t.rotation = glm::quat(glm::vec3(glm::radians(1.5f * (i % 3 - 1)),
+                                                             side > 0.0f ? glm::pi<float>() : 0.0f,
+                                                             glm::radians(-4.0f + (i % 5) * 2.0f)));
+                            t.scale = glm::vec3(0.055f,
+                                                0.48f + 0.08f * static_cast<float>(i % 4),
+                                                0.030f);
+                            auto& r = m_registry->AddComponent<Scene::RenderableComponent>(crack);
+                            r.mesh = cubeMesh;
+                            dressRock(r,
+                                      glm::vec3(0.11f, 0.045f, 0.035f),
+                                      0.95f,
+                                      0.28f,
+                                      0.48f);
+                            breakupCount++;
+                        }
+                    }
+
                     int talusCount = 0;
                     for (int i = 0; i < genExt.worldGeometry.talusClusterCount; ++i) {
                         const float side = (i % 2 == 0) ? -1.0f : 1.0f;
@@ -3961,6 +4074,11 @@ void Engine::BuildRecipeScene() {
                     }
                     if (foregroundCount > 0) {
                         spdlog::info("generative_exterior: created foreground occluder(s) {}", foregroundCount);
+                    }
+                    if (erosionCount > 0 || breakupCount > 0) {
+                        spdlog::info("generative_exterior: created cliff erosion detail ridges={} cracks={}",
+                                     erosionCount,
+                                     breakupCount);
                     }
                 }
             }
@@ -4623,6 +4741,93 @@ void Engine::BuildRecipeScene() {
                 spdlog::info("generative_exterior: created hero asset detail cabin_facade=0 camp={} foreground={}",
                              campDetailCount,
                              foregroundCount);
+            }
+        }
+    }
+
+    if (genExt.valid && genExt.atmosphereFidelity.enabled) {
+        if (auto* renderer = m_renderer.get()) {
+            auto cubeMesh = Utils::MeshGenerator::CreateCube();
+            const auto upCube = renderer->UploadMesh(cubeMesh);
+            if (upCube.IsErr()) {
+                spdlog::warn("generative_exterior: atmosphere detail mesh upload failed: {}", upCube.Error());
+            } else {
+                auto addAtmospherePart = [&](const std::string& tag,
+                                             const glm::vec3& position,
+                                             const glm::vec3& scale,
+                                             const glm::vec3& euler,
+                                             const glm::vec4& color,
+                                             float roughness,
+                                             float emissiveStrength = 0.0f) {
+                    entt::entity part = m_registry->CreateEntity();
+                    m_registry->AddComponent<Scene::TagComponent>(part, tag);
+                    auto& t = m_registry->AddComponent<TransformComponent>(part);
+                    t.position = position;
+                    t.scale = scale;
+                    t.rotation = glm::quat(euler);
+                    auto& r = m_registry->AddComponent<Scene::RenderableComponent>(part);
+                    r.mesh = cubeMesh;
+                    r.albedoColor = color;
+                    r.metallic = 0.0f;
+                    r.roughness = roughness;
+                    r.ao = 0.65f;
+                    r.occlusionStrength = 0.45f;
+                    r.normalScale = 0.04f;
+                    r.proceduralMaskStrength = 0.08f;
+                    r.specularFactor = 0.05f;
+                    r.doubleSided = true;
+                    r.alphaMode = Scene::RenderableComponent::AlphaMode::Blend;
+                    r.renderLayer = Scene::RenderableComponent::RenderLayer::Overlay;
+                    r.presetName = "naturalistic";
+                    if (emissiveStrength > 0.0f) {
+                        r.emissiveColor = glm::vec3(color);
+                        r.emissiveStrength = emissiveStrength;
+                        r.emissiveBloomFactor = 0.10f;
+                    }
+                };
+
+                int hazeCount = 0;
+                for (int i = 0; i < genExt.atmosphereFidelity.hazeDepthLayers; ++i) {
+                    const float f = static_cast<float>(i);
+                    const glm::vec3 hazeColor = genExt.atmosphereFidelity.nightSkyControl
+                        ? glm::vec3(0.12f, 0.18f, 0.34f)
+                        : glm::vec3(0.62f, 0.66f, 0.70f);
+                    addAtmospherePart("GenerativeExterior_AtmosphereHazeBand" + std::to_string(i),
+                                      glm::vec3(0.0f, 0.26f + f * 0.12f, -5.8f - f * 4.2f),
+                                      glm::vec3(genExt.extent * (0.92f + f * 0.08f),
+                                                0.18f + f * 0.03f,
+                                                0.035f),
+                                      glm::vec3(0.0f, glm::radians((i % 2 == 0) ? -2.0f : 2.0f), 0.0f),
+                                      glm::vec4(hazeColor, genExt.atmosphereFidelity.nightSkyControl ? 0.105f : 0.075f),
+                                      0.96f,
+                                      genExt.atmosphereFidelity.nightSkyControl ? 0.18f : 0.0f);
+                    hazeCount++;
+                }
+
+                int rainCount = 0;
+                for (int i = 0; i < genExt.atmosphereFidelity.rainStreakCount; ++i) {
+                    const float p = std::sin(static_cast<float>(i) * 12.9898f) * 43758.5453f;
+                    const float u = p - std::floor(p);
+                    const float q = std::sin(static_cast<float>(i) * 78.233f) * 19341.371f;
+                    const float v = q - std::floor(q);
+                    const float x = (u - 0.5f) * genExt.extent * 1.45f;
+                    const float z = 5.6f - v * genExt.extent * 0.72f;
+                    const float y = 1.15f + (i % 7) * 0.25f;
+                    addAtmospherePart("GenerativeExterior_RainStreak" + std::to_string(i),
+                                      glm::vec3(x, y, z),
+                                      glm::vec3(0.018f, 0.68f + 0.08f * (i % 4), 0.018f),
+                                      glm::vec3(glm::radians(-13.0f), glm::radians(6.0f), glm::radians(-10.0f)),
+                                      glm::vec4(0.62f, 0.72f, 0.90f, 0.18f),
+                                      0.35f,
+                                      0.10f);
+                    rainCount++;
+                }
+
+                spdlog::info("generative_exterior: atmospheric pass night_sky={} storm_layers={} haze_layers={} rain_streaks={}",
+                             genExt.atmosphereFidelity.nightSkyControl ? "on" : "off",
+                             genExt.atmosphereFidelity.stormLayerCount,
+                             hazeCount,
+                             rainCount);
             }
         }
     }

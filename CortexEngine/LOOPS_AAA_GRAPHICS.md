@@ -178,6 +178,29 @@ Escape: if dense procedural detail destabilizes generated captures, reduce mesh 
 
 Status: done
 
+### Loop 10: Atmospheric And Cliff Geometry Realism
+
+Invariant: generated exteriors with storm/moonlight/canyon prompts render authored atmosphere and non-planar cliff detail, not just cool color grading and wall-count metadata.
+
+Scope:
+
+- in: `tools/scene_graphics_gate.py`, `tools/scene_compiler.py`, `src/Core/Engine_Scenes.cpp`, focused ledgers.
+- out: `tools/scene_quality_gate.py`, forced DXR defaults, unrelated interior scenes.
+
+Verifier:
+
+- Current Loop 13 alpine artifact fails strengthened graphics gate with `missing_atmospheric_time_of_day`.
+- Current Loop 13 desert canyon artifact fails strengthened graphics gate with `planar_cliff_geometry`.
+- New alpine and desert prompts render and pass quality + strengthened graphics gates.
+- Runtime logs include `generative_exterior: atmospheric pass` and `generative_exterior: created cliff erosion detail` where required.
+- Kitchen smoke remains valid and nonblank.
+
+Exit: all verifier commands green, with artifacts and logs recorded.
+
+Escape: if weather overlay geometry hurts semantic/color gates, keep the runtime lighting/fog controls and reduce overlay counts before changing verifier thresholds.
+
+Status: done
+
 ## Progress Log
 
 2026-07-03:
@@ -272,6 +295,25 @@ Status: done
 - Visual inspection after Loop 9:
   - Improvement is real: visible tent ropes/stakes/embers/tripod, cabin siding/trim/porch/chimney, and denser ridge silhouettes are present in captures.
   - Remaining `HUMAN-GATE` gap is still large: canyon walls are planar/low-poly, trees and camp props are visibly stylized, some overlay geometry reads too flat, and moonlight/storm prompts still need stronger sky/time-of-day coherence. Next front should target geometry/material realism and atmospheric time-of-day, not another metadata-only gate.
+- Loop 10 red proof:
+  - `aaa_graphics_alpine_loop13` failed the strengthened graphics gate with `missing_atmospheric_time_of_day`.
+  - `aaa_graphics_desert_loop13` failed the strengthened graphics gate with `planar_cliff_geometry`.
+- Loop 10 implementation:
+  - `tools\scene_compiler.py` now emits `graphics_pass.atmosphere_fidelity` and `graphics_pass.geometry_realism`.
+  - `tools\scene_graphics_gate.py` requires atmosphere evidence for moonlight/storm prompts and cliff erosion evidence for canyon prompts.
+  - `src\Core\Engine_Scenes.cpp` now darkens moonlight/storm sky presentation, fixes exposure lower for authored night atmosphere, increases storm/fog density, renders haze bands and rain streaks, and adds canyon-wall erosion ridges/vertical cracks.
+- Loop 10 verifier evidence:
+  - `python -m py_compile tools\scene_compiler.py tools\scene_graphics_gate.py tools\scene_quality_gate.py tools\scene_gen.py` exited 0.
+  - Release build exited 0: `[OK] Build complete in 31.1s`.
+  - Alpine `aaa_graphics_alpine_loop14` rendered VALID; quality gate exited 0 (`avg_luma=0.1352`, `cool_fraction=0.8598`, `nonblack_fraction=0.9998`); graphics gate exited 0; runtime log shows `atmospheric pass night_sky=on storm_layers=4 haze_layers=4 rain_streaks=28`.
+  - Desert canyon `aaa_graphics_desert_loop14` rendered VALID; quality gate exited 0 (`turquoise_fraction=0.4233`); graphics gate exited 0 with residual warning `weak_image_contact_metric`; runtime log shows `created cliff erosion detail ridges=18 cracks=14`.
+  - Campsite `aaa_graphics_campsite_loop14` rendered VALID; quality and graphics gates exited 0; runtime log shows fog/haze atmosphere path with `night_sky=off`.
+  - Director IR validation exited 0 for campsite/desert/alpine Loop 14 packets.
+  - Known-bad quality and graphics oracles with `--expect-fail` exited 0.
+  - Kitchen smoke `regression_kitchen_aaa_loop14` rendered VALID and quality gate exited 0 (`avg_luma=0.4634`, `nonblack_fraction=1.0`).
+- Visual inspection after Loop 10:
+  - Alpine now reads closer to night/storm with a dark sky, cabin glow, visible rain, and retained inspectability.
+  - Desert cliff details are visible as erosion/crack lines, but the wall mass is still fundamentally planar and stylized. The next front should attack mesh silhouette/asset realism or integrate higher-fidelity cliff/tree/prop assets rather than adding more line overlays.
 
 ## BLOCKED / Decisions
 

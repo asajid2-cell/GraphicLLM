@@ -217,6 +217,8 @@ def evaluate(prompt: str, ir: dict[str, Any], png: Path | None, log_text: str) -
     shot = graphics.get("shot") or {}
     material_zones = graphics.get("material_zones") or {}
     asset_fidelity = graphics.get("asset_fidelity") or {}
+    atmosphere_fidelity = graphics.get("atmosphere_fidelity") or {}
+    geometry_realism = graphics.get("geometry_realism") or {}
     lighting = graphics.get("lighting") or {}
     surface_detail = graphics.get("surface_detail") or {}
     occlusion = graphics.get("occlusion") or {}
@@ -367,6 +369,30 @@ def evaluate(prompt: str, ir: dict[str, Any], png: Path | None, log_text: str) -
                 runtime_backdrop_detail=has_runtime_backdrop_detail,
             )
 
+        if flags["moonlight"] or "storm" in prompt.lower():
+            try:
+                storm_layers = int(atmosphere_fidelity.get("storm_layer_count", 0) or 0)
+                rain_streaks = int(atmosphere_fidelity.get("rain_streak_count", 0) or 0)
+                haze_layers = int(atmosphere_fidelity.get("haze_depth_layers", 0) or 0)
+            except Exception:
+                storm_layers = rain_streaks = haze_layers = 0
+            night_control = bool(atmosphere_fidelity.get("night_sky_control"))
+            has_runtime_atmosphere = "generative_exterior: atmospheric pass" in log_text
+            if (
+                not isinstance(atmosphere_fidelity, dict)
+                or not bool(atmosphere_fidelity.get("enabled"))
+                or (flags["moonlight"] and not night_control)
+                or ("storm" in prompt.lower() and (storm_layers < 2 or rain_streaks < 12))
+                or haze_layers < 2
+                or not has_runtime_atmosphere
+            ):
+                fail(
+                    "missing_atmospheric_time_of_day",
+                    "Storm/moonlight prompt lacks authored night-sky, haze, rain, or runtime atmosphere evidence",
+                    atmosphere_fidelity=atmosphere_fidelity,
+                    runtime_atmosphere=has_runtime_atmosphere,
+                )
+
         camera_role = str(shot.get("camera_role", "") if isinstance(shot, dict) else "").lower()
         has_shot_camera_contract = ("closer" in camera_role or "balanced" in camera_role) and "hero" in camera_role
         has_runtime_shot_camera = "generative_exterior: shot camera pass" in log_text
@@ -441,8 +467,11 @@ def evaluate(prompt: str, ir: dict[str, Any], png: Path | None, log_text: str) -
                 canyon_wall_layers = int(world_geometry.get("canyon_wall_layers", 0) or 0)
                 talus_clusters = int(world_geometry.get("talus_cluster_count", 0) or 0)
                 strata_layers = int(world_geometry.get("red_rock_strata_layers", 0) or 0)
+                erosion_ridges = int(geometry_realism.get("cliff_erosion_ridge_count", 0) or 0)
+                strata_breakup = int(geometry_realism.get("strata_breakup_count", 0) or 0)
             except Exception:
                 canyon_wall_layers = talus_clusters = strata_layers = 0
+                erosion_ridges = strata_breakup = 0
             has_runtime_canyon = "generative_exterior: created canyon wall" in log_text
             if canyon_wall_layers < 4 or talus_clusters < 8 or strata_layers < 4 or not has_runtime_canyon:
                 fail(
@@ -450,6 +479,20 @@ def evaluate(prompt: str, ir: dict[str, Any], png: Path | None, log_text: str) -
                     "Canyon prompt lacks canyon-wall, talus, and red-rock strata evidence",
                     world_geometry=world_geometry,
                     runtime_canyon=has_runtime_canyon,
+                )
+            has_runtime_cliff_detail = "generative_exterior: created cliff erosion detail" in log_text
+            if (
+                not isinstance(geometry_realism, dict)
+                or not bool(geometry_realism.get("enabled"))
+                or erosion_ridges < 10
+                or strata_breakup < 8
+                or not has_runtime_cliff_detail
+            ):
+                fail(
+                    "planar_cliff_geometry",
+                    "Canyon walls still read as planar blockout geometry without erosion/strata breakup evidence",
+                    geometry_realism=geometry_realism,
+                    runtime_cliff_detail=has_runtime_cliff_detail,
                 )
 
         if flags["desert"] or flags["canyon"]:

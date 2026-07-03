@@ -203,6 +203,30 @@ def _cinematic_material_lighting_runtime(log_text: str) -> dict[str, int] | None
     return {key: int(value) for key, value in zip(keys, m.groups())}
 
 
+def _hero_asset_replacement_runtime(log_text: str) -> dict[str, int] | None:
+    m = re.search(
+        r"generative_exterior: hero asset replacement "
+        r"canvas_shell=(\d+) fabric_layers=(\d+) structural_poles=(\d+) "
+        r"rope_stakes=(\d+) low_poly_masks=(\d+) cabin_facade=(\d+) "
+        r"cabin_roof=(\d+) cabin_deck_foundation=(\d+) hero_rock_masses=(\d+)",
+        log_text,
+    )
+    if not m:
+        return None
+    keys = (
+        "canvas_shell",
+        "fabric_layers",
+        "structural_poles",
+        "rope_stakes",
+        "low_poly_masks",
+        "cabin_facade",
+        "cabin_roof",
+        "cabin_deck_foundation",
+        "hero_rock_masses",
+    )
+    return {key: int(value) for key, value in zip(keys, m.groups())}
+
+
 def _asset_counts(ir: dict[str, Any]) -> dict[str, int]:
     counts = {
         "trees": 0,
@@ -302,6 +326,7 @@ def evaluate(prompt: str, ir: dict[str, Any], png: Path | None, log_text: str) -
     renderer_shadow_occlusion_budget = graphics.get("renderer_shadow_occlusion_budget") or {}
     authored_scene_module = graphics.get("authored_scene_module") or {}
     cinematic_material_lighting = graphics.get("cinematic_material_lighting") or {}
+    hero_asset_replacement = graphics.get("hero_asset_replacement") or {}
     image = _image_metrics(png)
 
     failures: list[dict[str, Any]] = []
@@ -867,6 +892,66 @@ def evaluate(prompt: str, ir: dict[str, Any], png: Path | None, log_text: str) -
                 normal_detail_scale=normal_detail_scale,
                 runtime_cinematic_material_lighting=runtime_cinematic,
                 runtime_cinematic_material_lighting_ok=runtime_cinematic_ok,
+            )
+
+        try:
+            canvas_shell = int(hero_asset_replacement.get("canvas_shell_panel_count", 0) or 0)
+            fabric_layers = int(hero_asset_replacement.get("fabric_layer_count", 0) or 0)
+            structural_poles = int(hero_asset_replacement.get("structural_pole_count", 0) or 0)
+            rope_stakes = int(hero_asset_replacement.get("rope_stake_count", 0) or 0)
+            low_poly_masks = int(hero_asset_replacement.get("low_poly_mask_count", 0) or 0)
+            cabin_facade = int(hero_asset_replacement.get("cabin_facade_module_count", 0) or 0)
+            cabin_roof = int(hero_asset_replacement.get("cabin_roof_module_count", 0) or 0)
+            cabin_deck_foundation = int(hero_asset_replacement.get("cabin_deck_foundation_count", 0) or 0)
+            hero_rock_masses = int(hero_asset_replacement.get("hero_rock_mass_count", 0) or 0)
+        except Exception:
+            canvas_shell = fabric_layers = structural_poles = rope_stakes = low_poly_masks = 0
+            cabin_facade = cabin_roof = cabin_deck_foundation = hero_rock_masses = 0
+        runtime_replacement = _hero_asset_replacement_runtime(log_text)
+        runtime_replacement_ok = isinstance(runtime_replacement, dict)
+        if runtime_replacement_ok:
+            if flags["campsite"]:
+                runtime_replacement_ok = (
+                    runtime_replacement.get("canvas_shell", 0) >= 10
+                    and runtime_replacement.get("fabric_layers", 0) >= 10
+                    and runtime_replacement.get("structural_poles", 0) >= 6
+                    and runtime_replacement.get("rope_stakes", 0) >= 8
+                    and runtime_replacement.get("low_poly_masks", 0) >= 2
+                )
+            if "cabin" in prompt.lower():
+                runtime_replacement_ok = runtime_replacement_ok and (
+                    runtime_replacement.get("cabin_facade", 0) >= 12
+                    and runtime_replacement.get("cabin_roof", 0) >= 6
+                    and runtime_replacement.get("cabin_deck_foundation", 0) >= 6
+                )
+            if canyon_prompt:
+                runtime_replacement_ok = runtime_replacement_ok and runtime_replacement.get("hero_rock_masses", 0) >= 8
+            if not (flags["campsite"] or "cabin" in prompt.lower() or canyon_prompt):
+                runtime_replacement_ok = sum(runtime_replacement.values()) >= 8
+        if (
+            not isinstance(hero_asset_replacement, dict)
+            or not bool(hero_asset_replacement.get("enabled"))
+            or (flags["campsite"] and (canvas_shell < 10 or fabric_layers < 10 or structural_poles < 6 or rope_stakes < 8 or low_poly_masks < 2))
+            or ("cabin" in prompt.lower() and (cabin_facade < 12 or cabin_roof < 6 or cabin_deck_foundation < 6))
+            or (canyon_prompt and hero_rock_masses < 8)
+            or (not (flags["campsite"] or "cabin" in prompt.lower() or canyon_prompt) and (canvas_shell + fabric_layers + cabin_facade + hero_rock_masses) < 8)
+            or not runtime_replacement_ok
+        ):
+            fail(
+                "missing_hero_asset_replacement",
+                "Generated exterior still lacks dominant hero asset replacement/overbuild for low-poly tent, cabin, or canyon forms",
+                hero_asset_replacement=hero_asset_replacement,
+                canvas_shell_panel_count=canvas_shell,
+                fabric_layer_count=fabric_layers,
+                structural_pole_count=structural_poles,
+                rope_stake_count=rope_stakes,
+                low_poly_mask_count=low_poly_masks,
+                cabin_facade_module_count=cabin_facade,
+                cabin_roof_module_count=cabin_roof,
+                cabin_deck_foundation_count=cabin_deck_foundation,
+                hero_rock_mass_count=hero_rock_masses,
+                runtime_hero_asset_replacement=runtime_replacement,
+                runtime_hero_asset_replacement_ok=runtime_replacement_ok,
             )
 
         if flags["moonlight"] or "storm" in prompt.lower():

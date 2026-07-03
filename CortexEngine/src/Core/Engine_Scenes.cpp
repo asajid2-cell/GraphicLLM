@@ -225,6 +225,19 @@ namespace {
         int heroAnchorCount = 0;
     };
 
+    struct GenerativeHeroAssetReplacement {
+        bool enabled = false;
+        int canvasShellPanelCount = 0;
+        int fabricLayerCount = 0;
+        int structuralPoleCount = 0;
+        int ropeStakeCount = 0;
+        int lowPolyMaskCount = 0;
+        int cabinFacadeModuleCount = 0;
+        int cabinRoofModuleCount = 0;
+        int cabinDeckFoundationCount = 0;
+        int heroRockMassCount = 0;
+    };
+
     struct GenerativeRendererShadowOcclusionBudget {
         bool enabled = false;
         bool rendererSSAO = false;
@@ -3408,6 +3421,7 @@ void Engine::BuildRecipeScene() {
         GenerativeHeroEnvironmentGeometry heroEnvironmentGeometry;
         GenerativeTextureMaterialFidelity textureMaterialFidelity;
         GenerativeSourceGeometryFidelity sourceGeometryFidelity;
+        GenerativeHeroAssetReplacement heroAssetReplacement;
         GenerativeRendererShadowOcclusionBudget rendererShadowOcclusionBudget;
         GenerativeCinematicMaterialLighting cinematicMaterialLighting;
         GenerativeAtmosphereFidelity atmosphereFidelity;
@@ -3688,6 +3702,26 @@ void Engine::BuildRecipeScene() {
                     static_cast<int>(std::clamp(num(sourceGeometryFidelity, "scanned_anchor_rock_count", 0.0f), 0.0f, 10.0f));
                 genExt.sourceGeometryFidelity.heroAnchorCount =
                     static_cast<int>(std::clamp(num(sourceGeometryFidelity, "hero_anchor_count", 0.0f), 0.0f, 16.0f));
+                const nlohmann::json heroAssetReplacement = graphics.value("hero_asset_replacement", nlohmann::json::object());
+                genExt.heroAssetReplacement.enabled = heroAssetReplacement.value("enabled", false);
+                genExt.heroAssetReplacement.canvasShellPanelCount =
+                    static_cast<int>(std::clamp(num(heroAssetReplacement, "canvas_shell_panel_count", 0.0f), 0.0f, 32.0f));
+                genExt.heroAssetReplacement.fabricLayerCount =
+                    static_cast<int>(std::clamp(num(heroAssetReplacement, "fabric_layer_count", 0.0f), 0.0f, 40.0f));
+                genExt.heroAssetReplacement.structuralPoleCount =
+                    static_cast<int>(std::clamp(num(heroAssetReplacement, "structural_pole_count", 0.0f), 0.0f, 24.0f));
+                genExt.heroAssetReplacement.ropeStakeCount =
+                    static_cast<int>(std::clamp(num(heroAssetReplacement, "rope_stake_count", 0.0f), 0.0f, 32.0f));
+                genExt.heroAssetReplacement.lowPolyMaskCount =
+                    static_cast<int>(std::clamp(num(heroAssetReplacement, "low_poly_mask_count", 0.0f), 0.0f, 16.0f));
+                genExt.heroAssetReplacement.cabinFacadeModuleCount =
+                    static_cast<int>(std::clamp(num(heroAssetReplacement, "cabin_facade_module_count", 0.0f), 0.0f, 48.0f));
+                genExt.heroAssetReplacement.cabinRoofModuleCount =
+                    static_cast<int>(std::clamp(num(heroAssetReplacement, "cabin_roof_module_count", 0.0f), 0.0f, 32.0f));
+                genExt.heroAssetReplacement.cabinDeckFoundationCount =
+                    static_cast<int>(std::clamp(num(heroAssetReplacement, "cabin_deck_foundation_count", 0.0f), 0.0f, 32.0f));
+                genExt.heroAssetReplacement.heroRockMassCount =
+                    static_cast<int>(std::clamp(num(heroAssetReplacement, "hero_rock_mass_count", 0.0f), 0.0f, 32.0f));
                 const nlohmann::json atmosphereFidelity = graphics.value("atmosphere_fidelity", nlohmann::json::object());
                 genExt.atmosphereFidelity.enabled = atmosphereFidelity.value("enabled", false);
                 genExt.atmosphereFidelity.nightSkyControl = atmosphereFidelity.value("night_sky_control", false);
@@ -7534,6 +7568,457 @@ void Engine::BuildRecipeScene() {
                              shorelineProps,
                              treeSilhouettes,
                              genExt.heroEnvironmentGeometry.supportPropCount);
+            }
+        }
+    }
+
+    if (genExt.valid && genExt.heroAssetReplacement.enabled) {
+        if (auto* renderer = m_renderer.get()) {
+            auto cubeMesh = Utils::MeshGenerator::CreateCube();
+            auto cylinderMesh = Utils::MeshGenerator::CreateCylinder(0.5f, 1.0f, 24);
+            auto shardMesh = CreateGenerativeRockShardMesh(44.17f);
+            auto tentShellMesh = CreateGenerativeGableRoofMesh(2.95f, 2.85f, 1.34f);
+            auto cabinRoofMesh = CreateGenerativeGableRoofMesh(4.55f, 3.82f, 1.34f);
+
+            const auto upCube = renderer->UploadMesh(cubeMesh);
+            const auto upCylinder = renderer->UploadMesh(cylinderMesh);
+            const auto upShard = renderer->UploadMesh(shardMesh);
+            const auto upTentShell = renderer->UploadMesh(tentShellMesh);
+            const auto upCabinRoof = renderer->UploadMesh(cabinRoofMesh);
+            if (upCube.IsErr() || upCylinder.IsErr() || upShard.IsErr()) {
+                spdlog::warn("generative_exterior: hero replacement mesh upload failed cube='{}' cylinder='{}' shard='{}'",
+                             upCube.IsErr() ? upCube.Error() : "ok",
+                             upCylinder.IsErr() ? upCylinder.Error() : "ok",
+                             upShard.IsErr() ? upShard.Error() : "ok");
+            } else {
+                auto addReplacement = [&](const std::string& tag,
+                                          const std::shared_ptr<Scene::MeshData>& mesh,
+                                          const glm::vec3& position,
+                                          const glm::vec3& scale,
+                                          const glm::vec3& euler,
+                                          const glm::vec4& color,
+                                          const char* preset,
+                                          const char* textureId,
+                                          float roughness,
+                                          float normalScale,
+                                          float occlusion = 0.58f) {
+                    entt::entity e = m_registry->CreateEntity();
+                    m_registry->AddComponent<Scene::TagComponent>(e, tag);
+                    auto& t = m_registry->AddComponent<TransformComponent>(e);
+                    t.position = position;
+                    t.scale = scale;
+                    t.rotation = glm::quat(euler);
+                    auto& r = m_registry->AddComponent<Scene::RenderableComponent>(e);
+                    r.mesh = mesh;
+                    r.albedoColor = color;
+                    r.metallic = 0.0f;
+                    r.roughness = roughness;
+                    r.ao = 0.94f;
+                    r.occlusionStrength = occlusion;
+                    r.normalScale = normalScale;
+                    r.proceduralMaskStrength = 0.54f;
+                    r.wetnessFactor = genExt.groundWetness * 0.18f;
+                    r.clearcoatFactor = 0.04f;
+                    r.clearcoatRoughnessFactor = 0.68f;
+                    r.specularFactor = 0.24f;
+                    r.anisotropyStrength = 0.18f;
+                    r.sheenWeight = std::string(preset ? preset : "") == "fabric" ? 0.24f : 0.06f;
+                    r.doubleSided = true;
+                    r.presetName = preset ? preset : "";
+                    if (textureId && textureId[0]) {
+                        applyGeneratedTextureMaterial(r, textureId, true, false);
+                    }
+                    return e;
+                };
+                auto pseudo = [](int i, float salt) {
+                    const float n = std::sin(static_cast<float>(i) * 17.371f + salt * 43.117f) * 21942.123f;
+                    return n - std::floor(n);
+                };
+
+                int canvasShell = 0;
+                int fabricLayers = 0;
+                int structuralPoles = 0;
+                int ropeStakes = 0;
+                int lowPolyMasks = 0;
+                int cabinFacade = 0;
+                int cabinRoof = 0;
+                int cabinDeckFoundation = 0;
+                int heroRockMasses = 0;
+
+                if (genExt.heroAssetReplacement.canvasShellPanelCount > 0 && !upTentShell.IsErr()) {
+                    const glm::vec3 tentCenter(2.9f, 0.0f, 0.9f);
+                    const float tentYaw = glm::radians(-18.0f);
+                    const float cs = std::cos(tentYaw);
+                    const float sn = std::sin(tentYaw);
+                    auto tentPlace = [&](float x, float y, float z) -> glm::vec3 {
+                        return tentCenter + glm::vec3(cs * x + sn * z, y, -sn * x + cs * z);
+                    };
+                    const glm::vec4 deepCanvas(0.155f, 0.110f, 0.080f, 1.0f);
+                    const glm::vec4 warmCanvas(0.245f, 0.160f, 0.098f, 1.0f);
+                    const glm::vec4 edgeCanvas(0.095f, 0.075f, 0.058f, 1.0f);
+                    const glm::vec4 ropeColor(0.62f, 0.46f, 0.30f, 1.0f);
+                    const glm::vec4 poleColor(0.16f, 0.105f, 0.060f, 1.0f);
+
+                    addReplacement("GenerativeExterior_HeroReplacement_TentShellMain",
+                                   tentShellMesh,
+                                   tentPlace(0.0f, 0.14f, -0.04f),
+                                   glm::vec3(1.0f),
+                                   glm::vec3(0.0f, tentYaw, 0.0f),
+                                   deepCanvas,
+                                   "fabric",
+                                   "fabric",
+                                   0.82f,
+                                   0.72f,
+                                   0.72f);
+                    canvasShell++;
+
+                    for (int i = 0; i < genExt.heroAssetReplacement.lowPolyMaskCount; ++i) {
+                        const int mode = i % 5;
+                        const float side = (mode % 2 == 0) ? -1.0f : 1.0f;
+                        const float z = -0.92f + 0.46f * static_cast<float>(i / 2);
+                        addReplacement("GenerativeExterior_HeroReplacement_TentMask" + std::to_string(i),
+                                       cubeMesh,
+                                       mode < 4 ? tentPlace(side * 1.16f, 0.40f, z) : tentPlace(0.0f, 0.56f, 1.36f),
+                                       mode < 4 ? glm::vec3(0.095f, 0.66f, 0.56f) : glm::vec3(1.18f, 0.76f, 0.075f),
+                                       mode < 4
+                                           ? glm::vec3(0.0f, tentYaw, glm::radians(side * -28.0f))
+                                           : glm::vec3(glm::radians(3.0f), tentYaw, 0.0f),
+                                       mode < 4 ? edgeCanvas : deepCanvas,
+                                       "fabric",
+                                       "fabric",
+                                       0.86f,
+                                       0.68f,
+                                       0.68f);
+                        lowPolyMasks++;
+                    }
+
+                    const int panelTarget = std::max(0, genExt.heroAssetReplacement.canvasShellPanelCount - canvasShell);
+                    for (int i = 0; i < panelTarget; ++i) {
+                        const float side = (i % 2 == 0) ? -1.0f : 1.0f;
+                        const int row = (i / 2) % 4;
+                        const float z = -1.03f + 0.42f * static_cast<float>((i / 8) % 6);
+                        const float y = 0.45f + 0.15f * static_cast<float>(row);
+                        addReplacement("GenerativeExterior_HeroReplacement_TentCanvasPanel" + std::to_string(i),
+                                       cubeMesh,
+                                       tentPlace(side * (0.82f + 0.055f * static_cast<float>(row)), y, z),
+                                       glm::vec3(0.040f, 0.27f + 0.025f * static_cast<float>(row), 0.31f),
+                                       glm::vec3(glm::radians(-1.5f + pseudo(i, 14.1f) * 3.0f),
+                                                 tentYaw,
+                                                 glm::radians(side * -32.0f)),
+                                       (i % 3 == 0) ? warmCanvas : deepCanvas,
+                                       "fabric",
+                                       "fabric",
+                                       0.80f,
+                                       0.66f,
+                                       0.70f);
+                        canvasShell++;
+                    }
+
+                    for (int i = 0; i < genExt.heroAssetReplacement.fabricLayerCount; ++i) {
+                        const int mode = i % 4;
+                        const float side = (i % 2 == 0) ? -1.0f : 1.0f;
+                        if (mode == 0) {
+                            addReplacement("GenerativeExterior_HeroReplacement_TentRidgeSeam" + std::to_string(i),
+                                           cylinderMesh,
+                                           tentPlace(0.0f, 1.50f + 0.006f * static_cast<float>(i / 4), -0.08f),
+                                           glm::vec3(0.035f, 2.88f, 0.035f),
+                                           glm::vec3(glm::radians(90.0f), tentYaw, 0.0f),
+                                           edgeCanvas,
+                                           "fabric",
+                                           "fabric",
+                                           0.86f,
+                                           0.58f,
+                                           0.70f);
+                        } else {
+                            const float z = -1.18f + 0.34f * static_cast<float>((i / 4) % 8);
+                            addReplacement("GenerativeExterior_HeroReplacement_TentWrinkle" + std::to_string(i),
+                                           cubeMesh,
+                                           tentPlace(side * (0.72f + 0.055f * static_cast<float>(mode)), 0.54f + 0.16f * static_cast<float>(mode), z),
+                                           glm::vec3(0.030f, 0.035f, 0.42f),
+                                           glm::vec3(glm::radians(-2.0f + pseudo(i, 15.3f) * 4.0f),
+                                                     tentYaw + glm::radians(side * 1.5f),
+                                                     glm::radians(side * -30.0f)),
+                                           (i % 5 == 0) ? warmCanvas : edgeCanvas,
+                                           "fabric",
+                                           "fabric",
+                                           0.88f,
+                                           0.60f,
+                                           0.68f);
+                        }
+                        fabricLayers++;
+                    }
+
+                    for (int i = 0; i < genExt.heroAssetReplacement.structuralPoleCount; ++i) {
+                        const int mode = i % 5;
+                        const float side = (i % 2 == 0) ? -1.0f : 1.0f;
+                        if (mode == 0) {
+                            addReplacement("GenerativeExterior_HeroReplacement_TentRidgePole" + std::to_string(i),
+                                           cylinderMesh,
+                                           tentPlace(0.0f, 1.44f, -0.05f),
+                                           glm::vec3(0.042f, 3.12f, 0.042f),
+                                           glm::vec3(glm::radians(90.0f), tentYaw, 0.0f),
+                                           poleColor,
+                                           "wood",
+                                           "wood",
+                                           0.78f,
+                                           0.44f,
+                                           0.56f);
+                        } else {
+                            const float z = (mode < 3) ? -1.34f : 1.34f;
+                            addReplacement("GenerativeExterior_HeroReplacement_TentAFramePole" + std::to_string(i),
+                                           cylinderMesh,
+                                           tentPlace(side * 0.78f, 0.70f, z),
+                                           glm::vec3(0.038f, 1.48f, 0.038f),
+                                           glm::vec3(glm::radians(side * 11.0f),
+                                                     tentYaw,
+                                                     glm::radians(side * -22.0f)),
+                                           poleColor,
+                                           "wood",
+                                           "wood",
+                                           0.78f,
+                                           0.44f,
+                                           0.56f);
+                        }
+                        structuralPoles++;
+                    }
+
+                    for (int i = 0; i < genExt.heroAssetReplacement.ropeStakeCount; ++i) {
+                        const float side = (i % 2 == 0) ? -1.0f : 1.0f;
+                        const float lane = static_cast<float>((i / 2) % 4);
+                        const bool stake = (i % 3 == 0);
+                        addReplacement("GenerativeExterior_HeroReplacement_TentRopeStake" + std::to_string(i),
+                                       cylinderMesh,
+                                       tentPlace(side * (1.42f + 0.14f * lane),
+                                                 stake ? 0.09f : 0.32f,
+                                                 -1.18f + 0.76f * lane),
+                                       stake ? glm::vec3(0.030f, 0.26f, 0.030f) : glm::vec3(0.018f, 0.92f, 0.018f),
+                                       stake
+                                           ? glm::vec3(glm::radians(8.0f), tentYaw + glm::radians(side * 8.0f), glm::radians(side * 10.0f))
+                                           : glm::vec3(glm::radians(70.0f), tentYaw + glm::radians(side * 22.0f), glm::radians(side * 12.0f)),
+                                       stake ? poleColor : ropeColor,
+                                       stake ? "wood" : "fabric",
+                                       stake ? "wood" : "fabric",
+                                       stake ? 0.82f : 0.74f,
+                                       stake ? 0.36f : 0.42f,
+                                       0.58f);
+                        ropeStakes++;
+                    }
+
+                    AddAssetLedPointLight(*m_registry,
+                                          "GenerativeExterior_HeroReplacement_TentInteriorGlow",
+                                          tentPlace(-0.10f, 0.54f, 0.42f),
+                                          glm::vec3(1.0f, 0.40f, 0.16f),
+                                          1.4f,
+                                          3.5f);
+                }
+
+                if ((genExt.heroAssetReplacement.cabinFacadeModuleCount > 0 ||
+                     genExt.heroAssetReplacement.cabinRoofModuleCount > 0 ||
+                     genExt.heroAssetReplacement.cabinDeckFoundationCount > 0) &&
+                    !genExt.structures.empty()) {
+                    const auto& structure = genExt.structures.front();
+                    const float yawRad = glm::radians(structure.yawDeg);
+                    const float cs = std::cos(yawRad);
+                    const float sn = std::sin(yawRad);
+                    auto place = [&](float x, float y, float z) -> glm::vec3 {
+                        return structure.position + glm::vec3(cs * x + sn * z,
+                                                              y,
+                                                              -sn * x + cs * z);
+                    };
+                    const float w = structure.widthM;
+                    const float d = structure.depthM;
+                    const float h = structure.wallHeightM;
+                    const float frontZ = d * 0.5f + 0.24f;
+                    const glm::vec4 deepWood(0.13f, 0.075f, 0.040f, 1.0f);
+                    const glm::vec4 faceWood(0.28f, 0.17f, 0.085f, 1.0f);
+                    const glm::vec4 paleEdge(0.42f, 0.28f, 0.15f, 1.0f);
+                    const glm::vec4 roofDark(0.052f, 0.044f, 0.040f, 1.0f);
+                    const glm::vec4 stone(0.15f, 0.13f, 0.11f, 1.0f);
+
+                    for (int i = 0; i < genExt.heroAssetReplacement.cabinFacadeModuleCount; ++i) {
+                        const int mode = i % 6;
+                        if (mode < 3) {
+                            const float row = static_cast<float>((i / 6) % 7);
+                            addReplacement("GenerativeExterior_HeroReplacement_CabinSiding" + std::to_string(i),
+                                           cubeMesh,
+                                           place(0.0f, 0.34f + row * h * 0.105f, frontZ + 0.070f),
+                                           glm::vec3(w + 0.22f, 0.036f, 0.060f),
+                                           glm::vec3(0.0f, yawRad, 0.0f),
+                                           (i % 2 == 0) ? faceWood : deepWood,
+                                           "wood",
+                                           "wood",
+                                           0.82f,
+                                           0.60f,
+                                           0.58f);
+                        } else if (mode == 3) {
+                            const float side = (i % 2 == 0) ? -1.0f : 1.0f;
+                            addReplacement("GenerativeExterior_HeroReplacement_CabinCornerLog" + std::to_string(i),
+                                           cylinderMesh,
+                                           place(side * (w * 0.53f), h * 0.54f, frontZ + 0.115f),
+                                           glm::vec3(0.075f, h * 1.02f, 0.075f),
+                                           glm::vec3(0.0f, yawRad, glm::radians(side * 2.5f)),
+                                           deepWood,
+                                           "wood",
+                                           "wood",
+                                           0.84f,
+                                           0.58f,
+                                           0.56f);
+                        } else if (mode == 4) {
+                            const float sx = (i % 4 < 2) ? -0.38f : 0.36f;
+                            addReplacement("GenerativeExterior_HeroReplacement_CabinWindowFrame" + std::to_string(i),
+                                           cubeMesh,
+                                           place(sx, h * 0.64f, frontZ + 0.150f),
+                                           glm::vec3(0.46f, 0.38f, 0.060f),
+                                           glm::vec3(0.0f, yawRad, 0.0f),
+                                           paleEdge,
+                                           "wood",
+                                           "wood",
+                                           0.70f,
+                                           0.46f,
+                                           0.54f);
+                        } else {
+                            addReplacement("GenerativeExterior_HeroReplacement_CabinDoorFrame" + std::to_string(i),
+                                           cubeMesh,
+                                           place(-w * 0.22f, 0.66f, frontZ + 0.160f),
+                                           glm::vec3(w * 0.34f, h * 0.74f, 0.070f),
+                                           glm::vec3(0.0f, yawRad, 0.0f),
+                                           deepWood,
+                                           "wood",
+                                           "wood",
+                                           0.82f,
+                                           0.54f,
+                                           0.56f);
+                        }
+                        cabinFacade++;
+                    }
+
+                    if (genExt.heroAssetReplacement.cabinRoofModuleCount > 0 && !upCabinRoof.IsErr()) {
+                        addReplacement("GenerativeExterior_HeroReplacement_CabinRoofShell",
+                                       cabinRoofMesh,
+                                       place(0.0f, h + 0.06f, 0.0f),
+                                       glm::vec3(1.0f),
+                                       glm::vec3(0.0f, yawRad, 0.0f),
+                                       roofDark,
+                                       "wood",
+                                       "wood",
+                                       0.90f,
+                                       0.62f,
+                                       0.54f);
+                        cabinRoof++;
+                    }
+                    for (int i = cabinRoof; i < genExt.heroAssetReplacement.cabinRoofModuleCount; ++i) {
+                        const float side = (i % 2 == 0) ? -1.0f : 1.0f;
+                        const float row = static_cast<float>((i / 2) % 5);
+                        addReplacement("GenerativeExterior_HeroReplacement_CabinRoofShingle" + std::to_string(i),
+                                       cubeMesh,
+                                       place(side * (0.42f + row * 0.21f), h + structure.roofHeightM * (0.34f + row * 0.055f), -d * 0.28f + row * 0.28f),
+                                       glm::vec3(0.72f, 0.045f, 0.30f),
+                                       glm::vec3(glm::radians(side * -7.0f),
+                                                 yawRad,
+                                                 glm::radians(side * -18.0f)),
+                                       (i % 3 == 0) ? deepWood : roofDark,
+                                       "wood",
+                                       "wood",
+                                       0.92f,
+                                       0.60f,
+                                       0.55f);
+                        cabinRoof++;
+                    }
+
+                    for (int i = 0; i < genExt.heroAssetReplacement.cabinDeckFoundationCount; ++i) {
+                        const int mode = i % 4;
+                        if (mode == 0) {
+                            addReplacement("GenerativeExterior_HeroReplacement_CabinDeckPlank" + std::to_string(i),
+                                           cubeMesh,
+                                           place(-w * 0.34f + static_cast<float>((i / 4) % 5) * w * 0.17f, 0.14f, d * 0.5f + 0.80f),
+                                           glm::vec3(0.12f, 0.090f, 1.04f),
+                                           glm::vec3(0.0f, yawRad, 0.0f),
+                                           faceWood,
+                                           "wood",
+                                           "wood",
+                                           0.86f,
+                                           0.52f,
+                                           0.58f);
+                        } else if (mode == 1) {
+                            addReplacement("GenerativeExterior_HeroReplacement_CabinDeckBeam" + std::to_string(i),
+                                           cubeMesh,
+                                           place(0.0f, 0.25f, d * 0.5f + 1.30f + 0.12f * static_cast<float>((i / 4) % 2)),
+                                           glm::vec3(w * 0.76f, 0.090f, 0.080f),
+                                           glm::vec3(0.0f, yawRad, 0.0f),
+                                           deepWood,
+                                           "wood",
+                                           "wood",
+                                           0.86f,
+                                           0.50f,
+                                           0.58f);
+                        } else if (mode == 2) {
+                            const float side = (i % 2 == 0) ? -1.0f : 1.0f;
+                            addReplacement("GenerativeExterior_HeroReplacement_CabinPorchPost" + std::to_string(i),
+                                           cylinderMesh,
+                                           place(side * w * 0.40f, 0.62f, d * 0.5f + 0.92f),
+                                           glm::vec3(0.052f, 0.96f, 0.052f),
+                                           glm::vec3(0.0f, yawRad, 0.0f),
+                                           deepWood,
+                                           "wood",
+                                           "wood",
+                                           0.82f,
+                                           0.48f,
+                                           0.58f);
+                        } else {
+                            addReplacement("GenerativeExterior_HeroReplacement_CabinFoundationStone" + std::to_string(i),
+                                           shardMesh,
+                                           place(-w * 0.42f + static_cast<float>((i / 4) % 6) * w * 0.16f, 0.10f, d * 0.5f + 0.34f),
+                                           glm::vec3(0.22f, 0.16f, 0.20f),
+                                           glm::vec3(glm::radians(-3.0f + pseudo(i, 16.1f) * 6.0f),
+                                                     yawRad + glm::radians(18.0f * static_cast<float>(i % 5)),
+                                                     glm::radians(-5.0f + pseudo(i, 16.7f) * 10.0f)),
+                                           stone,
+                                           "masonry",
+                                           "rock",
+                                           0.90f,
+                                           0.66f,
+                                           0.54f);
+                        }
+                        cabinDeckFoundation++;
+                    }
+                }
+
+                if (genExt.heroAssetReplacement.heroRockMassCount > 0) {
+                    const bool canyonModule = genExt.authoredSceneModule.moduleId == "desert_canyon_river";
+                    const float shoreZ = genExt.waterOn ? (genExt.waterFromZ + 0.35f) : -genExt.extent * 0.34f;
+                    for (int i = 0; i < genExt.heroAssetReplacement.heroRockMassCount; ++i) {
+                        const float side = (i % 2 == 0) ? -1.0f : 1.0f;
+                        const float lane = static_cast<float>((i / 2) % 6);
+                        const float x = side * (canyonModule ? (genExt.extent * 0.34f + 0.30f * lane) : (4.6f + 0.42f * lane));
+                        const float z = shoreZ - 0.25f - 1.05f * lane;
+                        const float s = 0.54f + 0.10f * static_cast<float>(i % 4);
+                        addReplacement("GenerativeExterior_HeroReplacement_RockMass" + std::to_string(i),
+                                       shardMesh,
+                                       glm::vec3(x, 0.18f + 0.035f * static_cast<float>(i % 3), z),
+                                       glm::vec3(s * 1.35f, s * 0.78f, s * 1.05f),
+                                       glm::vec3(glm::radians(-5.0f + pseudo(i, 17.3f) * 10.0f),
+                                                 glm::radians(side * (18.0f + 27.0f * lane)),
+                                                 glm::radians(side * (3.0f + pseudo(i, 17.9f) * 8.0f))),
+                                       canyonModule ? glm::vec4(0.42f, 0.20f, 0.105f, 1.0f) : glm::vec4(0.15f, 0.14f, 0.12f, 1.0f),
+                                       "masonry",
+                                       canyonModule ? "rock_cliff" : "rock",
+                                       0.88f,
+                                       0.78f,
+                                       0.52f);
+                        heroRockMasses++;
+                    }
+                }
+
+                spdlog::info("generative_exterior: hero asset replacement canvas_shell={} fabric_layers={} structural_poles={} rope_stakes={} low_poly_masks={} cabin_facade={} cabin_roof={} cabin_deck_foundation={} hero_rock_masses={}",
+                             canvasShell,
+                             fabricLayers,
+                             structuralPoles,
+                             ropeStakes,
+                             lowPolyMasks,
+                             cabinFacade,
+                             cabinRoof,
+                             cabinDeckFoundation,
+                             heroRockMasses);
             }
         }
     }

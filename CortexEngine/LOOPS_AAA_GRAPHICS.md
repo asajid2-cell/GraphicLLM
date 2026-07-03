@@ -624,6 +624,26 @@ Status: running
   - Kitchen smoke `regression_kitchen_aaa_loop22` quality green (`avg_luma=0.479`, `nonblack_fraction=1.0`).
   - Known-bad quality oracle `gen_a_foggy_mountain_campsite_beside_0` still fails with the fridge/missing-ridge/focal/purple-water failures. Known-bad graphics oracle `v3_campsite_ridge_test_0` still fails and now includes `missing_cinematic_material_lighting_pass`.
   - Visual residual: this pass improves material/contact depth and removes the first-pass artifacts, but the outputs are still not AAA. The next loop must attack hero asset replacement/source silhouette quality, especially the low-poly orange tent and simple camp/cabin props.
+- Loop 23 contract:
+  - Invariant: generated exteriors must replace or visibly overbuild the dominant low-poly hero silhouettes instead of merely decorating them.
+  - Entry: Loop 22 artifacts exist and current build is green on `main` at `0a6b567`.
+  - Scope in: `tools/scene_compiler.py`, `tools/scene_graphics_gate.py`, `src/Core/Engine_Scenes.cpp`, campaign ledgers.
+  - Scope out: weakening `tools/scene_quality_gate.py`, forcing generated DXR by default, parallel render validation, broad asset-import rewrites.
+  - Verifier: first make `scene_graphics_gate.py` reject Loop 22 campsite/desert/alpine with `missing_hero_asset_replacement`; then require new IR/runtime evidence and run Python compile, Release build, sequential campsite/desert/alpine renders, quality gates, graphics gates, Director validation, known-bad oracles, and kitchen smoke.
+  - Exit: verifier green on novel prompts plus visual inspection confirms the tent/cabin/canyon dominant shapes are materially changed; final AAA call remains `HUMAN-GATE`.
+  - Escape: stop if replacement geometry becomes obvious blocking cards, hides water/color/focal subjects, destabilizes captures, or just adds more disconnected clutter.
+- Loop 23 verifier evidence:
+  - Heartbeat proof: `node Z:\328\CMPUT328-A2\codexworks\301\heartbeat\bin\hb.mjs wait --label aaa-loop23-proof --timeout 1 --poll 1` fired by timeout after 1s.
+  - Red proof: `aaa_cinematic_campsite_loop22c`, `aaa_cinematic_desert_loop22c`, and `aaa_cinematic_alpine_loop22c` fail the strengthened graphics gate with only `missing_hero_asset_replacement`.
+  - Implementation: `tools/scene_compiler.py` emits `graphics_pass.hero_asset_replacement`; `tools/scene_graphics_gate.py` requires IR/runtime evidence; `src\Core\Engine_Scenes.cpp` builds a dominant canvas tent shell with fabric layers/poles/ropes/masking panels, cabin facade/roof/deck/foundation overbuild, and canyon hero rock masses.
+  - Visual correction: first `loop23` artifacts passed gates but the tent replacement read as a flat black triangle. Final `loop23b` increased canvas albedo and AO response before checkpointing.
+  - Build/regression: Python compile green; final Release rebuild green (`[OK] Build complete in 40.3s`); `git diff --check` green except CRLF warnings.
+  - Final campsite `aaa_hero_replace_campsite_loop23b` quality green (`purple_fraction=0.8792`), graphics green (`dark_contact_fraction=0.023`, `dark_contact_area_fraction=0.341`), Director validation green, runtime `canvas_shell=16 fabric_layers=18 structural_poles=10 rope_stakes=14 low_poly_masks=5 cabin_facade=0 cabin_roof=0 cabin_deck_foundation=0 hero_rock_masses=0`.
+  - Final desert `aaa_hero_replace_desert_loop23b` quality green (`turquoise_fraction=0.4158`), graphics green (`dark_contact_area_fraction=0.189`), Director validation green, runtime `canvas_shell=16 fabric_layers=18 structural_poles=10 rope_stakes=14 low_poly_masks=5 hero_rock_masses=12`.
+  - Final alpine `aaa_hero_replace_alpine_loop23b` quality green (`avg_luma=0.1164`, `cool_fraction=0.9058`), graphics green (`dark_contact_fraction=0.0246`, `dark_contact_area_fraction=0.801`), Director validation green, runtime `cabin_facade=18 cabin_roof=10 cabin_deck_foundation=12`.
+  - Kitchen smoke `regression_kitchen_aaa_loop23b` quality green (`avg_luma=0.4177`, `nonblack_fraction=1.0`).
+  - Known-bad quality oracle `gen_a_foggy_mountain_campsite_beside_0` still fails with the fridge/missing-ridge/focal/purple-water failures. Known-bad graphics oracle `v3_campsite_ridge_test_0` still fails and now includes `missing_hero_asset_replacement`.
+  - Visual residual: the replacement pass changes the dominant tent/cabin forms, but the campsite/desert frames still read cluttered, disconnected, and game-kit-like. Next loop should attack cohesive staging/pruning and shot composition rather than adding more detail geometry.
 - Image metrics alone cannot certify AAA quality; this loop uses them only to catch obvious flat/blockout failures and relies on runtime evidence for deterministic features.
 - Generated validation renders now intentionally use SSAO/SSR/shadows instead of forced DXR. Re-enable DXR only behind a separate density/BLAS budget gate.
 - Objective graphics gates are green, but visual inspection still shows asset/shot-fidelity limits: low-poly tree silhouettes, generic canyon composition, and remaining stage-like flatness. This is the next asset-fidelity front, not a blocker for this graphics-pass checkpoint.

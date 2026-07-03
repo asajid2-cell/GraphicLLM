@@ -738,6 +738,31 @@ def compile_v3_to_v2(v3: dict[str, Any]) -> dict[str, Any]:
                 "prompt_hero_source_mesh_anchors",
             ],
         },
+        "hero_asset_replacement": {
+            "enabled": True,
+            "replacement_family": "canvas_camp_overbuild" if campsite else (
+                "cabin_facade_overbuild" if cabin else (
+                    "canyon_hero_massing" if canyon else "landscape_hero_overbuild"
+                )
+            ),
+            "canvas_shell_panel_count": 16 if campsite else 0,
+            "fabric_layer_count": 18 if campsite else 0,
+            "structural_pole_count": 10 if campsite else 0,
+            "rope_stake_count": 14 if campsite else 0,
+            "low_poly_mask_count": 5 if campsite else 0,
+            "cabin_facade_module_count": 18 if cabin else 0,
+            "cabin_roof_module_count": 10 if cabin else 0,
+            "cabin_deck_foundation_count": 12 if cabin else 0,
+            "hero_rock_mass_count": 12 if canyon else (6 if not (campsite or cabin) else 0),
+            "systems": [
+                "dominant_canvas_shell_replaces_orange_tent_read",
+                "layered_fabric_wrinkles_and_edge_hems",
+                "structural_pole_and_guyline_frame",
+                "low_poly_catalog_masking_panels",
+                "cabin_facade_roof_deck_overbuild",
+                "prompt_family_hero_rock_massing",
+            ],
+        },
         "renderer_shadow_occlusion_budget": {
             "enabled": True,
             "renderer_ssao": True,

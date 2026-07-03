@@ -12,6 +12,7 @@ param(
     [int]$Frames = 200,
     [int]$TimeoutSec = 200,
     [switch]$Night,
+    [switch]$Fast,      # native-res render (no 1.5x SSAA): much lighter on the GPU/desktop
     [string]$Camera = ""
 )
 $ErrorActionPreference = "Stop"
@@ -35,6 +36,7 @@ $env:CORTEX_SMOKE_FRAMES = "$Frames"
 $env:CORTEX_HEADLESS = "1"
 $env:CORTEX_SHOWCASE = "1"               # showcase lighting (sun/window/fog) + hero camera + 1.5x SSAA
 if ($Night) { $env:CORTEX_SHOWCASE_NIGHT = "1" } else { Remove-Item Env:CORTEX_SHOWCASE_NIGHT -ErrorAction SilentlyContinue }
+if ($Fast) { $env:CORTEX_RENDER_SCALE = "1.0" } else { Remove-Item Env:CORTEX_RENDER_SCALE -ErrorAction SilentlyContinue }
 $env:CORTEX_SCENE_IR_JSON = $json        # the generative scene
 Remove-Item Env:CORTEX_SCENE_PROMPT   -ErrorAction SilentlyContinue
 Remove-Item Env:CORTEX_SCENE_RECIPE   -ErrorAction SilentlyContinue
@@ -51,6 +53,9 @@ if ($Camera) {
 Push-Location $bin
 try {
     $p = Start-Process -FilePath $exe -ArgumentList @("--no-llm","--no-launcher") -NoNewWindow -PassThru -RedirectStandardOutput "ir_harness.out" -RedirectStandardError "ir_harness.err"
+    # keep the desktop responsive: asset/texture decode is CPU-heavy and the render
+    # saturates the GPU -- run the engine below normal priority
+    try { $p.PriorityClass = [System.Diagnostics.ProcessPriorityClass]::BelowNormal } catch {}
     if (-not $p.WaitForExit($TimeoutSec * 1000)) { $p.Kill(); Write-Error "engine timed out after ${TimeoutSec}s"; exit 3 }
 } finally { Pop-Location }
 if (-not (Test-Path $bmp)) { Write-Error "no capture produced (see $bin\ir_harness.out/.err)"; exit 4 }

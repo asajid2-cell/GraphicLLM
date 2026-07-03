@@ -257,6 +257,73 @@ def compose_claude(prompt_text, timeout=120):
     return _extract_json(r.stdout), "claude"
 
 
+ANTHROPIC_MODEL = os.environ.get("ANTHROPIC_MODEL", "claude-opus-4-8")
+
+
+def _anthropic_client():
+    """BYOK lane: the official SDK resolves ANTHROPIC_API_KEY or an `ant auth login`
+    profile on its own -- a bare client works with either. Returns None (with a hint)
+    when the SDK is missing so the backend ladder just moves on."""
+    try:
+        import anthropic
+    except ImportError:
+        return None, "anthropic SDK not installed (pip install anthropic)"
+    try:
+        return anthropic.Anthropic(), None
+    except Exception as e:
+        return None, f"anthropic client: {e}"
+
+
+def compose_anthropic(prompt_text, timeout=120):
+    client, err = _anthropic_client()
+    if client is None:
+        return None, err
+    try:
+        resp = client.with_options(timeout=timeout).messages.create(
+            model=ANTHROPIC_MODEL,
+            max_tokens=4096,
+            thinking={"type": "adaptive"},
+            messages=[{"role": "user", "content": prompt_text}],
+        )
+        if resp.stop_reason == "refusal":
+            return None, "anthropic: refusal"
+        text = next((b.text for b in resp.content if b.type == "text"), "")
+        return _extract_json(text), "anthropic"
+    except Exception as e:
+        return None, f"anthropic err: {e}"
+
+
+def critique_anthropic(png, prompt, timeout=120):
+    """Vision verdict over the Anthropic API (base64 image block) -- used when the
+    claude CLI is unavailable or exhausted."""
+    client, err = _anthropic_client()
+    if client is None:
+        return None
+    try:
+        import base64
+        data = base64.standard_b64encode(Path(png).read_bytes()).decode()
+        resp = client.with_options(timeout=timeout).messages.create(
+            model=ANTHROPIC_MODEL,
+            max_tokens=1024,
+            thinking={"type": "adaptive"},
+            messages=[{
+                "role": "user",
+                "content": [
+                    {"type": "image",
+                     "source": {"type": "base64", "media_type": "image/png", "data": data}},
+                    {"type": "text",
+                     "text": CRITIC_PROMPT.format(prompt=prompt, img="(attached above)")},
+                ],
+            }],
+        )
+        if resp.stop_reason == "refusal":
+            return None
+        text = next((b.text for b in resp.content if b.type == "text"), "")
+        return _extract_json(text)
+    except Exception:
+        return None
+
+
 def compose_deepseek(prompt_text, timeout=120):
     key = os.environ.get("DEEPSEEK_API_KEY")
     if not key:
@@ -461,7 +528,9 @@ def compose(prompt, by_role, backends, verbose=True):
     menu = role_menu(by_role)
     prompt_text = COMPOSE_INSTRUCTIONS.format(menu=menu, schema=PLAN_SCHEMA,
                                               ext_schema=EXTERIOR_SCHEMA, prompt=prompt)
-    fns = {"codex": compose_codex, "claude": compose_claude, "deepseek": compose_deepseek}
+    fns = {"codex": compose_codex, "claude": compose_claude,
+           "anthropic": compose_anthropic, "byok": compose_anthropic,
+           "deepseek": compose_deepseek}
     for b in backends:
         if b == "offline":
             continue
@@ -632,10 +701,16 @@ def resolve_query(query, by_role, by_id, rng, verbose=True):
     non_color = [w for w in words if w not in COLOR_WORDS]
     if non_color:
         words = non_color
-    # keyword scoring over ids (nature sources preferred for exterior scenes)
+    # keyword scoring over ids (nature sources preferred for exterior scenes).
+    # Modular construction pieces (cliff blocks, bridges, path tiles) read as giant
+    # boxes when matched from generic nature queries -- only match them when the
+    # query names them.
+    MODULAR = ("block", "bridge", "platform", "path", "fence_gate")
     best, best_score = [], 0
     for a in by_id.values():
         idl = a["id"].lower()
+        if any(m in idl for m in MODULAR) and not any(m in q for m in MODULAR):
+            continue
         score = sum(2 for w in words if w in idl)
         if score and a.get("source") in NATURE_SOURCES:
             score += 1
@@ -1228,6 +1303,11 @@ def validity_check_interior(ir):
 # Render + critique loop.
 # ----------------------------------------------------------------------------
 
+# Native-res rendering (no 1.5x SSAA) keeps the desktop responsive during renders;
+# the battery sets this False for full-quality captures.
+RENDER_FAST = False
+
+
 def render_ir(ir, out_name, camera="", night=False, timeout=220):
     ir_path = LOGS / f"{out_name}_ir.json"
     ir_path.parent.mkdir(parents=True, exist_ok=True)
@@ -1238,6 +1318,8 @@ def render_ir(ir, out_name, camera="", night=False, timeout=220):
         args += ["-Camera", camera]
     if night:
         args += ["-Night"]
+    if RENDER_FAST:
+        args += ["-Fast"]
     r = subprocess.run(args, capture_output=True, text=True, timeout=timeout)
     lines = [l.strip() for l in r.stdout.splitlines() if l.strip()]
     png = lines[-1] if lines and lines[-1].lower().endswith(".png") else None
@@ -1261,17 +1343,21 @@ Image: {img}"""
 
 def critique(png, prompt, timeout=150, retries=3):
     """Vision verdict with retries + backoff -- claude -p rate-limits under rapid
-    bursts (the cause of the None verdicts in early battery runs)."""
+    bursts (the cause of the None verdicts in early battery runs). Falls back to the
+    Anthropic API (BYOK) when the CLI is unavailable or exhausted."""
     for attempt in range(retries):
         try:
             r = _run(["claude", "-p", CRITIC_PROMPT.format(prompt=prompt, img=png)], timeout)
-        except subprocess.TimeoutExpired:
+        except (subprocess.TimeoutExpired, FileNotFoundError):
             r = None
         crit = _extract_json(r.stdout) if (r and r.returncode == 0) else None
         if crit and isinstance(crit.get("score"), (int, float)):
             return crit
         if attempt < retries - 1:
             time.sleep(8 * (attempt + 1))
+    crit = critique_anthropic(png, prompt)
+    if crit and isinstance(crit.get("score"), (int, float)):
+        return crit
     return None
 
 
@@ -1323,7 +1409,8 @@ def enforce_mood_intent(plan, prompt):
     if plan.get("setting") == "exterior":
         env = plan.get("environment") or {}
         sun = env.setdefault("sun", {})
-        if any(w in p for w in ("sunset", "golden hour", "golden light", "dusk", "evening")):
+        if any(w in p for w in ("sunset", "golden hour", "golden light", "dusk", "evening",
+                                "dawn", "sunrise", "daybreak")):
             sun["elevation_deg"] = min(float(sun.get("elevation_deg", 45) or 45), 13.0)
             if _rgb(sun.get("color"), [1, 1, 1])[2] > 0.6:
                 sun["color"] = [1.0, 0.60, 0.32]
@@ -1439,16 +1526,32 @@ def run_pipeline(prompt, name, backends, iters=3, refresh_catalog=False, verbose
 
 
 def main():
-    ap = argparse.ArgumentParser(description="Generative interior scene pipeline")
-    ap.add_argument("prompt", help="natural-language interior prompt")
+    ap = argparse.ArgumentParser(description="Generative scene pipeline (interior + exterior)")
+    ap.add_argument("prompt", help="natural-language scene prompt")
     ap.add_argument("--name", default=None, help="output basename")
-    ap.add_argument("--backends", default="codex,claude,deepseek",
+    ap.add_argument("--backends", default="codex,claude,anthropic,deepseek",
                     help="comma list; offline heuristic is always the final fallback")
+    ap.add_argument("--codex", action="store_true", help="compose with the codex CLI only")
+    ap.add_argument("--claude", action="store_true", help="compose with the claude CLI only")
+    ap.add_argument("--byok", action="store_true",
+                    help="compose via the Anthropic API (ANTHROPIC_API_KEY or `ant auth login`; "
+                         "model via ANTHROPIC_MODEL, default claude-opus-4-8)")
     ap.add_argument("--iters", type=int, default=3, help="critique/reframe iterations")
     ap.add_argument("--refresh-catalog", action="store_true")
     ap.add_argument("--no-critic", action="store_true", help="skip the vision loop (1 render)")
+    ap.add_argument("--quality", action="store_true",
+                    help="full 1.5x SSAA renders (heavier on the GPU; the default for "
+                         "interactive runs is native-res so the desktop stays responsive)")
     args = ap.parse_args()
+    global RENDER_FAST
+    RENDER_FAST = not args.quality
     name = args.name or "gen_" + "".join(c if c.isalnum() else "_" for c in args.prompt.lower())[:32]
+    if args.codex:
+        args.backends = "codex"
+    elif args.claude:
+        args.backends = "claude"
+    elif args.byok:
+        args.backends = "anthropic"
     backends = ["offline"] if args.no_critic and args.backends == "offline" else args.backends.split(",")
     res = run_pipeline(args.prompt, name, backends, iters=(1 if args.no_critic else args.iters),
                        refresh_catalog=args.refresh_catalog)

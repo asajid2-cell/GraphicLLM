@@ -2993,7 +2993,18 @@ void Engine::BuildRecipeScene() {
         // capture. The 1.5 cap is the engine's existing render-scale ceiling; the
         // budget planner still clamps down if VRAM-limited. Perf is a non-issue for a
         // one-frame still. Interactive/standard scenes stay at native 1.0.
-        renderer->SetRenderScale(showcase ? 1.5f : 1.0f);
+        // CORTEX_RENDER_SCALE overrides the showcase 1.5x SSAA -- interactive runs set
+        // 1.0 (via render_ir.ps1 -Fast) so a generative render doesn't freeze the
+        // desktop; battery/hero captures keep the full-quality default.
+        float showcaseScale = 1.5f;
+        if (const char* rs = std::getenv("CORTEX_RENDER_SCALE"); rs && *rs) {
+            char* end = nullptr;
+            const float v = std::strtof(rs, &end);
+            if (end != rs && std::isfinite(v)) {
+                showcaseScale = std::clamp(v, 0.5f, 1.5f);
+            }
+        }
+        renderer->SetRenderScale(showcase ? showcaseScale : 1.0f);
         renderer->SetTAAEnabled(true);
         renderer->SetSSREnabled(true);
         renderer->SetSSAOEnabled(true);

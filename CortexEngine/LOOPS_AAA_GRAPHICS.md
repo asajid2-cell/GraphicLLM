@@ -524,6 +524,29 @@ Status: done
 - Visual inspection after Loop 15:
   - Contact grounding is more legible under camp/desert props, and objective dark-contact area is no longer zero.
   - Remaining `HUMAN-GATE` gap: receiver slivers are still a stylized approximation. A future front should replace them with softer renderer-level contact shadows or a real density-budgeted RT/AO path.
+- Loop 16 red proof:
+  - Strengthened `tools\scene_graphics_gate.py` to require `graphics_pass.water_shore_integration` and `graphics_pass.soft_occlusion` plus runtime evidence.
+  - `aaa_graphics_campsite_loop28`, `aaa_graphics_desert_loop28`, and `aaa_graphics_alpine_loop28` failed with `missing_water_shore_integration_pass` and `missing_soft_occlusion_pass`.
+- Loop 16 implementation:
+  - `tools\scene_compiler.py` now emits water/shore integration metadata for foam lace, shoreline ripples, wetline bands, reflection glints, and submerged-edge rocks.
+  - `tools\scene_compiler.py` now emits a soft-occlusion contract with penumbra patch count, gradient layers, hero anchors, and stronger SSAO/soft-shadow settings.
+  - `src\Core\Engine_Scenes.cpp` now parses those contracts and renders bounded shoreline/ripple/wetline/glint/submerged-edge geometry plus terrain-toned soft contact penumbra and localized raised hard contact cores.
+  - `tools\scene_graphics_gate.py` now fails water prompts without water/shore integration evidence and all generated exteriors without soft-occlusion evidence.
+- Loop 16 verifier evidence:
+  - Heartbeat proof and liveness: `aaa-proof` fired by timeout; `aaa-push-loop16` was armed, timed out once during long verification, then was rearmed.
+  - `python -m py_compile tools\scene_compiler.py tools\scene_graphics_gate.py tools\scene_quality_gate.py tools\scene_gen.py` exited 0.
+  - Release build exited 0 after final C++ changes: `[OK] Build complete in 30.0s`.
+  - Campsite `aaa_graphics_campsite_loop16` rendered VALID; quality gate exited 0 (`purple_fraction=0.7458`, `nonblack_fraction=1.0`); graphics gate exited 0 with `dark_contact_area_fraction=0.0041`; Director IR validation exited 0. Runtime log shows `created image contact occluders patches=56`, `created soft contact occlusion penumbra=20 gradient_layers=3 hero_anchors=12`, and `created water shore integration foam_lace=14 ripples=16 wetline_bands=4 reflection_glints=10 submerged_edge_rocks=6`.
+  - Desert canyon `aaa_graphics_desert_loop16` rendered VALID; quality gate exited 0 (`turquoise_fraction=0.4199`, `nonblack_fraction=1.0`); graphics gate exited 0 with `dark_contact_area_fraction=0.0066`; Director IR validation exited 0. Runtime log shows the same water/soft/contact systems with 56 contact occluders.
+  - Alpine cabin `aaa_graphics_alpine_loop16` rendered VALID; quality gate exited 0 (`avg_luma=0.1348`, `cool_fraction=0.8593`, `nonblack_fraction=0.9998`); graphics gate exited 0 with `dark_contact_fraction=0.0129`; Director IR validation exited 0. Runtime log shows `created image contact occluders patches=18`, `created soft contact occlusion penumbra=14 gradient_layers=2 hero_anchors=8`, and water shore integration.
+  - Kitchen smoke `regression_kitchen_aaa_loop16` rendered VALID and quality gate exited 0 (`avg_luma=0.4635`, `nonblack_fraction=1.0`).
+  - Known-bad quality oracle `gen_a_foggy_mountain_campsite_beside_0` with `--expect-fail` exited 0 and still reports the fridge/missing-ridge/purple-water failures.
+  - Known-bad graphics oracle `v3_campsite_ridge_test_0` with `--expect-fail` exited 0 and now also reports `missing_water_shore_integration_pass` and `missing_soft_occlusion_pass`.
+- Visual inspection after Loop 16:
+  - Improvement is visible in shore/water staging and contact grounding, and the first black-puddle version was corrected to terrain-toned soft penumbra.
+  - Remaining `HUMAN-GATE` gap: outputs are still stylized and overlay-driven; low-poly cliffs, simple tent/cabin/camp assets, and coarse background geometry are now the dominant ceiling again.
+- Loop 16 learning:
+  - In this render path, alpha-blended penumbra overlays can read much darker than intended. Soft occlusion needs terrain-toned albedo plus separate small hard contact cores; relying on alpha alone produces black-puddle artifacts.
 
 ## BLOCKED / Decisions
 

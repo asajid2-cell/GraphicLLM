@@ -234,6 +234,8 @@ def evaluate(prompt: str, ir: dict[str, Any], png: Path | None, log_text: str) -
     surface_detail = graphics.get("surface_detail") or {}
     occlusion = graphics.get("occlusion") or {}
     image_contact_occlusion = graphics.get("image_contact_occlusion") or {}
+    water_shore_integration = graphics.get("water_shore_integration") or {}
+    soft_occlusion = graphics.get("soft_occlusion") or {}
     image = _image_metrics(png)
 
     failures: list[dict[str, Any]] = []
@@ -566,6 +568,55 @@ def evaluate(prompt: str, ir: dict[str, Any], png: Path | None, log_text: str) -
                 image_contact_occlusion=image_contact_occlusion,
                 deep_contact_patch_count=deep_contact_patches,
                 runtime_image_contact_occlusion=has_runtime_image_contact,
+            )
+
+        if flags["water"]:
+            try:
+                foam_lace = int(water_shore_integration.get("foam_lace_segment_count", 0) or 0)
+                shoreline_ripples = int(water_shore_integration.get("shoreline_ripple_count", 0) or 0)
+                wetline_bands = int(water_shore_integration.get("wetline_band_count", 0) or 0)
+                reflection_glints = int(water_shore_integration.get("reflection_glint_count", 0) or 0)
+                submerged_rocks = int(water_shore_integration.get("submerged_edge_rock_count", 0) or 0)
+            except Exception:
+                foam_lace = shoreline_ripples = wetline_bands = reflection_glints = submerged_rocks = 0
+            has_runtime_water_shore = "generative_exterior: created water shore integration" in log_text
+            if (
+                not isinstance(water_shore_integration, dict)
+                or not bool(water_shore_integration.get("enabled"))
+                or foam_lace < 8
+                or shoreline_ripples < 8
+                or wetline_bands < 3
+                or reflection_glints < 6
+                or submerged_rocks < 4
+                or not has_runtime_water_shore
+            ):
+                fail(
+                    "missing_water_shore_integration_pass",
+                    "Water prompt lacks authored shoreline foam, ripples, wetline bands, reflection glints, and submerged-edge grounding",
+                    water_shore_integration=water_shore_integration,
+                    runtime_water_shore_integration=has_runtime_water_shore,
+                )
+
+        try:
+            penumbra_patches = int(soft_occlusion.get("penumbra_patch_count", 0) or 0)
+            gradient_layers = int(soft_occlusion.get("contact_gradient_layer_count", 0) or 0)
+            hero_anchors = int(soft_occlusion.get("hero_anchor_count", 0) or 0)
+        except Exception:
+            penumbra_patches = gradient_layers = hero_anchors = 0
+        has_runtime_soft_occlusion = "generative_exterior: created soft contact occlusion" in log_text
+        if (
+            not isinstance(soft_occlusion, dict)
+            or not bool(soft_occlusion.get("enabled"))
+            or penumbra_patches < 12
+            or gradient_layers < 2
+            or hero_anchors < 6
+            or not has_runtime_soft_occlusion
+        ):
+            fail(
+                "missing_soft_occlusion_pass",
+                "Scene lacks broad soft contact-occlusion penumbra around props and hero anchors",
+                soft_occlusion=soft_occlusion,
+                runtime_soft_occlusion=has_runtime_soft_occlusion,
             )
 
         try:

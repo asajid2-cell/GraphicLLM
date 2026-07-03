@@ -139,6 +139,23 @@ namespace {
         float targetDarkContactFraction = 0.002f;
     };
 
+    struct GenerativeSoftOcclusion {
+        bool enabled = false;
+        int penumbraPatchCount = 0;
+        int contactGradientLayerCount = 0;
+        int heroAnchorCount = 0;
+        float targetSoftContactFraction = 0.010f;
+    };
+
+    struct GenerativeWaterShoreIntegration {
+        bool enabled = false;
+        int foamLaceSegmentCount = 0;
+        int shorelineRippleCount = 0;
+        int wetlineBandCount = 0;
+        int reflectionGlintCount = 0;
+        int submergedEdgeRockCount = 0;
+    };
+
     struct GenerativeSurfaceMaterialRichness {
         bool enabled = false;
         int groundDecalCount = 0;
@@ -3296,6 +3313,8 @@ void Engine::BuildRecipeScene() {
         GenerativeWorldGeometry worldGeometry;
         GenerativeSurfaceDetail surfaceDetail;
         GenerativeImageContactOcclusion imageContactOcclusion;
+        GenerativeSoftOcclusion softOcclusion;
+        GenerativeWaterShoreIntegration waterShoreIntegration;
         GenerativeSurfaceMaterialRichness surfaceMaterialRichness;
         GenerativeMeshSilhouetteRealism meshSilhouetteRealism;
         GenerativeNaturalisticEcology naturalisticEcology;
@@ -3489,9 +3508,31 @@ void Engine::BuildRecipeScene() {
                 const nlohmann::json imageContactOcclusion = graphics.value("image_contact_occlusion", nlohmann::json::object());
                 genExt.imageContactOcclusion.enabled = imageContactOcclusion.value("enabled", false);
                 genExt.imageContactOcclusion.deepContactPatchCount =
-                    static_cast<int>(std::clamp(num(imageContactOcclusion, "deep_contact_patch_count", 0.0f), 0.0f, 32.0f));
+                    static_cast<int>(std::clamp(num(imageContactOcclusion, "deep_contact_patch_count", 0.0f), 0.0f, 48.0f));
                 genExt.imageContactOcclusion.targetDarkContactFraction =
                     std::clamp(num(imageContactOcclusion, "target_dark_contact_fraction", 0.002f), 0.0f, 0.05f);
+                const nlohmann::json softOcclusion = graphics.value("soft_occlusion", nlohmann::json::object());
+                genExt.softOcclusion.enabled = softOcclusion.value("enabled", false);
+                genExt.softOcclusion.penumbraPatchCount =
+                    static_cast<int>(std::clamp(num(softOcclusion, "penumbra_patch_count", 0.0f), 0.0f, 48.0f));
+                genExt.softOcclusion.contactGradientLayerCount =
+                    static_cast<int>(std::clamp(num(softOcclusion, "contact_gradient_layer_count", 0.0f), 0.0f, 5.0f));
+                genExt.softOcclusion.heroAnchorCount =
+                    static_cast<int>(std::clamp(num(softOcclusion, "hero_anchor_count", 0.0f), 0.0f, 20.0f));
+                genExt.softOcclusion.targetSoftContactFraction =
+                    std::clamp(num(softOcclusion, "target_soft_contact_fraction", 0.010f), 0.0f, 0.08f);
+                const nlohmann::json waterShoreIntegration = graphics.value("water_shore_integration", nlohmann::json::object());
+                genExt.waterShoreIntegration.enabled = waterShoreIntegration.value("enabled", false);
+                genExt.waterShoreIntegration.foamLaceSegmentCount =
+                    static_cast<int>(std::clamp(num(waterShoreIntegration, "foam_lace_segment_count", 0.0f), 0.0f, 32.0f));
+                genExt.waterShoreIntegration.shorelineRippleCount =
+                    static_cast<int>(std::clamp(num(waterShoreIntegration, "shoreline_ripple_count", 0.0f), 0.0f, 32.0f));
+                genExt.waterShoreIntegration.wetlineBandCount =
+                    static_cast<int>(std::clamp(num(waterShoreIntegration, "wetline_band_count", 0.0f), 0.0f, 8.0f));
+                genExt.waterShoreIntegration.reflectionGlintCount =
+                    static_cast<int>(std::clamp(num(waterShoreIntegration, "reflection_glint_count", 0.0f), 0.0f, 24.0f));
+                genExt.waterShoreIntegration.submergedEdgeRockCount =
+                    static_cast<int>(std::clamp(num(waterShoreIntegration, "submerged_edge_rock_count", 0.0f), 0.0f, 16.0f));
                 const nlohmann::json contact = graphics.value("contact", nlohmann::json::object());
                 genExt.shoreLayerCount = static_cast<int>(std::clamp(num(contact, "shore_layer_count", 0.0f), 0.0f, 8.0f));
                 for (const auto& patchJson : contact.value("patches", nlohmann::json::array())) {
@@ -3993,7 +4034,7 @@ void Engine::BuildRecipeScene() {
                         return n - std::floor(n);
                     };
                     int deepContactCount = 0;
-                    const int patchLimit = std::min(genExt.imageContactOcclusion.deepContactPatchCount, 32);
+                    const int patchLimit = std::min(genExt.imageContactOcclusion.deepContactPatchCount, 48);
                     for (int i = 0; i < patchLimit; ++i) {
                         const auto& patch = genExt.contactPatches[static_cast<size_t>(i) % genExt.contactPatches.size()];
                         const float px = patch.position.x + (pseudo(i + 907, 1.41f) - 0.5f) * patch.radius * 0.30f;
@@ -4003,13 +4044,13 @@ void Engine::BuildRecipeScene() {
                             contact, "GenerativeExterior_ImageContactOccluder" + std::to_string(i));
                         auto& t = m_registry->AddComponent<TransformComponent>(contact);
                         t.position = glm::vec3(px,
-                                               0.031f + static_cast<float>(i % 7) * 0.0010f,
+                                               0.064f + static_cast<float>(i % 7) * 0.0010f,
                                                pz);
                         t.rotation = glm::quat(glm::vec3(0.0f, glm::radians(17.0f * static_cast<float>(i)), 0.0f));
                         const float radius = std::clamp(patch.radius, 0.26f, 1.45f);
-                        t.scale = glm::vec3(radius * (0.54f + 0.06f * static_cast<float>(i % 3)),
+                        t.scale = glm::vec3(radius * (0.76f + 0.06f * static_cast<float>(i % 3)),
                                             1.0f,
-                                            radius * (0.13f + 0.03f * static_cast<float>((i + 1) % 3)));
+                                            radius * (0.22f + 0.028f * static_cast<float>((i + 1) % 3)));
                         auto& r = m_registry->AddComponent<Scene::RenderableComponent>(contact);
                         r.mesh = deepContactMesh;
                         r.albedoColor = glm::vec4(0.0012f, 0.0010f, 0.0008f, 1.0f);
@@ -4049,7 +4090,7 @@ void Engine::BuildRecipeScene() {
                             m_registry->AddComponent<Scene::TagComponent>(
                                 contact, "GenerativeExterior_ImageContactHeroAnchor" + std::to_string(i));
                             auto& t = m_registry->AddComponent<TransformComponent>(contact);
-                            t.position = glm::vec3(anchorData[i][0], 0.052f + static_cast<float>(i % 5) * 0.001f, anchorData[i][1]);
+                            t.position = glm::vec3(anchorData[i][0], 0.074f + static_cast<float>(i % 5) * 0.001f, anchorData[i][1]);
                             t.rotation = glm::quat(glm::vec3(0.0f, glm::radians(-18.0f + 13.0f * static_cast<float>(i)), 0.0f));
                             t.scale = glm::vec3(anchorData[i][2], 1.0f, anchorData[i][3]);
                             auto& r = m_registry->AddComponent<Scene::RenderableComponent>(contact);
@@ -4074,6 +4115,306 @@ void Engine::BuildRecipeScene() {
                     spdlog::info("generative_exterior: created image contact occluders patches={} target_dark_contact={:.4f}",
                                  deepContactCount,
                                  genExt.imageContactOcclusion.targetDarkContactFraction);
+                }
+            }
+            if (genExt.graphicsMaterials && genExt.softOcclusion.enabled && !genExt.contactPatches.empty()) {
+                auto softMesh = Utils::MeshGenerator::CreateDisk(1.0f, 48);
+                auto upSoft = renderer->UploadMesh(softMesh);
+                if (upSoft.IsErr()) {
+                    spdlog::warn("generative_exterior: soft contact occlusion mesh upload failed: {}", upSoft.Error());
+                } else {
+                    auto pseudo = [](int i, float salt) {
+                        const float n = std::sin(static_cast<float>(i) * 12.9898f + salt * 78.233f) * 43758.5453f;
+                        return n - std::floor(n);
+                    };
+                    auto addSoftPatch = [&](const std::string& tag,
+                                            float x,
+                                            float z,
+                                            float sx,
+                                            float sz,
+                                            float yawDeg,
+                                            float alpha,
+                                            int index) {
+                        entt::entity soft = m_registry->CreateEntity();
+                        m_registry->AddComponent<Scene::TagComponent>(soft, tag);
+                        auto& t = m_registry->AddComponent<TransformComponent>(soft);
+                        t.position = glm::vec3(x, 0.043f + static_cast<float>(index % 11) * 0.0006f, z);
+                        t.rotation = glm::quat(glm::vec3(0.0f, glm::radians(yawDeg), 0.0f));
+                        t.scale = glm::vec3(sx, 1.0f, sz);
+                        auto& r = m_registry->AddComponent<Scene::RenderableComponent>(soft);
+                        r.mesh = softMesh;
+                        const glm::vec3 softColor = glm::max(glm::mix(gcol, glm::vec3(0.025f), 0.42f), glm::vec3(0.020f));
+                        r.albedoColor = glm::vec4(softColor, alpha);
+                        r.metallic = 0.0f;
+                        r.roughness = 0.98f;
+                        r.ao = 0.38f;
+                        r.occlusionStrength = 0.86f;
+                        r.normalScale = 0.03f;
+                        r.wetnessFactor = genExt.groundWetness * 0.10f;
+                        r.proceduralMaskStrength = 0.03f;
+                        r.specularFactor = 0.02f;
+                        r.clearcoatFactor = 0.0f;
+                        r.doubleSided = true;
+                        r.alphaMode = Scene::RenderableComponent::AlphaMode::Blend;
+                        r.renderLayer = Scene::RenderableComponent::RenderLayer::Overlay;
+                        r.presetName = "shadow";
+                    };
+
+                    int penumbraCount = 0;
+                    const int layerCount = std::max(1, genExt.softOcclusion.contactGradientLayerCount);
+                    const int patchLimit = std::min(genExt.softOcclusion.penumbraPatchCount, 48);
+                    for (int i = 0; i < patchLimit; ++i) {
+                        const int layer = i % layerCount;
+                        const auto& patch = genExt.contactPatches[static_cast<size_t>(i / layerCount) % genExt.contactPatches.size()];
+                        const float spread = 1.0f + static_cast<float>(layer) * 0.72f;
+                        const float radius = std::clamp(patch.radius * (0.82f + 0.12f * pseudo(i + 1001, 1.37f)), 0.28f, 1.65f);
+                        const float alpha = std::clamp(0.055f - static_cast<float>(layer) * 0.012f +
+                                                       genExt.softOcclusion.targetSoftContactFraction * 0.35f,
+                                                       0.018f,
+                                                       0.068f);
+                        addSoftPatch("GenerativeExterior_SoftContactPenumbra" + std::to_string(i),
+                                     patch.position.x + (pseudo(i + 1013, 2.17f) - 0.5f) * patch.radius * 0.18f,
+                                     patch.position.y + (pseudo(i + 1021, 2.61f) - 0.5f) * patch.radius * 0.16f,
+                                     radius * (1.08f + 0.16f * pseudo(i, 1.71f)) * spread,
+                                     radius * (0.48f + 0.08f * pseudo(i, 1.93f)) * spread,
+                                     -18.0f + 57.0f * pseudo(i, 2.37f),
+                                     alpha,
+                                     i);
+                        penumbraCount++;
+                    }
+
+                    int heroAnchorCount = 0;
+                    if (!genExt.structures.empty()) {
+                        for (const auto& structure : genExt.structures) {
+                            const float yawRad = glm::radians(structure.yawDeg);
+                            const float cs = std::cos(yawRad);
+                            const float sn = std::sin(yawRad);
+                            auto place = [&](float x, float z) -> glm::vec2 {
+                                const glm::vec3 p = structure.position + glm::vec3(cs * x + sn * z,
+                                                                                  0.0f,
+                                                                                  -sn * x + cs * z);
+                                return glm::vec2(p.x, p.z);
+                            };
+                            const std::array<glm::vec4, 8> cabinAnchors = {
+                                glm::vec4(0.0f, 0.0f, structure.widthM * 0.50f, structure.depthM * 0.38f),
+                                glm::vec4(0.0f, structure.depthM * 0.54f, structure.widthM * 0.38f, 0.34f),
+                                glm::vec4(-structure.widthM * 0.34f, structure.depthM * 0.34f, 0.28f, 0.28f),
+                                glm::vec4(structure.widthM * 0.34f, structure.depthM * 0.34f, 0.28f, 0.28f),
+                                glm::vec4(-structure.widthM * 0.48f, -structure.depthM * 0.32f, 0.26f, 0.24f),
+                                glm::vec4(structure.widthM * 0.48f, -structure.depthM * 0.32f, 0.26f, 0.24f),
+                                glm::vec4(-structure.widthM * 0.18f, structure.depthM * 0.62f, 0.24f, 0.22f),
+                                glm::vec4(structure.widthM * 0.18f, structure.depthM * 0.62f, 0.24f, 0.22f),
+                            };
+                            for (size_t i = 0; i < cabinAnchors.size() && heroAnchorCount < genExt.softOcclusion.heroAnchorCount; ++i) {
+                                const glm::vec2 p = place(cabinAnchors[i].x, cabinAnchors[i].y);
+                                addSoftPatch("GenerativeExterior_SoftHeroAnchor_Cabin" + std::to_string(heroAnchorCount),
+                                             p.x,
+                                             p.y,
+                                             cabinAnchors[i].z,
+                                             cabinAnchors[i].w,
+                                             structure.yawDeg,
+                                             0.044f,
+                                             100 + heroAnchorCount);
+                                heroAnchorCount++;
+                            }
+                        }
+                    } else {
+                        const float anchorData[][4] = {
+                            { 2.90f, 0.90f, 1.24f, 0.48f },
+                            { -0.35f, 0.35f, 0.72f, 0.38f },
+                            { -1.05f, 0.86f, 0.54f, 0.30f },
+                            { 0.48f, -0.18f, 0.56f, 0.30f },
+                            { -2.25f, 1.35f, 0.70f, 0.34f },
+                            { 1.25f, 2.35f, 0.68f, 0.34f },
+                            { -0.35f, 2.85f, 0.70f, 0.34f },
+                            { 3.85f, 1.55f, 0.64f, 0.32f },
+                            { -3.70f, 2.05f, 0.62f, 0.30f },
+                            { 5.60f, 2.65f, 0.60f, 0.30f },
+                            { -5.30f, 3.10f, 0.58f, 0.28f },
+                            { 0.90f, 3.35f, 0.58f, 0.28f },
+                        };
+                        constexpr int anchorCount = static_cast<int>(sizeof(anchorData) / sizeof(anchorData[0]));
+                        for (int i = 0; i < std::min(anchorCount, genExt.softOcclusion.heroAnchorCount); ++i) {
+                            addSoftPatch("GenerativeExterior_SoftHeroAnchor_Camp" + std::to_string(i),
+                                         anchorData[i][0],
+                                         anchorData[i][1],
+                                         anchorData[i][2],
+                                         anchorData[i][3],
+                                         -20.0f + 17.0f * static_cast<float>(i),
+                                         0.040f,
+                                         140 + i);
+                            heroAnchorCount++;
+                        }
+                    }
+                    spdlog::info("generative_exterior: created soft contact occlusion penumbra={} gradient_layers={} hero_anchors={} target_soft_contact={:.4f}",
+                                 penumbraCount,
+                                 layerCount,
+                                 heroAnchorCount,
+                                 genExt.softOcclusion.targetSoftContactFraction);
+                }
+            }
+            if (genExt.waterOn && genExt.waterShoreIntegration.enabled) {
+                auto ribbonMesh = Utils::MeshGenerator::CreatePlane(1.0f, 1.0f);
+                auto edgeRockMesh = CreateGenerativeRockShardMesh(8.91f);
+                const auto upRibbon = renderer->UploadMesh(ribbonMesh);
+                const auto upEdgeRock = renderer->UploadMesh(edgeRockMesh);
+                if (upRibbon.IsErr() || upEdgeRock.IsErr()) {
+                    spdlog::warn("generative_exterior: water shore integration mesh upload failed ribbon='{}' rock='{}'",
+                                 upRibbon.IsErr() ? upRibbon.Error() : "ok",
+                                 upEdgeRock.IsErr() ? upEdgeRock.Error() : "ok");
+                } else {
+                    auto pseudo = [](int i, float salt) {
+                        const float n = std::sin(static_cast<float>(i) * 12.9898f + salt * 78.233f) * 43758.5453f;
+                        return n - std::floor(n);
+                    };
+                    auto dressWaterOverlay = [&](Scene::RenderableComponent& r,
+                                                 const glm::vec4& color,
+                                                 float roughness,
+                                                 float wetness,
+                                                 float clearcoat,
+                                                 const char* preset) {
+                        r.albedoColor = color;
+                        r.metallic = 0.0f;
+                        r.roughness = roughness;
+                        r.ao = 0.72f;
+                        r.occlusionStrength = 0.58f;
+                        r.normalScale = 0.10f;
+                        r.wetnessFactor = wetness;
+                        r.proceduralMaskStrength = 0.18f;
+                        r.specularFactor = 0.34f + clearcoat * 0.80f;
+                        r.clearcoatFactor = clearcoat;
+                        r.clearcoatRoughnessFactor = 0.48f;
+                        r.anisotropyStrength = 0.20f;
+                        r.doubleSided = true;
+                        r.alphaMode = Scene::RenderableComponent::AlphaMode::Blend;
+                        r.renderLayer = Scene::RenderableComponent::RenderLayer::Overlay;
+                        r.presetName = preset;
+                    };
+                    auto addRibbon = [&](const std::string& tag,
+                                         const glm::vec3& position,
+                                         const glm::vec3& scale,
+                                         float yawDeg,
+                                         const glm::vec4& color,
+                                         float roughness,
+                                         float wetness,
+                                         float clearcoat,
+                                         const char* preset) {
+                        entt::entity e = m_registry->CreateEntity();
+                        m_registry->AddComponent<Scene::TagComponent>(e, tag);
+                        auto& t = m_registry->AddComponent<TransformComponent>(e);
+                        t.position = position;
+                        t.rotation = glm::quat(glm::vec3(0.0f, glm::radians(yawDeg), 0.0f));
+                        t.scale = scale;
+                        auto& r = m_registry->AddComponent<Scene::RenderableComponent>(e);
+                        r.mesh = ribbonMesh;
+                        dressWaterOverlay(r, color, roughness, wetness, clearcoat, preset);
+                    };
+
+                    int wetlineBands = 0;
+                    for (int i = 0; i < genExt.waterShoreIntegration.wetlineBandCount; ++i) {
+                        const float bandZ = shoreZ + 0.16f + static_cast<float>(i) * 0.22f;
+                        const float alpha = 0.16f - static_cast<float>(i) * 0.018f;
+                        addRibbon("GenerativeExterior_WaterWetlineGradient" + std::to_string(i),
+                                  glm::vec3(0.0f, 0.061f + static_cast<float>(i) * 0.0012f, bandZ),
+                                  glm::vec3(groundW * (0.96f - i * 0.035f), 1.0f, 0.18f + i * 0.06f),
+                                  -1.5f + 0.8f * static_cast<float>(i),
+                                  glm::vec4(glm::mix(gcol * 0.30f, genExt.waterShallow, 0.34f), std::max(alpha, 0.08f)),
+                                  0.70f,
+                                  0.62f,
+                                  0.18f,
+                                  "naturalistic");
+                        wetlineBands++;
+                    }
+
+                    int foamLace = 0;
+                    for (int i = 0; i < genExt.waterShoreIntegration.foamLaceSegmentCount; ++i) {
+                        const float x = (pseudo(i + 1201, 1.23f) - 0.5f) * groundW * 0.84f;
+                        const float z = shoreZ - 0.08f + (pseudo(i + 1211, 1.91f) - 0.5f) * 0.36f;
+                        const glm::vec3 foam = glm::mix(glm::vec3(0.92f, 0.94f, 0.96f), genExt.waterShallow, 0.24f);
+                        addRibbon("GenerativeExterior_WaterFoamLace" + std::to_string(i),
+                                  glm::vec3(x, genExt.waterLevel + 0.034f + static_cast<float>(i % 7) * 0.0009f, z),
+                                  glm::vec3(1.10f + pseudo(i, 2.11f) * 1.80f,
+                                            1.0f,
+                                            0.035f + pseudo(i, 2.73f) * 0.050f),
+                                  -8.0f + pseudo(i, 3.01f) * 16.0f,
+                                  glm::vec4(foam, 0.26f),
+                                  0.30f,
+                                  0.78f,
+                                  0.28f,
+                                  "water");
+                        foamLace++;
+                    }
+
+                    int rippleCount = 0;
+                    for (int i = 0; i < genExt.waterShoreIntegration.shorelineRippleCount; ++i) {
+                        const float lane = static_cast<float>(i % 5);
+                        const float x = (pseudo(i + 1301, 1.47f) - 0.5f) * groundW * 0.76f;
+                        const float z = shoreZ - 0.52f - lane * 0.32f - pseudo(i + 1319, 2.29f) * 0.20f;
+                        const glm::vec3 ripple = glm::mix(genExt.waterShallow, glm::vec3(1.0f), 0.16f + 0.04f * pseudo(i, 2.91f));
+                        addRibbon("GenerativeExterior_WaterShoreRipple" + std::to_string(i),
+                                  glm::vec3(x, genExt.waterLevel + 0.039f + static_cast<float>(i % 5) * 0.0008f, z),
+                                  glm::vec3(0.80f + pseudo(i, 1.69f) * 1.55f,
+                                            1.0f,
+                                            0.025f + pseudo(i, 2.41f) * 0.035f),
+                                  -4.0f + pseudo(i, 3.17f) * 8.0f,
+                                  glm::vec4(ripple, 0.12f),
+                                  0.24f,
+                                  0.62f,
+                                  0.34f,
+                                  "water");
+                        rippleCount++;
+                    }
+
+                    int glintCount = 0;
+                    for (int i = 0; i < genExt.waterShoreIntegration.reflectionGlintCount; ++i) {
+                        const float x = (pseudo(i + 1409, 1.83f) - 0.5f) * groundW * 0.58f;
+                        const float z = shoreZ - 0.88f - pseudo(i + 1423, 2.67f) * 3.4f;
+                        const glm::vec3 glint = glm::mix(genExt.waterShallow, glm::vec3(1.0f), 0.34f);
+                        addRibbon("GenerativeExterior_WaterReflectionGlint" + std::to_string(i),
+                                  glm::vec3(x, genExt.waterLevel + 0.046f + static_cast<float>(i % 3) * 0.0007f, z),
+                                  glm::vec3(0.42f + pseudo(i, 2.01f) * 0.76f,
+                                            1.0f,
+                                            0.018f + pseudo(i, 2.89f) * 0.025f),
+                                  8.0f + pseudo(i, 3.31f) * 148.0f,
+                                  glm::vec4(glint, 0.16f),
+                                  0.18f,
+                                  0.72f,
+                                  0.42f,
+                                  "water");
+                        glintCount++;
+                    }
+
+                    int submergedRocks = 0;
+                    for (int i = 0; i < genExt.waterShoreIntegration.submergedEdgeRockCount; ++i) {
+                        const float x = (pseudo(i + 1501, 2.07f) - 0.5f) * groundW * 0.82f;
+                        const float z = shoreZ - 0.24f - pseudo(i + 1511, 2.53f) * 1.25f;
+                        entt::entity rock = m_registry->CreateEntity();
+                        m_registry->AddComponent<Scene::TagComponent>(rock, "GenerativeExterior_SubmergedEdgeRock" + std::to_string(i));
+                        auto& t = m_registry->AddComponent<TransformComponent>(rock);
+                        t.position = glm::vec3(x, genExt.waterLevel + 0.018f + static_cast<float>(i % 4) * 0.001f, z);
+                        t.rotation = glm::quat(glm::vec3(glm::radians(-3.0f + pseudo(i, 2.19f) * 6.0f),
+                                                         glm::radians(pseudo(i, 2.71f) * 360.0f),
+                                                         glm::radians(-5.0f + pseudo(i, 3.13f) * 10.0f)));
+                        const float s = 0.34f + pseudo(i, 3.77f) * 0.34f;
+                        t.scale = glm::vec3(s * 1.35f, s * 0.34f, s * 0.78f);
+                        auto& r = m_registry->AddComponent<Scene::RenderableComponent>(rock);
+                        r.mesh = edgeRockMesh;
+                        const glm::vec3 rockColor = glm::mix(gcol, glm::vec3(0.08f, 0.075f, 0.070f), 0.56f);
+                        dressWaterOverlay(r,
+                                          glm::vec4(glm::max(rockColor, glm::vec3(0.012f)), 0.72f),
+                                          0.66f,
+                                          0.82f,
+                                          0.20f,
+                                          "wet_stone");
+                        submergedRocks++;
+                    }
+
+                    spdlog::info("generative_exterior: created water shore integration foam_lace={} ripples={} wetline_bands={} reflection_glints={} submerged_edge_rocks={}",
+                                 foamLace,
+                                 rippleCount,
+                                 wetlineBands,
+                                 glintCount,
+                                 submergedRocks);
                 }
             }
             if (genExt.worldGeometry.enabled) {

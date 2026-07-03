@@ -25,6 +25,7 @@
 #include <fstream>
 #include <optional>
 #include <unordered_map>
+#include <vector>
 
 #include <glm/geometric.hpp>
 #include <nlohmann/json.hpp>
@@ -84,6 +85,102 @@ namespace {
         emitter.sizeEnd *= sizeScale;
         emitter.colorStart.a *= alphaScale;
         emitter.colorEnd.a *= alphaScale;
+    }
+
+    struct GenerativeRidgeLayer {
+        float distanceM = 55.0f;
+        float heightM = 12.0f;
+        glm::vec3 color{0.16f, 0.18f, 0.22f};
+    };
+
+    struct GenerativeStructure {
+        std::string type = "cabin";
+        glm::vec3 position{0.0f, 0.0f, 0.0f};
+        float yawDeg = 0.0f;
+        float widthM = 3.8f;
+        float depthM = 3.0f;
+        float wallHeightM = 2.0f;
+        float roofHeightM = 1.0f;
+        bool litWindows = true;
+    };
+
+    std::shared_ptr<Scene::MeshData> CreateGenerativeRidgeMesh(float width,
+                                                               float height,
+                                                               float baseY,
+                                                               float phase) {
+        auto mesh = std::make_shared<Scene::MeshData>();
+        mesh->kind = Scene::MeshKind::Procedural;
+        constexpr uint32_t kSegments = 28;
+        mesh->positions.reserve((kSegments + 1) * 2);
+        mesh->normals.reserve((kSegments + 1) * 2);
+        mesh->texCoords.reserve((kSegments + 1) * 2);
+        for (uint32_t i = 0; i <= kSegments; ++i) {
+            const float u = static_cast<float>(i) / static_cast<float>(kSegments);
+            const float x = (u - 0.5f) * width;
+            const float n0 = std::sin(u * 19.0f + phase) * 0.18f;
+            const float n1 = std::sin(u * 43.0f + phase * 1.7f) * 0.10f;
+            const float ridge = std::clamp(0.54f + n0 + n1, 0.30f, 0.92f);
+            const float yTop = baseY + height * ridge;
+            mesh->positions.emplace_back(x, baseY, 0.0f);
+            mesh->positions.emplace_back(x, yTop, 0.0f);
+            mesh->normals.emplace_back(0.0f, 0.0f, 1.0f);
+            mesh->normals.emplace_back(0.0f, 0.0f, 1.0f);
+            mesh->texCoords.emplace_back(u, 1.0f);
+            mesh->texCoords.emplace_back(u, 0.0f);
+        }
+        for (uint32_t i = 0; i < kSegments; ++i) {
+            const uint32_t b0 = i * 2u;
+            const uint32_t t0 = b0 + 1u;
+            const uint32_t b1 = b0 + 2u;
+            const uint32_t t1 = b0 + 3u;
+            mesh->indices.insert(mesh->indices.end(), { b0, b1, t1, b0, t1, t0 });
+        }
+        mesh->UpdateBounds();
+        return mesh;
+    }
+
+    std::shared_ptr<Scene::MeshData> CreateGenerativeGableRoofMesh(float width,
+                                                                   float depth,
+                                                                   float height) {
+        auto mesh = std::make_shared<Scene::MeshData>();
+        mesh->kind = Scene::MeshKind::Procedural;
+
+        const float hx = width * 0.5f;
+        const float hz = depth * 0.5f;
+        const glm::vec3 lb(-hx, 0.0f, -hz);
+        const glm::vec3 rb( hx, 0.0f, -hz);
+        const glm::vec3 lf(-hx, 0.0f,  hz);
+        const glm::vec3 rf( hx, 0.0f,  hz);
+        const glm::vec3 pb(0.0f, height, -hz);
+        const glm::vec3 pf(0.0f, height,  hz);
+
+        auto addTri = [&](const glm::vec3& a, const glm::vec3& b, const glm::vec3& c) {
+            const uint32_t base = static_cast<uint32_t>(mesh->positions.size());
+            glm::vec3 n = glm::cross(b - a, c - a);
+            if (glm::length(n) < 1e-5f) {
+                n = glm::vec3(0.0f, 1.0f, 0.0f);
+            } else {
+                n = glm::normalize(n);
+            }
+            mesh->positions.insert(mesh->positions.end(), {a, b, c});
+            mesh->normals.insert(mesh->normals.end(), {n, n, n});
+            mesh->texCoords.insert(mesh->texCoords.end(), {
+                glm::vec2(0.0f, 1.0f), glm::vec2(1.0f, 1.0f), glm::vec2(0.5f, 0.0f)
+            });
+            mesh->indices.insert(mesh->indices.end(), {base, base + 1u, base + 2u});
+        };
+        auto addQuad = [&](const glm::vec3& a, const glm::vec3& b,
+                           const glm::vec3& c, const glm::vec3& d) {
+            addTri(a, b, c);
+            addTri(a, c, d);
+        };
+
+        addTri(lf, rf, pf);       // front gable
+        addTri(rb, lb, pb);       // back gable
+        addQuad(lb, lf, pf, pb);  // left roof slope
+        addQuad(rf, rb, pb, pf);  // right roof slope
+        mesh->UpdateBounds();
+        return mesh;
     }
 
     std::shared_ptr<Scene::MeshData> LoadNaturalisticShowcaseMesh(const char* relativeGltf) {
@@ -2876,12 +2973,19 @@ void Engine::BuildRecipeScene() {
         float exposure = 1.0f;
         bool waterOn = false;
         float waterLevel = 0.05f, waterFromZ = -6.0f, waterRough = 0.055f, waterWave = 0.045f;
+        float waterAbsorption = 0.72f, waterFoam = 0.62f, waterFresnel = 0.55f;
+        float waterViscosity = 0.48f, waterBodyThickness = 0.80f;
+        float waterColorStrength = 0.0f;
         glm::vec3 waterShallow{0.15f, 0.42f, 0.30f}, waterDeep{0.020f, 0.10f, 0.09f};
         float extent = 30.0f;
         std::string groundKind = "grass";
         glm::vec3 groundColor{0.24f, 0.34f, 0.16f};
         bool groundColorSet = false;
         std::string skyPreset;   // optional IR override: sky_day | sky_sunset | sky_partly_cloudy
+        std::string lookTime;
+        std::string lookGrade;
+        std::vector<GenerativeRidgeLayer> ridgeLayers;
+        std::vector<GenerativeStructure> structures;
     } genExt;
     if (recipe == "generative_exterior") {
         if (const char* raw = std::getenv("CORTEX_SCENE_IR_JSON"); raw && *raw) {
@@ -2905,6 +3009,9 @@ void Engine::BuildRecipeScene() {
                 genExt.fogStart = std::clamp(num(fog, "start", genExt.fogStart), 0.0f, 30.0f);
                 genExt.exposure = std::clamp(num(env, "exposure", 1.0f), 0.4f, 1.8f);
                 genExt.skyPreset = env.value("sky", std::string());
+                const nlohmann::json look = env.value("look", nlohmann::json::object());
+                genExt.lookTime = look.value("time", std::string());
+                genExt.lookGrade = look.value("grade", std::string());
                 const nlohmann::json ground = env.value("ground", nlohmann::json::object());
                 genExt.extent = std::clamp(num(ground, "extent", genExt.extent), 12.0f, 80.0f);
                 genExt.groundKind = ground.value("kind", genExt.groundKind);
@@ -2919,8 +3026,49 @@ void Engine::BuildRecipeScene() {
                                                -genExt.extent * 0.5f, genExt.extent * 0.35f);
                 genExt.waterRough = std::clamp(num(water, "roughness", genExt.waterRough), 0.02f, 0.4f);
                 genExt.waterWave = std::clamp(num(water, "wave", genExt.waterWave), 0.005f, 0.09f);
+                genExt.waterAbsorption = std::clamp(num(water, "absorption", genExt.waterAbsorption), 0.05f, 1.5f);
+                genExt.waterFoam = std::clamp(num(water, "foam", genExt.waterFoam), 0.0f, 1.0f);
+                genExt.waterFresnel = std::clamp(num(water, "fresnel", genExt.waterFresnel), 0.02f, 1.5f);
+                genExt.waterViscosity = std::clamp(num(water, "viscosity", genExt.waterViscosity), 0.0f, 1.0f);
+                genExt.waterBodyThickness = std::clamp(num(water, "body_thickness", genExt.waterBodyThickness), 0.10f, 2.0f);
+                genExt.waterColorStrength = std::clamp(num(water, "color_strength", genExt.waterColorStrength), 0.0f, 1.0f);
                 genExt.waterShallow = vec3Of(water, "shallow", genExt.waterShallow);
                 genExt.waterDeep = vec3Of(water, "deep", genExt.waterDeep);
+                const nlohmann::json background = env.value("background", nlohmann::json::object());
+                const nlohmann::json ridgeLayers = background.value("ridge_layers", nlohmann::json::array());
+                for (const auto& layer : ridgeLayers) {
+                    if (!layer.is_object()) {
+                        continue;
+                    }
+                    GenerativeRidgeLayer ridge{};
+                    ridge.distanceM = std::clamp(num(layer, "distance_m", ridge.distanceM), 24.0f, 180.0f);
+                    ridge.heightM = std::clamp(num(layer, "height_m", ridge.heightM), 4.0f, 42.0f);
+                    ridge.color = vec3Of(layer, "color", ridge.color);
+                    genExt.ridgeLayers.push_back(ridge);
+                }
+                const nlohmann::json structures = env.value("structures", nlohmann::json::array());
+                for (const auto& item : structures) {
+                    if (!item.is_object()) {
+                        continue;
+                    }
+                    GenerativeStructure structure{};
+                    structure.type = item.value("type", structure.type);
+                    if (structure.type != "cabin") {
+                        continue;
+                    }
+                    structure.position.x = std::clamp(num(item, "x", structure.position.x),
+                                                      -genExt.extent * 0.45f, genExt.extent * 0.45f);
+                    structure.position.y = std::clamp(num(item, "y", structure.position.y), -0.2f, 2.0f);
+                    structure.position.z = std::clamp(num(item, "z", structure.position.z),
+                                                      -genExt.extent * 0.28f, genExt.extent * 0.35f);
+                    structure.yawDeg = num(item, "yaw_deg", structure.yawDeg);
+                    structure.widthM = std::clamp(num(item, "width_m", structure.widthM), 2.0f, 6.0f);
+                    structure.depthM = std::clamp(num(item, "depth_m", structure.depthM), 1.8f, 5.0f);
+                    structure.wallHeightM = std::clamp(num(item, "wall_height_m", structure.wallHeightM), 1.4f, 3.0f);
+                    structure.roofHeightM = std::clamp(num(item, "roof_height_m", structure.roofHeightM), 0.45f, 1.8f);
+                    structure.litWindows = item.value("lit_windows", structure.litWindows);
+                    genExt.structures.push_back(structure);
+                }
                 genExt.valid = true;
             } catch (const std::exception& e) {
                 spdlog::warn("generative_exterior: bad IR json for environment: {}", e.what());
@@ -3048,6 +3196,17 @@ void Engine::BuildRecipeScene() {
             if (skyPreset.empty()) {
                 skyPreset = genExt.sunEl < 18.0f ? "sky_sunset" : "sky_day";
             }
+            auto lowercase = [](std::string s) {
+                std::transform(s.begin(), s.end(), s.begin(),
+                               [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+                return s;
+            };
+            const std::string skyLower = lowercase(skyPreset);
+            const std::string timeLower = lowercase(genExt.lookTime);
+            const std::string gradeLower = lowercase(genExt.lookGrade);
+            const bool moonlightLook = timeLower == "moonlight" ||
+                                       gradeLower.find("moon") != std::string::npos ||
+                                       skyLower.find("night") != std::string::npos;
             renderer->SetEnvironmentPreset(skyPreset);
             renderer->SetIBLEnabled(true);
             // Poly Haven pure-sky HDRIs sit around 0.1 median linear luminance (vs the
@@ -3055,9 +3214,10 @@ void Engine::BuildRecipeScene() {
             // strong lift to read as a bright day. The sunset HDRI is brighter and
             // saturated -- lifting it 4x washes it to pastel, so it gets its own curve.
             const bool sunsetSky = skyPreset == "sky_sunset";
-            renderer->SetIBLIntensity(sunsetSky ? 2.1f : 3.2f,
-                                      sunsetSky ? 1.4f : 1.8f); // NOTE: specular also drives the visible sky-background brightness
-            renderer->SetBackgroundPresentation(true, sunsetSky ? 2.2f : 4.0f, 0.0f);
+            renderer->SetIBLIntensity(moonlightLook ? 0.72f : (sunsetSky ? 2.1f : 3.2f),
+                                      moonlightLook ? 1.15f : (sunsetSky ? 1.4f : 1.8f)); // NOTE: specular also drives the visible sky-background brightness
+            renderer->SetBackgroundPresentation(true, moonlightLook ? 1.05f : (sunsetSky ? 2.2f : 4.0f),
+                                                moonlightLook ? 0.10f : 0.0f);
             // Each HDRI's baked sun sits at its own azimuth in the file; the offset
             // aligns the visible glow with the IR sun light/shadows (calibrated
             // empirically: the sunset glow centres at rotation sunAz+150).
@@ -3075,19 +3235,26 @@ void Engine::BuildRecipeScene() {
                                       lightingBalance.sunScale);
             // Ambient = a sky-blue fill nudged toward the sun's colour so shade zones
             // read plausibly under any time-of-day the composer picks.
-            const glm::vec3 skyFill = glm::mix(glm::vec3(0.16f, 0.19f, 0.24f),
-                                               genExt.sunColor * 0.22f, 0.35f);
-            renderer->SetAmbientLighting(skyFill, 1.0f);
+            const glm::vec3 skyFill = moonlightLook
+                ? glm::vec3(0.035f, 0.050f, 0.095f)
+                : glm::mix(glm::vec3(0.16f, 0.19f, 0.24f),
+                           genExt.sunColor * 0.22f, 0.35f);
+            renderer->SetAmbientLighting(skyFill, moonlightLook ? 0.92f : 1.0f);
             renderer->SetFogParams(genExt.fogDensity, 0.05f, 0.34f, genExt.fogStart);
+            if (moonlightLook) {
+                renderer->SetColorGrade(0.02f, 0.30f);
+                renderer->SetToneGrade(1.085f, 0.96f);
+                renderer->SetCinematicPost(0.105f, 0.0f);
+            }
             // FIXED exposure: auto-adaptation meters the bright sky (half the frame)
             // and crushes the ground into mud. Deterministic base; the critique loop
             // adjusts via CORTEX_AUTOEXPOSURE_MULT.
             renderer->SetAutoExposureEnabled(false);
-            renderer->SetExposure(std::clamp(0.80f * genExt.exposure, 0.35f, 1.45f));
+            renderer->SetExposure(std::clamp((moonlightLook ? 0.98f : 0.80f) * genExt.exposure, 0.35f, 1.45f));
             if (genExt.waterOn) {
                 renderer->SetWaterParams(genExt.waterLevel, genExt.waterWave, 9.5f, 0.42f,
                                          0.12f, 0.92f, 0.020f, 0.44f); // gentle swell rolling toward the shore (+Z)
-                renderer->SetWaterOptics(genExt.waterRough, 0.55f); // weak fresnel: the tinted volume wins over the sky-mirror
+                renderer->SetWaterOptics(genExt.waterRough, genExt.waterFresnel); // v3 color intent can damp sky-mirror washout
             }
         }
         renderer->SetBloomShape(outdoor ? 1.05f : 1.02f, outdoor ? 0.45f : 0.50f, outdoor ? 2.0f : 0.82f);
@@ -3235,20 +3402,183 @@ void Engine::BuildRecipeScene() {
                 r.ao = 1.0f;
                 r.presetName = "water";
                 Scene::WaterSurfaceComponent sea{};
-                const bool sunsetWater = genExt.skyPreset == "sky_sunset" ||
-                                         (genExt.skyPreset.empty() && genExt.sunEl < 18.0f);
-                sea.absorption = 0.72f;   // the sloped seabed gives real depth: let the tint saturate with it
-                sea.foamStrength = 0.62f;
-                // Water.hlsl: reflectionWeight = lerp(0.68,0.24,viscosity)*... Daylight
-                // damps the white sky-mirror so the tinted body reads; golden hour KEEPS
-                // the mirror -- the warm sky reflecting off the lake IS the shot.
-                sea.viscosity = sunsetWater ? 0.22f : 0.48f;
-                sea.bodyThickness = 0.80f;
+                sea.absorption = genExt.waterAbsorption;   // v3 controls explicit color readability
+                sea.foamStrength = genExt.waterFoam;
+                sea.viscosity = genExt.waterViscosity;
+                sea.emissiveHeat = genExt.waterColorStrength; // water shader uses this as authored color strength for liquidType::Water
+                sea.bodyThickness = genExt.waterBodyThickness;
                 sea.meniscusStrength = 0.38f;
                 sea.flowSpeed = 0.46f;
                 sea.shallowTint = genExt.waterShallow;
                 sea.deepTint = genExt.waterDeep;
                 m_registry->AddComponent<Scene::WaterSurfaceComponent>(water, sea);
+            }
+        }
+    }
+
+    if (genExt.valid && !genExt.structures.empty()) {
+        if (auto* renderer = m_renderer.get()) {
+            auto cubeMesh = Utils::MeshGenerator::CreateCube();
+            auto upCube = renderer->UploadMesh(cubeMesh);
+            if (upCube.IsErr()) {
+                spdlog::warn("generative_exterior: cabin cube mesh upload failed: {}", upCube.Error());
+            } else {
+                int cabinCount = 0;
+                for (const auto& structure : genExt.structures) {
+                    if (structure.type != "cabin") {
+                        continue;
+                    }
+
+                    const float yawRad = glm::radians(structure.yawDeg);
+                    const float cs = std::cos(yawRad);
+                    const float sn = std::sin(yawRad);
+                    const glm::quat rotation(glm::vec3(0.0f, yawRad, 0.0f));
+                    auto place = [&](float x, float y, float z) -> glm::vec3 {
+                        return structure.position + glm::vec3(cs * x + sn * z,
+                                                              y,
+                                                              -sn * x + cs * z);
+                    };
+                    auto addCubePart = [&](const std::string& tag,
+                                           const glm::vec3& localCenter,
+                                           const glm::vec3& scale,
+                                           const glm::vec4& albedo,
+                                           const char* preset,
+                                           float roughness,
+                                           const glm::vec3& emissive = glm::vec3(0.0f),
+                                           float emissiveStrength = 1.0f) {
+                        entt::entity part = m_registry->CreateEntity();
+                        m_registry->AddComponent<Scene::TagComponent>(part, tag);
+                        auto& t = m_registry->AddComponent<TransformComponent>(part);
+                        t.position = place(localCenter.x, localCenter.y, localCenter.z);
+                        t.rotation = rotation;
+                        t.scale = scale;
+                        auto& r = m_registry->AddComponent<Scene::RenderableComponent>(part);
+                        r.mesh = cubeMesh;
+                        r.albedoColor = albedo;
+                        r.metallic = 0.0f;
+                        r.roughness = roughness;
+                        r.ao = 1.0f;
+                        r.presetName = preset;
+                        r.emissiveColor = emissive;
+                        r.emissiveStrength = emissiveStrength;
+                    };
+
+                    const float w = structure.widthM;
+                    const float d = structure.depthM;
+                    const float h = structure.wallHeightM;
+                    const float frontZ = d * 0.5f + 0.035f;
+
+                    addCubePart("GenerativeExterior_Cabin_Body",
+                                glm::vec3(0.0f, h * 0.5f, 0.0f),
+                                glm::vec3(w, h, d),
+                                glm::vec4(0.34f, 0.22f, 0.13f, 1.0f),
+                                "wood",
+                                0.74f);
+                    addCubePart("GenerativeExterior_Cabin_Door",
+                                glm::vec3(-w * 0.20f, 0.58f, frontZ),
+                                glm::vec3(w * 0.22f, h * 0.56f, 0.07f),
+                                glm::vec4(0.12f, 0.075f, 0.045f, 1.0f),
+                                "wood",
+                                0.82f);
+
+                    const glm::vec3 windowGlow = structure.litWindows
+                        ? glm::vec3(1.0f, 0.53f, 0.19f)
+                        : glm::vec3(0.0f);
+                    const float windowEmit = structure.litWindows ? 4.8f : 1.0f;
+                    addCubePart("GenerativeExterior_Cabin_Window_L",
+                                glm::vec3(w * 0.22f, h * 0.64f, frontZ + 0.01f),
+                                glm::vec3(w * 0.18f, h * 0.24f, 0.055f),
+                                glm::vec4(1.0f, 0.58f, 0.24f, 1.0f),
+                                "naturalistic",
+                                0.18f,
+                                windowGlow,
+                                windowEmit);
+                    addCubePart("GenerativeExterior_Cabin_Window_R",
+                                glm::vec3(w * 0.41f, h * 0.64f, frontZ + 0.01f),
+                                glm::vec3(w * 0.16f, h * 0.22f, 0.055f),
+                                glm::vec4(1.0f, 0.58f, 0.24f, 1.0f),
+                                "naturalistic",
+                                0.18f,
+                                windowGlow,
+                                windowEmit);
+
+                    auto roofMesh = CreateGenerativeGableRoofMesh(w + 0.52f,
+                                                                   d + 0.44f,
+                                                                   structure.roofHeightM);
+                    auto upRoof = renderer->UploadMesh(roofMesh);
+                    if (upRoof.IsErr()) {
+                        spdlog::warn("generative_exterior: cabin roof mesh upload failed: {}", upRoof.Error());
+                    } else {
+                        entt::entity roof = m_registry->CreateEntity();
+                        m_registry->AddComponent<Scene::TagComponent>(roof, "GenerativeExterior_Cabin_Roof");
+                        auto& t = m_registry->AddComponent<TransformComponent>(roof);
+                        t.position = place(0.0f, h, 0.0f);
+                        t.rotation = rotation;
+                        auto& r = m_registry->AddComponent<Scene::RenderableComponent>(roof);
+                        r.mesh = roofMesh;
+                        r.albedoColor = glm::vec4(0.105f, 0.075f, 0.065f, 1.0f);
+                        r.metallic = 0.0f;
+                        r.roughness = 0.86f;
+                        r.ao = 1.0f;
+                        r.doubleSided = true;
+                        r.presetName = "wood";
+                    }
+
+                    if (structure.litWindows) {
+                        entt::entity lamp = m_registry->CreateEntity();
+                        m_registry->AddComponent<Scene::TagComponent>(lamp, "GenerativeExterior_Cabin_WindowGlow");
+                        auto& t = m_registry->AddComponent<TransformComponent>(lamp);
+                        t.position = place(w * 0.25f, h * 0.63f, d * 0.5f + 0.35f);
+                        auto& l = m_registry->AddComponent<Scene::LightComponent>(lamp);
+                        l.type = Scene::LightType::Point;
+                        l.color = glm::vec3(1.0f, 0.48f, 0.18f);
+                        l.intensity = 4.2f;
+                        l.range = 5.8f;
+                        l.castsShadows = false;
+                    }
+                    cabinCount++;
+                }
+                if (cabinCount > 0) {
+                    spdlog::info("generative_exterior: created {} procedural cabin structure(s)", cabinCount);
+                }
+            }
+        }
+    }
+
+    if (genExt.valid && !genExt.ridgeLayers.empty()) {
+        if (auto* renderer = m_renderer.get()) {
+            int ridgeCount = 0;
+            for (std::size_t i = 0; i < genExt.ridgeLayers.size(); ++i) {
+                const auto& layer = genExt.ridgeLayers[i];
+                const float width = genExt.extent * (2.25f + static_cast<float>(i) * 0.32f);
+                const float baseY = -1.15f - static_cast<float>(i) * 0.55f;
+                auto ridgeMesh = CreateGenerativeRidgeMesh(width,
+                                                           layer.heightM,
+                                                           baseY,
+                                                           1.73f + static_cast<float>(i) * 4.91f);
+                auto up = renderer->UploadMesh(ridgeMesh);
+                if (up.IsErr()) {
+                    spdlog::warn("generative_exterior: ridge mesh upload failed: {}", up.Error());
+                    continue;
+                }
+                entt::entity ridge = m_registry->CreateEntity();
+                m_registry->AddComponent<Scene::TagComponent>(
+                    ridge, "GenerativeExterior_RidgeLayer" + std::to_string(i));
+                auto& t = m_registry->AddComponent<TransformComponent>(ridge);
+                t.position = glm::vec3(0.0f, 0.0f, -layer.distanceM);
+                auto& r = m_registry->AddComponent<Scene::RenderableComponent>(ridge);
+                r.mesh = ridgeMesh;
+                const float depthFade = std::clamp(1.0f - static_cast<float>(i) * 0.18f, 0.55f, 1.0f);
+                r.albedoColor = glm::vec4(glm::max(layer.color * depthFade, glm::vec3(0.035f)), 1.0f);
+                r.metallic = 0.0f;
+                r.roughness = 0.98f;
+                r.ao = 1.0f;
+                r.doubleSided = true;
+                r.presetName = "naturalistic";
+                ridgeCount++;
+            }
+            if (ridgeCount > 0) {
+                spdlog::info("generative_exterior: created {} procedural ridge layer(s)", ridgeCount);
             }
         }
     }

@@ -33,6 +33,9 @@ import sys
 import time
 from pathlib import Path
 
+from director_ir_v3 import director_from_prompt, scene_type_for, validate as validate_director_ir
+from scene_compiler import compile_v3_to_v2
+
 ROOT = Path(__file__).resolve().parent.parent          # CortexEngine/
 EXE = ROOT / "build" / "bin" / "CortexEngine.exe"
 LOGS = ROOT / "build" / "bin" / "logs"
@@ -381,7 +384,10 @@ STYLE_WORDS = ["modern", "rustic", "industrial", "classic", "minimal", "cozy", "
 
 EXTERIOR_WORDS = {"beach", "garden", "forest", "lake", "desert", "campsite", "camp",
                   "meadow", "park", "outdoor", "outside", "island", "jungle", "woods",
-                  "shore", "coast", "seaside", "riverbank", "clearing", "backyard"}
+                  "shore", "coast", "seaside", "riverbank", "river", "creek", "clearing",
+                  "backyard", "mountain", "mountains", "ridge", "alpine", "canyon"}
+INTERIOR_HINT_WORDS = {"room", "bedroom", "living room", "office", "kitchen",
+                       "dining room", "bathroom", "studio", "interior"}
 
 EXT_SCENE_KITS = {
     # scene: (ground_kind, water, [(query, zone, count, cluster, size_m)])
@@ -424,6 +430,13 @@ EXT_SCENE_KITS = {
 def prompt_is_exterior(prompt):
     words = set(w.strip(",.") for w in prompt.lower().split())
     return bool(words & EXTERIOR_WORDS)
+
+
+def prompt_uses_director_v3(prompt):
+    p = prompt.lower()
+    if any(w in p for w in INTERIOR_HINT_WORDS):
+        return False
+    return prompt_is_exterior(prompt) or scene_type_for(prompt) != "exterior_landscape"
 
 
 def compose_offline_exterior(prompt, by_role):
@@ -1455,13 +1468,45 @@ def enforce_mood_intent(plan, prompt):
     return plan
 
 
-def run_pipeline(prompt, name, backends, iters=3, refresh_catalog=False, verbose=True):
+def build_director_v3_scene(prompt, name, verbose=True):
+    v3 = director_from_prompt(prompt)
+    errors = validate_director_ir(v3)
+    if errors:
+        raise RuntimeError("Director IR v3 validation failed: " + "; ".join(errors))
+    director_path = LOGS / f"{name}_director_v3.json"
+    director_path.parent.mkdir(parents=True, exist_ok=True)
+    director_path.write_text(json.dumps(v3, indent=2), encoding="utf-8")
+    ir = compile_v3_to_v2(v3)
+    if verbose:
+        print(f"[director-v3] {v3['intent']['scene_type']} -> {len(ir['objects'])} objects")
+        print(f"[director-v3] packet {director_path}")
+    return ir, {
+        "version": 3,
+        "scene_type": v3["intent"]["scene_type"],
+        "must_read": v3["intent"]["must_read"],
+        "path": str(director_path),
+    }
+
+
+def run_pipeline(prompt, name, backends, iters=3, refresh_catalog=False, verbose=True,
+                 use_director_v3=True, skip_critic=False):
     assets, by_role, by_id = load_catalog(refresh=refresh_catalog)
-    plan = compose(prompt, by_role, backends, verbose=verbose)
-    plan, repairs = validate_plan(plan, by_role, by_id, verbose=verbose)
-    plan = enforce_color_intent(plan, prompt)
-    plan = enforce_mood_intent(plan, prompt)
-    ir, dropped = solve(plan)
+    director_meta = None
+    if use_director_v3 and prompt_uses_director_v3(prompt):
+        ir, director_meta = build_director_v3_scene(prompt, name, verbose=verbose)
+        repairs = []
+        dropped = []
+        plan = {
+            "_backend": "director_v3",
+            "setting": "exterior",
+            "scene_type": director_meta["scene_type"],
+        }
+    else:
+        plan = compose(prompt, by_role, backends, verbose=verbose)
+        plan, repairs = validate_plan(plan, by_role, by_id, verbose=verbose)
+        plan = enforce_color_intent(plan, prompt)
+        plan = enforce_mood_intent(plan, prompt)
+        ir, dropped = solve(plan)
     if dropped and verbose:
         print(f"[solve] dropped {len(dropped)} un-placeable: {dropped}")
     problems = validity_check(ir)
@@ -1472,6 +1517,8 @@ def run_pipeline(prompt, name, backends, iters=3, refresh_catalog=False, verbose
         "objects": len(ir["objects"]),
         "dropped": dropped, "repairs": repairs, "validity": problems, "ir": ir,
     }
+    if director_meta:
+        result["director"] = director_meta
     if verbose:
         status = "VALID" if not problems else f"{len(problems)} PROBLEM(S)"
         where = (f"room {ir['room']['w']}x{ir['room']['d']}" if "room" in ir
@@ -1503,7 +1550,7 @@ def run_pipeline(prompt, name, backends, iters=3, refresh_catalog=False, verbose
             if verbose:
                 print(f"[render] iter {it}: FAILED after retries -- keeping best so far")
             break
-        crit = critique(png, prompt) if backends != ["offline"] else None
+        crit = None if skip_critic else (critique(png, prompt) if backends != ["offline"] else None)
         score = crit.get("score") if crit else None
         if verbose:
             extra = ""
@@ -1543,6 +1590,8 @@ def main():
     ap.add_argument("--fast", action="store_true",
                     help="native-res preview renders (quicker, lighter; full 1.5x SSAA "
                          "quality is the default -- renders yield to the desktop either way)")
+    ap.add_argument("--legacy-exterior", action="store_true",
+                    help="use the pre-v3 exterior composer/solver path")
     args = ap.parse_args()
     global RENDER_FAST
     RENDER_FAST = args.fast
@@ -1555,7 +1604,8 @@ def main():
         args.backends = "anthropic"
     backends = ["offline"] if args.no_critic and args.backends == "offline" else args.backends.split(",")
     res = run_pipeline(args.prompt, name, backends, iters=(1 if args.no_critic else args.iters),
-                       refresh_catalog=args.refresh_catalog)
+                       refresh_catalog=args.refresh_catalog, use_director_v3=not args.legacy_exterior,
+                       skip_critic=args.no_critic)
     print("\n=== RESULT ===")
     print(json.dumps({k: v for k, v in res.items() if k not in ("ir", "best")}, indent=2))
     if res.get("best"):

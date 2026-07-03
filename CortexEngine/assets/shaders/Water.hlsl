@@ -532,6 +532,7 @@ float4 WaterPS(PSInput input) : SV_TARGET
     float foamStrength = saturate(g_ExtraParams.y);
     float viscosity = saturate(g_ExtraParams.z);
     float emissiveHeat = max(g_FractalParams1.w, g_TransmissionParams.z);
+    float authoredColor = (liquidType == 0u) ? saturate(emissiveHeat) : 0.0f;
     float bodyThickness = saturate(g_CoatParams.x);
     float meniscusStrength = saturate(g_CoatParams.y);
     float sloshStrength = saturate(g_CoatParams.z);
@@ -593,10 +594,12 @@ float4 WaterPS(PSInput input) : SV_TARGET
                                      deepProfile * float3(0.85f, 1.05f, 1.35f),
                                      saturate(depthMix + viewDepth * 0.18f));
         float turbidity = saturate(absorption * 0.55f + bodyThickness * 0.40f);
-        baseColor = lerp(baseColor, localSilt, turbidity * 0.34f * (1.0f - depthMix * 0.30f));
-        baseColor = lerp(baseColor, deepProfile * 0.78f + localSilt * 0.20f, bankDarkening * 0.34f);
-        baseColor = lerp(baseColor, baseColor * lerp(0.92f, 1.08f, surfaceFilm), 0.12f);
-        baseColor = lerp(baseColor, clearWaterTint, 0.36f);
+        float naturalize = 1.0f - authoredColor;
+        baseColor = lerp(baseColor, localSilt, turbidity * 0.34f * (1.0f - depthMix * 0.30f) * naturalize);
+        baseColor = lerp(baseColor, deepProfile * 0.78f + localSilt * 0.20f, bankDarkening * 0.34f * naturalize);
+        baseColor = lerp(baseColor, baseColor * lerp(0.92f, 1.08f, surfaceFilm), 0.12f * naturalize);
+        baseColor = lerp(baseColor, clearWaterTint, lerp(0.36f, 0.10f, authoredColor));
+        baseColor = lerp(baseColor, shallowProfile * 0.70f + deepProfile * 0.38f, authoredColor * 0.58f);
     }
     baseColor = lerp(baseColor, g_Albedo.rgb, liquidType == 0u ? 0.16f : 0.08f);
     float opticalDepth = absorption * (0.35f + depthMix * 1.15f + bodyThickness * 1.35f + meniscus * 0.55f);
@@ -643,11 +646,12 @@ float4 WaterPS(PSInput input) : SV_TARGET
     {
         float skyFacing = saturate(N.y * 0.65f + pow(1.0f - NdotV, 2.0f) * 0.35f);
         float3 sceneWaterSky = lerp(shallowProfile, max(g_AmbientColor.rgb * 1.35f, shallowProfile), 0.45f);
-        depthTint = lerp(baseColor, sceneWaterSky, 0.18f * skyFacing);
+        depthTint = lerp(baseColor, sceneWaterSky, 0.18f * skyFacing * (1.0f - authoredColor * 0.78f));
         float3 clearDepthTint = lerp(shallowProfile * float3(1.08f, 1.20f, 1.18f),
                                      deepProfile * float3(0.90f, 1.06f, 1.34f),
                                      saturate(depthMix + viewDepth * 0.20f));
-        depthTint = lerp(depthTint, clearDepthTint, 0.32f);
+        depthTint = lerp(depthTint, clearDepthTint, 0.32f * (1.0f - authoredColor * 0.55f));
+        depthTint = lerp(depthTint, shallowProfile * 0.62f + deepProfile * 0.46f, authoredColor * 0.72f);
     }
     else if (liquidType == 1u)
     {
@@ -703,6 +707,7 @@ float4 WaterPS(PSInput input) : SV_TARGET
     if (liquidType == 0u)
     {
         reflectionWeight *= saturate(1.0f - bankDarkening * 0.22f + surfaceFilm * 0.16f);
+        reflectionWeight *= lerp(1.0f, 0.24f, authoredColor);
         reflectedRoom = lerp(reflectedRoom, reflectedRoom * float3(0.78f, 0.88f, 0.74f), bankDarkening * 0.22f);
     }
     color += reflectedRoom * reflectionWeight;
@@ -761,7 +766,9 @@ float4 WaterPS(PSInput input) : SV_TARGET
                                        deepProfile * float3(0.82f, 1.06f, 1.24f),
                                        saturate(depthMix + grazingReflect * 0.22f + farDepth * 0.12f));
         naturalBody = lerp(naturalBody, fresnelDepthWash, 0.22f + grazingReflect * 0.12f);
-        color = lerp(color, naturalBody + reflectedRoom * reflectionWeight * 0.92f + sunSheen, 0.42f);
+        color = lerp(color, naturalBody + reflectedRoom * reflectionWeight * 0.92f + sunSheen,
+                     0.42f * (1.0f - authoredColor * 0.88f));
+        color = lerp(color, shallowProfile * 0.50f + deepProfile * 0.58f, authoredColor * 0.34f);
     }
     else if (liquidType == 1u)
     {
@@ -806,6 +813,7 @@ float4 WaterPS(PSInput input) : SV_TARGET
     {
         float farEdgeMask = smoothstep(0.70f, 0.98f, input.texCoord.y);
         color = ApplyWaterHorizonBlend(color, input.worldPos, farEdgeMask, shallowProfile, deepProfile, radiance, flowNoise);
+        color = lerp(color, shallowProfile * 0.52f + deepProfile * 0.48f, authoredColor * farEdgeMask * 0.42f);
     }
 
     return float4(color, alpha);

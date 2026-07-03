@@ -63,6 +63,200 @@ def _read_log(path: Path | None) -> str:
     return ""
 
 
+def _frame_report_candidates(frame_report: Path | None, ir: Path | None, png: Path | None, log: Path | None) -> list[Path]:
+    candidates: list[Path] = []
+    if frame_report:
+        candidates.append(frame_report)
+    for path in (png, ir, log):
+        if not path:
+            continue
+        stem = path.stem
+        if stem.endswith("_ir"):
+            stem = stem[:-3]
+        elif stem.endswith("_frame_report"):
+            stem = stem[: -len("_frame_report")]
+        candidates.append(path.with_name(f"{stem}_frame_report.json"))
+    deduped: list[Path] = []
+    seen: set[str] = set()
+    for candidate in candidates:
+        key = str(candidate.resolve()) if candidate.exists() else str(candidate)
+        if key not in seen:
+            deduped.append(candidate)
+            seen.add(key)
+    return deduped
+
+
+def _load_frame_report(frame_report: Path | None, ir: Path | None, png: Path | None, log: Path | None) -> dict[str, Any] | None:
+    for candidate in _frame_report_candidates(frame_report, ir, png, log):
+        try:
+            if candidate.exists():
+                data = _load_json(candidate)
+                if isinstance(data, dict):
+                    data["_gate_source_path"] = str(candidate)
+                    return data
+        except Exception:
+            continue
+    return None
+
+
+def _string_set(values: Any) -> set[str]:
+    if isinstance(values, list):
+        return {str(v) for v in values}
+    return set()
+
+
+def _executed_pass(passes: dict[str, dict[str, Any]], name: str) -> dict[str, Any]:
+    value = passes.get(name)
+    return value if isinstance(value, dict) else {}
+
+
+def _full_scene_pipeline_evidence(frame_report: dict[str, Any] | None) -> dict[str, Any]:
+    if not isinstance(frame_report, dict):
+        return {
+            "ok": False,
+            "report_present": False,
+            "missing": ["frame_report_sidecar"],
+        }
+
+    frame_contract = frame_report.get("frame_contract") or {}
+    if not isinstance(frame_contract, dict):
+        return {
+            "ok": False,
+            "report_present": True,
+            "path": frame_report.get("_gate_source_path"),
+            "missing": ["frame_contract"],
+        }
+
+    features = frame_contract.get("features") or {}
+    executed_features = frame_contract.get("executed_features") or {}
+    culling = frame_contract.get("culling") or {}
+    draw_counts = frame_contract.get("draw_counts") or {}
+    v3 = frame_contract.get("full_scene_shader_pipeline_v3") or {}
+
+    pass_records = frame_contract.get("passes") or []
+    passes = {
+        str(p.get("name")): p
+        for p in pass_records
+        if isinstance(p, dict) and p.get("name")
+    }
+    resources = {
+        str(r.get("name")): r
+        for r in (frame_contract.get("resources") or [])
+        if isinstance(r, dict) and r.get("name")
+    }
+
+    required_resources = {
+        "visibility_buffer",
+        "vb_gbuffer_albedo",
+        "vb_gbuffer_normal_roughness",
+        "vb_gbuffer_material_ext2",
+        "shadow_map",
+    }
+    valid_resources = {
+        name
+        for name in required_resources
+        if isinstance(resources.get(name), dict) and bool(resources[name].get("valid"))
+    }
+
+    vb_material_resolve = _executed_pass(passes, "VBMaterialResolve")
+    vb_deferred_lighting = _executed_pass(passes, "VBDeferredLighting")
+    visibility_buffer = _executed_pass(passes, "VisibilityBuffer")
+    vb_material_writes = _string_set(vb_material_resolve.get("writes"))
+    vb_deferred_reads = _string_set(vb_deferred_lighting.get("reads"))
+    vb_deferred_writes = _string_set(vb_deferred_lighting.get("writes"))
+    visibility_writes = _string_set(visibility_buffer.get("writes"))
+    gpu_passes = frame_report.get("gpu_passes") or []
+    gpu_visibility_ms = 0.0
+    gpu_visibility_seen = False
+    for gpu_pass in gpu_passes:
+        if isinstance(gpu_pass, dict) and gpu_pass.get("name") == "VisibilityBuffer":
+            gpu_visibility_seen = True
+            try:
+                gpu_visibility_ms = max(gpu_visibility_ms, float(gpu_pass.get("ms", 0.0) or 0.0))
+            except Exception:
+                pass
+
+    try:
+        vb_instances = int(draw_counts.get("visibility_buffer_instances", 0) or 0)
+        vb_materials = int(draw_counts.get("visibility_buffer_materials", 0) or 0)
+        vb_batches = int(draw_counts.get("visibility_buffer_draw_batches", 0) or 0)
+    except Exception:
+        vb_instances = vb_materials = vb_batches = 0
+
+    v3_pass_names = _string_set(v3.get("render_graph_v3_pass_names"))
+    evidence = {
+        "ok": True,
+        "report_present": True,
+        "path": frame_report.get("_gate_source_path"),
+        "visibility_buffer_enabled": bool(features.get("visibility_buffer_enabled")),
+        "visibility_buffer_executed": bool(executed_features.get("visibility_buffer_enabled")),
+        "visibility_buffer_rendered": bool(culling.get("visibility_buffer_rendered")),
+        "visibility_buffer_instances": vb_instances,
+        "visibility_buffer_materials": vb_materials,
+        "visibility_buffer_draw_batches": vb_batches,
+        "visibility_buffer_gpu_pass_seen": gpu_visibility_seen,
+        "visibility_buffer_gpu_ms": round(gpu_visibility_ms, 4),
+        "vb_material_resolve_executed": bool(vb_material_resolve.get("executed")),
+        "vb_material_resolve_writes": sorted(vb_material_writes),
+        "vb_deferred_lighting_executed": bool(vb_deferred_lighting.get("executed")),
+        "vb_deferred_lighting_reads": sorted(vb_deferred_reads),
+        "vb_deferred_lighting_writes": sorted(vb_deferred_writes),
+        "visibility_buffer_pass_executed": bool(visibility_buffer.get("executed")),
+        "visibility_buffer_pass_writes": sorted(visibility_writes),
+        "valid_resources": sorted(valid_resources),
+        "material_attributes_ready": bool(v3.get("material_attributes_ready")),
+        "lighting_adapter_ready": bool(v3.get("lighting_adapter_ready")),
+        "lighting_split_resources_allocated": bool(v3.get("lighting_split_resources_allocated")),
+        "lighting_split_resources_ready": bool(v3.get("lighting_split_resources_ready")),
+        "render_graph_v3_inventory_ready": bool(v3.get("render_graph_v3_inventory_ready")),
+        "render_graph_v3_pass_names": sorted(v3_pass_names),
+    }
+
+    missing: list[str] = []
+    if not evidence["visibility_buffer_enabled"]:
+        missing.append("visibility_buffer_enabled")
+    if not evidence["visibility_buffer_executed"]:
+        missing.append("visibility_buffer_executed_feature")
+    if not evidence["visibility_buffer_rendered"]:
+        missing.append("visibility_buffer_rendered")
+    if vb_instances <= 0:
+        missing.append("visibility_buffer_instances")
+    if vb_materials <= 0:
+        missing.append("visibility_buffer_materials")
+    if vb_batches <= 0:
+        missing.append("visibility_buffer_draw_batches")
+    if not gpu_visibility_seen:
+        missing.append("visibility_buffer_gpu_pass")
+    if not evidence["visibility_buffer_pass_executed"]:
+        missing.append("VisibilityBuffer_pass")
+    if not {"visibility_buffer", "vb_gbuffer_albedo", "vb_gbuffer_normal_roughness", "vb_gbuffer_material_ext2"}.issubset(visibility_writes):
+        missing.append("VisibilityBuffer_gbuffer_writes")
+    if not evidence["vb_material_resolve_executed"]:
+        missing.append("VBMaterialResolve_pass")
+    if not {"gbuffer_albedo", "gbuffer_normal_roughness", "gbuffer_material_ext2"}.issubset(vb_material_writes):
+        missing.append("VBMaterialResolve_gbuffer_writes")
+    if not evidence["vb_deferred_lighting_executed"]:
+        missing.append("VBDeferredLighting_pass")
+    if not {"gbuffer_albedo", "gbuffer_normal_roughness", "gbuffer_material_ext2", "shadow_map"}.issubset(vb_deferred_reads):
+        missing.append("VBDeferredLighting_material_shadow_reads")
+    if "hdr_color" not in vb_deferred_writes:
+        missing.append("VBDeferredLighting_hdr_write")
+    if valid_resources != required_resources:
+        missing.append("valid_visibility_gbuffer_resources")
+    if not evidence["material_attributes_ready"]:
+        missing.append("full_scene_v3_material_attributes_ready")
+    if not evidence["lighting_adapter_ready"]:
+        missing.append("full_scene_v3_lighting_adapter_ready")
+    if not evidence["render_graph_v3_inventory_ready"]:
+        missing.append("full_scene_v3_render_graph_inventory")
+    if not {"VisibilityBuffer", "VBDeferredLighting"}.issubset(v3_pass_names):
+        missing.append("full_scene_v3_pass_inventory")
+
+    evidence["missing"] = missing
+    evidence["ok"] = not missing
+    return evidence
+
+
 def _objects(ir: dict[str, Any]) -> list[dict[str, Any]]:
     return [o for o in ir.get("objects") or [] if isinstance(o, dict)]
 
@@ -477,7 +671,13 @@ def _image_metrics(path: Path | None) -> dict[str, Any]:
     }
 
 
-def evaluate(prompt: str, ir: dict[str, Any], png: Path | None, log_text: str) -> dict[str, Any]:
+def evaluate(
+    prompt: str,
+    ir: dict[str, Any],
+    png: Path | None,
+    log_text: str,
+    frame_report: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     flags = _prompt_flags(prompt)
     graphics = _graphics(ir)
     ground = _ground(ir)
@@ -516,6 +716,7 @@ def evaluate(prompt: str, ir: dict[str, Any], png: Path | None, log_text: str) -
     lighting_shadow_material_field = graphics.get("lighting_shadow_material_field") or {}
     source_readability_balance = graphics.get("source_readability_balance") or {}
     image = _image_metrics(png)
+    frame_pipeline = _full_scene_pipeline_evidence(frame_report)
 
     failures: list[dict[str, Any]] = []
     warnings: list[dict[str, Any]] = []
@@ -609,6 +810,13 @@ def evaluate(prompt: str, ir: dict[str, Any], png: Path | None, log_text: str) -
                 "No runtime evidence that AO/SSR/shadow graphics controls were applied",
                 renderer=renderer,
                 runtime_renderer=has_runtime_renderer,
+            )
+
+        if not frame_pipeline.get("ok"):
+            fail(
+                "missing_full_scene_shader_pipeline_evidence",
+                "Generated exterior lacks per-render frame-contract evidence for the visibility-buffer material resolve/deferred lighting/full-scene shader path",
+                frame_pipeline=frame_pipeline,
             )
 
         has_lighting_contract = (
@@ -1815,12 +2023,18 @@ def evaluate(prompt: str, ir: dict[str, Any], png: Path | None, log_text: str) -
         else:
             warn("image_metrics_skipped", "PNG/Pillow unavailable; only IR/runtime graphics evidence was checked")
 
+    metrics: dict[str, Any] = {}
+    if image:
+        metrics["image"] = image
+    if frame_pipeline.get("report_present") or frame_pipeline.get("missing"):
+        metrics["frame_pipeline"] = frame_pipeline
+
     return {
         "prompt": prompt,
         "passed": not failures,
         "failures": failures,
         "warnings": warnings,
-        "metrics": {"image": image} if image else {},
+        "metrics": metrics,
     }
 
 
@@ -1830,13 +2044,15 @@ def main() -> int:
     ap.add_argument("--ir", required=True, type=Path)
     ap.add_argument("--png", type=Path)
     ap.add_argument("--log", type=Path)
+    ap.add_argument("--frame-report", type=Path)
     ap.add_argument("--out", type=Path)
     ap.add_argument("--expect-fail", action="store_true")
     args = ap.parse_args()
 
     ir = _load_json(args.ir)
     log_text = _read_log(args.log)
-    report = evaluate(args.prompt, ir, args.png, log_text)
+    frame_report = _load_frame_report(args.frame_report, args.ir, args.png, args.log)
+    report = evaluate(args.prompt, ir, args.png, log_text, frame_report)
 
     out_dir = args.out or (LOGS / "scene_graphics" / _slug(args.prompt))
     out_dir.mkdir(parents=True, exist_ok=True)

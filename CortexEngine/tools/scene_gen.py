@@ -28,6 +28,7 @@ import argparse
 import json
 import math
 import os
+import shutil
 import subprocess
 import sys
 import time
@@ -1322,6 +1323,31 @@ def validity_check_interior(ir):
 RENDER_FAST = False
 
 
+def _snapshot_frame_report(out_name: str, render_start: float, log_parts: list[str]) -> Path | None:
+    sidecar = LOGS / f"{out_name}_frame_report.json"
+    fresh: list[tuple[float, Path]] = []
+    for name in ("frame_report_shutdown.json", "frame_report_last.json"):
+        candidate = LOGS / name
+        try:
+            if candidate.exists():
+                mtime = candidate.stat().st_mtime
+                if mtime >= render_start - 2.0:
+                    fresh.append((mtime, candidate))
+        except OSError:
+            continue
+    if not fresh:
+        log_parts.append(f"[scene_gen] frame report sidecar missing or stale for {out_name}")
+        return None
+    source = max(fresh, key=lambda item: item[0])[1]
+    try:
+        shutil.copy2(source, sidecar)
+    except OSError as exc:
+        log_parts.append(f"[scene_gen] frame report sidecar copy failed for {out_name}: {exc}")
+        return None
+    log_parts.append(f"[scene_gen] frame report sidecar: {sidecar}")
+    return sidecar
+
+
 def render_ir(ir, out_name, camera="", night=False, timeout=220):
     ir_path = LOGS / f"{out_name}_ir.json"
     ir_path.parent.mkdir(parents=True, exist_ok=True)
@@ -1334,12 +1360,14 @@ def render_ir(ir, out_name, camera="", night=False, timeout=220):
         args += ["-Night"]
     if RENDER_FAST:
         args += ["-Fast"]
+    render_start = time.time()
     r = subprocess.run(args, capture_output=True, text=True, timeout=timeout)
     log_parts = [r.stdout or "", r.stderr or ""]
     for harness_name in ("ir_harness.out", "ir_harness.err"):
         harness_path = ROOT / "build" / "bin" / harness_name
         if harness_path.exists():
             log_parts.append(harness_path.read_text(encoding="utf-8", errors="replace"))
+    _snapshot_frame_report(out_name, render_start, log_parts)
     (LOGS / f"{out_name}.out").write_text("\n".join(p for p in log_parts if p), encoding="utf-8")
     lines = [l.strip() for l in r.stdout.splitlines() if l.strip()]
     png = lines[-1] if lines and lines[-1].lower().endswith(".png") else None

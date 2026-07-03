@@ -369,6 +369,17 @@ def compile_v3_to_v2(v3: dict[str, Any]) -> dict[str, Any]:
         _scatter_ring(objects, "dead_tree_trunk", 5, radius_x=18.0, z_base=0.6, z_jitter=3.0,
                       foot=1.55, seed=scene_type + ":snags", tint=[0.34, 0.22, 0.13],
                       placed=placed)
+        if canyon:
+            cliff_specs = [
+                ("cliff_large_rock", -19.5, -3.2, 8.0, 3.6),
+                ("cliff_large_rock", 19.2, -5.8, 188.0, 3.4),
+                ("cliff_cornerLarge_rock", -20.4, -12.4, 24.0, 3.3),
+                ("cliff_cornerLarge_rock", 20.0, -15.2, 204.0, 3.2),
+                ("cliff_blockSlope_rock", -17.8, -21.2, -12.0, 3.0),
+                ("cliff_blockSlope_rock", 17.6, -21.8, 168.0, 3.0),
+            ]
+            for asset, x, z, yaw, foot in cliff_specs:
+                _add(objects, asset, x, z, yaw, foot, tint=rock_tint, placed=placed)
     else:
         _scatter_ring(objects, "tree_pineTallA_detailed", 14, radius_x=18.0, z_base=-1.3, z_jitter=3.8,
                       foot=3.0, seed=scene_type + ":trees", tint=foliage_tint,

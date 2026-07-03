@@ -201,6 +201,27 @@ Escape: if weather overlay geometry hurts semantic/color gates, keep the runtime
 
 Status: done
 
+### Loop 11: Catalog Cliff Asset Integration
+
+Invariant: canyon generated exteriors use real catalog cliff/rock assets for visible silhouette mass, not only procedural wall planes and overlay lines.
+
+Scope:
+
+- in: `tools/scene_graphics_gate.py`, `tools/scene_compiler.py`, focused ledgers.
+- out: C++ renderer changes, quality gate changes, forced DXR defaults, unrelated prompt classes.
+
+Verifier:
+
+- Current Loop 14 desert canyon artifact fails strengthened graphics gate with `missing_catalog_cliff_assets`.
+- New desert canyon prompt renders VALID and passes quality + strengthened graphics gate with at least four `cliff_*` catalog assets in the IR.
+- Campsite/alpine regressions remain valid and green.
+
+Exit: all verifier commands green, with artifacts and logs recorded.
+
+Escape: if catalog cliff assets destabilize layout validity, reduce count/footprint and keep procedural cliff detail as fallback.
+
+Status: done
+
 ## Progress Log
 
 2026-07-03:
@@ -314,6 +335,24 @@ Status: done
 - Visual inspection after Loop 10:
   - Alpine now reads closer to night/storm with a dark sky, cabin glow, visible rain, and retained inspectability.
   - Desert cliff details are visible as erosion/crack lines, but the wall mass is still fundamentally planar and stylized. The next front should attack mesh silhouette/asset realism or integrate higher-fidelity cliff/tree/prop assets rather than adding more line overlays.
+- Loop 11 heartbeat proof:
+  - `node Z:\328\CMPUT328-A2\codexworks\301\heartbeat\bin\hb.mjs wait --label codex_aaa_push_proof --timeout 1 --poll 1` exited by timeout after 1s.
+- Loop 11 red proof:
+  - `python tools\scene_graphics_gate.py --prompt "a sunny desert canyon campsite with red rocks and a turquoise river" --ir build\bin\logs\aaa_graphics_desert_loop14_0_ir.json --png build\bin\logs\aaa_graphics_desert_loop14_0.png --log build\bin\logs\aaa_graphics_desert_loop14.out` exited 1 with only `missing_catalog_cliff_assets`.
+- Loop 11 implementation:
+  - `tools\scene_graphics_gate.py` now counts catalog `cliff_*` assets and requires at least four for canyon prompts.
+  - `tools\scene_compiler.py` now scatters six conservative canyon flank cliff assets: `cliff_large_rock`, `cliff_cornerLarge_rock`, and `cliff_blockSlope_rock`.
+- Loop 11 verifier evidence:
+  - `python -m py_compile tools\scene_compiler.py tools\scene_graphics_gate.py tools\scene_quality_gate.py tools\scene_gen.py` exited 0.
+  - Desert canyon `aaa_graphics_desert_loop17` rendered VALID with 54 objects; quality gate exited 0 (`turquoise_fraction=0.4212`, `nonblack_fraction=1.0`); graphics gate exited 0 with residual warning `weak_image_contact_metric`; Director IR validation exited 0.
+  - Fresh IR contains six catalog cliffs: `cliff_blockSlope_rock 2`, `cliff_cornerLarge_rock 2`, and `cliff_large_rock 2`.
+  - Campsite `aaa_graphics_campsite_loop17` rendered VALID with 58 objects; quality gate exited 0 (`purple_fraction=0.7429`, `nonblack_fraction=1.0`); graphics gate exited 0 with residual warning `weak_image_contact_metric`; Director IR validation exited 0.
+  - Alpine `aaa_graphics_alpine_loop17` rendered VALID with 50 objects; quality gate exited 0 (`avg_luma=0.1352`, `cool_fraction=0.8599`, `nonblack_fraction=0.9998`); graphics gate exited 0; Director IR validation exited 0.
+  - Kitchen smoke `regression_kitchen_aaa_loop17` rendered VALID and quality gate exited 0 (`avg_luma=0.4618`, `nonblack_fraction=1.0`).
+  - Known-bad quality oracle `gen_a_foggy_mountain_campsite_beside_0` with `--expect-fail` exited 0 and still reports the fridge/missing-ridge/purple-water failures.
+  - Known-bad graphics oracle `v3_campsite_ridge_test_0` with `--expect-fail` exited 0 and still reports the expected graphics-fidelity failures.
+- Visual inspection after Loop 11:
+  - Catalog cliffs add real mesh silhouettes to canyon IRs, but they do not close the AAA gap by themselves. The next slice should target surface/material realism and repeated low-poly asset reads, not another metadata-only gate.
 
 ## BLOCKED / Decisions
 

@@ -147,6 +147,7 @@ def _asset_counts(ir: dict[str, Any]) -> dict[str, int]:
         "trees": 0,
         "pines": 0,
         "rocks": 0,
+        "cliffs": 0,
         "hero": 0,
     }
     for obj in _objects(ir):
@@ -157,6 +158,8 @@ def _asset_counts(ir: dict[str, Any]) -> dict[str, int]:
             counts["pines"] += 1
         if any(w in low for w in ("rock", "boulder", "stone", "cliff")):
             counts["rocks"] += 1
+        if "cliff" in low:
+            counts["cliffs"] += 1
         if any(w in low for w in ("tent", "campfire", "fire", "cabin", "log", "lantern")):
             counts["hero"] += 1
     return counts
@@ -493,6 +496,13 @@ def evaluate(prompt: str, ir: dict[str, Any], png: Path | None, log_text: str) -
                     "Canyon walls still read as planar blockout geometry without erosion/strata breakup evidence",
                     geometry_realism=geometry_realism,
                     runtime_cliff_detail=has_runtime_cliff_detail,
+                )
+            assets = _asset_counts(ir)
+            if assets["cliffs"] < 4:
+                fail(
+                    "missing_catalog_cliff_assets",
+                    "Canyon prompt lacks real catalog cliff assets to break up procedural wall silhouettes",
+                    assets=assets,
                 )
 
         if flags["desert"] or flags["canyon"]:

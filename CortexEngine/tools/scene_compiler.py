@@ -479,6 +479,23 @@ def compile_v3_to_v2(v3: dict[str, Any]) -> dict[str, Any]:
                 "prop_silhouette_breakup",
             ],
         },
+        "naturalistic_ecology": {
+            "enabled": True,
+            "grass_cluster_count": 14 if not desert else 0,
+            "bush_cluster_count": 6 if not desert else 0,
+            "fern_cluster_count": 5 if not desert else 0,
+            "trunk_count": 3 if not desert else 2,
+            "branch_count": 3 if not desert else 6,
+            "stump_count": 2,
+            "moss_rock_count": 5 if not desert else 5,
+            "systems": [
+                "scanned_grass_clumps",
+                "scanned_ferns_or_bushes",
+                "scanned_dry_branches",
+                "scanned_stumps_and_trunks",
+                "scanned_moss_or_boulder_rocks",
+            ],
+        },
         "asset_fidelity": {
             "enabled": True,
             "hero_detail_count": (18 if campsite else 6) + (24 if cabin else 0),

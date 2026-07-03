@@ -150,6 +150,17 @@ namespace {
         int propDepthLayerCount = 0;
     };
 
+    struct GenerativeNaturalisticEcology {
+        bool enabled = false;
+        int grassClusterCount = 0;
+        int bushClusterCount = 0;
+        int fernClusterCount = 0;
+        int trunkCount = 0;
+        int branchCount = 0;
+        int stumpCount = 0;
+        int mossRockCount = 0;
+    };
+
     struct GenerativeAssetFidelity {
         bool enabled = false;
         int heroDetailCount = 0;
@@ -3280,6 +3291,7 @@ void Engine::BuildRecipeScene() {
         GenerativeSurfaceDetail surfaceDetail;
         GenerativeSurfaceMaterialRichness surfaceMaterialRichness;
         GenerativeMeshSilhouetteRealism meshSilhouetteRealism;
+        GenerativeNaturalisticEcology naturalisticEcology;
         GenerativeAssetFidelity assetFidelity;
         GenerativeAtmosphereFidelity atmosphereFidelity;
         GenerativeGeometryRealism geometryRealism;
@@ -3411,6 +3423,22 @@ void Engine::BuildRecipeScene() {
                     static_cast<int>(std::clamp(num(meshSilhouetteRealism, "hero_bevel_detail_count", 0.0f), 0.0f, 48.0f));
                 genExt.meshSilhouetteRealism.propDepthLayerCount =
                     static_cast<int>(std::clamp(num(meshSilhouetteRealism, "prop_depth_layer_count", 0.0f), 0.0f, 24.0f));
+                const nlohmann::json naturalisticEcology = graphics.value("naturalistic_ecology", nlohmann::json::object());
+                genExt.naturalisticEcology.enabled = naturalisticEcology.value("enabled", false);
+                genExt.naturalisticEcology.grassClusterCount =
+                    static_cast<int>(std::clamp(num(naturalisticEcology, "grass_cluster_count", 0.0f), 0.0f, 24.0f));
+                genExt.naturalisticEcology.bushClusterCount =
+                    static_cast<int>(std::clamp(num(naturalisticEcology, "bush_cluster_count", 0.0f), 0.0f, 16.0f));
+                genExt.naturalisticEcology.fernClusterCount =
+                    static_cast<int>(std::clamp(num(naturalisticEcology, "fern_cluster_count", 0.0f), 0.0f, 16.0f));
+                genExt.naturalisticEcology.trunkCount =
+                    static_cast<int>(std::clamp(num(naturalisticEcology, "trunk_count", 0.0f), 0.0f, 10.0f));
+                genExt.naturalisticEcology.branchCount =
+                    static_cast<int>(std::clamp(num(naturalisticEcology, "branch_count", 0.0f), 0.0f, 14.0f));
+                genExt.naturalisticEcology.stumpCount =
+                    static_cast<int>(std::clamp(num(naturalisticEcology, "stump_count", 0.0f), 0.0f, 8.0f));
+                genExt.naturalisticEcology.mossRockCount =
+                    static_cast<int>(std::clamp(num(naturalisticEcology, "moss_rock_count", 0.0f), 0.0f, 12.0f));
                 const nlohmann::json assetFidelity = graphics.value("asset_fidelity", nlohmann::json::object());
                 genExt.assetFidelity.enabled = assetFidelity.value("enabled", false);
                 genExt.assetFidelity.heroDetailCount =
@@ -4643,6 +4671,253 @@ void Engine::BuildRecipeScene() {
             }
         }
     }
+
+    if (genExt.valid && genExt.naturalisticEcology.enabled) {
+        if (auto* renderer = m_renderer.get()) {
+            auto grassMesh = LoadNaturalisticShowcaseMesh("grass_bermuda_01/grass_bermuda_01_1k.gltf");
+            auto bushMesh = LoadNaturalisticShowcaseMesh("wild_rooibos_bush/wild_rooibos_bush_1k.gltf");
+            auto fernMesh = LoadNaturalisticShowcaseMesh("fern_02/fern_02_1k.gltf");
+            auto trunkMesh = LoadNaturalisticShowcaseMesh("dead_tree_trunk/dead_tree_trunk_1k.gltf");
+            auto branchMesh = LoadNaturalisticShowcaseMesh("dry_branches_medium_01/dry_branches_medium_01_1k.gltf");
+            auto stumpMesh = LoadNaturalisticShowcaseMesh("tree_stump_01/tree_stump_01_1k.gltf");
+            auto mossRockMesh = LoadNaturalisticShowcaseMesh("rock_moss_set_01/rock_moss_set_01_1k.gltf");
+            auto boulderMesh = LoadNaturalisticShowcaseMesh("boulder_01/boulder_01_1k.gltf");
+
+            const bool uploadsOk =
+                UploadAssetLedMesh(renderer, grassMesh, "grass_bermuda_01") &&
+                UploadAssetLedMesh(renderer, bushMesh, "wild_rooibos_bush") &&
+                UploadAssetLedMesh(renderer, fernMesh, "fern_02") &&
+                UploadAssetLedMesh(renderer, trunkMesh, "dead_tree_trunk") &&
+                UploadAssetLedMesh(renderer, branchMesh, "dry_branches_medium_01") &&
+                UploadAssetLedMesh(renderer, stumpMesh, "tree_stump_01") &&
+                UploadAssetLedMesh(renderer, mossRockMesh, "rock_moss_set_01") &&
+                UploadAssetLedMesh(renderer, boulderMesh, "boulder_01");
+            if (!uploadsOk) {
+                spdlog::warn("generative_exterior: naturalistic ecology mesh upload failed");
+            } else {
+                const bool desertSurface = genExt.groundKind.find("dirt") != std::string::npos ||
+                                           genExt.worldGeometry.canyonWallLayers > 0;
+                const float groundW = genExt.extent * 1.82f;
+                const float shoreZ = genExt.waterOn ? genExt.waterFromZ : -genExt.extent * 0.30f;
+                const float landSpan = genExt.extent * 0.54f;
+                auto pseudo = [](int i, float salt) {
+                    const float n = std::sin(static_cast<float>(i) * 12.9898f + salt * 78.233f) * 43758.5453f;
+                    return n - std::floor(n);
+                };
+
+                const AssetLedMaterialSettings wetBark{
+                    glm::vec4(desertSurface ? glm::vec3(0.36f, 0.24f, 0.14f) : glm::vec3(0.18f, 0.11f, 0.070f), 1.0f),
+                    0.0f,
+                    desertSurface ? 0.78f : 0.58f,
+                    0.0f,
+                    1.5f,
+                    glm::vec3(0.0f),
+                    1.0f,
+                    desertSurface ? 0.08f : std::min(0.62f, genExt.groundWetness + 0.20f),
+                    0.42f,
+                    false,
+                    Scene::RenderableComponent::AlphaMode::Opaque,
+                    Scene::RenderableComponent::RenderLayer::Opaque,
+                    "wood"
+                };
+                const AssetLedMaterialSettings vegetation{
+                    glm::vec4(desertSurface ? glm::vec3(0.45f, 0.36f, 0.18f) : glm::vec3(0.10f, 0.23f, 0.12f), 1.0f),
+                    0.0f,
+                    desertSurface ? 0.86f : 0.72f,
+                    0.0f,
+                    1.5f,
+                    glm::vec3(0.0f),
+                    1.0f,
+                    desertSurface ? 0.03f : std::min(0.48f, genExt.groundWetness + 0.12f),
+                    desertSurface ? 0.24f : 0.46f,
+                    true,
+                    Scene::RenderableComponent::AlphaMode::Opaque,
+                    Scene::RenderableComponent::RenderLayer::Opaque,
+                    "vegetation"
+                };
+                const AssetLedMaterialSettings stone{
+                    glm::vec4(desertSurface ? glm::vec3(0.54f, 0.32f, 0.20f) : glm::vec3(0.17f, 0.20f, 0.16f), 1.0f),
+                    0.0f,
+                    desertSurface ? 0.76f : 0.62f,
+                    0.0f,
+                    1.5f,
+                    glm::vec3(0.0f),
+                    1.0f,
+                    desertSurface ? 0.04f : std::min(0.70f, genExt.groundWetness + 0.22f),
+                    desertSurface ? 0.42f : 0.66f,
+                    false,
+                    Scene::RenderableComponent::AlphaMode::Opaque,
+                    Scene::RenderableComponent::RenderLayer::Opaque,
+                    "mossy_masonry"
+                };
+
+                auto addNatural = [&](const std::string& tag,
+                                      const char* assetId,
+                                      const std::shared_ptr<Scene::MeshData>& mesh,
+                                      const glm::vec3& position,
+                                      const glm::vec3& scale,
+                                      const glm::vec3& euler,
+                                      const AssetLedMaterialSettings& material,
+                                      int& counter) {
+                    if (!mesh || !mesh->gpuBuffers) {
+                        return;
+                    }
+                    AddAssetLedNaturalisticRenderable(*m_registry,
+                                                      tag.c_str(),
+                                                      assetId,
+                                                      mesh,
+                                                      position,
+                                                      scale,
+                                                      euler,
+                                                      material);
+                    counter++;
+                };
+
+                int grassInstances = 0;
+                int bushInstances = 0;
+                int fernInstances = 0;
+                int trunkInstances = 0;
+                int branchInstances = 0;
+                int stumpInstances = 0;
+                int rockInstances = 0;
+
+                for (int i = 0; i < genExt.naturalisticEcology.grassClusterCount; ++i) {
+                    float x = (pseudo(i + 701, 1.13f) - 0.5f) * groundW * 0.72f;
+                    float z = shoreZ + 0.84f + pseudo(i + 709, 1.61f) * landSpan;
+                    if (!desertSurface && i < 6) {
+                        static const float anchorX[6] = { -12.4f, -9.2f, 10.6f, 13.0f, -5.6f, 6.8f };
+                        static const float anchorZ[6] = { 3.6f, 5.1f, 3.1f, 5.4f, 2.4f, 2.8f };
+                        x = anchorX[i];
+                        z = anchorZ[i];
+                    }
+                    const float s = desertSurface
+                        ? 0.12f + 0.030f * static_cast<float>(i % 3)
+                        : 0.40f + 0.060f * static_cast<float>(i % 4);
+                    addNatural("GenerativeExterior_NaturalisticGrass" + std::to_string(i),
+                               "grass_bermuda_01",
+                               grassMesh,
+                               glm::vec3(x, 0.055f, z),
+                               glm::vec3(s),
+                               glm::vec3(0.0f, glm::radians(37.0f * static_cast<float>(i)), 0.0f),
+                               vegetation,
+                               grassInstances);
+                }
+
+                for (int i = 0; i < genExt.naturalisticEcology.bushClusterCount; ++i) {
+                    const float side = (i % 2 == 0) ? -1.0f : 1.0f;
+                    float x = side * (5.2f + pseudo(i + 733, 2.03f) * genExt.extent * 0.30f);
+                    float z = shoreZ + 1.2f + pseudo(i + 739, 2.41f) * landSpan * 0.84f;
+                    if (!desertSurface && i < 4) {
+                        static const float anchorX[4] = { -14.2f, 14.0f, -8.4f, 8.8f };
+                        static const float anchorZ[4] = { 2.9f, 3.2f, 5.7f, 5.2f };
+                        x = anchorX[i];
+                        z = anchorZ[i];
+                    }
+                    const float s = desertSurface ? 0.30f : 0.62f + 0.070f * static_cast<float>(i % 3);
+                    addNatural("GenerativeExterior_NaturalisticBush" + std::to_string(i),
+                               "wild_rooibos_bush",
+                               bushMesh,
+                               glm::vec3(x, 0.18f, z),
+                               glm::vec3(s),
+                               glm::vec3(0.0f, glm::radians(-24.0f + 31.0f * static_cast<float>(i)), 0.0f),
+                               vegetation,
+                               bushInstances);
+                }
+
+                for (int i = 0; i < genExt.naturalisticEcology.fernClusterCount; ++i) {
+                    const float side = (i % 2 == 0) ? -1.0f : 1.0f;
+                    const float x = side * (1.4f + pseudo(i + 751, 2.77f) * 7.2f);
+                    const float z = shoreZ + 1.5f + pseudo(i + 757, 3.19f) * landSpan * 0.72f;
+                    addNatural("GenerativeExterior_NaturalisticFern" + std::to_string(i),
+                               "fern_02",
+                               fernMesh,
+                               glm::vec3(x, 0.060f, z),
+                               glm::vec3(0.46f + 0.055f * static_cast<float>(i % 4)),
+                               glm::vec3(0.0f, glm::radians(22.0f * static_cast<float>(i)), 0.0f),
+                               vegetation,
+                               fernInstances);
+                }
+
+                for (int i = 0; i < genExt.naturalisticEcology.trunkCount; ++i) {
+                    const float x = -7.2f + static_cast<float>(i) * (14.4f / static_cast<float>(std::max(1, genExt.naturalisticEcology.trunkCount)));
+                    const float z = shoreZ + 2.4f + pseudo(i + 769, 3.47f) * landSpan * 0.54f;
+                    addNatural("GenerativeExterior_NaturalisticTrunk" + std::to_string(i),
+                               "dead_tree_trunk",
+                               trunkMesh,
+                               glm::vec3(x, 0.10f, z),
+                               glm::vec3(desertSurface ? 0.28f : 0.38f),
+                               glm::vec3(glm::radians(-3.0f + 5.0f * pseudo(i, 4.1f)),
+                                         glm::radians(18.0f + 53.0f * static_cast<float>(i)),
+                                         glm::radians(-5.0f + 7.0f * pseudo(i, 4.7f))),
+                               wetBark,
+                               trunkInstances);
+                }
+
+                for (int i = 0; i < genExt.naturalisticEcology.branchCount; ++i) {
+                    const float x = (pseudo(i + 787, 4.23f) - 0.5f) * groundW * 0.62f;
+                    const float z = shoreZ + 1.0f + pseudo(i + 797, 4.67f) * landSpan * 0.84f;
+                    addNatural("GenerativeExterior_NaturalisticBranch" + std::to_string(i),
+                               "dry_branches_medium_01",
+                               branchMesh,
+                               glm::vec3(x, 0.075f + 0.020f * static_cast<float>(i % 2), z),
+                               glm::vec3(desertSurface ? 0.48f : 0.54f),
+                               glm::vec3(glm::radians(2.0f * static_cast<float>(i % 3)),
+                                         glm::radians(-42.0f + 29.0f * static_cast<float>(i)),
+                                         glm::radians(-6.0f + 4.0f * static_cast<float>(i % 4))),
+                               wetBark,
+                               branchInstances);
+                }
+
+                for (int i = 0; i < genExt.naturalisticEcology.stumpCount; ++i) {
+                    const float side = (i % 2 == 0) ? -1.0f : 1.0f;
+                    const float x = side * (2.2f + pseudo(i + 811, 5.03f) * 8.6f);
+                    const float z = shoreZ + 2.0f + pseudo(i + 821, 5.41f) * landSpan * 0.62f;
+                    addNatural("GenerativeExterior_NaturalisticStump" + std::to_string(i),
+                               "tree_stump_01",
+                               stumpMesh,
+                               glm::vec3(x, 0.055f, z),
+                               glm::vec3(desertSurface ? 0.24f : 0.32f),
+                               glm::vec3(0.0f, glm::radians(34.0f * static_cast<float>(i)), glm::radians(-2.0f + 3.0f * static_cast<float>(i % 2))),
+                               wetBark,
+                               stumpInstances);
+                }
+
+                for (int i = 0; i < genExt.naturalisticEcology.mossRockCount; ++i) {
+                    const bool useBoulder = desertSurface || (i % 2 == 0);
+                    const auto& rockMesh = useBoulder ? boulderMesh : mossRockMesh;
+                    const char* rockId = useBoulder ? "boulder_01" : "rock_moss_set_01";
+                    const float x = (pseudo(i + 839, 5.89f) - 0.5f) * groundW * 0.78f;
+                    const float z = shoreZ + 0.55f + pseudo(i + 853, 6.11f) * landSpan * 0.72f;
+                    addNatural("GenerativeExterior_NaturalisticMossRock" + std::to_string(i),
+                               rockId,
+                               rockMesh,
+                               glm::vec3(x, 0.040f, z),
+                               glm::vec3(desertSurface ? 0.22f : 0.18f + 0.030f * static_cast<float>(i % 3)),
+                               glm::vec3(glm::radians(-2.0f + 4.0f * pseudo(i, 6.7f)),
+                                         glm::radians(27.0f * static_cast<float>(i)),
+                                         glm::radians(-4.0f + 5.0f * pseudo(i, 7.1f))),
+                               stone,
+                               rockInstances);
+                }
+
+                const int totalNaturalistic = grassInstances + bushInstances + fernInstances +
+                    trunkInstances + branchInstances + stumpInstances + rockInstances;
+                if (totalNaturalistic > 0) {
+                    spdlog::info("generative_exterior: created naturalistic ecology assets grass={} bush={} fern={} trunks={} branches={} stumps={} moss_rocks={}",
+                                 grassInstances,
+                                 bushInstances,
+                                 fernInstances,
+                                 trunkInstances,
+                                 branchInstances,
+                                 stumpInstances,
+                                 rockInstances);
+                } else {
+                    spdlog::warn("generative_exterior: naturalistic ecology assets requested but no scanned instances were created");
+                }
+            }
+        }
+    }
+
     if (genExt.valid && genExt.waterOn) {
         if (auto* renderer = m_renderer.get()) {
             const float farEdge = -(genExt.extent * 1.9f + 10.0f); // to the ground's far edge: no bare seabed strip at the horizon

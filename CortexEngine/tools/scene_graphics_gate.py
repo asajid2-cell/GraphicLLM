@@ -225,6 +225,7 @@ def evaluate(prompt: str, ir: dict[str, Any], png: Path | None, log_text: str) -
     geometry_realism = graphics.get("geometry_realism") or {}
     surface_material_richness = graphics.get("surface_material_richness") or {}
     mesh_silhouette_realism = graphics.get("mesh_silhouette_realism") or {}
+    naturalistic_ecology = graphics.get("naturalistic_ecology") or {}
     lighting = graphics.get("lighting") or {}
     surface_detail = graphics.get("surface_detail") or {}
     occlusion = graphics.get("occlusion") or {}
@@ -408,6 +409,44 @@ def evaluate(prompt: str, ir: dict[str, Any], png: Path | None, log_text: str) -
                 prop_depth_layer_count=prop_depth_layers,
                 runtime_faceted_cliff=has_runtime_faceted_cliff,
                 runtime_hero_silhouette=has_runtime_hero_silhouette,
+            )
+
+        try:
+            natural_grass = int(naturalistic_ecology.get("grass_cluster_count", 0) or 0)
+            natural_bush = int(naturalistic_ecology.get("bush_cluster_count", 0) or 0)
+            natural_fern = int(naturalistic_ecology.get("fern_cluster_count", 0) or 0)
+            natural_trunks = int(naturalistic_ecology.get("trunk_count", 0) or 0)
+            natural_branches = int(naturalistic_ecology.get("branch_count", 0) or 0)
+            natural_stumps = int(naturalistic_ecology.get("stump_count", 0) or 0)
+            natural_moss_rocks = int(naturalistic_ecology.get("moss_rock_count", 0) or 0)
+        except Exception:
+            natural_grass = natural_bush = natural_fern = natural_trunks = natural_branches = natural_stumps = natural_moss_rocks = 0
+        natural_leafy = natural_grass + natural_bush + natural_fern
+        natural_woody = natural_trunks + natural_branches + natural_stumps
+        natural_total = natural_leafy + natural_woody + natural_moss_rocks
+        desert_like = flags["desert"] or flags["canyon"]
+        has_runtime_naturalistic = "generative_exterior: created naturalistic ecology assets" in log_text
+        if (
+            not isinstance(naturalistic_ecology, dict)
+            or not bool(naturalistic_ecology.get("enabled"))
+            or not has_runtime_naturalistic
+            or natural_total < (10 if desert_like else 20)
+            or (not desert_like and (natural_grass < 8 or (natural_bush + natural_fern) < 4 or natural_woody < 3))
+            or (desert_like and ((natural_branches + natural_trunks) < 5 or natural_moss_rocks < 3))
+        ):
+            fail(
+                "missing_naturalistic_ecology_assets",
+                "Generated exterior lacks scanned naturalistic grass/brush/branches/stumps/rocks to break up game-kit vegetation",
+                naturalistic_ecology=naturalistic_ecology,
+                grass_cluster_count=natural_grass,
+                bush_cluster_count=natural_bush,
+                fern_cluster_count=natural_fern,
+                trunk_count=natural_trunks,
+                branch_count=natural_branches,
+                stump_count=natural_stumps,
+                moss_rock_count=natural_moss_rocks,
+                total_naturalistic_instances=natural_total,
+                runtime_naturalistic_ecology=has_runtime_naturalistic,
             )
 
         try:

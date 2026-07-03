@@ -266,6 +266,28 @@ Escape: if extra mesh bands or hero bevels destabilize captures, reduce counts b
 
 Status: done
 
+### Loop 14: Naturalistic Ecology Assets
+
+Invariant: generated exteriors must not rely only on low-poly repeated trees, simple grass cards, and primitive debris; the runtime path should stage existing scanned naturalistic grass, fern/bush, branch, stump, trunk, and moss/rock assets as foreground and flank ecology.
+
+Scope:
+
+- in: `tools/scene_graphics_gate.py`, `tools/scene_compiler.py`, `src/Core/Engine_Scenes.cpp`, focused ledgers.
+- out: `tools/scene_quality_gate.py`, forced DXR defaults, external asset downloads, unrelated interiors.
+
+Verifier:
+
+- Current Loop 21 campsite/desert/alpine artifacts fail strengthened graphics gate with `missing_naturalistic_ecology_assets`.
+- New campsite/desert/alpine prompts render VALID and pass quality + strengthened graphics gates.
+- Runtime logs include `generative_exterior: created naturalistic ecology assets` with scanned asset instance counts.
+- Release build, Director IR validation, known-bad oracles, and kitchen smoke remain green.
+
+Exit: all verifier commands green, with artifacts and logs recorded.
+
+Escape: if scanned assets fail to load/upload or make desert prompts read as forest, reduce per-biome counts or switch desert instances to dry branches/stumps/rocks before changing thresholds.
+
+Status: done
+
 ## Progress Log
 
 2026-07-03:
@@ -437,6 +459,28 @@ Status: done
   - Remaining `HUMAN-GATE` gap is still dominated by source/catalog stylization: repeated low-poly trees, simplified camp/cabin meshes, sparse close vegetation, and limited true shadowing/occlusion complexity.
 - Loop 13 learning:
   - Fresh `scene_gen` outputs store runtime logs as `build\bin\logs\<out_name>_0.out` for iteration 0. Passing `build\bin\logs\<out_name>.out` to the graphics gate correctly fails because runtime evidence is absent.
+- Loop 14 heartbeat proof:
+  - `node Z:\328\CMPUT328-A2\codexworks\301\heartbeat\bin\hb.mjs wait --label aaa_graphics_loop14_proof --timeout 1 --poll 1` exited by timeout after 1s.
+- Loop 14 red proof:
+  - `aaa_graphics_campsite_loop21`, `aaa_graphics_desert_loop21`, and `aaa_graphics_alpine_loop21` failed the strengthened graphics gate with only `missing_naturalistic_ecology_assets`.
+- Loop 14 implementation:
+  - `tools\scene_graphics_gate.py` now requires `graphics_pass.naturalistic_ecology` plus runtime evidence for scanned ecology assets.
+  - `tools\scene_compiler.py` now emits biome-aware naturalistic ecology counts. Non-desert prompts get scanned grass, bush, fern, trunk, branch, stump, and moss/rock detail; desert/canyon prompts get dry branches, trunks/stumps, and rocks without grass.
+  - `src\Core\Engine_Scenes.cpp` now loads/uploads the existing naturalistic showcase meshes and instances them in bounded foreground/flank clusters with texture hooks already used by asset-led scenes.
+- Loop 14 verifier evidence:
+  - `python -m py_compile tools\scene_compiler.py tools\scene_graphics_gate.py tools\scene_quality_gate.py tools\scene_gen.py` exited 0.
+  - Release build exited 0: `[OK] Build complete in 26.4s`.
+  - Campsite `aaa_graphics_campsite_loop23` rendered VALID sequentially with no retry; quality gate exited 0 (`purple_fraction=0.7436`, `nonblack_fraction=1.0`); graphics gate exited 0 using `build\bin\logs\aaa_graphics_campsite_loop23_0.out`; Director IR validation exited 0. Runtime log shows `created naturalistic ecology assets grass=14 bush=6 fern=5 trunks=3 branches=3 stumps=2 moss_rocks=5`.
+  - Desert canyon `aaa_graphics_desert_loop23` rendered VALID sequentially with no retry; quality gate exited 0 (`turquoise_fraction=0.4192`, `nonblack_fraction=1.0`); graphics gate exited 0 using `build\bin\logs\aaa_graphics_desert_loop23_0.out`; Director IR validation exited 0. Runtime log shows `created naturalistic ecology assets grass=0 bush=0 fern=0 trunks=2 branches=6 stumps=2 moss_rocks=5`.
+  - Alpine cabin `aaa_graphics_alpine_loop23` rendered VALID sequentially with no retry; quality gate exited 0 (`avg_luma=0.1344`, `cool_fraction=0.8593`, `nonblack_fraction=0.9998`); graphics gate exited 0 using `build\bin\logs\aaa_graphics_alpine_loop23_0.out`; Director IR validation exited 0. Runtime log shows `created naturalistic ecology assets grass=14 bush=6 fern=5 trunks=3 branches=3 stumps=2 moss_rocks=5`.
+  - Kitchen smoke `regression_kitchen_aaa_loop23` rendered VALID and quality gate exited 0 (`avg_luma=0.2697`, `nonblack_fraction=1.0`).
+  - Known-bad quality oracle `gen_a_foggy_mountain_campsite_beside_0` with `--expect-fail` exited 0 and still reports the fridge/missing-ridge/purple-water failures.
+  - Known-bad graphics oracle `v3_campsite_ridge_test_0` with `--expect-fail` exited 0 and still reports the expected graphics-fidelity failures, including `missing_naturalistic_ecology_assets`.
+- Visual inspection after Loop 14:
+  - Scanned ecology is visible as additional brush/debris/rock breakup, especially on campsite/alpine flanks, and desert no longer gets distracting grass artifacts after the refinement.
+  - Remaining `HUMAN-GATE` gap: the stills are still stylized and contact shadows remain visibly weak; the next objective front should promote weak contact-shadow image metrics from warnings into a real occlusion loop.
+- Loop 14 learning:
+  - Running multiple `scene_gen` captures in parallel created timeout retries; rerunning the same prompts sequentially completed cleanly in one pass. Future capture verification should be sequential unless intentionally testing contention.
 
 ## BLOCKED / Decisions
 

@@ -111,6 +111,28 @@ namespace {
         float wetness = 0.24f;
     };
 
+    struct GenerativeWorldGeometry {
+        bool enabled = false;
+        int foregroundOccluderCount = 0;
+        int canyonWallLayers = 0;
+        int talusClusterCount = 0;
+        int redRockStrataLayers = 0;
+        int shorelineSegmentCount = 0;
+        int depthBandCount = 0;
+        float canyonWidthM = 0.0f;
+        float wallHeightM = 0.0f;
+    };
+
+    struct GenerativeSurfaceDetail {
+        bool enabled = false;
+        int pebbleCount = 0;
+        int terrainCreaseCount = 0;
+        int shoreFoamSegmentCount = 0;
+        int wetGlintCount = 0;
+        int occlusionRibbonCount = 0;
+        float contactShadowStrength = 0.0f;
+    };
+
     float GenerativeTerrainNoise(float x, float z, float phase) {
         const float a = std::sin(x * 0.33f + z * 0.17f + phase) * 0.48f;
         const float b = std::sin(x * 0.91f - z * 0.27f + phase * 1.73f) * 0.22f;
@@ -233,6 +255,84 @@ namespace {
             const uint32_t t1 = b0 + 3u;
             mesh->indices.insert(mesh->indices.end(), { b0, b1, t1, b0, t1, t0 });
         }
+        mesh->UpdateBounds();
+        return mesh;
+    }
+
+    std::shared_ptr<Scene::MeshData> CreateGenerativeCliffWallMesh(float length,
+                                                                   float height,
+                                                                   float roughness,
+                                                                   float phase) {
+        auto mesh = std::make_shared<Scene::MeshData>();
+        mesh->kind = Scene::MeshKind::Procedural;
+        constexpr uint32_t kSegments = 36;
+        mesh->positions.reserve((kSegments + 1u) * 2u);
+        mesh->normals.reserve((kSegments + 1u) * 2u);
+        mesh->texCoords.reserve((kSegments + 1u) * 2u);
+
+        const float halfLen = length * 0.5f;
+        for (uint32_t i = 0; i <= kSegments; ++i) {
+            const float u = static_cast<float>(i) / static_cast<float>(kSegments);
+            const float z = -halfLen + u * length;
+            const float ledge = std::sin(u * 23.0f + phase) * 0.35f +
+                                std::sin(u * 57.0f + phase * 1.9f) * 0.16f;
+            const float x = ledge * roughness;
+            const float top = height * std::clamp(0.72f + std::sin(u * 11.0f + phase * 0.7f) * 0.18f,
+                                                  0.48f,
+                                                  1.02f);
+            const float base = -0.18f + std::sin(u * 17.0f + phase) * 0.08f;
+            mesh->positions.emplace_back(x, base, z);
+            mesh->positions.emplace_back(x + ledge * 0.35f, top, z);
+            mesh->normals.emplace_back(1.0f, 0.0f, 0.0f);
+            mesh->normals.emplace_back(1.0f, 0.0f, 0.0f);
+            mesh->texCoords.emplace_back(u * 6.0f, 1.0f);
+            mesh->texCoords.emplace_back(u * 6.0f, 0.0f);
+        }
+        for (uint32_t i = 0; i < kSegments; ++i) {
+            const uint32_t b0 = i * 2u;
+            const uint32_t t0 = b0 + 1u;
+            const uint32_t b1 = b0 + 2u;
+            const uint32_t t1 = b0 + 3u;
+            mesh->indices.insert(mesh->indices.end(), { b0, b1, t1, b0, t1, t0 });
+        }
+        mesh->UpdateBounds();
+        return mesh;
+    }
+
+    std::shared_ptr<Scene::MeshData> CreateGenerativeRockShardMesh(float phase) {
+        auto mesh = std::make_shared<Scene::MeshData>();
+        mesh->kind = Scene::MeshKind::Procedural;
+        const glm::vec3 top(0.06f * std::sin(phase), 0.72f, -0.04f);
+        const glm::vec3 bottom(0.0f, -0.08f, 0.0f);
+        const glm::vec3 left(-0.62f, 0.12f, -0.18f);
+        const glm::vec3 right(0.56f, 0.08f, 0.22f);
+        const glm::vec3 front(-0.10f, 0.18f, 0.66f);
+        const glm::vec3 back(0.16f, 0.10f, -0.58f);
+
+        auto addTri = [&](const glm::vec3& a, const glm::vec3& b, const glm::vec3& c) {
+            const uint32_t base = static_cast<uint32_t>(mesh->positions.size());
+            glm::vec3 n = glm::cross(b - a, c - a);
+            if (glm::length(n) < 1e-5f) {
+                n = glm::vec3(0.0f, 1.0f, 0.0f);
+            } else {
+                n = glm::normalize(n);
+            }
+            mesh->positions.insert(mesh->positions.end(), {a, b, c});
+            mesh->normals.insert(mesh->normals.end(), {n, n, n});
+            mesh->texCoords.insert(mesh->texCoords.end(), {
+                glm::vec2(0.0f, 0.0f), glm::vec2(1.0f, 0.0f), glm::vec2(0.5f, 1.0f)
+            });
+            mesh->indices.insert(mesh->indices.end(), {base, base + 1u, base + 2u});
+        };
+
+        addTri(top, front, right);
+        addTri(top, right, back);
+        addTri(top, back, left);
+        addTri(top, left, front);
+        addTri(bottom, right, front);
+        addTri(bottom, back, right);
+        addTri(bottom, left, back);
+        addTri(bottom, front, left);
         mesh->UpdateBounds();
         return mesh;
     }
@@ -3099,7 +3199,11 @@ void Engine::BuildRecipeScene() {
         std::vector<GenerativeRidgeLayer> ridgeLayers;
         std::vector<GenerativeStructure> structures;
         std::vector<GenerativeContactPatch> contactPatches;
+        GenerativeWorldGeometry worldGeometry;
+        GenerativeSurfaceDetail surfaceDetail;
         int shoreLayerCount = 0;
+        int rimLightCount = 0;
+        int advancedShaderTermCount = 0;
     } genExt;
     if (recipe == "generative_exterior") {
         if (const char* raw = std::getenv("CORTEX_SCENE_IR_JSON"); raw && *raw) {
@@ -3161,11 +3265,53 @@ void Engine::BuildRecipeScene() {
                 genExt.groundWetness = std::clamp(num(graphicsMaterials, "ground_wetness", genExt.groundWetness), 0.0f, 1.0f);
                 genExt.groundProceduralMask = std::clamp(num(graphicsMaterials, "procedural_mask", genExt.groundProceduralMask), 0.0f, 1.0f);
                 genExt.groundRoughness = std::clamp(num(graphicsMaterials, "roughness", genExt.groundRoughness), 0.15f, 1.0f);
+                const nlohmann::json advancedTerms = graphicsMaterials.value("advanced_shader_terms", nlohmann::json::object());
+                genExt.advancedShaderTermCount = 0;
+                if (advancedTerms.is_object()) {
+                    for (auto it = advancedTerms.begin(); it != advancedTerms.end(); ++it) {
+                        if (it.value().is_boolean() && it.value().get<bool>()) {
+                            genExt.advancedShaderTermCount++;
+                        }
+                    }
+                }
                 const nlohmann::json graphicsRenderer = graphics.value("renderer", nlohmann::json::object());
                 genExt.graphicsSSAORadius = std::clamp(num(graphicsRenderer, "ssao_radius", genExt.graphicsSSAORadius), 0.20f, 2.5f);
                 genExt.graphicsSSAOIntensity = std::clamp(num(graphicsRenderer, "ssao_intensity", genExt.graphicsSSAOIntensity), 0.5f, 4.5f);
                 genExt.graphicsShadowBias = std::clamp(num(graphicsRenderer, "shadow_bias", genExt.graphicsShadowBias), 0.0003f, 0.010f);
                 genExt.graphicsShadowPCF = std::clamp(num(graphicsRenderer, "shadow_pcf_radius", genExt.graphicsShadowPCF), 0.25f, 5.0f);
+                const nlohmann::json worldGeometry = graphics.value("world_geometry", nlohmann::json::object());
+                genExt.worldGeometry.enabled = worldGeometry.value("enabled", false);
+                genExt.worldGeometry.foregroundOccluderCount =
+                    static_cast<int>(std::clamp(num(worldGeometry, "foreground_occluder_count", 0.0f), 0.0f, 12.0f));
+                genExt.worldGeometry.canyonWallLayers =
+                    static_cast<int>(std::clamp(num(worldGeometry, "canyon_wall_layers", 0.0f), 0.0f, 12.0f));
+                genExt.worldGeometry.talusClusterCount =
+                    static_cast<int>(std::clamp(num(worldGeometry, "talus_cluster_count", 0.0f), 0.0f, 36.0f));
+                genExt.worldGeometry.redRockStrataLayers =
+                    static_cast<int>(std::clamp(num(worldGeometry, "red_rock_strata_layers", 0.0f), 0.0f, 20.0f));
+                genExt.worldGeometry.shorelineSegmentCount =
+                    static_cast<int>(std::clamp(num(worldGeometry, "shoreline_segment_count", 0.0f), 0.0f, 8.0f));
+                genExt.worldGeometry.depthBandCount =
+                    static_cast<int>(std::clamp(num(worldGeometry, "depth_band_count", 0.0f), 0.0f, 8.0f));
+                genExt.worldGeometry.canyonWidthM = std::clamp(num(worldGeometry, "canyon_width_m", 0.0f), 0.0f, 42.0f);
+                genExt.worldGeometry.wallHeightM = std::clamp(num(worldGeometry, "wall_height_m", 0.0f), 0.0f, 22.0f);
+                const nlohmann::json graphicsLighting = graphics.value("lighting", nlohmann::json::object());
+                genExt.rimLightCount = static_cast<int>(std::clamp(num(graphicsLighting, "rim_light_count", 0.0f), 0.0f, 4.0f));
+                const nlohmann::json surfaceDetail = graphics.value("surface_detail", nlohmann::json::object());
+                genExt.surfaceDetail.enabled = surfaceDetail.value("enabled", false);
+                genExt.surfaceDetail.pebbleCount =
+                    static_cast<int>(std::clamp(num(surfaceDetail, "pebble_count", 0.0f), 0.0f, 80.0f));
+                genExt.surfaceDetail.terrainCreaseCount =
+                    static_cast<int>(std::clamp(num(surfaceDetail, "terrain_crease_count", 0.0f), 0.0f, 18.0f));
+                genExt.surfaceDetail.shoreFoamSegmentCount =
+                    static_cast<int>(std::clamp(num(surfaceDetail, "shore_foam_segment_count", 0.0f), 0.0f, 16.0f));
+                genExt.surfaceDetail.wetGlintCount =
+                    static_cast<int>(std::clamp(num(surfaceDetail, "wet_glint_count", 0.0f), 0.0f, 16.0f));
+                const nlohmann::json occlusion = graphics.value("occlusion", nlohmann::json::object());
+                genExt.surfaceDetail.occlusionRibbonCount =
+                    static_cast<int>(std::clamp(num(occlusion, "ground_shadow_ribbon_count", 0.0f), 0.0f, 18.0f));
+                genExt.surfaceDetail.contactShadowStrength =
+                    std::clamp(num(occlusion, "contact_shadow_strength", 0.0f), 0.0f, 1.0f);
                 const nlohmann::json contact = graphics.value("contact", nlohmann::json::object());
                 genExt.shoreLayerCount = static_cast<int>(std::clamp(num(contact, "shore_layer_count", 0.0f), 0.0f, 8.0f));
                 for (const auto& patchJson : contact.value("patches", nlohmann::json::array())) {
@@ -3487,12 +3633,17 @@ void Engine::BuildRecipeScene() {
                 r.metallic = 0.0f;
                 r.roughness = genExt.graphicsMaterials ? genExt.groundRoughness : 0.92f;
                 r.ao = 1.0f;
+                r.occlusionStrength = genExt.surfaceDetail.enabled ? 0.72f : 1.0f;
                 r.doubleSided = true;
                 r.presetName = genExt.groundKind == "sand" ? "sand" : "naturalistic";
                 r.normalScale = genExt.graphicsMaterials ? genExt.groundNormalScale : r.normalScale;
                 r.wetnessFactor = genExt.graphicsMaterials ? genExt.groundWetness : r.wetnessFactor;
                 r.proceduralMaskStrength = genExt.graphicsMaterials ? genExt.groundProceduralMask : r.proceduralMaskStrength;
                 r.specularFactor = genExt.graphicsMaterials ? 0.72f : r.specularFactor;
+                r.clearcoatFactor = genExt.graphicsMaterials ? std::min(genExt.groundWetness * 0.38f, 0.22f) : r.clearcoatFactor;
+                r.clearcoatRoughnessFactor = 0.72f;
+                r.sheenWeight = genExt.surfaceDetail.enabled ? 0.055f : r.sheenWeight;
+                r.anisotropyStrength = genExt.surfaceDetail.enabled ? 0.12f : r.anisotropyStrength;
                 // Explicitly requested SATURATED ground colours ("red sand") must
                 // actually paint the terrain: tint weight scales with how far the
                 // colour sits from neutral, so natural palettes stay texture-led.
@@ -3583,10 +3734,13 @@ void Engine::BuildRecipeScene() {
                     r.metallic = 0.0f;
                     r.roughness = i == 0 ? 0.78f : 0.86f;
                     r.ao = 0.72f;
+                    r.occlusionStrength = 0.70f;
                     r.normalScale = 0.22f;
                     r.wetnessFactor = i == 0 ? 0.28f : 0.10f;
                     r.proceduralMaskStrength = 0.16f;
                     r.specularFactor = i == 0 ? 0.20f : 0.12f;
+                    r.clearcoatFactor = i == 0 ? 0.18f : 0.06f;
+                    r.clearcoatRoughnessFactor = 0.66f;
                     r.doubleSided = true;
                     r.alphaMode = Scene::RenderableComponent::AlphaMode::Blend;
                     r.renderLayer = Scene::RenderableComponent::RenderLayer::Overlay;
@@ -3616,15 +3770,18 @@ void Engine::BuildRecipeScene() {
                         t.scale = glm::vec3(patch.radius * 0.78f, 1.0f, patch.radius * squash * 0.78f);
                         auto& r = m_registry->AddComponent<Scene::RenderableComponent>(contact);
                         r.mesh = contactMesh;
-                        const glm::vec3 dark = glm::max(gcol * (1.0f - patch.darkness * 0.82f), glm::vec3(0.014f));
-                        r.albedoColor = glm::vec4(dark, 0.24f);
+                        const glm::vec3 dark = glm::max(gcol * (1.0f - patch.darkness * 1.05f), glm::vec3(0.010f));
+                        r.albedoColor = glm::vec4(dark, 0.34f);
                         r.metallic = 0.0f;
                         r.roughness = 0.88f;
-                        r.ao = 0.64f;
+                        r.ao = 0.52f;
+                        r.occlusionStrength = 0.46f;
                         r.normalScale = 0.12f;
                         r.wetnessFactor = patch.wetness * 0.42f;
                         r.proceduralMaskStrength = 0.10f;
                         r.specularFactor = 0.16f;
+                        r.clearcoatFactor = patch.wetness * 0.10f;
+                        r.clearcoatRoughnessFactor = 0.80f;
                         r.doubleSided = true;
                         r.alphaMode = Scene::RenderableComponent::AlphaMode::Blend;
                         r.renderLayer = Scene::RenderableComponent::RenderLayer::Overlay;
@@ -3634,12 +3791,353 @@ void Engine::BuildRecipeScene() {
                     spdlog::info("generative_exterior: created contact grounding {} patch(es)", contactCount);
                 }
             }
+            if (genExt.worldGeometry.enabled) {
+                const float canyonHalfWidth = genExt.worldGeometry.canyonWidthM > 1.0f
+                    ? genExt.worldGeometry.canyonWidthM * 0.5f
+                    : genExt.extent * 0.36f;
+                const float wallHeight = genExt.worldGeometry.wallHeightM > 1.0f
+                    ? genExt.worldGeometry.wallHeightM
+                    : std::max(5.5f, genExt.terrainRelief * 10.0f);
+                auto cliffMesh = CreateGenerativeCliffWallMesh(genExt.extent * 1.08f,
+                                                               wallHeight,
+                                                               0.95f,
+                                                               4.31f);
+                auto shardMesh = CreateGenerativeRockShardMesh(2.17f);
+                auto cubeMesh = Utils::MeshGenerator::CreateCube();
+                const auto upCliff = renderer->UploadMesh(cliffMesh);
+                const auto upShard = renderer->UploadMesh(shardMesh);
+                const auto upCube = renderer->UploadMesh(cubeMesh);
+                if (upCliff.IsErr() || upShard.IsErr() || upCube.IsErr()) {
+                    spdlog::warn("generative_exterior: world geometry mesh upload failed cliff='{}' shard='{}' cube='{}'",
+                                 upCliff.IsErr() ? upCliff.Error() : "ok",
+                                 upShard.IsErr() ? upShard.Error() : "ok",
+                                 upCube.IsErr() ? upCube.Error() : "ok");
+                } else {
+                    const glm::vec3 rockBase = genExt.groundKind == "dirt"
+                        ? glm::vec3(0.58f, 0.24f, 0.14f)
+                        : glm::mix(gcol, glm::vec3(0.34f, 0.34f, 0.32f), 0.55f);
+                    auto dressRock = [&](Scene::RenderableComponent& r,
+                                         const glm::vec3& color,
+                                         float roughness,
+                                         float normalScale,
+                                         float proceduralMask) {
+                        r.albedoColor = glm::vec4(glm::max(color, glm::vec3(0.018f)), 1.0f);
+                        r.metallic = 0.0f;
+                        r.roughness = roughness;
+                        r.ao = 0.88f;
+                        r.occlusionStrength = 0.76f;
+                        r.normalScale = normalScale;
+                        r.wetnessFactor = genExt.groundWetness * 0.35f;
+                        r.proceduralMaskStrength = proceduralMask;
+                        r.specularFactor = 0.24f;
+                        r.clearcoatFactor = std::min(genExt.groundWetness * 0.24f, 0.18f);
+                        r.clearcoatRoughnessFactor = 0.72f;
+                        r.anisotropyStrength = 0.10f;
+                        r.doubleSided = true;
+                        r.presetName = "masonry";
+                    };
+
+                    int canyonWalls = 0;
+                    for (int i = 0; i < genExt.worldGeometry.canyonWallLayers; ++i) {
+                        const int row = i / 2;
+                        const float side = (i % 2 == 0) ? -1.0f : 1.0f;
+                        entt::entity wall = m_registry->CreateEntity();
+                        m_registry->AddComponent<Scene::TagComponent>(
+                            wall, "GenerativeExterior_CanyonWall" + std::to_string(i));
+                        auto& t = m_registry->AddComponent<TransformComponent>(wall);
+                        t.position = glm::vec3(side * (canyonHalfWidth + row * 2.7f),
+                                               0.0f,
+                                               -12.0f - static_cast<float>(row) * 8.5f);
+                        t.rotation = glm::quat(glm::vec3(0.0f, side > 0.0f ? glm::pi<float>() : 0.0f, 0.0f));
+                        t.scale = glm::vec3(1.0f, std::max(0.55f, 1.0f - row * 0.08f), 1.0f + row * 0.12f);
+                        auto& r = m_registry->AddComponent<Scene::RenderableComponent>(wall);
+                        r.mesh = cliffMesh;
+                        const glm::vec3 color = glm::mix(rockBase, glm::vec3(0.18f, 0.09f, 0.065f), row * 0.11f);
+                        dressRock(r, color, 0.88f, 0.82f, 0.72f);
+                        canyonWalls++;
+                    }
+
+                    int strataCount = 0;
+                    for (int i = 0; i < genExt.worldGeometry.redRockStrataLayers; ++i) {
+                        const int band = i / 2;
+                        const float side = (i % 2 == 0) ? -1.0f : 1.0f;
+                        entt::entity strata = m_registry->CreateEntity();
+                        m_registry->AddComponent<Scene::TagComponent>(
+                            strata, "GenerativeExterior_RedRockStrata" + std::to_string(i));
+                        auto& t = m_registry->AddComponent<TransformComponent>(strata);
+                        t.position = glm::vec3(side * (canyonHalfWidth - 0.18f),
+                                               1.05f + band * 0.86f,
+                                               -11.0f - band * 4.25f);
+                        t.scale = glm::vec3(0.12f, 0.045f, genExt.extent * (0.30f + band * 0.025f));
+                        auto& r = m_registry->AddComponent<Scene::RenderableComponent>(strata);
+                        r.mesh = cubeMesh;
+                        const glm::vec3 stripe = (band % 2 == 0)
+                            ? glm::vec3(0.78f, 0.40f, 0.18f)
+                            : glm::vec3(0.36f, 0.13f, 0.09f);
+                        dressRock(r, stripe, 0.82f, 0.45f, 0.56f);
+                        strataCount++;
+                    }
+
+                    int talusCount = 0;
+                    for (int i = 0; i < genExt.worldGeometry.talusClusterCount; ++i) {
+                        const float side = (i % 2 == 0) ? -1.0f : 1.0f;
+                        const int lane = (i / 2) % 4;
+                        entt::entity talus = m_registry->CreateEntity();
+                        m_registry->AddComponent<Scene::TagComponent>(
+                            talus, "GenerativeExterior_TalusRock" + std::to_string(i));
+                        auto& t = m_registry->AddComponent<TransformComponent>(talus);
+                        t.position = glm::vec3(side * (canyonHalfWidth - 2.1f - lane * 0.65f),
+                                               0.12f,
+                                               -3.5f - static_cast<float>(i % 9) * 2.35f);
+                        t.rotation = glm::quat(glm::vec3(glm::radians((i % 3) * 4.0f),
+                                                         glm::radians(31.0f * i),
+                                                         glm::radians((i % 5 - 2) * 5.0f)));
+                        const float s = 0.72f + 0.13f * static_cast<float>(i % 5);
+                        t.scale = glm::vec3(s * 1.15f, s * 0.62f, s * 0.90f);
+                        auto& r = m_registry->AddComponent<Scene::RenderableComponent>(talus);
+                        r.mesh = shardMesh;
+                        dressRock(r, glm::mix(rockBase, glm::vec3(0.24f, 0.10f, 0.07f), 0.25f + (i % 4) * 0.08f),
+                                  0.90f,
+                                  0.70f,
+                                  0.62f);
+                        talusCount++;
+                    }
+
+                    int foregroundCount = 0;
+                    for (int i = 0; i < genExt.worldGeometry.foregroundOccluderCount; ++i) {
+                        const float side = (i % 2 == 0) ? -1.0f : 1.0f;
+                        entt::entity fg = m_registry->CreateEntity();
+                        m_registry->AddComponent<Scene::TagComponent>(
+                            fg, "GenerativeExterior_ForegroundOccluder" + std::to_string(i));
+                        auto& t = m_registry->AddComponent<TransformComponent>(fg);
+                        t.position = glm::vec3(side * (5.4f + (i % 3) * 1.35f),
+                                               0.18f,
+                                               5.3f - static_cast<float>(i / 2) * 1.15f);
+                        t.rotation = glm::quat(glm::vec3(glm::radians(-5.0f + i * 3.0f),
+                                                         glm::radians(47.0f * i),
+                                                         glm::radians(6.0f - i * 2.0f)));
+                        const float s = 1.28f + 0.22f * static_cast<float>(i % 3);
+                        t.scale = glm::vec3(s * 1.25f, s * 0.82f, s);
+                        auto& r = m_registry->AddComponent<Scene::RenderableComponent>(fg);
+                        r.mesh = shardMesh;
+                        dressRock(r, glm::mix(rockBase, glm::vec3(0.06f, 0.045f, 0.040f), 0.38f),
+                                  0.93f,
+                                  0.74f,
+                                  0.66f);
+                        foregroundCount++;
+                    }
+
+                    spdlog::info("generative_exterior: created world geometry depth_bands={} foreground={} ridge_layers={} shoreline={} talus={} strata={}",
+                                 genExt.worldGeometry.depthBandCount,
+                                 foregroundCount,
+                                 genExt.ridgeLayers.size(),
+                                 genExt.worldGeometry.shorelineSegmentCount,
+                                 talusCount,
+                                 strataCount);
+                    if (canyonWalls > 0) {
+                        spdlog::info("generative_exterior: created canyon wall layer(s) {}", canyonWalls);
+                    }
+                    if (foregroundCount > 0) {
+                        spdlog::info("generative_exterior: created foreground occluder(s) {}", foregroundCount);
+                    }
+                }
+            }
+            if (genExt.surfaceDetail.enabled) {
+                auto detailShardMesh = CreateGenerativeRockShardMesh(5.73f);
+                auto ribbonMesh = Utils::MeshGenerator::CreatePlane(1.0f, 1.0f);
+                auto diskMesh = Utils::MeshGenerator::CreateDisk(1.0f, 32);
+                const auto upDetailShard = renderer->UploadMesh(detailShardMesh);
+                const auto upRibbon = renderer->UploadMesh(ribbonMesh);
+                const auto upDisk = renderer->UploadMesh(diskMesh);
+                if (upDetailShard.IsErr() || upRibbon.IsErr() || upDisk.IsErr()) {
+                    spdlog::warn("generative_exterior: surface detail mesh upload failed shard='{}' ribbon='{}' disk='{}'",
+                                 upDetailShard.IsErr() ? upDetailShard.Error() : "ok",
+                                 upRibbon.IsErr() ? upRibbon.Error() : "ok",
+                                 upDisk.IsErr() ? upDisk.Error() : "ok");
+                } else {
+                    auto pseudo = [](int i, float f) -> float {
+                        return std::sin(static_cast<float>(i) * f) * 0.5f + 0.5f;
+                    };
+                    auto dressOverlay = [&](Scene::RenderableComponent& r,
+                                            const glm::vec4& color,
+                                            float roughness,
+                                            float normalScale,
+                                            float wetness,
+                                            float clearcoat) {
+                        r.albedoColor = color;
+                        r.metallic = 0.0f;
+                        r.roughness = roughness;
+                        r.ao = 0.60f;
+                        r.occlusionStrength = 0.52f;
+                        r.normalScale = normalScale;
+                        r.wetnessFactor = wetness;
+                        r.proceduralMaskStrength = 0.24f;
+                        r.specularFactor = 0.22f + clearcoat * 0.55f;
+                        r.clearcoatFactor = clearcoat;
+                        r.clearcoatRoughnessFactor = 0.62f;
+                        r.doubleSided = true;
+                        r.alphaMode = Scene::RenderableComponent::AlphaMode::Blend;
+                        r.renderLayer = Scene::RenderableComponent::RenderLayer::Overlay;
+                        r.presetName = "naturalistic";
+                    };
+
+                    int ribbonCount = 0;
+                    const float landSpan = std::max(groundNear - shoreZ, 8.0f);
+                    for (int i = 0; i < genExt.surfaceDetail.occlusionRibbonCount; ++i) {
+                        entt::entity ribbon = m_registry->CreateEntity();
+                        m_registry->AddComponent<Scene::TagComponent>(
+                            ribbon, "GenerativeExterior_OcclusionRibbon" + std::to_string(i));
+                        auto& t = m_registry->AddComponent<TransformComponent>(ribbon);
+                        const float x = (pseudo(i, 1.91f) - 0.5f) * groundW * 0.62f;
+                        const float z = shoreZ + 1.1f + pseudo(i + 3, 2.17f) * (landSpan * 0.72f);
+                        t.position = glm::vec3(x, 0.036f + i * 0.0007f, z);
+                        t.rotation = glm::quat(glm::vec3(0.0f, glm::radians(-34.0f + pseudo(i, 0.77f) * 68.0f), 0.0f));
+                        t.scale = glm::vec3(2.2f + pseudo(i, 1.31f) * 2.1f,
+                                            1.0f,
+                                            0.20f + pseudo(i + 7, 1.13f) * 0.20f);
+                        auto& r = m_registry->AddComponent<Scene::RenderableComponent>(ribbon);
+                        r.mesh = ribbonMesh;
+                        const float alpha = 0.12f + genExt.surfaceDetail.contactShadowStrength * 0.20f;
+                        dressOverlay(r, glm::vec4(glm::max(gcol * 0.18f, glm::vec3(0.012f)), alpha),
+                                     0.92f,
+                                     0.10f,
+                                     0.06f,
+                                     0.02f);
+                        ribbonCount++;
+                    }
+
+                    int creaseCount = 0;
+                    for (int i = 0; i < genExt.surfaceDetail.terrainCreaseCount; ++i) {
+                        entt::entity crease = m_registry->CreateEntity();
+                        m_registry->AddComponent<Scene::TagComponent>(
+                            crease, "GenerativeExterior_TerrainCrease" + std::to_string(i));
+                        auto& t = m_registry->AddComponent<TransformComponent>(crease);
+                        const float x = (pseudo(i + 11, 2.03f) - 0.5f) * groundW * 0.74f;
+                        const float z = shoreZ + 0.5f + pseudo(i + 5, 1.57f) * (landSpan * 0.58f);
+                        t.position = glm::vec3(x, 0.041f + i * 0.0009f, z);
+                        t.rotation = glm::quat(glm::vec3(0.0f, glm::radians(18.0f + pseudo(i, 2.41f) * 144.0f), 0.0f));
+                        t.scale = glm::vec3(1.0f + pseudo(i, 0.97f) * 1.3f,
+                                            1.0f,
+                                            0.055f + pseudo(i, 1.71f) * 0.065f);
+                        auto& r = m_registry->AddComponent<Scene::RenderableComponent>(crease);
+                        r.mesh = ribbonMesh;
+                        dressOverlay(r, glm::vec4(glm::max(gcol * 0.20f, glm::vec3(0.012f)), 0.18f),
+                                     0.90f,
+                                     0.18f,
+                                     genExt.groundWetness * 0.22f,
+                                     0.04f);
+                        creaseCount++;
+                    }
+
+                    int pebbleCount = 0;
+                    const glm::vec3 pebbleBase = genExt.groundKind == "dirt"
+                        ? glm::vec3(0.42f, 0.17f, 0.10f)
+                        : glm::mix(gcol, glm::vec3(0.30f, 0.31f, 0.29f), 0.55f);
+                    for (int i = 0; i < genExt.surfaceDetail.pebbleCount; ++i) {
+                        entt::entity pebble = m_registry->CreateEntity();
+                        m_registry->AddComponent<Scene::TagComponent>(
+                            pebble, "GenerativeExterior_MicroPebble" + std::to_string(i));
+                        auto& t = m_registry->AddComponent<TransformComponent>(pebble);
+                        const float x = (pseudo(i + 19, 1.67f) - 0.5f) * groundW * 0.76f;
+                        const float z = shoreZ + 0.9f + pseudo(i + 23, 2.29f) * (landSpan * 0.66f);
+                        t.position = glm::vec3(x, 0.050f, z);
+                        t.rotation = glm::quat(glm::vec3(glm::radians(-3.0f + pseudo(i, 2.11f) * 6.0f),
+                                                         glm::radians(pseudo(i, 3.03f) * 360.0f),
+                                                         glm::radians(-4.0f + pseudo(i, 1.23f) * 8.0f)));
+                        const float s = 0.10f + pseudo(i, 0.83f) * 0.18f;
+                        t.scale = glm::vec3(s * (1.0f + pseudo(i, 1.17f) * 0.8f), s * 0.42f, s);
+                        auto& r = m_registry->AddComponent<Scene::RenderableComponent>(pebble);
+                        r.mesh = detailShardMesh;
+                        const glm::vec3 color = glm::mix(pebbleBase, glm::vec3(0.10f, 0.09f, 0.08f), pseudo(i, 1.49f) * 0.38f);
+                        r.albedoColor = glm::vec4(glm::max(color, glm::vec3(0.018f)), 1.0f);
+                        r.metallic = 0.0f;
+                        r.roughness = 0.86f;
+                        r.ao = 0.78f;
+                        r.occlusionStrength = 0.70f;
+                        r.normalScale = 0.36f;
+                        r.wetnessFactor = genExt.groundWetness * (0.25f + pseudo(i, 2.71f) * 0.30f);
+                        r.proceduralMaskStrength = 0.38f;
+                        r.specularFactor = 0.20f;
+                        r.clearcoatFactor = std::min(r.wetnessFactor * 0.24f, 0.12f);
+                        r.clearcoatRoughnessFactor = 0.74f;
+                        r.doubleSided = true;
+                        r.presetName = "stone";
+                        pebbleCount++;
+                    }
+
+                    int shoreFoamCount = 0;
+                    if (genExt.waterOn) {
+                        for (int i = 0; i < genExt.surfaceDetail.shoreFoamSegmentCount; ++i) {
+                            entt::entity foam = m_registry->CreateEntity();
+                            m_registry->AddComponent<Scene::TagComponent>(
+                                foam, "GenerativeExterior_ShoreFoamWetline" + std::to_string(i));
+                            auto& t = m_registry->AddComponent<TransformComponent>(foam);
+                            const float x = (pseudo(i + 31, 1.43f) - 0.5f) * groundW * 0.78f;
+                            t.position = glm::vec3(x, genExt.waterLevel + 0.018f + i * 0.0006f, shoreZ - 0.08f + pseudo(i, 1.77f) * 0.34f);
+                            t.rotation = glm::quat(glm::vec3(0.0f, glm::radians(-7.0f + pseudo(i, 1.01f) * 14.0f), 0.0f));
+                            t.scale = glm::vec3(1.7f + pseudo(i, 1.91f) * 1.4f,
+                                                1.0f,
+                                                0.055f + pseudo(i, 2.73f) * 0.035f);
+                            auto& r = m_registry->AddComponent<Scene::RenderableComponent>(foam);
+                            r.mesh = ribbonMesh;
+                            const glm::vec3 foamColor = glm::mix(glm::vec3(0.92f), genExt.waterShallow, 0.28f);
+                            dressOverlay(r, glm::vec4(foamColor, 0.18f),
+                                         0.38f,
+                                         0.08f,
+                                         0.52f,
+                                         0.22f);
+                            shoreFoamCount++;
+                        }
+                    }
+
+                    int wetGlintCount = 0;
+                    for (int i = 0; i < genExt.surfaceDetail.wetGlintCount; ++i) {
+                        entt::entity glint = m_registry->CreateEntity();
+                        m_registry->AddComponent<Scene::TagComponent>(
+                            glint, "GenerativeExterior_WetSpecularGlint" + std::to_string(i));
+                        auto& t = m_registry->AddComponent<TransformComponent>(glint);
+                        const float x = (pseudo(i + 43, 2.19f) - 0.5f) * groundW * 0.60f;
+                        const float z = genExt.waterOn
+                            ? shoreZ + 0.45f + pseudo(i, 1.29f) * 3.2f
+                            : shoreZ + 2.0f + pseudo(i, 1.29f) * (landSpan * 0.28f);
+                        t.position = glm::vec3(x, 0.045f + i * 0.0005f, z);
+                        t.rotation = glm::quat(glm::vec3(0.0f, glm::radians(10.0f + pseudo(i, 2.63f) * 160.0f), 0.0f));
+                        t.scale = glm::vec3(0.60f + pseudo(i, 1.49f) * 0.95f,
+                                            1.0f,
+                                            0.035f + pseudo(i, 0.91f) * 0.055f);
+                        auto& r = m_registry->AddComponent<Scene::RenderableComponent>(glint);
+                        r.mesh = ribbonMesh;
+                        const glm::vec3 glintColor = genExt.waterOn
+                            ? glm::mix(genExt.waterShallow, glm::vec3(1.0f), 0.34f)
+                            : glm::mix(gcol, glm::vec3(1.0f), 0.20f);
+                        dressOverlay(r, glm::vec4(glintColor, 0.10f),
+                                     0.30f,
+                                     0.05f,
+                                     0.46f,
+                                     0.34f);
+                        wetGlintCount++;
+                    }
+
+                    spdlog::info("generative_exterior: created occlusion layering ribbons={} creases={} strength={:.2f}",
+                                 ribbonCount,
+                                 creaseCount,
+                                 genExt.surfaceDetail.contactShadowStrength);
+                    spdlog::info("generative_exterior: created surface detail pebbles={} shore_foam={} wet_glints={}",
+                                 pebbleCount,
+                                 shoreFoamCount,
+                                 wetGlintCount);
+                }
+            }
             if (genExt.graphicsMaterials) {
                 spdlog::info("generative_exterior: graphics material pass ground_normal={:.2f} ground_wetness={:.2f} procedural={:.2f} contacts={}",
                              genExt.groundNormalScale,
                              genExt.groundWetness,
                              genExt.groundProceduralMask,
                              genExt.contactPatches.size());
+                spdlog::info("generative_exterior: graphics shader material pass advanced_terms={} occlusion_ribbons={} pebbles={}",
+                             genExt.advancedShaderTermCount,
+                             genExt.surfaceDetail.occlusionRibbonCount,
+                             genExt.surfaceDetail.pebbleCount);
             }
         }
     }
@@ -3664,6 +4162,11 @@ void Engine::BuildRecipeScene() {
                 r.metallic = 0.0f;
                 r.roughness = genExt.waterRough;
                 r.ao = 1.0f;
+                r.occlusionStrength = 0.84f;
+                r.clearcoatFactor = 0.42f;
+                r.clearcoatRoughnessFactor = std::clamp(genExt.waterRough + 0.12f, 0.08f, 0.65f);
+                r.specularFactor = 1.18f;
+                r.anisotropyStrength = 0.20f;
                 r.presetName = "water";
                 Scene::WaterSurfaceComponent sea{};
                 sea.absorption = genExt.waterAbsorption;   // v3 controls explicit color readability
@@ -3722,9 +4225,18 @@ void Engine::BuildRecipeScene() {
                         r.metallic = 0.0f;
                         r.roughness = roughness;
                         r.ao = 1.0f;
+                        r.occlusionStrength = 0.78f;
+                        r.normalScale = 0.26f;
+                        r.proceduralMaskStrength = 0.28f;
+                        r.wetnessFactor = genExt.groundWetness * 0.20f;
+                        r.clearcoatFactor = std::min(genExt.groundWetness * 0.18f, 0.10f);
+                        r.clearcoatRoughnessFactor = 0.70f;
+                        r.anisotropyStrength = std::string(preset) == "wood" ? 0.24f : 0.06f;
+                        r.sheenWeight = std::string(preset) == "naturalistic" ? 0.08f : 0.0f;
                         r.presetName = preset;
                         r.emissiveColor = emissive;
                         r.emissiveStrength = emissiveStrength;
+                        r.emissiveBloomFactor = glm::length(emissive) > 0.0f ? 0.42f : 0.0f;
                     };
 
                     const float w = structure.widthM;
@@ -3871,6 +4383,32 @@ void Engine::BuildRecipeScene() {
         l.castsShadows = true;
     }
 
+    if (genExt.valid && genExt.rimLightCount > 0) {
+        int rimLights = 0;
+        const bool moonRim = genExt.lookTime.find("moon") != std::string::npos ||
+                             genExt.lookGrade.find("moon") != std::string::npos;
+        for (int i = 0; i < genExt.rimLightCount; ++i) {
+            const float side = (i % 2 == 0) ? -1.0f : 1.0f;
+            entt::entity e = m_registry->CreateEntity();
+            m_registry->AddComponent<Scene::TagComponent>(e, "GenerativeExterior_RimLight" + std::to_string(i));
+            auto& t = m_registry->AddComponent<TransformComponent>(e);
+            t.position = glm::vec3(side * 8.5f, 3.6f, 3.8f - static_cast<float>(i) * 2.0f);
+            const glm::vec3 target(0.0f, 0.62f, -4.6f);
+            t.rotation = glm::quatLookAtLH(glm::normalize(target - t.position), glm::vec3(0.0f, 1.0f, 0.0f));
+            auto& l = m_registry->AddComponent<Scene::LightComponent>(e);
+            l.type = Scene::LightType::Spot;
+            l.color = moonRim ? glm::vec3(0.48f, 0.58f, 1.0f) : glm::vec3(1.0f, 0.52f, 0.24f);
+            l.intensity = moonRim ? 3.2f : 4.4f;
+            l.range = 22.0f;
+            l.innerConeDegrees = 28.0f;
+            l.outerConeDegrees = 64.0f;
+            l.castsShadows = false;
+            l.semanticClassId = 4u;
+            rimLights++;
+        }
+        spdlog::info("generative_exterior: graphics lighting pass rim_lights={} fixed_exposure=on raking_key=on", rimLights);
+    }
+
     if (!outdoor) {
         entt::entity e = m_registry->CreateEntity();
         m_registry->AddComponent<Scene::TagComponent>(e, "Recipe_WindowSun_Directional");
@@ -3944,13 +4482,21 @@ void Engine::BuildRecipeScene() {
             target = glm::vec3(0.2f, 0.35f, -0.9f);
             camFov = 52.0f;
         } else if (recipe == "generative_exterior") {
-            // Open-world establishing shot: raised eye looking DOWN the -Z depth axis
-            // (foreground props -> midground -> water/horizon); the downward angle
-            // lets water read by transmission (green shallows) instead of pure sky
-            // mirror. The critique loop refines via the CORTEX_AUTOCAM_* overrides.
-            camPos = glm::vec3(0.0f, 3.0f, 10.5f);
-            target = glm::vec3(0.0f, 0.1f, -6.5f);
-            camFov = 58.0f;
+            if (genExt.valid && !genExt.structures.empty()) {
+                // Cabin exteriors need more distance; otherwise the authored cabin
+                // becomes a cropped wall and loses the lake/mountain context.
+                camPos = glm::vec3(0.0f, 3.05f, 11.0f);
+                target = glm::vec3(0.0f, 0.10f, -6.5f);
+                camFov = 55.0f;
+                spdlog::info("generative_exterior: shot camera pass profile=balanced_cabin_hero pos=(0.00,3.05,11.00) target=(0.00,0.10,-6.50) fov=55.0");
+            } else {
+                // Closer exterior hero shot: keeps the water/horizon depth cue, but
+                // moves campsite/desert hero props out of tiny blockout scale.
+                camPos = glm::vec3(0.0f, 2.25f, 8.0f);
+                target = glm::vec3(0.0f, -0.04f, -6.5f);
+                camFov = 52.0f;
+                spdlog::info("generative_exterior: shot camera pass profile=closer_midground_hero pos=(0.00,2.25,8.00) target=(0.00,-0.04,-6.50) fov=52.0");
+            }
         }
         // Showcase hero framing: low, front-centre, looking up at the blinded window so the
         // filtered volumetric daylight reads coming down past the furniture (avoids the

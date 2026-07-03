@@ -4,6 +4,8 @@
 
 Generated exterior scenes must move beyond semantic blockouts into inspectable high-fidelity stills: shaped terrain, grounded props, material variation, stronger contact occlusion/shadows, water/shore integration, and runtime evidence that the high-quality renderer path is active.
 
+2026-07-03 update: the `9c38cea` checkpoint is now treated as a baseline graphics pass, not completion. The next autonomous target is stronger world/shot/material fidelity: canyon walls and strata for canyon prompts, foreground framing geometry, material-zone variation, manipulated lighting evidence, shader-backed material terms, occlusion/surface layers, and adaptive hero-scale cameras that avoid both tiny blockouts and cropped cabin walls.
+
 Autonomous gates can prove hard failures are gone. The final "AAA enough" call remains `HUMAN-GATE`.
 
 ## Constraints & Anti-goals
@@ -49,6 +51,10 @@ Unknown:
 | 2 | Procedural terrain + grounding | Native heightfield terrain and contact decals will remove the planar scene feel. | Replace flat land strip with terrain mesh and add authored ground contact disks. | Dead if new render still has flat-plane metrics/logs or destabilizes prompts. | won |
 | 3 | Material/look pass | IR/runtime material profiles plus stronger AO/shadow settings will create visible surface variation and depth. | Compile material metadata and apply normal/procedural/wetness/specular controls at runtime. | Dead if logs/IR show controls but pixels do not change after render A/B. | won |
 | 4 | Asset fidelity | Remaining gap may be mostly source asset quality. | After graphics pass, compare output and list missing hero assets. | live residual / HUMAN-GATE |
+| 5 | World/shot fidelity gate | Current green desert/campsite stills fail if the verifier requires foreground occluders, depth bands, material zones, and canyon wall/strata evidence. | Strengthen `scene_graphics_gate.py` and run it on `aaa_graphics_desert_0_ir.json`. | Dead if it only catches prompt-specific fixture names instead of structural evidence. | won |
+| 6 | Procedural world geometry slice | Native procedural side walls, talus, strata strips, and foreground rocks can reduce the flat stage read without imported assets. | Add IR contract + runtime geometry logs; render novel campsite/alpine/desert prompts. | Dead if build/render is unstable or pixels/logs show no visible change. | won |
+| 7 | Shader material + occlusion slice | Existing material constants and overlay geometry can make the pass materially richer without unsafe DXR defaults. | Require advanced shader terms, occlusion ribbons, terrain creases, pebbles, shore foam/wet glints, and runtime logs. | Dead if pixels/logs show no visible change or if quality gates regress. | won |
+| 8 | Adaptive shot camera slice | One closer camera improves campsites but can crop cabins; scene-type camera profiles should improve both. | Require shot-camera runtime evidence and render campsite/desert/alpine. | Dead if camera changes break water/color/visibility gates or crop a prompt class. | won |
 
 ## Fronts
 
@@ -57,7 +63,8 @@ Unknown:
 | Gate | loops | done | Known-bad v3 campsite fixture rejected by `scene_graphics_gate.py --expect-fail` |
 | Runtime terrain/contact/material | loops | done | Campsite/alpine/desert rendered with heightfield/contact/material logs and graphics gates green |
 | Regression synthesis | loops | done | Release build, Python compile, known-bad gates, novel prompts, and kitchen smoke green |
-| Asset fidelity | self/HUMAN-GATE | residual | Desert/campsite still show catalog/shot-fidelity limits despite objective gates |
+| World/shot/material fidelity | loops | done checkpoint | World geometry, shader materials, occlusion/surface layers, and adaptive cameras verified on campsite/desert/alpine |
+| Asset fidelity | self/HUMAN-GATE | residual | Catalog quality is now the dominant visible limit: low-poly silhouettes, simple cabin/camp meshes, coarse mountain backdrops |
 
 ## Beat Log
 
@@ -73,6 +80,11 @@ Unknown:
 - Added heightfield terrain metadata, contact/shore grounding, material profiles, runtime renderer AO/SSR/shadow controls, per-object material lowering, and normal/specular overrides.
 - Release build green in 98.8s.
 - Verified campsite, alpine cabin moonlight, and desert turquoise river with semantic and graphics gates. All objective gates are green; final visual fidelity remains `HUMAN-GATE`.
+- Reopened after user rejected the baseline as still too basic/disconnected.
+- Proved the stronger gate red on `build/bin/logs/aaa_graphics_desert_0_ir.json`: old desert canyon now fails `insufficient_material_zone_variation`, `missing_world_depth_geometry`, `desert_canyon_blockout`, and `tree_heavy_desert_staging`.
+- Continued after user rejected stopping early. Proved new gate failures on current green artifacts, then implemented shader-backed material metadata, runtime material constants, occlusion ribbons, terrain creases, pebbles, shore foam/wet glints, and runtime evidence logs.
+- Added adaptive generated-exterior camera profiles. Campsite/desert use `closer_midground_hero`; cabin/alpine uses `balanced_cabin_hero` after visual inspection showed the closer camera cropped the cabin into a wall.
+- Final checkpoint evidence: Python compile green; Release build green (`[OK] Build complete in 17.2s`); campsite loop9, desert loop9, and alpine loop10 render valid and pass quality + strengthened graphics gates; Director IR validation green for all three; kitchen smoke green; known-bad quality oracle `gen_a_foggy_mountain_campsite_beside_0` still fails for the right semantic/color reasons; known-bad graphics oracle `v3_campsite_ridge_test_0` still fails the graphics gate.
 
 ## Learnings
 
@@ -80,6 +92,9 @@ Unknown:
 - Dense generated exteriors must not blindly inherit the validation path's forced DXR. The first-frame BLAS workload can stall before capture even when the same scene is stable through SSAO/SSR/shadows.
 - The new graphics gate proves missing hard features, not "AAA." It must remain paired with human image review and future asset-fidelity work.
 - Contact grounding needs careful restraint: too many bright overlay disks make the scene look more artificial even when metrics pass.
+- A valid generated scene is not necessarily a good still. The reopened gate now requires structural world geometry, shot-depth bands, material-zone diversity, and canyon-specific wall/strata evidence before subjective review.
+- The `v3_campsite_ridge_test` artifact is no longer a semantic/color quality oracle; it is a graphics-fidelity oracle. The original user-bad `gen_a_foggy_mountain_campsite_beside_0` artifact remains the quality oracle for fridge/missing-ridge/non-purple-water failures.
+- Procedural shader/occlusion/camera passes improve the stills, but they do not solve the asset-fidelity ceiling. The next serious front is better hero/environment assets or richer procedural meshes/textures, not another semantic gate.
 
 ## BLOCKED / Decisions Needed
 

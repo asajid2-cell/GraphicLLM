@@ -3,8 +3,8 @@
 
 This complements scene_quality_gate.py. It does not claim an image is AAA; it
 rejects the obvious blockout class: flat generated exteriors with disconnected
-props, no terrain/contact/material pass, and no runtime evidence that the
-high-quality exterior graphics path ran.
+props, no terrain/contact/material/shader pass, weak occlusion layering, and no
+runtime evidence that the high-quality exterior graphics path ran.
 """
 
 from __future__ import annotations
@@ -41,6 +41,9 @@ def _prompt_flags(prompt: str) -> dict[str, bool]:
         "exterior": any(w in p for w in ("lake", "river", "mountain", "campsite", "camp", "canyon", "alpine", "desert", "forest")),
         "water": any(w in p for w in ("lake", "river", "water", "shore")),
         "campsite": any(w in p for w in ("camp", "campsite")),
+        "canyon": "canyon" in p,
+        "desert": "desert" in p,
+        "moonlight": any(w in p for w in ("moon", "moonlight", "night")),
     }
 
 
@@ -83,12 +86,80 @@ def _material_detail_count(ir: dict[str, Any]) -> int:
         if not isinstance(mat, dict):
             continue
         richness = 0
-        for key in ("preset", "roughness", "normal_scale", "procedural_mask", "wetness", "specular"):
+        for key in (
+            "preset",
+            "roughness",
+            "normal_scale",
+            "procedural_mask",
+            "wetness",
+            "specular",
+            "ao",
+            "clearcoat",
+            "sheen",
+            "subsurface",
+            "anisotropy",
+        ):
             if key in mat:
                 richness += 1
         if richness >= 3:
             count += 1
     return count
+
+
+def _advanced_material_count(ir: dict[str, Any]) -> int:
+    count = 0
+    advanced_keys = {"ao", "clearcoat", "sheen", "subsurface", "anisotropy"}
+    for obj in _objects(ir):
+        mat = obj.get("material") or {}
+        if not isinstance(mat, dict):
+            continue
+        present = 0
+        for key in advanced_keys:
+            try:
+                if float(mat.get(key, 0.0) or 0.0) > 0.001:
+                    present += 1
+            except Exception:
+                continue
+        if present >= 2:
+            count += 1
+    return count
+
+
+def _material_zone_count(zones: Any) -> int:
+    if isinstance(zones, dict):
+        declared = zones.get("count")
+        try:
+            if declared is not None:
+                return int(declared)
+        except Exception:
+            pass
+        names = zones.get("zones")
+        if isinstance(names, list):
+            return len([z for z in names if z])
+        return len([k for k, v in zones.items() if k not in {"count", "zones"} and v])
+    if isinstance(zones, list):
+        return len([z for z in zones if z])
+    return 0
+
+
+def _asset_counts(ir: dict[str, Any]) -> dict[str, int]:
+    counts = {
+        "trees": 0,
+        "pines": 0,
+        "rocks": 0,
+        "hero": 0,
+    }
+    for obj in _objects(ir):
+        low = str(obj.get("asset") or "").lower()
+        if "tree" in low:
+            counts["trees"] += 1
+        if "pine" in low:
+            counts["pines"] += 1
+        if any(w in low for w in ("rock", "boulder", "stone", "cliff")):
+            counts["rocks"] += 1
+        if any(w in low for w in ("tent", "campfire", "fire", "cabin", "log", "lantern")):
+            counts["hero"] += 1
+    return counts
 
 
 def _image_metrics(path: Path | None) -> dict[str, Any]:
@@ -142,6 +213,12 @@ def evaluate(prompt: str, ir: dict[str, Any], png: Path | None, log_text: str) -
     materials = graphics.get("materials") or {}
     contact = graphics.get("contact") or {}
     renderer = graphics.get("renderer") or {}
+    world_geometry = graphics.get("world_geometry") or {}
+    shot = graphics.get("shot") or {}
+    material_zones = graphics.get("material_zones") or {}
+    lighting = graphics.get("lighting") or {}
+    surface_detail = graphics.get("surface_detail") or {}
+    occlusion = graphics.get("occlusion") or {}
     image = _image_metrics(png)
 
     failures: list[dict[str, Any]] = []
@@ -205,6 +282,23 @@ def evaluate(prompt: str, ir: dict[str, Any], png: Path | None, log_text: str) -
                 runtime_materials=has_runtime_materials,
             )
 
+        advanced_terms = materials.get("advanced_shader_terms") if isinstance(materials, dict) else {}
+        if isinstance(advanced_terms, dict):
+            advanced_term_count = sum(1 for value in advanced_terms.values() if bool(value))
+        else:
+            advanced_term_count = 0
+        advanced_objects = _advanced_material_count(ir)
+        has_runtime_shader_materials = "generative_exterior: graphics shader material pass" in log_text
+        if advanced_term_count < 4 or advanced_objects < 6 or not has_runtime_shader_materials:
+            fail(
+                "missing_advanced_shader_materials",
+                "Scene lacks shader-backed material terms such as clearcoat/sheen/anisotropy/occlusion",
+                advanced_terms=advanced_terms,
+                advanced_term_count=advanced_term_count,
+                advanced_object_materials=advanced_objects,
+                runtime_shader_materials=has_runtime_shader_materials,
+            )
+
         has_renderer_contract = (
             isinstance(renderer, dict)
             and bool(renderer.get("ssao"))
@@ -220,6 +314,124 @@ def evaluate(prompt: str, ir: dict[str, Any], png: Path | None, log_text: str) -
                 renderer=renderer,
                 runtime_renderer=has_runtime_renderer,
             )
+
+        has_lighting_contract = (
+            isinstance(lighting, dict)
+            and bool(lighting.get("fixed_exposure"))
+            and bool(lighting.get("raking_key"))
+            and int(lighting.get("rim_light_count", 0) or 0) >= 1
+        )
+        has_runtime_lighting = "generative_exterior: graphics lighting pass" in log_text
+        if not (has_lighting_contract and has_runtime_lighting):
+            fail(
+                "missing_lighting_shading_pass",
+                "Generated exterior lacks manipulated lighting/shading evidence",
+                lighting=lighting,
+                runtime_lighting=has_runtime_lighting,
+            )
+
+        material_zone_count = _material_zone_count(material_zones)
+        if material_zone_count < 4:
+            fail(
+                "insufficient_material_zone_variation",
+                "Scene lacks enough distinct authored material zones for terrain/shore/rocks/water/vegetation",
+                material_zones=material_zones,
+                material_zone_count=material_zone_count,
+            )
+
+        camera_role = str(shot.get("camera_role", "") if isinstance(shot, dict) else "").lower()
+        has_shot_camera_contract = ("closer" in camera_role or "balanced" in camera_role) and "hero" in camera_role
+        has_runtime_shot_camera = "generative_exterior: shot camera pass" in log_text
+        if not (has_shot_camera_contract and has_runtime_shot_camera):
+            fail(
+                "missing_shot_camera_pass",
+                "Generated exterior lacks the closer hero-scale camera profile required to avoid tiny staged blockouts",
+                shot=shot,
+                runtime_shot_camera=has_runtime_shot_camera,
+            )
+
+        try:
+            occlusion_ribbons = int(occlusion.get("ground_shadow_ribbon_count", 0) or 0)
+            contact_shadow_strength = float(occlusion.get("contact_shadow_strength", 0.0) or 0.0)
+            terrain_creases = int(surface_detail.get("terrain_crease_count", 0) or 0)
+            pebbles = int(surface_detail.get("pebble_count", 0) or 0)
+            wet_glints = int(surface_detail.get("wet_glint_count", 0) or 0)
+            shore_foam = int(surface_detail.get("shore_foam_segment_count", 0) or 0)
+        except Exception:
+            occlusion_ribbons = terrain_creases = pebbles = wet_glints = shore_foam = 0
+            contact_shadow_strength = 0.0
+        has_runtime_occlusion = "generative_exterior: created occlusion layering" in log_text
+        has_runtime_surface = "generative_exterior: created surface detail" in log_text
+        if (
+            occlusion_ribbons < 5
+            or contact_shadow_strength < 0.45
+            or terrain_creases < 4
+            or pebbles < 16
+            or (flags["water"] and (shore_foam < 3 or wet_glints < 3))
+            or not (has_runtime_occlusion and has_runtime_surface)
+        ):
+            fail(
+                "missing_occlusion_surface_layers",
+                "Scene lacks layered ground occlusion, terrain creases, micro surface detail, or shore wet/foam integration",
+                occlusion=occlusion,
+                surface_detail=surface_detail,
+                runtime_occlusion=has_runtime_occlusion,
+                runtime_surface=has_runtime_surface,
+            )
+
+        try:
+            foreground_occluders = int(world_geometry.get("foreground_occluder_count", 0) or 0)
+            depth_bands = int(shot.get("depth_band_count", world_geometry.get("depth_band_count", 0)) or 0)
+            ridge_layers = int(world_geometry.get("ridge_layer_count", 0) or 0)
+            shoreline_segments = int(world_geometry.get("shoreline_segment_count", 0) or 0)
+        except Exception:
+            foreground_occluders = depth_bands = ridge_layers = shoreline_segments = 0
+        has_runtime_world = "generative_exterior: created world geometry" in log_text
+        has_runtime_foreground = "generative_exterior: created foreground occluder" in log_text
+        if (
+            foreground_occluders < 2
+            or depth_bands < 4
+            or ridge_layers < 2
+            or (flags["water"] and shoreline_segments < 2)
+            or not (has_runtime_world and has_runtime_foreground)
+        ):
+            fail(
+                "missing_world_depth_geometry",
+                "Generated exterior lacks foreground/midground/shore/horizon world-geometry depth evidence",
+                world_geometry=world_geometry,
+                shot=shot,
+                runtime_world=has_runtime_world,
+                runtime_foreground=has_runtime_foreground,
+            )
+
+        canyon_like = flags["canyon"] or (
+            flags["desert"]
+            and "canyon" in str((ir.get("director") or {}).get("scene_type", "")).lower()
+        )
+        if canyon_like:
+            try:
+                canyon_wall_layers = int(world_geometry.get("canyon_wall_layers", 0) or 0)
+                talus_clusters = int(world_geometry.get("talus_cluster_count", 0) or 0)
+                strata_layers = int(world_geometry.get("red_rock_strata_layers", 0) or 0)
+            except Exception:
+                canyon_wall_layers = talus_clusters = strata_layers = 0
+            has_runtime_canyon = "generative_exterior: created canyon wall" in log_text
+            if canyon_wall_layers < 4 or talus_clusters < 8 or strata_layers < 4 or not has_runtime_canyon:
+                fail(
+                    "desert_canyon_blockout",
+                    "Canyon prompt lacks canyon-wall, talus, and red-rock strata evidence",
+                    world_geometry=world_geometry,
+                    runtime_canyon=has_runtime_canyon,
+                )
+
+        if flags["desert"] or flags["canyon"]:
+            assets = _asset_counts(ir)
+            if assets["pines"] > 2 or assets["trees"] > 8:
+                fail(
+                    "tree_heavy_desert_staging",
+                    "Desert/canyon scene reads as a generic forest campsite because tree assets dominate the flanks",
+                    assets=assets,
+                )
 
         if image:
             if image["ground_vertical_detail"] < 0.010:

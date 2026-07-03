@@ -71,46 +71,60 @@ def _material_for_asset(asset: str, desert: bool, moonlight: bool) -> dict[str, 
     if any(t in low for t in ("tree", "grass", "pine", "plant")):
         return {
             "preset": "foliage",
+            "ao": 0.78,
             "roughness": 0.68 if moonlight else 0.62,
             "normal_scale": 0.42,
             "procedural_mask": 0.34,
             "wetness": 0.12 if not desert else 0.03,
             "specular": 0.50,
+            "sheen": 0.14,
+            "subsurface": 0.20 if not desert else 0.08,
         }
     if any(t in low for t in ("rock", "boulder", "stone")):
         return {
             "preset": "wet_stone" if not desert else "stone",
+            "ao": 0.72,
             "roughness": 0.54 if not desert else 0.76,
             "normal_scale": 0.62,
             "procedural_mask": 0.48,
             "wetness": 0.36 if not desert else 0.08,
             "specular": 0.74 if not desert else 0.48,
+            "clearcoat": 0.18 if not desert else 0.05,
+            "anisotropy": 0.16,
         }
     if any(t in low for t in ("log", "trunk", "wood")):
         return {
             "preset": "wood",
+            "ao": 0.76,
             "roughness": 0.58,
             "normal_scale": 0.48,
             "procedural_mask": 0.46,
             "wetness": 0.16,
             "specular": 0.54,
+            "anisotropy": 0.34,
+            "clearcoat": 0.08,
         }
     if "tent" in low:
         return {
             "preset": "fabric",
+            "ao": 0.82,
             "roughness": 0.72,
             "normal_scale": 0.36,
             "procedural_mask": 0.30,
             "wetness": 0.08,
             "specular": 0.38,
+            "sheen": 0.34,
+            "subsurface": 0.10,
         }
     return {
         "preset": "naturalistic",
+        "ao": 0.80,
         "roughness": 0.70,
         "normal_scale": 0.34,
         "procedural_mask": 0.24,
         "wetness": 0.06,
         "specular": 0.42,
+        "clearcoat": 0.05,
     }
 
 
@@ -154,7 +168,7 @@ def _contact_patches(objects: list[dict[str, Any]], water_from_z: float, limit: 
             "x": _round3(x),
             "z": _round3(z),
             "radius": _round3(radius),
-            "darkness": 0.38 if near_shore else 0.28,
+            "darkness": 0.54 if near_shore else 0.42,
             "wetness": 0.56 if near_shore else 0.24,
         })
         if len(patches) >= limit:
@@ -209,20 +223,25 @@ def compile_v3_to_v2(v3: dict[str, Any]) -> dict[str, Any]:
 
     scene_type = str(intent.get("scene_type") or "exterior_landscape")
     prompt = str(intent.get("prompt") or "")
-    desert = "desert" in scene_type or "canyon" in scene_type or "desert" in prompt.lower()
-    campsite = "camp" in scene_type or "camp" in prompt.lower()
-    cabin = "cabin" in scene_type or "cabin" in prompt.lower()
+    prompt_lower = prompt.lower()
+    canyon = "canyon" in scene_type or "canyon" in prompt_lower
+    desert = "desert" in scene_type or canyon or "desert" in prompt_lower
+    campsite = "camp" in scene_type or "camp" in prompt_lower
+    cabin = "cabin" in scene_type or "cabin" in prompt_lower
     time_of_day = str(lighting.get("time") or "").lower()
-    moonlight = time_of_day == "moonlight" or "moon" in prompt.lower() or "moonlight" in prompt.lower()
-    stormy = "storm" in prompt.lower() or "storm" in time_of_day
+    moonlight = time_of_day == "moonlight" or "moon" in prompt_lower or "moonlight" in prompt_lower
+    stormy = "storm" in prompt_lower or "storm" in time_of_day
 
     extent = float(terrain.get("extent_m", 44.0) or 44.0)
     extent = _clamp(extent, 30.0, 52.0)
-    water_on = waterbody.get("type") in ("lake", "river", "waterbody") or "lake" in prompt.lower() or "river" in prompt.lower()
+    water_on = waterbody.get("type") in ("lake", "river", "waterbody") or "lake" in prompt_lower or "river" in prompt_lower
     water_from_z = -0.16 * extent
     water_shallow, water_deep = _water_palette(waterbody)
     water_intent = str(waterbody.get("color_intent") or "").lower()
     stylized_water = water_intent in {"purple", "violet", "turquoise", "blue"}
+    if canyon and water_intent == "turquoise":
+        water_shallow = [0.0, 1.80, 2.05]
+        water_deep = [0.0, 0.75, 1.05]
     if moonlight and not stylized_water:
         water_shallow = [0.11, 0.30, 0.52]
         water_deep = [0.01, 0.045, 0.17]
@@ -231,6 +250,21 @@ def compile_v3_to_v2(v3: dict[str, Any]) -> dict[str, Any]:
     ground_color = [0.58, 0.28, 0.18] if desert else [0.25, 0.34, 0.22]
     if moonlight and not desert:
         ground_color = [0.15, 0.19, 0.29]
+
+    ridge_layers = list(background.get("ridge_layers") or [])
+    if not ridge_layers:
+        ridge_layers = [
+            {
+                "distance_m": 55,
+                "height_m": 14 if canyon else 10,
+                "color": [0.45, 0.20, 0.13] if desert else [0.18, 0.20, 0.25],
+            },
+            {
+                "distance_m": 84,
+                "height_m": 25 if canyon else 18,
+                "color": [0.22, 0.10, 0.085] if desert else [0.10, 0.12, 0.18],
+            },
+        ]
 
     env = {
         "sun": {
@@ -279,7 +313,7 @@ def compile_v3_to_v2(v3: dict[str, Any]) -> dict[str, Any]:
             "color_strength": 1.0 if stylized_water else 0.0,
         },
         "background": {
-            "ridge_layers": background.get("ridge_layers", []),
+            "ridge_layers": ridge_layers,
             "intent": "procedural_ridge_backdrop",
         },
         "structures": [],
@@ -326,35 +360,108 @@ def compile_v3_to_v2(v3: dict[str, Any]) -> dict[str, Any]:
     _scatter_ring(objects, "grass_large", 20, radius_x=17.0, z_base=3.8, z_jitter=2.4,
                   foot=0.72, seed=scene_type + ":grass", tint=foliage_tint, sides=False, placed=placed)
 
-    # Tree masses on flanks, not the center corridor.
-    tree_asset = "tree_pineTallA" if not desert else "tree_pineSmallD"
-    _scatter_ring(objects, tree_asset, 14, radius_x=18.0, z_base=-1.3, z_jitter=3.8,
-                  foot=3.0 if not desert else 2.0, seed=scene_type + ":trees", tint=foliage_tint,
-                  placed=placed)
+    # Tree/vertical masses on flanks, not the center corridor. Desert canyons use
+    # sparse dead trunks instead of pine flanks so they do not read as a forest camp.
+    if desert:
+        _scatter_ring(objects, "dead_tree_trunk", 5, radius_x=18.0, z_base=0.6, z_jitter=3.0,
+                      foot=1.55, seed=scene_type + ":snags", tint=[0.34, 0.22, 0.13],
+                      placed=placed)
+    else:
+        _scatter_ring(objects, "tree_pineTallA", 14, radius_x=18.0, z_base=-1.3, z_jitter=3.8,
+                      foot=3.0, seed=scene_type + ":trees", tint=foliage_tint,
+                      placed=placed)
 
     if waterbody.get("type") == "lake" and not desert:
         _add(objects, "canoe", -5.2, -5.9, 16.0, 2.7, placed=placed)
 
     _attach_materials(objects, desert=desert, moonlight=moonlight)
     contact_patches = _contact_patches(objects, water_from_z)
+    foreground_occluders = 4 if canyon else 3
+    shoreline_segments = 3 if water_on else 0
+    material_zone_names = [
+        "terrain_red_dirt" if desert else "terrain_grass_rock",
+        "shore_wet_band" if water_on else "dry_contact_shadow",
+        "water_surface" if water_on else "sky_reflection_probe",
+        "rock_talus" if desert else "wet_boulders",
+        "dry_scrub" if desert else "foliage_flanks",
+    ]
+    if canyon:
+        material_zone_names.extend(["red_rock_cliff_faces", "red_rock_strata", "foreground_silhouette_rocks"])
+    elif campsite:
+        material_zone_names.append("camp_hero_fabric_wood")
+    material_zone_names.extend(["terrain_micro_pebbles", "soft_occlusion_ribbons"])
+    if water_on:
+        material_zone_names.extend(["shore_foam_wetline", "wet_specular_glints"])
+    env["shot"] = {
+        "composition": "foreground_frame_midground_hero_water_horizon",
+        "depth_band_count": 5 if water_on else 4,
+        "foreground_framing": True,
+        "clear_view_corridor": True,
+        "camera_role": "balanced_cabin_hero_water_horizon" if cabin else "closer_midground_hero_water_horizon",
+    }
     env["graphics_pass"] = {
-        "version": 1,
+        "version": 2,
         "terrain": {
             "heightfield": True,
             "relief_m": env["ground"]["terrain"]["relief_m"],
             "shore_integrated": bool(water_on),
         },
+        "world_geometry": {
+            "enabled": True,
+            "depth_band_count": env["shot"]["depth_band_count"],
+            "foreground_occluder_count": foreground_occluders,
+            "ridge_layer_count": max(2, len(ridge_layers)),
+            "shoreline_segment_count": shoreline_segments,
+            "canyon_wall_layers": 6 if canyon else 0,
+            "talus_cluster_count": 14 if canyon else 6,
+            "red_rock_strata_layers": 8 if canyon else 0,
+            "canyon_width_m": 36.0 if canyon else 0.0,
+            "wall_height_m": 10.5 if canyon else 0.0,
+        },
+        "shot": env["shot"],
         "contact": {
             "decal_count": len(contact_patches),
             "shore_layer_count": 2 if water_on else 0,
             "patches": contact_patches,
         },
+        "occlusion": {
+            "enabled": True,
+            "ground_shadow_ribbon_count": 11 if not desert else 9,
+            "contact_shadow_strength": 0.78 if not moonlight else 0.68,
+            "ambient_occlusion_multiplier": 1.26 if not moonlight else 1.14,
+        },
+        "surface_detail": {
+            "enabled": True,
+            "pebble_count": 42 if not canyon else 34,
+            "terrain_crease_count": 10 if not canyon else 12,
+            "shore_foam_segment_count": 6 if water_on else 0,
+            "wet_glint_count": 6 if water_on else 2,
+        },
+        "material_zones": {
+            "count": len(material_zone_names),
+            "zones": material_zone_names,
+        },
         "materials": {
             "enabled": True,
-            "ground_normal_scale": 0.82 if not desert else 0.68,
-            "ground_wetness": 0.30 if water_on and not desert else 0.10,
-            "procedural_mask": 0.42 if not desert else 0.28,
+            "advanced_shader_terms": {
+                "ao": True,
+                "clearcoat": True,
+                "sheen": True,
+                "subsurface": True,
+                "anisotropy": True,
+                "wetness": True,
+                "procedural_mask": True,
+            },
+            "ground_normal_scale": 0.82 if not desert else 0.76,
+            "ground_wetness": 0.30 if water_on and not desert else 0.13,
+            "procedural_mask": 0.42 if not desert else 0.46,
             "roughness": 0.84,
+        },
+        "lighting": {
+            "fixed_exposure": True,
+            "raking_key": True,
+            "rim_light_count": 1,
+            "volumetric_fog": True,
         },
         "renderer": {
             "ssao": True,

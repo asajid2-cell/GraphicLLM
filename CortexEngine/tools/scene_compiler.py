@@ -413,6 +413,9 @@ def compile_v3_to_v2(v3: dict[str, Any]) -> dict[str, Any]:
             "water_ripple_reflection_glints",
             "submerged_edge_rock_wetlines",
         ])
+    material_zone_names.extend(["hero_environment_geometry", "mountain_cliff_massing", "shoreline_prop_geometry"])
+    if not desert:
+        material_zone_names.append("irregular_tree_silhouettes")
     env["shot"] = {
         "composition": "foreground_frame_midground_hero_water_horizon",
         "depth_band_count": 5 if water_on else 4,
@@ -557,6 +560,23 @@ def compile_v3_to_v2(v3: dict[str, Any]) -> dict[str, Any]:
                 "cabin_trim",
                 "porch_steps",
                 "ridge_silhouette_breakup",
+            ],
+        },
+        "hero_environment_geometry": {
+            "enabled": True,
+            "high_detail_camp_piece_count": 34 if campsite else 0,
+            "high_detail_cabin_piece_count": 30 if cabin else 0,
+            "mountain_mass_layer_count": 5 if (water_on or canyon or cabin) else 3,
+            "cliff_mass_piece_count": 14 if canyon else 0,
+            "shoreline_prop_count": 10 if water_on else 0,
+            "irregular_tree_silhouette_count": 12 if not desert else 0,
+            "support_prop_count": 12 if campsite else (8 if cabin else 4),
+            "detail_systems": [
+                "high_detail_camp_kit",
+                "high_detail_cabin_kit",
+                "mountain_massing_meshes",
+                "shoreline_driftwood_and_stones",
+                "irregular_tree_silhouette_meshes",
             ],
         },
         "atmosphere_fidelity": {

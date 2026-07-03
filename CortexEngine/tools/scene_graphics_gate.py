@@ -236,6 +236,7 @@ def evaluate(prompt: str, ir: dict[str, Any], png: Path | None, log_text: str) -
     image_contact_occlusion = graphics.get("image_contact_occlusion") or {}
     water_shore_integration = graphics.get("water_shore_integration") or {}
     soft_occlusion = graphics.get("soft_occlusion") or {}
+    hero_environment_geometry = graphics.get("hero_environment_geometry") or {}
     image = _image_metrics(png)
 
     failures: list[dict[str, Any]] = []
@@ -481,6 +482,52 @@ def evaluate(prompt: str, ir: dict[str, Any], png: Path | None, log_text: str) -
                 asset_fidelity=asset_fidelity,
                 runtime_asset_fidelity=has_runtime_asset_fidelity,
                 runtime_backdrop_detail=has_runtime_backdrop_detail,
+            )
+
+        try:
+            high_detail_camp_pieces = int(hero_environment_geometry.get("high_detail_camp_piece_count", 0) or 0)
+            high_detail_cabin_pieces = int(hero_environment_geometry.get("high_detail_cabin_piece_count", 0) or 0)
+            mountain_mass_layers = int(hero_environment_geometry.get("mountain_mass_layer_count", 0) or 0)
+            cliff_mass_pieces = int(hero_environment_geometry.get("cliff_mass_piece_count", 0) or 0)
+            shoreline_props = int(hero_environment_geometry.get("shoreline_prop_count", 0) or 0)
+            irregular_tree_silhouettes = int(hero_environment_geometry.get("irregular_tree_silhouette_count", 0) or 0)
+        except Exception:
+            high_detail_camp_pieces = high_detail_cabin_pieces = mountain_mass_layers = 0
+            cliff_mass_pieces = shoreline_props = irregular_tree_silhouettes = 0
+        has_runtime_hero_env = "generative_exterior: created hero environment geometry" in log_text
+        has_runtime_camp_kit = "generative_exterior: created high detail camp kit" in log_text
+        has_runtime_cabin_kit = "generative_exterior: created high detail cabin kit" in log_text
+        has_runtime_mountain_mass = "generative_exterior: created mountain massing geometry" in log_text
+        has_runtime_tree_silhouette = "generative_exterior: created irregular tree silhouette geometry" in log_text
+        prompt_has_cabin = "cabin" in prompt.lower()
+        needs_non_desert_trees = not (flags["desert"] or flags["canyon"])
+        if (
+            not isinstance(hero_environment_geometry, dict)
+            or not bool(hero_environment_geometry.get("enabled"))
+            or not has_runtime_hero_env
+            or mountain_mass_layers < 3
+            or not has_runtime_mountain_mass
+            or (flags["water"] and shoreline_props < 6)
+            or (flags["campsite"] and (high_detail_camp_pieces < 24 or not has_runtime_camp_kit))
+            or (prompt_has_cabin and (high_detail_cabin_pieces < 22 or not has_runtime_cabin_kit))
+            or (canyon_prompt and cliff_mass_pieces < 8)
+            or (needs_non_desert_trees and (irregular_tree_silhouettes < 8 or not has_runtime_tree_silhouette))
+        ):
+            fail(
+                "missing_hero_environment_geometry",
+                "Generated exterior lacks high-detail hero/environment geometry for camp/cabin construction, mountain/cliff massing, shoreline props, or tree silhouettes",
+                hero_environment_geometry=hero_environment_geometry,
+                high_detail_camp_piece_count=high_detail_camp_pieces,
+                high_detail_cabin_piece_count=high_detail_cabin_pieces,
+                mountain_mass_layer_count=mountain_mass_layers,
+                cliff_mass_piece_count=cliff_mass_pieces,
+                shoreline_prop_count=shoreline_props,
+                irregular_tree_silhouette_count=irregular_tree_silhouettes,
+                runtime_hero_environment_geometry=has_runtime_hero_env,
+                runtime_high_detail_camp_kit=has_runtime_camp_kit,
+                runtime_high_detail_cabin_kit=has_runtime_cabin_kit,
+                runtime_mountain_massing_geometry=has_runtime_mountain_mass,
+                runtime_irregular_tree_silhouette_geometry=has_runtime_tree_silhouette,
             )
 
         if flags["moonlight"] or "storm" in prompt.lower():

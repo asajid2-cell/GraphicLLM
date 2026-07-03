@@ -310,11 +310,77 @@ Escape: if dark contact patches become visible black stains, reduce radius/count
 
 Status: done
 
+### Loop 16: Water Shore And Soft Occlusion
+
+Invariant: water prompts must show authored shore/water integration and all generated exteriors must show broad terrain-toned soft contact occlusion, without forcing DXR by default.
+
+Scope:
+
+- in: `tools/scene_graphics_gate.py`, `tools/scene_compiler.py`, `src/Core/Engine_Scenes.cpp`, focused ledgers.
+- out: `tools/scene_quality_gate.py`, forced DXR defaults, unrelated interiors.
+
+Verifier:
+
+- Current Loop 28 campsite/desert/alpine artifacts fail strengthened graphics gate with `missing_water_shore_integration_pass` and `missing_soft_occlusion_pass`.
+- New campsite/desert/alpine prompts render VALID and pass quality + strengthened graphics gates.
+- Runtime logs include `generative_exterior: created water shore integration` and `generative_exterior: created soft contact occlusion`.
+- Release build, Director IR validation, known-bad oracles, and kitchen smoke remain green.
+
+Exit: all verifier commands green, with artifacts and logs recorded.
+
+Escape: if soft occlusion reads as black puddles or breaks contact/color/visibility gates, reduce overlay darkness and preserve only small hard contact cores before changing thresholds.
+
+Status: done
+
+### Loop 17: Hero Environment Geometry Fidelity
+
+Invariant: generated exteriors must include a heavier hero/environment geometry construction pass that attacks the current low-poly kit ceiling: richer tent/cabin/camp construction, non-flat mountain/cliff massing, close shoreline/foreground prop geometry, and irregular tree/vegetation silhouette support.
+
+Scope:
+
+- in: `tools/scene_graphics_gate.py`, `tools/scene_compiler.py`, `src/Core/Engine_Scenes.cpp`, focused ledgers.
+- out: `tools/scene_quality_gate.py`, forced DXR defaults, broad asset-ingest rewrites, unrelated interiors.
+
+Verifier:
+
+- Current Loop 16 campsite/desert/alpine artifacts fail strengthened graphics gate with `missing_hero_environment_geometry`.
+- New campsite/desert/alpine prompts render VALID and pass quality + strengthened graphics gates.
+- Runtime logs include `generative_exterior: created hero environment geometry`.
+- Runtime logs include at least one of the prompt-relevant detail tokens: `created high detail camp kit`, `created high detail cabin kit`, `created mountain massing geometry`, or `created irregular tree silhouette geometry`.
+- Release build, Python compile, Director IR validation, known-bad oracles, and kitchen smoke remain green.
+
+Exit: all verifier commands green, with artifacts and logs recorded.
+
+Escape: if added geometry causes capture timeouts, visual clutter, or object visibility regressions, reduce counts and keep the contract focused on prompt-relevant systems rather than weakening existing gates.
+
+Status: done
+
 ## Progress Log
 
 2026-07-03:
 
 - Created this separate loop ledger to avoid contaminating the Director IR v3 ledger.
+- Loop 17 opened after Loop 16 visual inspection and user pushback: the next hard ceiling is source/hero/environment geometry fidelity rather than more overlay layers. Heartbeat proof `aaa-graphics-loop17-proof` fired by timeout after 1s.
+- Loop 17 red proof:
+  - Strengthened `tools\scene_graphics_gate.py` to require `graphics_pass.hero_environment_geometry` plus runtime logs for high-detail camp/cabin kits, mountain massing, and irregular tree silhouettes where prompt-relevant.
+  - Current Loop 16 campsite, desert, and alpine artifacts failed the strengthened gate with `missing_hero_environment_geometry` and no unrelated new failures.
+- Loop 17 implementation:
+  - `tools\scene_compiler.py` now emits `graphics_pass.hero_environment_geometry` counts for high-detail camp/cabin kit pieces, mountain/cliff massing, shoreline props, irregular tree silhouettes, and support props.
+  - `src\Core\Engine_Scenes.cpp` now parses that contract and builds bounded thick runtime geometry for camp gear/tent pieces, cabin log/rafter/porch/foundation/woodpile pieces, mountain/cliff massing, shoreline driftwood/stones, and irregular tree silhouettes.
+  - `tools\scene_graphics_gate.py` now fails generated exteriors without the new IR/runtime evidence.
+- Loop 17 verifier evidence:
+  - `python -m py_compile tools\scene_compiler.py tools\scene_graphics_gate.py tools\scene_quality_gate.py tools\scene_gen.py` exited 0.
+  - Final Release rebuild exited 0: `[OK] Build complete in 66.0s`.
+  - Campsite `aaa_graphics_campsite_loop17b` rendered VALID; quality gate exited 0 (`purple_fraction=0.8847`, `nonblack_fraction=1.0`); graphics gate exited 0 (`dark_contact_area_fraction=0.0187`); Director IR validation exited 0. Runtime log shows `created high detail camp kit pieces=34`, `created mountain massing geometry layers=5 cliff_mass=0`, `created irregular tree silhouette geometry trees=12`, and `created hero environment geometry camp=34 cabin=0 mountain_layers=5 cliff_mass=0 shoreline_props=10 tree_silhouettes=12 support_props=12`.
+  - Desert canyon `aaa_graphics_desert_loop17b` rendered VALID; quality gate exited 0 (`turquoise_fraction=0.4216`, `nonblack_fraction=1.0`); graphics gate exited 0 (`dark_contact_area_fraction=0.0069`); Director IR validation exited 0. Runtime log shows `created high detail camp kit pieces=34`, `created mountain massing geometry layers=5 cliff_mass=14`, and `created hero environment geometry camp=34 cabin=0 mountain_layers=5 cliff_mass=14 shoreline_props=10 tree_silhouettes=0 support_props=12`.
+  - Alpine cabin `aaa_graphics_alpine_loop17` rendered VALID; quality gate exited 0 (`avg_luma=0.1499`, `cool_fraction=0.8591`, `nonblack_fraction=1.0`); graphics gate exited 0 (`dark_contact_fraction=0.0048`); Director IR validation exited 0. Runtime log shows `created high detail cabin kit pieces=30`, `created mountain massing geometry layers=5 cliff_mass=0`, `created irregular tree silhouette geometry trees=12`, and `created hero environment geometry camp=0 cabin=30 mountain_layers=5 cliff_mass=0 shoreline_props=10 tree_silhouettes=12 support_props=8`.
+  - Kitchen smoke `regression_kitchen_aaa_loop17` rendered VALID and quality gate exited 0 (`avg_luma=0.4728`, `nonblack_fraction=1.0`).
+  - Known-bad quality oracle `gen_a_foggy_mountain_campsite_beside_0` with `--expect-fail` exited 0 and still reports forbidden fridge, missing mountain/ridge, focal visibility, and purple-water failures.
+  - Known-bad graphics oracle `v3_campsite_ridge_test_0` with explicit empty log and `--expect-fail` exited 0 and now includes `missing_hero_environment_geometry`.
+- Loop 17 visual/regression notes:
+  - First `aaa_graphics_campsite_loop17` failed `purple_water_roi_fail` because non-canyon mountain massing became near-side walls in the water ROI. Fixed by pushing non-canyon massing outward/back and disabling non-canyon cliff chunks.
+  - First `aaa_graphics_desert_loop17` failed `turquoise_water_roi_fail` because canyon massing narrowed the sampled river band. Fixed by shrinking and moving canyon Loop 17 massing to side/back detail while preserving the existing canyon-wall system.
+  - Visual residual remains `HUMAN-GATE`: Loop 17 adds real detail and form, but outputs are still stylized and some edge silhouettes are awkward, especially in alpine. The next front should bind source setpieces/regions to runtime geometry or attack asset/material ingestion rather than add unstructured clutter.
 - Heartbeat proof: `node Z:\328\CMPUT328-A2\codexworks\301\heartbeat\bin\hb.mjs wait --label aaa-graphics-proof --timeout 1 --poll 1` exited by timeout after 1s.
 - Loop 1 green:
   - `python tools\scene_graphics_gate.py --prompt "a foggy mountain campsite beside a purple lake at dawn" --ir build\bin\logs\v3_campsite_ridge_test_0_ir.json --png build\bin\logs\v3_campsite_ridge_test_0.png --expect-fail` exited 0.
@@ -547,6 +613,24 @@ Status: done
   - Remaining `HUMAN-GATE` gap: outputs are still stylized and overlay-driven; low-poly cliffs, simple tent/cabin/camp assets, and coarse background geometry are now the dominant ceiling again.
 - Loop 16 learning:
   - In this render path, alpha-blended penumbra overlays can read much darker than intended. Soft occlusion needs terrain-toned albedo plus separate small hard contact cores; relying on alpha alone produces black-puddle artifacts.
+- Loop 17 red proof:
+  - Strengthened `tools\scene_graphics_gate.py` to require `graphics_pass.hero_environment_geometry` plus runtime evidence.
+  - Current Loop 16 campsite/desert/alpine artifacts failed with `missing_hero_environment_geometry`.
+- Loop 17 implementation:
+  - `tools\scene_compiler.py` now emits high-detail camp/cabin kit, mountain/cliff massing, shoreline prop, irregular tree silhouette, and support prop counts.
+  - `src\Core\Engine_Scenes.cpp` now parses the contract and renders thick runtime geometry for camp gear/tent pieces, cabin log/rafter/porch/foundation/woodpile pieces, mountain/cliff massing, shoreline driftwood/stones, and irregular tree silhouettes.
+  - `tools\scene_graphics_gate.py` now fails generated exteriors without this IR/runtime evidence.
+- Loop 17 verifier evidence:
+  - Python compile exited 0.
+  - Final Release rebuild exited 0: `[OK] Build complete in 66.0s`.
+  - Campsite `aaa_graphics_campsite_loop17b` rendered VALID; quality green (`purple_fraction=0.8847`); graphics green (`dark_contact_area_fraction=0.0187`); Director IR validation green; runtime `camp=34 mountain_layers=5 shoreline_props=10 tree_silhouettes=12`.
+  - Desert canyon `aaa_graphics_desert_loop17b` rendered VALID; quality green (`turquoise_fraction=0.4216`); graphics green (`dark_contact_area_fraction=0.0069`); Director IR validation green; runtime `camp=34 mountain_layers=5 cliff_mass=14 shoreline_props=10`.
+  - Alpine cabin `aaa_graphics_alpine_loop17` rendered VALID; quality green (`avg_luma=0.1499`, `cool_fraction=0.8591`); graphics green (`dark_contact_fraction=0.0048`); Director IR validation green; runtime `cabin=30 mountain_layers=5 shoreline_props=10 tree_silhouettes=12`.
+  - Kitchen smoke `regression_kitchen_aaa_loop17` rendered VALID and quality green (`avg_luma=0.4728`).
+  - Known-bad quality oracle still fails the fridge/missing-ridge/focal-visibility/purple-water fixture. Known-bad graphics oracle with explicit empty log still fails and now includes `missing_hero_environment_geometry`.
+- Loop 17 learning:
+  - First `aaa_graphics_campsite_loop17` failed `purple_water_roi_fail` because non-canyon mountain massing became near-side walls in the fixed water ROI. First `aaa_graphics_desert_loop17` failed `turquoise_water_roi_fail` because canyon massing narrowed the sampled river band. Both were fixed by moving Loop 17 massing outward/back; keep semantic color gates strict.
+  - Remaining `HUMAN-GATE` gap: outputs are richer but still stylized, and the next serious front should bind Director setpieces/regions to runtime source geometry or attack asset/material ingestion rather than add unstructured clutter.
 
 ## BLOCKED / Decisions
 

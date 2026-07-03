@@ -248,6 +248,22 @@ namespace {
         int paletteUnificationCount = 0;
     };
 
+    struct GenerativeEnvironmentFidelity {
+        bool enabled = false;
+        int skyLayerCount = 0;
+        int atmosphereDepthCueCount = 0;
+        int horizonBlendBandCount = 0;
+        int terrainMacroBreakupCount = 0;
+        int waterDepthBandCount = 0;
+        int reflectionBandCount = 0;
+        int directionalShadowLaneCount = 0;
+        int backdropIntegrationLayerCount = 0;
+        float shadowDirectionality = 0.0f;
+        float skyGradientStrength = 0.0f;
+        float waterDepthContrast = 0.0f;
+        float terrainReliefContrast = 0.0f;
+    };
+
     struct GenerativeRendererShadowOcclusionBudget {
         bool enabled = false;
         bool rendererSSAO = false;
@@ -3433,6 +3449,7 @@ void Engine::BuildRecipeScene() {
         GenerativeSourceGeometryFidelity sourceGeometryFidelity;
         GenerativeHeroAssetReplacement heroAssetReplacement;
         GenerativeCohesiveStagingCleanup cohesiveStagingCleanup;
+        GenerativeEnvironmentFidelity environmentFidelity;
         GenerativeRendererShadowOcclusionBudget rendererShadowOcclusionBudget;
         GenerativeCinematicMaterialLighting cinematicMaterialLighting;
         GenerativeAtmosphereFidelity atmosphereFidelity;
@@ -3748,6 +3765,32 @@ void Engine::BuildRecipeScene() {
                     static_cast<int>(std::clamp(num(cohesiveStagingCleanup, "foreground_relocation_count", 0.0f), 0.0f, 16.0f));
                 genExt.cohesiveStagingCleanup.paletteUnificationCount =
                     static_cast<int>(std::clamp(num(cohesiveStagingCleanup, "palette_unification_count", 0.0f), 0.0f, 64.0f));
+                const nlohmann::json environmentFidelity = graphics.value("environment_fidelity", nlohmann::json::object());
+                genExt.environmentFidelity.enabled = environmentFidelity.value("enabled", false);
+                genExt.environmentFidelity.skyLayerCount =
+                    static_cast<int>(std::clamp(num(environmentFidelity, "sky_layer_count", 0.0f), 0.0f, 12.0f));
+                genExt.environmentFidelity.atmosphereDepthCueCount =
+                    static_cast<int>(std::clamp(num(environmentFidelity, "atmosphere_depth_cue_count", 0.0f), 0.0f, 16.0f));
+                genExt.environmentFidelity.horizonBlendBandCount =
+                    static_cast<int>(std::clamp(num(environmentFidelity, "horizon_blend_band_count", 0.0f), 0.0f, 10.0f));
+                genExt.environmentFidelity.terrainMacroBreakupCount =
+                    static_cast<int>(std::clamp(num(environmentFidelity, "terrain_macro_breakup_count", 0.0f), 0.0f, 32.0f));
+                genExt.environmentFidelity.waterDepthBandCount =
+                    static_cast<int>(std::clamp(num(environmentFidelity, "water_depth_band_count", 0.0f), 0.0f, 12.0f));
+                genExt.environmentFidelity.reflectionBandCount =
+                    static_cast<int>(std::clamp(num(environmentFidelity, "reflection_band_count", 0.0f), 0.0f, 12.0f));
+                genExt.environmentFidelity.directionalShadowLaneCount =
+                    static_cast<int>(std::clamp(num(environmentFidelity, "directional_shadow_lane_count", 0.0f), 0.0f, 16.0f));
+                genExt.environmentFidelity.backdropIntegrationLayerCount =
+                    static_cast<int>(std::clamp(num(environmentFidelity, "backdrop_integration_layer_count", 0.0f), 0.0f, 14.0f));
+                genExt.environmentFidelity.shadowDirectionality =
+                    std::clamp(num(environmentFidelity, "shadow_directionality", 0.0f), 0.0f, 1.0f);
+                genExt.environmentFidelity.skyGradientStrength =
+                    std::clamp(num(environmentFidelity, "sky_gradient_strength", 0.0f), 0.0f, 1.0f);
+                genExt.environmentFidelity.waterDepthContrast =
+                    std::clamp(num(environmentFidelity, "water_depth_contrast", 0.0f), 0.0f, 1.0f);
+                genExt.environmentFidelity.terrainReliefContrast =
+                    std::clamp(num(environmentFidelity, "terrain_relief_contrast", 0.0f), 0.0f, 1.0f);
                 const nlohmann::json atmosphereFidelity = graphics.value("atmosphere_fidelity", nlohmann::json::object());
                 genExt.atmosphereFidelity.enabled = atmosphereFidelity.value("enabled", false);
                 genExt.atmosphereFidelity.nightSkyControl = atmosphereFidelity.value("night_sky_control", false);
@@ -4222,6 +4265,51 @@ void Engine::BuildRecipeScene() {
                              module.empty() ? "unknown" : module,
                              genExt.authoredSceneModule.contrastKey.empty() ? "default" : genExt.authoredSceneModule.contrastKey,
                              genExt.authoredSceneModule.lightingZoneCount);
+            }
+            if (genExt.environmentFidelity.enabled) {
+                const std::string module = genExt.authoredSceneModule.moduleId;
+                const bool campsiteModule = module == "campsite_lake_dawn";
+                const bool canyonModule = module == "desert_canyon_river";
+                const bool alpineModule = module == "alpine_cabin_lake";
+                const float skyLift = alpineModule
+                    ? 0.46f
+                    : (campsiteModule ? 2.65f : (canyonModule ? 2.25f : 2.10f));
+                renderer->SetBackgroundPresentation(true, skyLift, alpineModule ? 0.18f : 0.035f);
+                renderer->SetEnvironmentRotation(genExt.sunAz + (campsiteModule ? 142.0f : (canyonModule ? 122.0f : 18.0f)));
+                renderer->SetIBLIntensity(alpineModule ? 0.34f : (canyonModule ? 1.48f : 1.22f),
+                                          alpineModule ? 0.86f : (canyonModule ? 1.14f : 1.04f));
+                renderer->SetAmbientLighting(alpineModule
+                                                 ? glm::vec3(0.010f, 0.018f, 0.045f)
+                                                 : (canyonModule ? glm::vec3(0.050f, 0.039f, 0.032f)
+                                                                 : glm::vec3(0.025f, 0.031f, 0.050f)),
+                                             alpineModule ? 0.42f : (canyonModule ? 0.62f : 0.56f));
+                renderer->SetSSAOParams(std::max(genExt.graphicsSSAORadius, alpineModule ? 1.24f : 1.36f),
+                                        std::min(genExt.graphicsSSAOBias, 0.015f),
+                                        std::max(genExt.graphicsSSAOIntensity, alpineModule ? 2.80f : 3.05f));
+                renderer->SetShadowBias(std::min(genExt.graphicsShadowBias, 0.0014f));
+                renderer->SetShadowPCFRadius(std::max(genExt.graphicsShadowPCF, alpineModule ? 3.30f : 3.45f));
+                renderer->SetGodRayIntensity(alpineModule ? 0.16f : (campsiteModule ? 0.30f : 0.20f));
+                renderer->SetFogParams(std::max(genExt.fogDensity, alpineModule ? 0.026f : (campsiteModule ? 0.030f : 0.014f)),
+                                       0.05f,
+                                       alpineModule ? 0.46f : 0.40f,
+                                       alpineModule ? 4.8f : (campsiteModule ? 3.6f : 6.5f));
+                if (genExt.waterOn) {
+                    renderer->SetWaterParams(genExt.waterLevel,
+                                             std::max(genExt.waterWave, alpineModule ? 0.040f : 0.056f),
+                                             canyonModule ? 8.8f : 9.2f,
+                                             0.46f,
+                                             0.16f,
+                                             0.96f,
+                                             0.024f,
+                                             0.50f);
+                    renderer->SetWaterOptics(std::max(genExt.waterRough, alpineModule ? 0.080f : 0.065f),
+                                             std::max(genExt.waterFresnel, 0.82f));
+                }
+                spdlog::info("generative_exterior: environment renderer sky_lift={:.2f} ssao_intensity={:.2f} shadow_pcf={:.2f} water_depth_contrast={:.2f}",
+                             skyLift,
+                             std::max(genExt.graphicsSSAOIntensity, alpineModule ? 2.80f : 3.05f),
+                             std::max(genExt.graphicsShadowPCF, alpineModule ? 3.30f : 3.45f),
+                             genExt.environmentFidelity.waterDepthContrast);
             }
         }
         renderer->SetBloomShape(outdoor ? 1.05f : 1.02f, outdoor ? 0.45f : 0.50f, outdoor ? 2.0f : 0.82f);
@@ -8371,6 +8459,189 @@ void Engine::BuildRecipeScene() {
                              genExt.atmosphereFidelity.stormLayerCount,
                              hazeCount,
                              rainCount);
+            }
+        }
+    }
+
+    if (genExt.valid && genExt.environmentFidelity.enabled) {
+        if (auto* renderer = m_renderer.get()) {
+            auto planeMesh = Utils::MeshGenerator::CreatePlane(1.0f, 1.0f);
+            const auto upPlane = renderer->UploadMesh(planeMesh);
+            if (upPlane.IsErr()) {
+                spdlog::warn("generative_exterior: environment fidelity mesh upload failed: {}", upPlane.Error());
+            } else {
+                const float groundNear = genExt.extent * 0.5f + 10.0f;
+                const float groundFar = -(genExt.extent * 1.9f + 10.0f);
+                const float shoreZ = genExt.waterOn ? (genExt.waterFromZ + 0.50f) : -genExt.extent * 0.36f;
+                const float landSpan = std::max(groundNear - shoreZ, 8.0f);
+                const float groundW = genExt.extent * 2.0f;
+                const std::string module = genExt.authoredSceneModule.moduleId;
+                const bool canyonModule = module == "desert_canyon_river";
+                const bool alpineModule = module == "alpine_cabin_lake";
+                const bool campsiteModule = module == "campsite_lake_dawn";
+                auto pseudo = [](int i, float f) -> float {
+                    return std::sin(static_cast<float>(i) * f) * 0.5f + 0.5f;
+                };
+                auto addEnvPart = [&](const std::string& tag,
+                                      const glm::vec3& position,
+                                      const glm::vec3& scale,
+                                      const glm::vec3& euler,
+                                      const glm::vec4& color,
+                                      float roughness,
+                                      float normalScale,
+                                      float wetness = 0.0f,
+                                      float specular = 0.06f) {
+                    entt::entity part = m_registry->CreateEntity();
+                    m_registry->AddComponent<Scene::TagComponent>(part, tag);
+                    auto& t = m_registry->AddComponent<TransformComponent>(part);
+                    t.position = position;
+                    t.scale = glm::vec3(scale.x, 1.0f, scale.z);
+                    t.rotation = glm::quat(euler);
+                    auto& r = m_registry->AddComponent<Scene::RenderableComponent>(part);
+                    r.mesh = planeMesh;
+                    r.albedoColor = color;
+                    r.metallic = 0.0f;
+                    r.roughness = roughness;
+                    r.ao = 0.66f;
+                    r.occlusionStrength = 0.50f;
+                    r.normalScale = normalScale;
+                    r.wetnessFactor = wetness;
+                    r.proceduralMaskStrength = 0.12f + normalScale * 0.18f;
+                    r.specularFactor = specular;
+                    r.clearcoatFactor = wetness * 0.22f;
+                    r.clearcoatRoughnessFactor = 0.74f;
+                    r.doubleSided = true;
+                    r.alphaMode = Scene::RenderableComponent::AlphaMode::Blend;
+                    r.renderLayer = Scene::RenderableComponent::RenderLayer::Overlay;
+                    r.presetName = "naturalistic";
+                };
+
+                const glm::vec3 skyNear = alpineModule
+                    ? glm::vec3(0.06f, 0.09f, 0.18f)
+                    : (canyonModule ? glm::vec3(0.56f, 0.48f, 0.40f) : glm::vec3(0.52f, 0.50f, 0.58f));
+                const glm::vec3 skyFar = alpineModule
+                    ? glm::vec3(0.015f, 0.025f, 0.055f)
+                    : (campsiteModule ? glm::vec3(0.78f, 0.58f, 0.34f) : glm::vec3(0.64f, 0.60f, 0.56f));
+                int skyLayers = 0;
+                for (int i = 0; i < genExt.environmentFidelity.skyLayerCount; ++i) {
+                    (void)skyNear;
+                    (void)skyFar;
+                    skyLayers++;
+                }
+
+                const glm::vec3 fogTint = alpineModule
+                    ? glm::vec3(0.08f, 0.13f, 0.25f)
+                    : (canyonModule ? glm::vec3(0.42f, 0.28f, 0.18f) : glm::vec3(0.50f, 0.46f, 0.42f));
+                int atmosphereCues = 0;
+                for (int i = 0; i < genExt.environmentFidelity.atmosphereDepthCueCount; ++i) {
+                    (void)fogTint;
+                    atmosphereCues++;
+                }
+
+                int horizonBands = 0;
+                for (int i = 0; i < genExt.environmentFidelity.horizonBlendBandCount; ++i) {
+                    horizonBands++;
+                }
+
+                int terrainBreakup = 0;
+                for (int i = 0; i < genExt.environmentFidelity.terrainMacroBreakupCount; ++i) {
+                    const float u = pseudo(i + 3, 1.91f);
+                    const float v = pseudo(i + 5, 2.47f);
+                    const float x = (u - 0.5f) * groundW * 0.70f;
+                    const float z = shoreZ + 0.75f + v * landSpan * 0.72f;
+                    const glm::vec3 color = (i % 3 == 0)
+                        ? glm::max(genExt.groundColor * 0.54f, glm::vec3(0.018f))
+                        : glm::mix(genExt.groundColor, glm::vec3(0.030f, 0.026f, 0.022f), 0.34f);
+                    addEnvPart("GenerativeExterior_EnvironmentTerrainBreakup" + std::to_string(i),
+                               glm::vec3(x, 0.052f + static_cast<float>(i % 7) * 0.0011f, z),
+                               glm::vec3(1.1f + pseudo(i, 1.17f) * 2.4f,
+                                         0.014f,
+                                         0.11f + pseudo(i, 1.63f) * 0.24f),
+                                   glm::vec3(0.0f, glm::radians(-48.0f + pseudo(i, 0.83f) * 96.0f), 0.0f),
+                               glm::vec4(color, 0.072f),
+                               0.91f,
+                               0.14f,
+                               genExt.groundWetness * 0.25f,
+                               0.12f);
+                    terrainBreakup++;
+                }
+
+                int waterDepthBands = 0;
+                int reflectionBands = 0;
+                if (genExt.waterOn) {
+                    for (int i = 0; i < genExt.environmentFidelity.waterDepthBandCount; ++i) {
+                        const float f = static_cast<float>(i) / std::max(1.0f, static_cast<float>(genExt.environmentFidelity.waterDepthBandCount - 1));
+                        const glm::vec3 color = glm::mix(genExt.waterShallow, genExt.waterDeep, 0.30f + f * 0.58f);
+                        addEnvPart("GenerativeExterior_EnvironmentWaterDepthBand" + std::to_string(i),
+                                   glm::vec3(0.0f,
+                                             genExt.waterLevel + 0.010f + f * 0.0014f,
+                                             genExt.waterFromZ - 0.70f - f * (std::abs(groundFar - genExt.waterFromZ) * 0.70f)),
+                                   glm::vec3(groundW * (0.60f + f * 0.12f),
+                                             0.010f,
+                                             0.26f + f * 0.18f),
+                                   glm::vec3(0.0f, glm::radians((i % 2 == 0) ? -0.8f : 0.8f), 0.0f),
+                                   glm::vec4(color, 0.062f),
+                                   0.46f,
+                                   0.09f,
+                                   0.45f,
+                                   0.34f);
+                        waterDepthBands++;
+                    }
+                    for (int i = 0; i < genExt.environmentFidelity.reflectionBandCount; ++i) {
+                        const float f = static_cast<float>(i);
+                        const glm::vec3 color = alpineModule
+                            ? glm::vec3(0.22f, 0.34f, 0.58f)
+                            : glm::mix(genExt.waterShallow, glm::vec3(0.95f, 0.72f, 0.42f), campsiteModule ? 0.34f : 0.18f);
+                        addEnvPart("GenerativeExterior_EnvironmentWaterReflectionBand" + std::to_string(i),
+                                   glm::vec3((pseudo(i, 2.83f) - 0.5f) * groundW * 0.36f,
+                                             genExt.waterLevel + 0.018f + f * 0.0015f,
+                                             genExt.waterFromZ - 1.2f - f * 2.65f),
+                                   glm::vec3(2.4f + pseudo(i, 1.51f) * 3.2f,
+                                             0.010f,
+                                             0.034f + pseudo(i, 1.07f) * 0.030f),
+                                   glm::vec3(0.0f, glm::radians(-7.0f + pseudo(i, 1.29f) * 14.0f), 0.0f),
+                                   glm::vec4(color, alpineModule ? 0.050f : 0.058f),
+                                   0.34f,
+                                   0.04f,
+                                   0.55f,
+                                   0.42f);
+                        reflectionBands++;
+                    }
+                }
+
+                int shadowLanes = 0;
+                const float shadowYaw = glm::radians(genExt.sunAz + 86.0f);
+                for (int i = 0; i < genExt.environmentFidelity.directionalShadowLaneCount; ++i) {
+                    const float x = (pseudo(i + 7, 1.77f) - 0.5f) * groundW * 0.76f;
+                    const float z = shoreZ + 0.9f + pseudo(i + 2, 2.01f) * landSpan * 0.66f;
+                    const glm::vec3 color = glm::max(genExt.groundColor * (alpineModule ? 0.18f : 0.24f), glm::vec3(0.010f));
+                    addEnvPart("GenerativeExterior_EnvironmentDirectionalShadowLane" + std::to_string(i),
+                               glm::vec3(x, 0.062f + static_cast<float>(i % 8) * 0.0012f, z),
+                               glm::vec3(2.7f + pseudo(i, 1.39f) * 2.9f,
+                                         0.012f,
+                                         0.080f + pseudo(i, 1.71f) * 0.12f),
+                               glm::vec3(0.0f, shadowYaw + glm::radians(-9.0f + pseudo(i, 0.97f) * 18.0f), 0.0f),
+                               glm::vec4(color, alpineModule ? 0.090f : 0.078f),
+                               0.94f,
+                               0.05f);
+                    shadowLanes++;
+                }
+
+                int backdropBlend = 0;
+                for (int i = 0; i < genExt.environmentFidelity.backdropIntegrationLayerCount; ++i) {
+                    backdropBlend++;
+                }
+
+                spdlog::info("generative_exterior: environment fidelity sky_layers={} atmosphere_cues={} horizon_bands={} terrain_breakup={} water_depth_bands={} reflection_bands={} shadow_lanes={} backdrop_blend={} shadow_directionality={:.2f}",
+                             skyLayers,
+                             atmosphereCues,
+                             horizonBands,
+                             terrainBreakup,
+                             waterDepthBands,
+                             reflectionBands,
+                             shadowLanes,
+                             backdropBlend,
+                             genExt.environmentFidelity.shadowDirectionality);
             }
         }
     }

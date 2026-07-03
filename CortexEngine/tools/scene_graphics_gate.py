@@ -246,6 +246,31 @@ def _cohesive_staging_cleanup_runtime(log_text: str) -> dict[str, float | int] |
     }
 
 
+def _environment_fidelity_runtime(log_text: str) -> dict[str, float | int] | None:
+    m = re.search(
+        r"generative_exterior: environment fidelity "
+        r"sky_layers=(\d+) atmosphere_cues=(\d+) horizon_bands=(\d+) "
+        r"terrain_breakup=(\d+) water_depth_bands=(\d+) reflection_bands=(\d+) "
+        r"shadow_lanes=(\d+) backdrop_blend=(\d+) shadow_directionality=([0-9.]+)",
+        log_text,
+    )
+    if not m:
+        return None
+    keys = (
+        "sky_layers",
+        "atmosphere_cues",
+        "horizon_bands",
+        "terrain_breakup",
+        "water_depth_bands",
+        "reflection_bands",
+        "shadow_lanes",
+        "backdrop_blend",
+    )
+    values: dict[str, float | int] = {key: int(value) for key, value in zip(keys, m.groups()[:8])}
+    values["shadow_directionality"] = float(m.group(9))
+    return values
+
+
 def _asset_counts(ir: dict[str, Any]) -> dict[str, int]:
     counts = {
         "trees": 0,
@@ -347,6 +372,7 @@ def evaluate(prompt: str, ir: dict[str, Any], png: Path | None, log_text: str) -
     cinematic_material_lighting = graphics.get("cinematic_material_lighting") or {}
     hero_asset_replacement = graphics.get("hero_asset_replacement") or {}
     cohesive_staging_cleanup = graphics.get("cohesive_staging_cleanup") or {}
+    environment_fidelity = graphics.get("environment_fidelity") or {}
     image = _image_metrics(png)
 
     failures: list[dict[str, Any]] = []
@@ -1019,6 +1045,68 @@ def evaluate(prompt: str, ir: dict[str, Any], png: Path | None, log_text: str) -
                 palette_unification_count=palette_unified,
                 runtime_cohesive_staging_cleanup=runtime_staging,
                 runtime_cohesive_staging_cleanup_ok=runtime_staging_ok,
+            )
+
+        try:
+            sky_layers = int(environment_fidelity.get("sky_layer_count", 0) or 0)
+            atmosphere_cues = int(environment_fidelity.get("atmosphere_depth_cue_count", 0) or 0)
+            horizon_bands = int(environment_fidelity.get("horizon_blend_band_count", 0) or 0)
+            terrain_breakup = int(environment_fidelity.get("terrain_macro_breakup_count", 0) or 0)
+            water_depth_bands = int(environment_fidelity.get("water_depth_band_count", 0) or 0)
+            reflection_bands = int(environment_fidelity.get("reflection_band_count", 0) or 0)
+            shadow_lanes = int(environment_fidelity.get("directional_shadow_lane_count", 0) or 0)
+            backdrop_blend = int(environment_fidelity.get("backdrop_integration_layer_count", 0) or 0)
+            shadow_directionality = float(environment_fidelity.get("shadow_directionality", 0.0) or 0.0)
+        except Exception:
+            sky_layers = atmosphere_cues = horizon_bands = terrain_breakup = 0
+            water_depth_bands = reflection_bands = shadow_lanes = backdrop_blend = 0
+            shadow_directionality = 0.0
+        runtime_environment = _environment_fidelity_runtime(log_text)
+        runtime_environment_ok = (
+            isinstance(runtime_environment, dict)
+            and runtime_environment.get("sky_layers", 0) >= max(sky_layers - 1, 3)
+            and runtime_environment.get("atmosphere_cues", 0) >= max(atmosphere_cues - 1, 4)
+            and runtime_environment.get("horizon_bands", 0) >= max(horizon_bands - 1, 3)
+            and runtime_environment.get("terrain_breakup", 0) >= max(terrain_breakup - 2, 10)
+            and runtime_environment.get("shadow_lanes", 0) >= max(shadow_lanes - 1, 6)
+            and runtime_environment.get("backdrop_blend", 0) >= max(backdrop_blend - 1, 5)
+            and runtime_environment.get("shadow_directionality", 0.0) >= max(shadow_directionality - 0.05, 0.60)
+            and (
+                not flags["water"]
+                or (
+                    runtime_environment.get("water_depth_bands", 0) >= max(water_depth_bands - 1, 4)
+                    and runtime_environment.get("reflection_bands", 0) >= max(reflection_bands - 1, 4)
+                )
+            )
+        )
+        if (
+            not isinstance(environment_fidelity, dict)
+            or not bool(environment_fidelity.get("enabled"))
+            or sky_layers < 4
+            or atmosphere_cues < 5
+            or horizon_bands < 3
+            or terrain_breakup < 12
+            or shadow_lanes < 6
+            or backdrop_blend < 5
+            or shadow_directionality < 0.65
+            or (flags["water"] and (water_depth_bands < 5 or reflection_bands < 4))
+            or not runtime_environment_ok
+        ):
+            fail(
+                "missing_environment_fidelity_pass",
+                "Generated exterior lacks a single integrated sky/atmosphere/water/terrain/backdrop/shadow fidelity pass",
+                environment_fidelity=environment_fidelity,
+                sky_layer_count=sky_layers,
+                atmosphere_depth_cue_count=atmosphere_cues,
+                horizon_blend_band_count=horizon_bands,
+                terrain_macro_breakup_count=terrain_breakup,
+                water_depth_band_count=water_depth_bands,
+                reflection_band_count=reflection_bands,
+                directional_shadow_lane_count=shadow_lanes,
+                backdrop_integration_layer_count=backdrop_blend,
+                shadow_directionality=shadow_directionality,
+                runtime_environment_fidelity=runtime_environment,
+                runtime_environment_fidelity_ok=runtime_environment_ok,
             )
 
         if flags["moonlight"] or "storm" in prompt.lower():

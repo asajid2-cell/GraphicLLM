@@ -501,14 +501,14 @@ def compile_v3_to_v2(v3: dict[str, Any]) -> dict[str, Any]:
         "clear_view_corridor": True,
         "camera_role": "balanced_cabin_hero_water_horizon" if cabin else "closer_midground_hero_water_horizon",
     }
-    renderer_ssao_radius = 1.26 if not moonlight else 1.18
-    renderer_ssao_intensity = 2.70 if not moonlight else 2.28
-    renderer_shadow_pcf = 3.10 if not moonlight else 2.60
+    renderer_ssao_radius = 1.36 if not moonlight else 1.24
+    renderer_ssao_intensity = 3.05 if not moonlight else 2.80
+    renderer_shadow_pcf = 3.45 if not moonlight else 3.30
     if authored_module_id == "alpine_cabin_lake":
         renderer_ssao_radius = 1.24
-        renderer_ssao_intensity = 2.65
-        renderer_shadow_pcf = 3.00
-    renderer_shadow_bias = 0.0020
+        renderer_ssao_intensity = 2.80
+        renderer_shadow_pcf = 3.30
+    renderer_shadow_bias = 0.0014
     contact_receiver_patch_budget = 72 if not moonlight else 40
     soft_penumbra_patch_budget = 40 if not moonlight else 32
     cinematic_relief_patches = 34 if canyon else (30 if campsite else 26)
@@ -778,6 +778,29 @@ def compile_v3_to_v2(v3: dict[str, Any]) -> dict[str, Any]:
                 "reduce_stray_wood_and_loose_prop_spread",
                 "palette_unify_small_detail_materials",
                 "keep_prompt_hero_readable_before_more_detail",
+            ],
+        },
+        "environment_fidelity": {
+            "enabled": True,
+            "sky_layer_count": 6 if (moonlight or stormy or fog) else 5,
+            "atmosphere_depth_cue_count": 7 if (canyon or moonlight or fog) else 5,
+            "horizon_blend_band_count": 4 if water_on else 3,
+            "terrain_macro_breakup_count": 18 if not desert else 16,
+            "water_depth_band_count": 6 if water_on else 0,
+            "reflection_band_count": 5 if water_on else 0,
+            "directional_shadow_lane_count": 8 if not moonlight else 6,
+            "backdrop_integration_layer_count": 7 if (canyon or cabin) else 6,
+            "shadow_directionality": 0.82 if not moonlight else 0.72,
+            "sky_gradient_strength": 0.72 if not moonlight else 0.42,
+            "water_depth_contrast": 0.78 if water_on else 0.0,
+            "terrain_relief_contrast": 0.70 if not desert else 0.62,
+            "systems": [
+                "layered_sky_and_horizon_depth",
+                "atmospheric_backdrop_integration",
+                "macro_terrain_light_shadow_breakup",
+                "water_depth_and_reflection_banding",
+                "directional_shadow_lanes_from_key_light",
+                "single_environment_lighting_contract",
             ],
         },
         "renderer_shadow_occlusion_budget": {

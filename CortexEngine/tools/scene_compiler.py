@@ -452,6 +452,20 @@ def compile_v3_to_v2(v3: dict[str, Any]) -> dict[str, Any]:
             "shore_foam_segment_count": 6 if water_on else 0,
             "wet_glint_count": 6 if water_on else 2,
         },
+        "surface_material_richness": {
+            "enabled": True,
+            "ground_decal_count": 20 if not desert else 18,
+            "rock_lichen_patch_count": 14 if not desert else 2,
+            "desert_strata_patch_count": 16 if canyon else (8 if desert else 0),
+            "vegetation_cluster_count": 18 if not desert else 10,
+            "hero_material_line_count": 24 if (campsite or cabin) else 12,
+            "systems": [
+                "ground_albedo_breakup",
+                "rock_lichen_or_desert_stain",
+                "vegetation_scrub_clusters",
+                "fabric_wood_material_lines",
+            ],
+        },
         "asset_fidelity": {
             "enabled": True,
             "hero_detail_count": (18 if campsite else 6) + (24 if cabin else 0),

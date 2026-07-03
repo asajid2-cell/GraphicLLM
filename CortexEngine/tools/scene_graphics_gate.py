@@ -3,8 +3,9 @@
 
 This complements scene_quality_gate.py. It does not claim an image is AAA; it
 rejects the obvious blockout class: flat generated exteriors with disconnected
-props, no terrain/contact/material/shader pass, weak occlusion layering, and no
-runtime evidence that the high-quality exterior graphics path ran.
+props, no terrain/contact/material/shader pass, weak occlusion layering, weak
+surface material breakup, and no runtime evidence that the high-quality
+exterior graphics path ran.
 """
 
 from __future__ import annotations
@@ -222,6 +223,7 @@ def evaluate(prompt: str, ir: dict[str, Any], png: Path | None, log_text: str) -
     asset_fidelity = graphics.get("asset_fidelity") or {}
     atmosphere_fidelity = graphics.get("atmosphere_fidelity") or {}
     geometry_realism = graphics.get("geometry_realism") or {}
+    surface_material_richness = graphics.get("surface_material_richness") or {}
     lighting = graphics.get("lighting") or {}
     surface_detail = graphics.get("surface_detail") or {}
     occlusion = graphics.get("occlusion") or {}
@@ -343,6 +345,39 @@ def evaluate(prompt: str, ir: dict[str, Any], png: Path | None, log_text: str) -
                 "Scene lacks enough distinct authored material zones for terrain/shore/rocks/water/vegetation",
                 material_zones=material_zones,
                 material_zone_count=material_zone_count,
+            )
+
+        try:
+            ground_decals = int(surface_material_richness.get("ground_decal_count", 0) or 0)
+            rock_patches = int(surface_material_richness.get("rock_lichen_patch_count", 0) or 0)
+            desert_patches = int(surface_material_richness.get("desert_strata_patch_count", 0) or 0)
+            vegetation_clusters = int(surface_material_richness.get("vegetation_cluster_count", 0) or 0)
+            hero_lines = int(surface_material_richness.get("hero_material_line_count", 0) or 0)
+        except Exception:
+            ground_decals = rock_patches = desert_patches = vegetation_clusters = hero_lines = 0
+        has_runtime_material_breakup = "generative_exterior: created material breakup decals" in log_text
+        has_runtime_vegetation_clusters = "generative_exterior: created vegetation surface clusters" in log_text
+        rock_or_desert_patches = rock_patches + desert_patches
+        if (
+            not isinstance(surface_material_richness, dict)
+            or not bool(surface_material_richness.get("enabled"))
+            or ground_decals < 12
+            or rock_or_desert_patches < 8
+            or vegetation_clusters < 8
+            or (flags["campsite"] and hero_lines < 12)
+            or ("cabin" in prompt.lower() and hero_lines < 12)
+            or not (has_runtime_material_breakup and has_runtime_vegetation_clusters)
+        ):
+            fail(
+                "missing_surface_material_richness",
+                "Generated exterior lacks visible material breakup decals, close-prop material lines, or vegetation/scrub surface clusters",
+                surface_material_richness=surface_material_richness,
+                ground_decal_count=ground_decals,
+                rock_or_desert_patch_count=rock_or_desert_patches,
+                vegetation_cluster_count=vegetation_clusters,
+                hero_material_line_count=hero_lines,
+                runtime_material_breakup=has_runtime_material_breakup,
+                runtime_vegetation_clusters=has_runtime_vegetation_clusters,
             )
 
         try:

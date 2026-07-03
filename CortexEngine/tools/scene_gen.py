@@ -1335,6 +1335,12 @@ def render_ir(ir, out_name, camera="", night=False, timeout=220):
     if RENDER_FAST:
         args += ["-Fast"]
     r = subprocess.run(args, capture_output=True, text=True, timeout=timeout)
+    log_parts = [r.stdout or "", r.stderr or ""]
+    for harness_name in ("ir_harness.out", "ir_harness.err"):
+        harness_path = ROOT / "build" / "bin" / harness_name
+        if harness_path.exists():
+            log_parts.append(harness_path.read_text(encoding="utf-8", errors="replace"))
+    (LOGS / f"{out_name}.out").write_text("\n".join(p for p in log_parts if p), encoding="utf-8")
     lines = [l.strip() for l in r.stdout.splitlines() if l.strip()]
     png = lines[-1] if lines and lines[-1].lower().endswith(".png") else None
     if png and Path(png).exists():

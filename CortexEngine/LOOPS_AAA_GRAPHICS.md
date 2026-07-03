@@ -162,7 +162,7 @@ Invariant: generated exteriors render visible close-range hero construction and 
 
 Scope:
 
-- in: `tools/scene_graphics_gate.py`, `tools/scene_compiler.py`, `src/Core/Engine_Scenes.cpp`, focused ledgers.
+- in: `tools/scene_graphics_gate.py`, `tools/scene_compiler.py`, `tools/scene_gen.py`, `src/Core/Engine_Scenes.cpp`, focused ledgers.
 - out: `tools/scene_quality_gate.py`, forced DXR defaults, broad renderer architecture, unrelated interior scenes.
 
 Verifier:
@@ -219,6 +219,28 @@ Verifier:
 Exit: all verifier commands green, with artifacts and logs recorded.
 
 Escape: if catalog cliff assets destabilize layout validity, reduce count/footprint and keep procedural cliff detail as fallback.
+
+Status: done
+
+### Loop 12: Surface Material Richness And Ground Integration
+
+Invariant: generated exteriors must show visible material breakup and surface integration: ground stains, rock/lichen or desert stratification decals, wood/fabric detail lines, and vegetation/scrub clusters that reduce the toy-like flat-surface read.
+
+Scope:
+
+- in: `tools/scene_graphics_gate.py`, `tools/scene_compiler.py`, `src/Core/Engine_Scenes.cpp`, focused ledgers.
+- out: `tools/scene_quality_gate.py`, forced DXR defaults, unrelated interior scenes, external asset downloads.
+
+Verifier:
+
+- Current Loop 17 campsite/desert/alpine artifacts fail strengthened graphics gate with `missing_surface_material_richness`.
+- New campsite/desert/alpine prompts render VALID and pass quality + strengthened graphics gates.
+- Runtime logs include `generative_exterior: created material breakup decals` and `generative_exterior: created vegetation surface clusters`.
+- Director IR validation and kitchen smoke remain green.
+
+Exit: all verifier commands green, with artifacts and logs recorded.
+
+Escape: if surface overlays make scenes noisy or hurt water/color gates, reduce alpha/counts and keep the IR/runtime contract rather than weakening the gate.
 
 Status: done
 
@@ -353,6 +375,24 @@ Status: done
   - Known-bad graphics oracle `v3_campsite_ridge_test_0` with `--expect-fail` exited 0 and still reports the expected graphics-fidelity failures.
 - Visual inspection after Loop 11:
   - Catalog cliffs add real mesh silhouettes to canyon IRs, but they do not close the AAA gap by themselves. The next slice should target surface/material realism and repeated low-poly asset reads, not another metadata-only gate.
+- Loop 12 red proof:
+  - Strengthened `tools\scene_graphics_gate.py` to require `surface_material_richness` IR plus runtime logs for material breakup decals and vegetation/scrub clusters.
+  - `aaa_graphics_campsite_loop17`, `aaa_graphics_desert_loop17`, and `aaa_graphics_alpine_loop17` failed the strengthened gate with `missing_surface_material_richness`.
+- Loop 12 implementation:
+  - `tools\scene_compiler.py` now emits `graphics_pass.surface_material_richness` with bounded counts for ground decals, rock/lichen or desert-strata patches, vegetation/scrub clusters, and hero material lines.
+  - `src\Core\Engine_Scenes.cpp` now parses that contract and renders material breakup decals, canyon-wall desert strata marks, grass/dry-scrub surface clusters, and cabin/tent material line geometry.
+  - `tools\scene_gen.py` now writes each render's engine harness output to `build\bin\logs\<out_name>.out`, fixing the stale-log verifier issue where graphics gates could fall back to `cortex_last_run.txt`.
+- Loop 12 verifier evidence:
+  - `python -m py_compile tools\scene_compiler.py tools\scene_graphics_gate.py tools\scene_quality_gate.py tools\scene_gen.py` exited 0.
+  - Release build exited 0: `[OK] Build complete in 48.3s`.
+  - Campsite `aaa_graphics_campsite_loop20` rendered VALID with 58 objects; quality gate exited 0 (`purple_fraction=0.742`, `nonblack_fraction=1.0`); graphics gate exited 0 with residual warning `weak_image_contact_metric`; Director IR validation exited 0. Runtime log shows `created material breakup decals ground=20 rock_lichen=14 desert_strata=0 hero_lines=24` and `created vegetation surface clusters clusters=18 blades=54`.
+  - Desert canyon `aaa_graphics_desert_loop20` rendered VALID with 54 objects; quality gate exited 0 (`turquoise_fraction=0.4209`, `nonblack_fraction=1.0`); graphics gate exited 0 with residual warning `weak_image_contact_metric`; Director IR validation exited 0. Runtime log shows `created canyon wall layer(s) 6`, `created material breakup decals ground=18 rock_lichen=2 desert_strata=16 hero_lines=24`, and `created vegetation surface clusters clusters=10 blades=30`.
+  - Alpine cabin `aaa_graphics_alpine_loop20` rendered VALID with 50 objects; quality gate exited 0 (`avg_luma=0.1351`, `cool_fraction=0.8608`, `nonblack_fraction=0.9998`); graphics gate exited 0; Director IR validation exited 0. Runtime log shows material breakup decals and vegetation surface clusters.
+  - Kitchen smoke `regression_kitchen_aaa_loop20` rendered VALID and quality gate exited 0 (`avg_luma=0.4721`, `nonblack_fraction=1.0`).
+  - Known-bad quality oracle `gen_a_foggy_mountain_campsite_beside_0` with `--expect-fail` exited 0 and still reports the fridge/missing-ridge/purple-water failures.
+  - Known-bad graphics oracle `v3_campsite_ridge_test_0` with `--expect-fail` exited 0 and now also reports `missing_surface_material_richness`.
+- Visual inspection after Loop 12:
+  - Surface detail is visible: ground breakup, tent/cabin line detail, vegetation/scrub clusters, and canyon-wall stains now show in the stills. The remaining gap is still source geometry/style: smooth low-poly cliffs, simplified props, and primitive tent/cabin forms. The next front should attack mesh silhouette and prop realism directly.
 
 ## BLOCKED / Decisions
 

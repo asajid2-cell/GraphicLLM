@@ -133,6 +133,15 @@ namespace {
         float contactShadowStrength = 0.0f;
     };
 
+    struct GenerativeSurfaceMaterialRichness {
+        bool enabled = false;
+        int groundDecalCount = 0;
+        int rockLichenPatchCount = 0;
+        int desertStrataPatchCount = 0;
+        int vegetationClusterCount = 0;
+        int heroMaterialLineCount = 0;
+    };
+
     struct GenerativeAssetFidelity {
         bool enabled = false;
         int heroDetailCount = 0;
@@ -3228,6 +3237,7 @@ void Engine::BuildRecipeScene() {
         std::vector<GenerativeContactPatch> contactPatches;
         GenerativeWorldGeometry worldGeometry;
         GenerativeSurfaceDetail surfaceDetail;
+        GenerativeSurfaceMaterialRichness surfaceMaterialRichness;
         GenerativeAssetFidelity assetFidelity;
         GenerativeAtmosphereFidelity atmosphereFidelity;
         GenerativeGeometryRealism geometryRealism;
@@ -3337,6 +3347,18 @@ void Engine::BuildRecipeScene() {
                     static_cast<int>(std::clamp(num(surfaceDetail, "shore_foam_segment_count", 0.0f), 0.0f, 16.0f));
                 genExt.surfaceDetail.wetGlintCount =
                     static_cast<int>(std::clamp(num(surfaceDetail, "wet_glint_count", 0.0f), 0.0f, 16.0f));
+                const nlohmann::json surfaceMaterialRichness = graphics.value("surface_material_richness", nlohmann::json::object());
+                genExt.surfaceMaterialRichness.enabled = surfaceMaterialRichness.value("enabled", false);
+                genExt.surfaceMaterialRichness.groundDecalCount =
+                    static_cast<int>(std::clamp(num(surfaceMaterialRichness, "ground_decal_count", 0.0f), 0.0f, 36.0f));
+                genExt.surfaceMaterialRichness.rockLichenPatchCount =
+                    static_cast<int>(std::clamp(num(surfaceMaterialRichness, "rock_lichen_patch_count", 0.0f), 0.0f, 28.0f));
+                genExt.surfaceMaterialRichness.desertStrataPatchCount =
+                    static_cast<int>(std::clamp(num(surfaceMaterialRichness, "desert_strata_patch_count", 0.0f), 0.0f, 32.0f));
+                genExt.surfaceMaterialRichness.vegetationClusterCount =
+                    static_cast<int>(std::clamp(num(surfaceMaterialRichness, "vegetation_cluster_count", 0.0f), 0.0f, 32.0f));
+                genExt.surfaceMaterialRichness.heroMaterialLineCount =
+                    static_cast<int>(std::clamp(num(surfaceMaterialRichness, "hero_material_line_count", 0.0f), 0.0f, 48.0f));
                 const nlohmann::json assetFidelity = graphics.value("asset_fidelity", nlohmann::json::object());
                 genExt.assetFidelity.enabled = assetFidelity.value("enabled", false);
                 genExt.assetFidelity.heroDetailCount =
@@ -4278,6 +4300,256 @@ void Engine::BuildRecipeScene() {
                              genExt.advancedShaderTermCount,
                              genExt.surfaceDetail.occlusionRibbonCount,
                              genExt.surfaceDetail.pebbleCount);
+            }
+            if (genExt.surfaceMaterialRichness.enabled) {
+                auto decalMesh = Utils::MeshGenerator::CreatePlane(1.0f, 1.0f);
+                auto cubeMesh = Utils::MeshGenerator::CreateCube();
+                const auto upDecal = renderer->UploadMesh(decalMesh);
+                const auto upCube = renderer->UploadMesh(cubeMesh);
+                if (upDecal.IsErr() || upCube.IsErr()) {
+                    spdlog::warn("generative_exterior: material richness mesh upload failed decal='{}' cube='{}'",
+                                 upDecal.IsErr() ? upDecal.Error() : "ok",
+                                 upCube.IsErr() ? upCube.Error() : "ok");
+                } else {
+                    auto pseudo = [](int i, float f) -> float {
+                        return std::sin(static_cast<float>(i) * f) * 0.5f + 0.5f;
+                    };
+                    auto dressOverlay = [&](Scene::RenderableComponent& r,
+                                            const glm::vec4& color,
+                                            const char* preset,
+                                            float roughness,
+                                            float normalScale,
+                                            float wetness,
+                                            float clearcoat) {
+                        r.albedoColor = color;
+                        r.metallic = 0.0f;
+                        r.roughness = roughness;
+                        r.ao = 0.70f;
+                        r.occlusionStrength = 0.58f;
+                        r.normalScale = normalScale;
+                        r.wetnessFactor = wetness;
+                        r.proceduralMaskStrength = 0.42f;
+                        r.specularFactor = 0.18f + clearcoat * 0.48f;
+                        r.clearcoatFactor = clearcoat;
+                        r.clearcoatRoughnessFactor = 0.70f;
+                        r.anisotropyStrength = 0.16f;
+                        r.doubleSided = true;
+                        r.alphaMode = Scene::RenderableComponent::AlphaMode::Blend;
+                        r.renderLayer = Scene::RenderableComponent::RenderLayer::Overlay;
+                        r.presetName = preset;
+                    };
+                    auto addDecal = [&](const std::string& tag,
+                                        const glm::vec3& position,
+                                        const glm::vec3& scale,
+                                        float yaw,
+                                        const glm::vec4& color,
+                                        const char* preset,
+                                        float roughness,
+                                        float normalScale,
+                                        float wetness,
+                                        float clearcoat) {
+                        entt::entity decal = m_registry->CreateEntity();
+                        m_registry->AddComponent<Scene::TagComponent>(decal, tag);
+                        auto& t = m_registry->AddComponent<TransformComponent>(decal);
+                        t.position = position;
+                        t.rotation = glm::quat(glm::vec3(0.0f, yaw, 0.0f));
+                        t.scale = scale;
+                        auto& r = m_registry->AddComponent<Scene::RenderableComponent>(decal);
+                        r.mesh = decalMesh;
+                        dressOverlay(r, color, preset, roughness, normalScale, wetness, clearcoat);
+                    };
+                    auto addCubeMark = [&](const std::string& tag,
+                                           const glm::vec3& position,
+                                           const glm::vec3& scale,
+                                           const glm::vec3& euler,
+                                           const glm::vec4& color,
+                                           const char* preset,
+                                           float roughness,
+                                           float normalScale) {
+                        entt::entity mark = m_registry->CreateEntity();
+                        m_registry->AddComponent<Scene::TagComponent>(mark, tag);
+                        auto& t = m_registry->AddComponent<TransformComponent>(mark);
+                        t.position = position;
+                        t.rotation = glm::quat(euler);
+                        t.scale = scale;
+                        auto& r = m_registry->AddComponent<Scene::RenderableComponent>(mark);
+                        r.mesh = cubeMesh;
+                        dressOverlay(r, color, preset, roughness, normalScale, genExt.groundWetness * 0.22f, 0.06f);
+                    };
+
+                    const bool desertSurface = genExt.groundKind == "dirt";
+                    const float landSpan = std::max(groundNear - shoreZ, 8.0f);
+                    int groundDecals = 0;
+                    for (int i = 0; i < genExt.surfaceMaterialRichness.groundDecalCount; ++i) {
+                        const float x = (pseudo(i + 101, 1.73f) - 0.5f) * groundW * 0.72f;
+                        const float z = shoreZ + 0.85f + pseudo(i + 109, 2.21f) * landSpan * 0.70f;
+                        const glm::vec3 base = desertSurface
+                            ? glm::mix(gcol, glm::vec3(0.25f, 0.10f, 0.055f), 0.44f + 0.18f * pseudo(i, 0.91f))
+                            : glm::mix(gcol, glm::vec3(0.11f, 0.15f, 0.10f), 0.34f + 0.22f * pseudo(i, 0.91f));
+                        addDecal("GenerativeExterior_MaterialBreakup_Ground" + std::to_string(i),
+                                 glm::vec3(x, 0.057f + i * 0.0005f, z),
+                                 glm::vec3(0.52f + pseudo(i, 1.31f) * 1.10f,
+                                           1.0f,
+                                           0.22f + pseudo(i, 1.97f) * 0.52f),
+                                 glm::radians(pseudo(i, 2.63f) * 180.0f),
+                                 glm::vec4(glm::max(base, glm::vec3(0.018f)), desertSurface ? 0.20f : 0.16f),
+                                 "naturalistic",
+                                 0.92f,
+                                 0.24f,
+                                 genExt.groundWetness * 0.30f,
+                                 0.04f);
+                        groundDecals++;
+                    }
+
+                    int rockPatches = 0;
+                    const int patchCount = genExt.surfaceMaterialRichness.rockLichenPatchCount;
+                    for (int i = 0; i < patchCount; ++i) {
+                        const float x = (pseudo(i + 151, 2.09f) - 0.5f) * groundW * 0.76f;
+                        const float z = shoreZ + 0.45f + pseudo(i + 157, 1.61f) * landSpan * 0.58f;
+                        const glm::vec3 lichen = desertSurface
+                            ? glm::vec3(0.34f, 0.18f, 0.09f)
+                            : glm::mix(glm::vec3(0.16f, 0.30f, 0.14f), glm::vec3(0.08f, 0.18f, 0.20f), pseudo(i, 0.77f));
+                        addDecal("GenerativeExterior_MaterialBreakup_RockLichen" + std::to_string(i),
+                                 glm::vec3(x, 0.065f + i * 0.0005f, z),
+                                 glm::vec3(0.30f + pseudo(i, 1.13f) * 0.46f,
+                                           1.0f,
+                                           0.18f + pseudo(i, 1.79f) * 0.34f),
+                                 glm::radians(20.0f + pseudo(i, 2.83f) * 140.0f),
+                                 glm::vec4(lichen, desertSurface ? 0.15f : 0.19f),
+                                 desertSurface ? "stone" : "foliage",
+                                 desertSurface ? 0.90f : 0.78f,
+                                 0.30f,
+                                 genExt.groundWetness * 0.20f,
+                                 desertSurface ? 0.03f : 0.08f);
+                        rockPatches++;
+                    }
+
+                    int desertPatches = 0;
+                    if (genExt.surfaceMaterialRichness.desertStrataPatchCount > 0) {
+                        const float canyonHalfWidth = genExt.worldGeometry.canyonWidthM > 1.0f
+                            ? genExt.worldGeometry.canyonWidthM * 0.5f
+                            : genExt.extent * 0.36f;
+                        for (int i = 0; i < genExt.surfaceMaterialRichness.desertStrataPatchCount; ++i) {
+                            const float side = (i % 2 == 0) ? -1.0f : 1.0f;
+                            const float y = 0.72f + static_cast<float>(i % 7) * 0.44f;
+                            const float z = -4.4f - static_cast<float>((i * 5) % 25);
+                            const glm::vec3 stripe = (i % 3 == 0)
+                                ? glm::vec3(0.82f, 0.42f, 0.20f)
+                                : glm::vec3(0.24f, 0.080f, 0.050f);
+                            addCubeMark("GenerativeExterior_MaterialBreakup_DesertStrata" + std::to_string(i),
+                                        glm::vec3(side * (canyonHalfWidth - 0.045f), y, z),
+                                        glm::vec3(0.052f,
+                                                  0.026f + 0.008f * static_cast<float>(i % 3),
+                                                  0.72f + 0.16f * static_cast<float>(i % 4)),
+                                        glm::vec3(glm::radians(-2.0f + static_cast<float>(i % 5)),
+                                                  side > 0.0f ? glm::pi<float>() : 0.0f,
+                                                  glm::radians(-5.0f + static_cast<float>(i % 4) * 2.0f)),
+                                        glm::vec4(stripe, 0.72f),
+                                        "masonry",
+                                        0.86f,
+                                        0.56f);
+                            desertPatches++;
+                        }
+                    }
+
+                    int vegetationClusters = 0;
+                    int vegetationBlades = 0;
+                    const glm::vec4 vegColor = desertSurface
+                        ? glm::vec4(0.48f, 0.40f, 0.20f, 1.0f)
+                        : glm::vec4(0.15f, 0.38f, 0.18f, 1.0f);
+                    for (int i = 0; i < genExt.surfaceMaterialRichness.vegetationClusterCount; ++i) {
+                        const float x = (pseudo(i + 211, 1.47f) - 0.5f) * groundW * 0.70f;
+                        const float z = shoreZ + 1.2f + pseudo(i + 217, 1.89f) * landSpan * 0.62f;
+                        const float clusterScale = desertSurface ? 0.76f : 1.0f;
+                        for (int b = 0; b < 3; ++b) {
+                            const float bx = x + (static_cast<float>(b) - 1.0f) * 0.055f;
+                            const float bz = z + (pseudo(i + b + 229, 2.37f) - 0.5f) * 0.12f;
+                            addCubeMark("GenerativeExterior_VegetationSurfaceCluster" + std::to_string(i) + "_" + std::to_string(b),
+                                        glm::vec3(bx, 0.12f + 0.015f * b, bz),
+                                        glm::vec3(0.035f,
+                                                  (0.22f + 0.060f * b) * clusterScale,
+                                                  0.030f),
+                                        glm::vec3(glm::radians(-10.0f + 9.0f * static_cast<float>(b)),
+                                                  glm::radians(35.0f * static_cast<float>(i + b)),
+                                                  glm::radians(-6.0f + 6.0f * static_cast<float>(b))),
+                                        vegColor,
+                                        "foliage",
+                                        desertSurface ? 0.84f : 0.64f,
+                                        0.34f);
+                            vegetationBlades++;
+                        }
+                        vegetationClusters++;
+                    }
+
+                    int heroLines = 0;
+                    const int desiredHeroLines = genExt.surfaceMaterialRichness.heroMaterialLineCount;
+                    if (!genExt.structures.empty()) {
+                        const auto& structure = genExt.structures.front();
+                        const float yawRad = glm::radians(structure.yawDeg);
+                        const float cs = std::cos(yawRad);
+                        const float sn = std::sin(yawRad);
+                        auto place = [&](float x, float y, float z) -> glm::vec3 {
+                            return structure.position + glm::vec3(cs * x + sn * z,
+                                                                  y,
+                                                                  -sn * x + cs * z);
+                        };
+                        const float frontZ = structure.depthM * 0.5f + 0.16f;
+                        for (int i = 0; i < desiredHeroLines; ++i) {
+                            const float row = static_cast<float>(i / 6);
+                            const float col = static_cast<float>(i % 6);
+                            addCubeMark("GenerativeExterior_HeroMaterialLine_Cabin" + std::to_string(i),
+                                        place(-structure.widthM * 0.38f + col * structure.widthM * 0.15f,
+                                              0.36f + row * 0.18f,
+                                              frontZ),
+                                        glm::vec3(structure.widthM * (0.060f + 0.012f * static_cast<float>(i % 3)),
+                                                  0.018f,
+                                                  0.024f),
+                                        glm::vec3(0.0f, yawRad, glm::radians(-1.5f + static_cast<float>(i % 4))),
+                                        glm::vec4(0.10f, 0.060f, 0.032f, 0.74f),
+                                        "wood",
+                                        0.82f,
+                                        0.40f);
+                            heroLines++;
+                        }
+                    } else {
+                        const glm::vec3 tentCenter(2.9f, 0.0f, 0.9f);
+                        const float tentYaw = glm::radians(-18.0f);
+                        const float cs = std::cos(tentYaw);
+                        const float sn = std::sin(tentYaw);
+                        auto tentPlace = [&](float x, float y, float z) -> glm::vec3 {
+                            return tentCenter + glm::vec3(cs * x + sn * z, y, -sn * x + cs * z);
+                        };
+                        for (int i = 0; i < desiredHeroLines; ++i) {
+                            const float row = static_cast<float>(i / 6);
+                            const float col = static_cast<float>(i % 6);
+                            const float sideZ = (i % 2 == 0) ? -0.62f : 0.62f;
+                            addCubeMark("GenerativeExterior_HeroMaterialLine_Tent" + std::to_string(i),
+                                        tentPlace(-0.92f + col * 0.36f,
+                                                  0.42f + row * 0.11f,
+                                                  sideZ),
+                                        glm::vec3(0.25f,
+                                                  0.020f,
+                                                  0.022f),
+                                        glm::vec3(glm::radians(8.0f),
+                                                  tentYaw,
+                                                  glm::radians(-4.0f + static_cast<float>(i % 5) * 2.0f)),
+                                        glm::vec4(0.070f, 0.040f, 0.050f, 0.72f),
+                                        "fabric",
+                                        0.76f,
+                                        0.32f);
+                            heroLines++;
+                        }
+                    }
+
+                    spdlog::info("generative_exterior: created material breakup decals ground={} rock_lichen={} desert_strata={} hero_lines={}",
+                                 groundDecals,
+                                 rockPatches,
+                                 desertPatches,
+                                 heroLines);
+                    spdlog::info("generative_exterior: created vegetation surface clusters clusters={} blades={}",
+                                 vegetationClusters,
+                                 vegetationBlades);
+                }
             }
         }
     }

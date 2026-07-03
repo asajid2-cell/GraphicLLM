@@ -1303,8 +1303,9 @@ def validity_check_interior(ir):
 # Render + critique loop.
 # ----------------------------------------------------------------------------
 
-# Native-res rendering (no 1.5x SSAA) keeps the desktop responsive during renders;
-# the battery sets this False for full-quality captures.
+# Optional native-res rendering (no 1.5x SSAA). Full quality is the default --
+# renders yield to the desktop via background GPU scheduling + frame pacing instead
+# of dropping resolution. --fast is for quick previews on weak GPUs.
 RENDER_FAST = False
 
 
@@ -1539,12 +1540,12 @@ def main():
     ap.add_argument("--iters", type=int, default=3, help="critique/reframe iterations")
     ap.add_argument("--refresh-catalog", action="store_true")
     ap.add_argument("--no-critic", action="store_true", help="skip the vision loop (1 render)")
-    ap.add_argument("--quality", action="store_true",
-                    help="full 1.5x SSAA renders (heavier on the GPU; the default for "
-                         "interactive runs is native-res so the desktop stays responsive)")
+    ap.add_argument("--fast", action="store_true",
+                    help="native-res preview renders (quicker, lighter; full 1.5x SSAA "
+                         "quality is the default -- renders yield to the desktop either way)")
     args = ap.parse_args()
     global RENDER_FAST
-    RENDER_FAST = not args.quality
+    RENDER_FAST = args.fast
     name = args.name or "gen_" + "".join(c if c.isalnum() else "_" for c in args.prompt.lower())[:32]
     if args.codex:
         args.backends = "codex"

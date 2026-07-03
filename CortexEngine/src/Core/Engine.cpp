@@ -553,6 +553,25 @@ Result<void> Engine::Initialize(const EngineConfig& config) {
     m_maxFrames = config.maxFrames;
     m_simulateDeviceRemovedFrame = config.simulateDeviceRemovedFrame;
     m_exitAfterVisualValidationCapture = config.exitAfterVisualValidationCapture;
+    // Background GPU scheduling (CORTEX_LOW_GPU_PRIORITY): drop this process's GPU
+    // scheduling class so the desktop compositor always preempts our render packets.
+    // Full-quality headless captures then coexist with an interactive desktop instead
+    // of freezing it -- quality is untouched, the render just yields.
+    if (const char* lowGpu = std::getenv("CORTEX_LOW_GPU_PRIORITY"); lowGpu && *lowGpu && *lowGpu != '0') {
+        using PFN_SetGpuPrio = LONG(WINAPI*)(HANDLE, int);
+        HMODULE gdi = ::GetModuleHandleW(L"gdi32.dll");
+        if (!gdi) {
+            gdi = ::LoadLibraryW(L"gdi32.dll");
+        }
+        if (gdi) {
+            if (auto setPrio = reinterpret_cast<PFN_SetGpuPrio>(
+                    ::GetProcAddress(gdi, "D3DKMTSetProcessSchedulingPriorityClass"))) {
+                const LONG status = setPrio(::GetCurrentProcess(), 1); // D3DKMT_SCHEDULINGPRIORITYCLASS_BELOW_NORMAL
+                spdlog::info("GPU scheduling priority lowered for background rendering (status=0x{:x})",
+                             static_cast<unsigned long>(status));
+            }
+        }
+    }
     m_hudMode = config.initialHudMode;
     m_startupArchitectCommandJson = config.startupArchitectCommandJson;
     m_startupArchitectCommandSubmitted = false;
@@ -1369,6 +1388,17 @@ void Engine::Run() {
     if (fixedDeltaTime) {
         spdlog::info("Smoke automation fixed delta time enabled: {:.6f}s", *fixedDeltaTime);
     }
+    // Frame pacing (CORTEX_FRAME_PACE_MS): sleep between frames during automated
+    // captures so the GPU idles briefly each frame -- the desktop compositor gets its
+    // time slices and sustained-saturation TDRs ease off. Costs a few seconds per
+    // capture; costs nothing in quality.
+    std::optional<float> framePaceMs = ReadOptionalEnvFloat("CORTEX_FRAME_PACE_MS");
+    if (framePaceMs && (*framePaceMs <= 0.0f || *framePaceMs > 250.0f)) {
+        framePaceMs.reset();
+    }
+    if (framePaceMs) {
+        spdlog::info("Frame pacing enabled: {:.0f} ms between frames", *framePaceMs);
+    }
 
     while (m_running) {
         // Calculate delta time
@@ -1404,6 +1434,11 @@ void Engine::Run() {
             spdlog::info("Smoke automation reached max frame count {}; exiting main loop",
                          static_cast<unsigned long long>(m_maxFrames));
             m_running = false;
+        }
+
+        if (framePaceMs && m_running) {
+            std::this_thread::sleep_for(
+                std::chrono::microseconds(static_cast<long long>(*framePaceMs * 1000.0f)));
         }
     }
 

@@ -37,6 +37,10 @@ $env:CORTEX_HEADLESS = "1"
 $env:CORTEX_SHOWCASE = "1"               # showcase lighting (sun/window/fog) + hero camera + 1.5x SSAA
 if ($Night) { $env:CORTEX_SHOWCASE_NIGHT = "1" } else { Remove-Item Env:CORTEX_SHOWCASE_NIGHT -ErrorAction SilentlyContinue }
 if ($Fast) { $env:CORTEX_RENDER_SCALE = "1.0" } else { Remove-Item Env:CORTEX_RENDER_SCALE -ErrorAction SilentlyContinue }
+# Yield to the desktop, don't sacrifice quality: background GPU scheduling + gentle
+# frame pacing keep the system responsive during full-SSAA captures.
+$env:CORTEX_LOW_GPU_PRIORITY = "1"
+$env:CORTEX_FRAME_PACE_MS = "35"
 $env:CORTEX_SCENE_IR_JSON = $json        # the generative scene
 Remove-Item Env:CORTEX_SCENE_PROMPT   -ErrorAction SilentlyContinue
 Remove-Item Env:CORTEX_SCENE_RECIPE   -ErrorAction SilentlyContinue

@@ -235,6 +235,16 @@ def compile_v3_to_v2(v3: dict[str, Any]) -> dict[str, Any]:
     extent = float(terrain.get("extent_m", 44.0) or 44.0)
     extent = _clamp(extent, 30.0, 52.0)
     water_on = waterbody.get("type") in ("lake", "river", "waterbody") or "lake" in prompt_lower or "river" in prompt_lower
+    if campsite and water_on and not desert:
+        authored_module_id = "campsite_lake_dawn"
+    elif canyon:
+        authored_module_id = "desert_canyon_river"
+    elif cabin and water_on:
+        authored_module_id = "alpine_cabin_lake"
+    elif water_on:
+        authored_module_id = "exterior_water_setpiece"
+    else:
+        authored_module_id = "exterior_landscape_setpiece"
     water_from_z = -0.16 * extent
     water_shallow, water_deep = _water_palette(waterbody)
     water_intent = str(waterbody.get("color_intent") or "").lower()
@@ -242,6 +252,9 @@ def compile_v3_to_v2(v3: dict[str, Any]) -> dict[str, Any]:
     if canyon and water_intent == "turquoise":
         water_shallow = [0.0, 1.80, 2.05]
         water_deep = [0.0, 0.75, 1.05]
+    if water_intent in {"purple", "violet"}:
+        water_shallow = [1.10, 0.02, 1.85]
+        water_deep = [0.36, 0.00, 0.92]
     if moonlight and not stylized_water:
         water_shallow = [0.11, 0.30, 0.52]
         water_deep = [0.01, 0.045, 0.17]
@@ -320,6 +333,47 @@ def compile_v3_to_v2(v3: dict[str, Any]) -> dict[str, Any]:
         "graphics_pass": {},
     }
 
+    if authored_module_id == "campsite_lake_dawn":
+        env["sun"].update({
+            "azimuth_deg": 126.0,
+            "elevation_deg": 8.5,
+            "color": [1.0, 0.46, 0.24],
+            "intensity": 4.35,
+        })
+        env["sky"] = "sky_sunset"
+        env["look"] = {"time": "dawn", "grade": "warm_fog_contrast"}
+        env["fog"] = {"density": max(env["fog"]["density"], 0.026), "start": 4.0}
+        env["exposure"] = min(env["exposure"], 0.88)
+        env["water"].update({
+            "roughness": min(env["water"]["roughness"], 0.065),
+            "fresnel": 0.24 if stylized_water else 0.48,
+            "absorption": max(env["water"]["absorption"], 1.05),
+            "foam": max(env["water"]["foam"], 0.20),
+            "body_thickness": max(env["water"]["body_thickness"], 1.18),
+            "color_strength": 1.0 if stylized_water else env["water"]["color_strength"],
+        })
+    elif authored_module_id == "desert_canyon_river":
+        env["sun"].update({
+            "azimuth_deg": 112.0,
+            "elevation_deg": 13.0,
+            "color": [1.0, 0.62, 0.34],
+            "intensity": 4.10,
+        })
+        env["sky"] = "sky_sunset"
+        env["look"] = {"time": "golden_hour", "grade": "desert_canyon_contrast"}
+        env["fog"] = {"density": max(env["fog"]["density"], 0.012), "start": 8.0}
+        env["exposure"] = min(env["exposure"], 0.84)
+    elif authored_module_id == "alpine_cabin_lake":
+        env["sun"].update({
+            "azimuth_deg": 214.0,
+            "elevation_deg": 12.0,
+            "color": [0.55, 0.66, 1.0],
+            "intensity": 1.45,
+        })
+        env["look"] = {"time": "moonlight" if moonlight else "blue_hour", "grade": "cool_moonlight"}
+        env["fog"] = {"density": max(env["fog"]["density"], 0.022), "start": 5.0}
+        env["exposure"] = min(env["exposure"], 0.78)
+
     objects: list[dict[str, Any]] = []
     placed: list[tuple[float, float, float]] = []
     foliage_tint = [0.34, 0.68, 0.28] if not desert else [0.55, 0.48, 0.25]
@@ -330,7 +384,8 @@ def compile_v3_to_v2(v3: dict[str, Any]) -> dict[str, Any]:
 
     # Hero grammar: the focal set stays tight enough for the quality gate and camera.
     if campsite:
-        _add(objects, "tent_detailedOpen", 2.9, 0.9, -18.0, 2.55, placed=placed)
+        tent_tint = [0.58, 0.43, 0.26] if desert else ([0.20, 0.24, 0.30] if moonlight else [0.46, 0.30, 0.20])
+        _add(objects, "tent_detailedOpen", 2.9, 0.9, -18.0, 2.55, tint=tent_tint, placed=placed)
         _add(objects, "campfire_bricks", -0.35, 0.35, 0.0, 1.05, placed=placed)
         _add(objects, "campfire_logs", -1.05, 0.86, 31.0, 0.56, placed=placed)
         _add(objects, "campfire_stones", 0.48, -0.18, -12.0, 0.62, placed=placed)
@@ -420,8 +475,16 @@ def compile_v3_to_v2(v3: dict[str, Any]) -> dict[str, Any]:
         "texture_source_wood",
         "texture_source_fabric",
     ])
+    material_zone_names.extend([
+        "authored_scene_module_layout",
+        "authored_foreground_frame",
+        "authored_midground_hero_cluster",
+        "authored_backdrop_gate",
+        "authored_lighting_zones",
+    ])
     if water_on:
         material_zone_names.append("texture_source_wet_shore")
+        material_zone_names.append("authored_curved_shore_water_corridor")
     if not desert:
         material_zone_names.append("irregular_tree_silhouettes")
     env["shot"] = {
@@ -434,11 +497,41 @@ def compile_v3_to_v2(v3: dict[str, Any]) -> dict[str, Any]:
     renderer_ssao_radius = 1.26 if not moonlight else 1.18
     renderer_ssao_intensity = 2.70 if not moonlight else 2.28
     renderer_shadow_pcf = 3.10 if not moonlight else 2.60
+    if authored_module_id == "alpine_cabin_lake":
+        renderer_ssao_radius = 1.24
+        renderer_ssao_intensity = 2.65
+        renderer_shadow_pcf = 3.00
     renderer_shadow_bias = 0.0020
     contact_receiver_patch_budget = 72 if not moonlight else 40
     soft_penumbra_patch_budget = 40 if not moonlight else 32
     env["graphics_pass"] = {
         "version": 2,
+        "authored_scene_module": {
+            "enabled": True,
+            "module_id": authored_module_id,
+            "composition_anchor_count": 8 if (campsite or cabin or canyon) else 6,
+            "terrain_setpiece_count": 7 if canyon else (6 if water_on else 4),
+            "hero_cluster_count": 3 if (campsite or cabin) else 2,
+            "foreground_frame_count": 5 if (campsite or cabin) else 4,
+            "backdrop_gate_count": 4 if canyon else 3,
+            "lighting_zone_count": 4 if (campsite or cabin) else 3,
+            "material_family_count": 7 if water_on else 5,
+            "water_shape_segment_count": 9 if water_on else 0,
+            "practical_light_count": 2 if authored_module_id == "desert_canyon_river" else (3 if campsite else (4 if cabin else 1)),
+            "contrast_key": "warm_low_dawn" if authored_module_id == "campsite_lake_dawn" else (
+                "hot_canyon_side_key" if authored_module_id == "desert_canyon_river" else (
+                    "cool_moon_warm_window" if authored_module_id == "alpine_cabin_lake" else "neutral_raking_key"
+                )
+            ),
+            "systems": [
+                "family_authored_foreground_frame",
+                "cohesive_midground_hero_cluster",
+                "curved_shore_or_carved_river_corridor",
+                "backdrop_gate_silhouette",
+                "module_specific_practical_lighting",
+                "module_material_family_palette",
+            ],
+        },
         "terrain": {
             "heightfield": True,
             "relief_m": env["ground"]["terrain"]["relief_m"],

@@ -268,6 +268,21 @@ namespace {
         float wallNormalBreakup = 0.0f;
     };
 
+    struct GenerativeAuthoredSceneModule {
+        bool enabled = false;
+        std::string moduleId;
+        int compositionAnchorCount = 0;
+        int terrainSetpieceCount = 0;
+        int heroClusterCount = 0;
+        int foregroundFrameCount = 0;
+        int backdropGateCount = 0;
+        int lightingZoneCount = 0;
+        int materialFamilyCount = 0;
+        int waterShapeSegmentCount = 0;
+        int practicalLightCount = 0;
+        std::string contrastKey;
+    };
+
     float GenerativeTerrainNoise(float x, float z, float phase) {
         const float a = std::sin(x * 0.33f + z * 0.17f + phase) * 0.48f;
         const float b = std::sin(x * 0.91f - z * 0.27f + phase * 1.73f) * 0.22f;
@@ -3382,6 +3397,7 @@ void Engine::BuildRecipeScene() {
         GenerativeRendererShadowOcclusionBudget rendererShadowOcclusionBudget;
         GenerativeAtmosphereFidelity atmosphereFidelity;
         GenerativeGeometryRealism geometryRealism;
+        GenerativeAuthoredSceneModule authoredSceneModule;
         int shoreLayerCount = 0;
         int rimLightCount = 0;
         int advancedShaderTermCount = 0;
@@ -3489,6 +3505,29 @@ void Engine::BuildRecipeScene() {
                     genExt.graphicsShadowBias = genExt.rendererShadowOcclusionBudget.shadowBias;
                     genExt.graphicsShadowPCF = genExt.rendererShadowOcclusionBudget.shadowPCFRadius;
                 }
+                const nlohmann::json authoredSceneModule =
+                    graphics.value("authored_scene_module", nlohmann::json::object());
+                genExt.authoredSceneModule.enabled = authoredSceneModule.value("enabled", false);
+                genExt.authoredSceneModule.moduleId = authoredSceneModule.value("module_id", std::string());
+                genExt.authoredSceneModule.contrastKey = authoredSceneModule.value("contrast_key", std::string());
+                genExt.authoredSceneModule.compositionAnchorCount =
+                    static_cast<int>(std::clamp(num(authoredSceneModule, "composition_anchor_count", 0.0f), 0.0f, 16.0f));
+                genExt.authoredSceneModule.terrainSetpieceCount =
+                    static_cast<int>(std::clamp(num(authoredSceneModule, "terrain_setpiece_count", 0.0f), 0.0f, 14.0f));
+                genExt.authoredSceneModule.heroClusterCount =
+                    static_cast<int>(std::clamp(num(authoredSceneModule, "hero_cluster_count", 0.0f), 0.0f, 8.0f));
+                genExt.authoredSceneModule.foregroundFrameCount =
+                    static_cast<int>(std::clamp(num(authoredSceneModule, "foreground_frame_count", 0.0f), 0.0f, 10.0f));
+                genExt.authoredSceneModule.backdropGateCount =
+                    static_cast<int>(std::clamp(num(authoredSceneModule, "backdrop_gate_count", 0.0f), 0.0f, 8.0f));
+                genExt.authoredSceneModule.lightingZoneCount =
+                    static_cast<int>(std::clamp(num(authoredSceneModule, "lighting_zone_count", 0.0f), 0.0f, 8.0f));
+                genExt.authoredSceneModule.materialFamilyCount =
+                    static_cast<int>(std::clamp(num(authoredSceneModule, "material_family_count", 0.0f), 0.0f, 12.0f));
+                genExt.authoredSceneModule.waterShapeSegmentCount =
+                    static_cast<int>(std::clamp(num(authoredSceneModule, "water_shape_segment_count", 0.0f), 0.0f, 18.0f));
+                genExt.authoredSceneModule.practicalLightCount =
+                    static_cast<int>(std::clamp(num(authoredSceneModule, "practical_light_count", 0.0f), 0.0f, 8.0f));
                 const nlohmann::json worldGeometry = graphics.value("world_geometry", nlohmann::json::object());
                 genExt.worldGeometry.enabled = worldGeometry.value("enabled", false);
                 genExt.worldGeometry.foregroundOccluderCount =
@@ -4029,6 +4068,62 @@ void Engine::BuildRecipeScene() {
                 renderer->SetWaterParams(genExt.waterLevel, genExt.waterWave, 9.5f, 0.42f,
                                          0.12f, 0.92f, 0.020f, 0.44f); // gentle swell rolling toward the shore (+Z)
                 renderer->SetWaterOptics(genExt.waterRough, genExt.waterFresnel); // v3 color intent can damp sky-mirror washout
+            }
+            if (genExt.authoredSceneModule.enabled) {
+                renderer->SetLightingRigContract("generative_authored_scene_module", "generated_scene_module", false);
+                renderer->SetWorldShaderPaletteContract(genExt.authoredSceneModule.moduleId.empty()
+                                                            ? "generative_authored_exterior"
+                                                            : genExt.authoredSceneModule.moduleId,
+                                                        "generated_scene_module");
+                const std::string module = genExt.authoredSceneModule.moduleId;
+                if (module == "campsite_lake_dawn") {
+                    renderer->SetSunDirection(glm::normalize(glm::vec3(0.74f, 0.17f, -0.64f)));
+                    renderer->SetSunColor(glm::vec3(1.0f, 0.45f, 0.22f));
+                    renderer->SetSunIntensity(4.25f * lightingBalance.sunScale);
+                    renderer->SetAmbientLighting(glm::vec3(0.030f, 0.038f, 0.058f), 0.64f);
+                    renderer->SetIBLIntensity(1.05f, 0.96f);
+                    renderer->SetColorGrade(0.18f, 0.055f);
+                    renderer->SetToneGrade(1.24f, 1.13f);
+                    renderer->SetExposure(std::min(0.88f, genExt.exposure));
+                    renderer->SetBloomIntensity(0.24f);
+                    renderer->SetFogParams(std::max(genExt.fogDensity, 0.026f), 0.05f, 0.42f, 4.0f);
+                    renderer->SetGodRayIntensity(0.18f);
+                } else if (module == "desert_canyon_river") {
+                    renderer->SetSunDirection(glm::normalize(glm::vec3(0.82f, 0.22f, -0.52f)));
+                    renderer->SetSunColor(glm::vec3(1.0f, 0.58f, 0.30f));
+                    renderer->SetSunIntensity(4.05f * lightingBalance.sunScale);
+                    renderer->SetAmbientLighting(glm::vec3(0.055f, 0.043f, 0.034f), 0.70f);
+                    renderer->SetIBLIntensity(1.35f, 1.05f);
+                    renderer->SetColorGrade(0.20f, 0.020f);
+                    renderer->SetToneGrade(1.22f, 1.10f);
+                    renderer->SetExposure(std::min(0.86f, genExt.exposure));
+                    renderer->SetBloomIntensity(0.12f);
+                    renderer->SetFogParams(std::max(genExt.fogDensity, 0.012f), 0.05f, 0.40f, 8.0f);
+                } else if (module == "alpine_cabin_lake") {
+                    renderer->SetSunDirection(glm::normalize(glm::vec3(-0.36f, 0.32f, -0.88f)));
+                    renderer->SetSunColor(glm::vec3(0.50f, 0.62f, 1.0f));
+                    renderer->SetSunIntensity(1.05f * lightingBalance.sunScale);
+                    renderer->SetAmbientLighting(glm::vec3(0.014f, 0.020f, 0.052f), 0.48f);
+                    renderer->SetIBLIntensity(0.30f, 0.74f);
+                    renderer->SetColorGrade(0.015f, 0.40f);
+                    renderer->SetToneGrade(1.18f, 1.06f);
+                    renderer->SetExposure(std::min(0.74f, genExt.exposure));
+                    renderer->SetBloomIntensity(0.22f);
+                    renderer->SetFogParams(std::max(genExt.fogDensity, 0.024f), 0.05f, 0.42f, 5.0f);
+                } else {
+                    renderer->SetAmbientLighting(glm::vec3(0.060f, 0.070f, 0.078f), 0.72f);
+                    renderer->SetToneGrade(1.16f, 1.08f);
+                    renderer->SetExposure(std::min(0.90f, genExt.exposure));
+                }
+                renderer->SetSSAOParams(std::max(genExt.graphicsSSAORadius, 1.24f),
+                                        std::min(genExt.graphicsSSAOBias, 0.018f),
+                                        std::max(genExt.graphicsSSAOIntensity, 2.65f));
+                renderer->SetShadowBias(std::min(genExt.graphicsShadowBias, 0.0018f));
+                renderer->SetShadowPCFRadius(std::max(genExt.graphicsShadowPCF, 3.0f));
+                spdlog::info("generative_exterior: authored module lighting module={} contrast_key={} zones={}",
+                             module.empty() ? "unknown" : module,
+                             genExt.authoredSceneModule.contrastKey.empty() ? "default" : genExt.authoredSceneModule.contrastKey,
+                             genExt.authoredSceneModule.lightingZoneCount);
             }
         }
         renderer->SetBloomShape(outdoor ? 1.05f : 1.02f, outdoor ? 0.45f : 0.50f, outdoor ? 2.0f : 0.82f);
@@ -5819,6 +5914,321 @@ void Engine::BuildRecipeScene() {
                 } else {
                     spdlog::warn("generative_exterior: source-bound hero geometry requested but no scanned hero meshes were created");
                 }
+            }
+        }
+    }
+
+    if (genExt.valid && genExt.authoredSceneModule.enabled) {
+        if (auto* renderer = m_renderer.get()) {
+            auto cubeMesh = Utils::MeshGenerator::CreateCube();
+            auto planeMesh = Utils::MeshGenerator::CreatePlane(1.0f, 1.0f);
+            auto cylinderMesh = Utils::MeshGenerator::CreateCylinder(0.5f, 1.0f, 24);
+            auto shardMesh = CreateGenerativeRockShardMesh(21.73f);
+            auto cliffMesh = CreateGenerativeCliffWallMesh(genExt.extent * 0.34f,
+                                                           std::max(4.2f, genExt.terrainRelief * 7.0f + 3.2f),
+                                                           1.72f,
+                                                           23.41f,
+                                                           6u);
+            const auto upCube = renderer->UploadMesh(cubeMesh);
+            const auto upPlane = renderer->UploadMesh(planeMesh);
+            const auto upCylinder = renderer->UploadMesh(cylinderMesh);
+            const auto upShard = renderer->UploadMesh(shardMesh);
+            const auto upCliff = renderer->UploadMesh(cliffMesh);
+            if (upCube.IsErr() || upPlane.IsErr() || upCylinder.IsErr() || upShard.IsErr() || upCliff.IsErr()) {
+                spdlog::warn("generative_exterior: authored scene module mesh upload failed cube='{}' plane='{}' cylinder='{}' shard='{}' cliff='{}'",
+                             upCube.IsErr() ? upCube.Error() : "ok",
+                             upPlane.IsErr() ? upPlane.Error() : "ok",
+                             upCylinder.IsErr() ? upCylinder.Error() : "ok",
+                             upShard.IsErr() ? upShard.Error() : "ok",
+                             upCliff.IsErr() ? upCliff.Error() : "ok");
+            } else {
+                const std::string module = genExt.authoredSceneModule.moduleId.empty()
+                    ? std::string("exterior_landscape_setpiece")
+                    : genExt.authoredSceneModule.moduleId;
+                const bool campsiteModule = module == "campsite_lake_dawn";
+                const bool canyonModule = module == "desert_canyon_river";
+                const bool alpineModule = module == "alpine_cabin_lake";
+                const float shoreZ = genExt.waterOn ? (genExt.waterFromZ + 0.5f) : -genExt.extent * 0.32f;
+                const float groundW = genExt.extent * 1.86f;
+                const glm::vec3 baseGround = genExt.groundColorSet
+                    ? genExt.groundColor
+                    : (canyonModule ? glm::vec3(0.48f, 0.22f, 0.12f) : glm::vec3(0.20f, 0.28f, 0.18f));
+
+                const AssetLedMaterialSettings bankMat{
+                    glm::vec4(glm::max(glm::mix(baseGround, canyonModule ? glm::vec3(0.72f, 0.30f, 0.15f) : glm::vec3(0.18f, 0.22f, 0.17f), 0.42f), glm::vec3(0.025f)), 1.0f),
+                    0.0f, 0.82f, 0.0f, 1.5f, glm::vec3(0.0f), 1.0f,
+                    genExt.groundWetness * 0.22f, 0.56f, false,
+                    Scene::RenderableComponent::AlphaMode::Opaque,
+                    Scene::RenderableComponent::RenderLayer::Opaque,
+                    canyonModule ? "masonry" : "naturalistic"
+                };
+                const AssetLedMaterialSettings darkBank{
+                    glm::vec4(glm::max(baseGround * (canyonModule ? 0.46f : 0.38f), glm::vec3(0.018f)), 1.0f),
+                    0.0f, 0.88f, 0.0f, 1.5f, glm::vec3(0.0f), 1.0f,
+                    genExt.groundWetness * 0.16f, 0.48f, false,
+                    Scene::RenderableComponent::AlphaMode::Opaque,
+                    Scene::RenderableComponent::RenderLayer::Opaque,
+                    "masonry"
+                };
+                const AssetLedMaterialSettings wetShore{
+                    glm::vec4(glm::mix(baseGround * 0.45f, genExt.waterShallow, 0.22f), 1.0f),
+                    0.0f, 0.46f, 0.0f, 1.5f, glm::vec3(0.0f), 1.0f,
+                    std::max(0.48f, genExt.groundWetness), 0.52f, false,
+                    Scene::RenderableComponent::AlphaMode::Opaque,
+                    Scene::RenderableComponent::RenderLayer::Opaque,
+                    "wet_masonry"
+                };
+                const AssetLedMaterialSettings waterAccent{
+                    glm::vec4(glm::max(genExt.waterShallow, glm::vec3(0.05f)), 0.42f),
+                    0.0f, 0.08f, 0.22f, 1.333f, glm::vec3(0.0f), 1.0f,
+                    0.85f, 0.18f, true,
+                    Scene::RenderableComponent::AlphaMode::Blend,
+                    Scene::RenderableComponent::RenderLayer::Overlay,
+                    "water"
+                };
+                const AssetLedMaterialSettings warmWood{
+                    glm::vec4(0.24f, 0.13f, 0.060f, 1.0f),
+                    0.0f, 0.62f, 0.0f, 1.5f, glm::vec3(0.0f), 1.0f,
+                    genExt.groundWetness * 0.28f, 0.42f, false,
+                    Scene::RenderableComponent::AlphaMode::Opaque,
+                    Scene::RenderableComponent::RenderLayer::Opaque,
+                    "wood"
+                };
+                const AssetLedMaterialSettings darkFabric{
+                    glm::vec4(campsiteModule ? glm::vec3(0.16f, 0.070f, 0.090f) : glm::vec3(0.18f, 0.18f, 0.20f), 1.0f),
+                    0.0f, 0.72f, 0.0f, 1.5f, glm::vec3(0.0f), 1.0f,
+                    genExt.groundWetness * 0.18f, 0.34f, false,
+                    Scene::RenderableComponent::AlphaMode::Opaque,
+                    Scene::RenderableComponent::RenderLayer::Opaque,
+                    "fabric"
+                };
+                const AssetLedMaterialSettings warmGlow{
+                    glm::vec4(1.0f, 0.48f, 0.16f, 1.0f),
+                    0.0f, 0.34f, 0.0f, 1.5f, glm::vec3(1.0f, 0.36f, 0.10f), 3.8f,
+                    0.0f, 0.08f, true,
+                    Scene::RenderableComponent::AlphaMode::Opaque,
+                    Scene::RenderableComponent::RenderLayer::Opaque,
+                    "emissive"
+                };
+
+                auto addModulePart = [&](const std::string& tag,
+                                         const std::shared_ptr<Scene::MeshData>& mesh,
+                                         const glm::vec3& position,
+                                         const glm::vec3& scale,
+                                         const glm::vec3& euler,
+                                         const AssetLedMaterialSettings& material) {
+                    AddAssetLedRenderable(*m_registry, tag.c_str(), mesh, position, scale, euler, material);
+                };
+
+                int compositionAnchors = 0;
+                int terrainSetpieces = 0;
+                int heroClusters = 0;
+                int foregroundFrames = 0;
+                int backdropGates = 0;
+                int lightingZones = 0;
+                int materialFamilies = 7;
+                int waterSegments = 0;
+                int practicalLights = 0;
+
+                const int backdropTarget = std::max(3, genExt.authoredSceneModule.backdropGateCount);
+                for (int i = 0; i < backdropTarget; ++i) {
+                    const float side = (i % 2 == 0) ? -1.0f : 1.0f;
+                    const float z = (canyonModule ? -19.0f : -22.0f) - static_cast<float>(i / 2) * 4.6f;
+                    const float x = side * (canyonModule ? genExt.extent * 0.54f : genExt.extent * (0.36f + 0.025f * static_cast<float>(i)));
+                    addModulePart("GenerativeExterior_AuthoredBackdropGate" + std::to_string(i),
+                                  cliffMesh,
+                                  glm::vec3(x, canyonModule ? 0.18f : -0.55f, z),
+                                  canyonModule ? glm::vec3(0.78f, 0.88f, 0.82f) : glm::vec3(0.58f, 0.66f, 0.62f),
+                                  glm::vec3(glm::radians(-2.0f + 1.5f * static_cast<float>(i % 3)),
+                                            glm::radians(side * (canyonModule ? 8.0f : 20.0f)),
+                                            glm::radians(side * 1.5f)),
+                                  canyonModule ? bankMat : darkBank);
+                    backdropGates++;
+                    terrainSetpieces++;
+                    compositionAnchors++;
+                }
+
+                const int foregroundTarget = std::max(3, genExt.authoredSceneModule.foregroundFrameCount);
+                for (int i = 0; i < foregroundTarget; ++i) {
+                    const float side = (i % 2 == 0) ? -1.0f : 1.0f;
+                    const float x = side * (3.8f + 0.78f * static_cast<float>(i));
+                    const float z = 4.85f - 0.18f * static_cast<float>(i);
+                    addModulePart("GenerativeExterior_AuthoredForegroundFrame" + std::to_string(i),
+                                  shardMesh,
+                                  glm::vec3(x, 0.10f + 0.018f * static_cast<float>(i % 2), z),
+                                  glm::vec3(0.36f + 0.04f * static_cast<float>(i % 3),
+                                            0.18f,
+                                            0.30f + 0.03f * static_cast<float>(i % 2)),
+                                  glm::vec3(glm::radians(-2.0f + 1.0f * static_cast<float>(i % 3)),
+                                            glm::radians(side * (18.0f + 9.0f * static_cast<float>(i))),
+                                            glm::radians(side * 2.5f)),
+                                  (i % 2 == 0) ? darkBank : bankMat);
+                    foregroundFrames++;
+                    compositionAnchors++;
+                }
+
+                if (genExt.waterOn) {
+                    const int waterTarget = std::max(6, genExt.authoredSceneModule.waterShapeSegmentCount);
+                    for (int i = 0; i < waterTarget; ++i) {
+                        const float lane = static_cast<float>(i % 3);
+                        const float x = (static_cast<float>(i) - static_cast<float>(waterTarget - 1) * 0.5f) *
+                                        (groundW * 0.70f / static_cast<float>(std::max(1, waterTarget)));
+                        const float z = shoreZ - 0.14f - lane * 0.26f;
+                        addModulePart("GenerativeExterior_AuthoredWaterShape" + std::to_string(i),
+                                      planeMesh,
+                                      glm::vec3(x, genExt.waterLevel + 0.050f + static_cast<float>(i % 5) * 0.0009f, z),
+                                      glm::vec3(1.35f + 0.18f * static_cast<float>(i % 4), 1.0f, 0.055f),
+                                      glm::vec3(0.0f, glm::radians(-10.0f + 2.5f * static_cast<float>(i)), 0.0f),
+                                      waterAccent);
+                        waterSegments++;
+                    }
+                    addModulePart("GenerativeExterior_AuthoredCurvedShoreLeft",
+                                  cubeMesh,
+                                  glm::vec3(-groundW * 0.28f, 0.060f, shoreZ + 0.22f),
+                                  glm::vec3(groundW * 0.26f, 0.055f, 0.72f),
+                                  glm::vec3(0.0f, glm::radians(-7.0f), 0.0f),
+                                  wetShore);
+                    addModulePart("GenerativeExterior_AuthoredCurvedShoreRight",
+                                  cubeMesh,
+                                  glm::vec3(groundW * 0.24f, 0.062f, shoreZ + 0.34f),
+                                  glm::vec3(groundW * 0.22f, 0.055f, 0.64f),
+                                  glm::vec3(0.0f, glm::radians(8.0f), 0.0f),
+                                  wetShore);
+                    terrainSetpieces += 2;
+                    compositionAnchors += 2;
+                }
+
+                if (campsiteModule) {
+                    addModulePart("GenerativeExterior_AuthoredCampPad",
+                                  cubeMesh,
+                                  glm::vec3(1.38f, 0.036f, 1.10f),
+                                  glm::vec3(4.8f, 0.060f, 2.72f),
+                                  glm::vec3(0.0f, glm::radians(-10.0f), 0.0f),
+                                  darkBank);
+                    addModulePart("GenerativeExterior_AuthoredTentShadowBacking",
+                                  cubeMesh,
+                                  glm::vec3(3.34f, 0.42f, 0.30f),
+                                  glm::vec3(2.65f, 0.76f, 0.18f),
+                                  glm::vec3(0.0f, glm::radians(-20.0f), glm::radians(-3.0f)),
+                                  darkFabric);
+                    addModulePart("GenerativeExterior_AuthoredLogSeatArcA",
+                                  cylinderMesh,
+                                  glm::vec3(-1.34f, 0.22f, 1.58f),
+                                  glm::vec3(0.12f, 1.62f, 0.12f),
+                                  glm::vec3(glm::radians(88.0f), glm::radians(64.0f), glm::radians(2.0f)),
+                                  warmWood);
+                    addModulePart("GenerativeExterior_AuthoredLogSeatArcB",
+                                  cylinderMesh,
+                                  glm::vec3(1.34f, 0.22f, 2.10f),
+                                  glm::vec3(0.12f, 1.42f, 0.12f),
+                                  glm::vec3(glm::radians(88.0f), glm::radians(-42.0f), glm::radians(-2.0f)),
+                                  warmWood);
+                    addModulePart("GenerativeExterior_AuthoredFireGlowCore",
+                                  cubeMesh,
+                                  glm::vec3(-0.34f, 0.18f, 0.42f),
+                                  glm::vec3(0.36f, 0.11f, 0.32f),
+                                  glm::vec3(0.0f, glm::radians(12.0f), 0.0f),
+                                  warmGlow);
+                    terrainSetpieces += 1;
+                    heroClusters += 3;
+                    compositionAnchors += 5;
+                    AddAssetLedPointLight(*m_registry, "GenerativeExterior_AuthoredCampfireKey", glm::vec3(-0.32f, 0.72f, 0.42f), glm::vec3(1.0f, 0.38f, 0.12f), 4.9f, 6.0f);
+                    AddAssetLedPointLight(*m_registry, "GenerativeExterior_AuthoredLanternFill", glm::vec3(1.15f, 0.86f, 1.42f), glm::vec3(1.0f, 0.58f, 0.22f), 2.8f, 4.2f);
+                    AddAssetLedSpotLight(*m_registry, "GenerativeExterior_AuthoredDawnRim", glm::vec3(-5.2f, 4.4f, -2.8f), glm::vec3(0.5f, 0.42f, 0.6f), glm::vec3(1.0f, 0.44f, 0.18f), 5.4f, 18.0f, false);
+                    practicalLights += 3;
+                    lightingZones += 4;
+                } else if (canyonModule) {
+                    for (int i = 0; i < 4; ++i) {
+                        const float side = (i % 2 == 0) ? -1.0f : 1.0f;
+                        const float z = -4.0f - static_cast<float>(i / 2) * 5.8f;
+                        addModulePart("GenerativeExterior_AuthoredCanyonWallTerrace" + std::to_string(i),
+                                      cubeMesh,
+                                      glm::vec3(side * (genExt.extent * 0.44f), 0.72f + 0.25f * static_cast<float>(i / 2), z),
+                                      glm::vec3(1.1f, 1.35f + 0.22f * static_cast<float>(i), 4.2f),
+                                      glm::vec3(0.0f, glm::radians(side * 5.5f), glm::radians(side * 2.0f)),
+                                      (i % 2 == 0) ? bankMat : darkBank);
+                        terrainSetpieces++;
+                        compositionAnchors++;
+                    }
+                    addModulePart("GenerativeExterior_AuthoredRiverCutShadow",
+                                  cubeMesh,
+                                  glm::vec3(0.0f, 0.048f, shoreZ + 0.44f),
+                                  glm::vec3(groundW * 0.30f, 0.050f, 0.34f),
+                                  glm::vec3(0.0f, glm::radians(-2.0f), 0.0f),
+                                  darkBank);
+                    addModulePart("GenerativeExterior_AuthoredForegroundCanyonLedge",
+                                  shardMesh,
+                                  glm::vec3(-4.2f, 0.16f, 3.72f),
+                                  glm::vec3(0.82f, 0.34f, 0.62f),
+                                  glm::vec3(glm::radians(-4.0f), glm::radians(28.0f), glm::radians(-5.0f)),
+                                  bankMat);
+                    terrainSetpieces += 2;
+                    heroClusters += 2;
+                    compositionAnchors += 2;
+                    AddAssetLedSpotLight(*m_registry, "GenerativeExterior_AuthoredCanyonSideKey", glm::vec3(-6.0f, 5.2f, -4.0f), glm::vec3(0.0f, 0.65f, -5.0f), glm::vec3(1.0f, 0.58f, 0.30f), 5.6f, 20.0f, false);
+                    AddAssetLedPointLight(*m_registry, "GenerativeExterior_AuthoredCanyonWarmBounce", glm::vec3(2.8f, 1.0f, -1.8f), glm::vec3(1.0f, 0.36f, 0.16f), 1.8f, 8.0f);
+                    practicalLights += 2;
+                    lightingZones += 3;
+                } else if (alpineModule) {
+                    addModulePart("GenerativeExterior_AuthoredCabinGroundingDeck",
+                                  cubeMesh,
+                                  glm::vec3(1.24f, 0.08f, 2.18f),
+                                  glm::vec3(4.4f, 0.12f, 1.34f),
+                                  glm::vec3(0.0f, glm::radians(-10.0f), 0.0f),
+                                  warmWood);
+                    for (int i = 0; i < 5; ++i) {
+                        addModulePart("GenerativeExterior_AuthoredCabinWindowGlow" + std::to_string(i),
+                                      cubeMesh,
+                                      glm::vec3(0.38f + 0.38f * static_cast<float>(i % 3), 1.08f + 0.12f * static_cast<float>(i / 3), 2.72f),
+                                      glm::vec3(0.18f, 0.20f, 0.030f),
+                                      glm::vec3(0.0f, glm::radians(-10.0f), 0.0f),
+                                      warmGlow);
+                    }
+                    for (int i = 0; i < 4; ++i) {
+                        addModulePart("GenerativeExterior_AuthoredDockPlank" + std::to_string(i),
+                                      cubeMesh,
+                                      glm::vec3(-1.2f + 0.28f * static_cast<float>(i), 0.075f, shoreZ + 0.65f - 0.34f * static_cast<float>(i)),
+                                      glm::vec3(0.18f, 0.055f, 1.35f),
+                                      glm::vec3(0.0f, glm::radians(-13.0f), 0.0f),
+                                      warmWood);
+                    }
+                    terrainSetpieces += 2;
+                    heroClusters += 3;
+                    compositionAnchors += 6;
+                    AddAssetLedPointLight(*m_registry, "GenerativeExterior_AuthoredCabinInteriorGlow", glm::vec3(1.12f, 1.18f, 2.45f), glm::vec3(1.0f, 0.55f, 0.22f), 5.2f, 6.0f);
+                    AddAssetLedPointLight(*m_registry, "GenerativeExterior_AuthoredPorchLantern", glm::vec3(-0.30f, 0.92f, 2.15f), glm::vec3(1.0f, 0.62f, 0.30f), 2.6f, 4.0f);
+                    AddAssetLedSpotLight(*m_registry, "GenerativeExterior_AuthoredMoonRim", glm::vec3(-5.5f, 5.2f, -3.8f), glm::vec3(0.5f, 0.75f, 0.8f), glm::vec3(0.38f, 0.50f, 1.0f), 4.4f, 18.0f, false);
+                    AddAssetLedPointLight(*m_registry, "GenerativeExterior_AuthoredColdWaterFill", glm::vec3(-2.4f, 0.68f, shoreZ - 1.8f), glm::vec3(0.20f, 0.34f, 0.92f), 1.4f, 7.5f);
+                    practicalLights += 4;
+                    lightingZones += 4;
+                } else {
+                    addModulePart("GenerativeExterior_AuthoredGenericHeroPad",
+                                  cubeMesh,
+                                  glm::vec3(0.0f, 0.050f, 1.35f),
+                                  glm::vec3(4.2f, 0.070f, 2.2f),
+                                  glm::vec3(0.0f, glm::radians(-7.0f), 0.0f),
+                                  darkBank);
+                    terrainSetpieces += 1;
+                    heroClusters += 2;
+                    compositionAnchors += 2;
+                    AddAssetLedSpotLight(*m_registry, "GenerativeExterior_AuthoredGenericRim", glm::vec3(-4.8f, 4.4f, -3.0f), glm::vec3(0.0f, 0.45f, 0.0f), glm::vec3(0.82f, 0.88f, 1.0f), 3.4f, 16.0f, false);
+                    practicalLights += 1;
+                    lightingZones += 2;
+                }
+
+                lightingZones = std::max(lightingZones, genExt.authoredSceneModule.lightingZoneCount);
+                materialFamilies = std::max(materialFamilies, genExt.authoredSceneModule.materialFamilyCount);
+                spdlog::info("generative_exterior: authored scene module module={} anchors={} terrain_setpieces={} hero_clusters={} foreground_frames={} backdrop_gates={} lighting_zones={} material_families={} water_segments={} practical_lights={}",
+                             module,
+                             compositionAnchors,
+                             terrainSetpieces,
+                             heroClusters,
+                             foregroundFrames,
+                             backdropGates,
+                             lightingZones,
+                             materialFamilies,
+                             waterSegments,
+                             practicalLights);
             }
         }
     }

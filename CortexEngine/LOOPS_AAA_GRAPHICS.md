@@ -599,6 +599,12 @@ Status: running
 
 ## Learnings
 
+- 2026-07-03 Loop 21 pivot: the previous composition/staging path was killed before implementation because it still optimized the existing scatter-based generator. The active loop now targets a structural source-authored scene-module overhaul: family-specific campsite lake, desert canyon river, and alpine cabin lake modules with cohesive setpieces and authored lighting. This loop must prove old Loop 20 artifacts fail a new module contract before runtime code is accepted.
+- Loop 21 source-authored module checkpoint:
+  - Red proof: Loop 20 campsite/desert/alpine artifacts fail `scene_graphics_gate.py` with `missing_authored_scene_module`.
+  - Implementation: `tools/scene_compiler.py` emits `graphics_pass.authored_scene_module`; `src/Core/Engine_Scenes.cpp` parses it, applies module-specific lighting, builds cohesive terrain/shore/backdrop/hero setpieces, and logs runtime receipts; `tools/scene_graphics_gate.py` requires the IR/runtime module evidence.
+  - Final green evidence: Release build `[OK] Build complete in 35.3s`; `aaa_module_campsite_loop21e`, `aaa_module_desert_loop21e`, and `aaa_module_alpine_loop21e` are VALID and pass quality, graphics, and Director validation gates; known-bad quality/graphics oracles still fail; kitchen smoke `regression_kitchen_aaa_loop21e` quality green.
+  - Visual residual: the module pass improves purple water, authored lighting, cabin moonlight/warm windows, and canyon/campsite composition, but the assets still read low-poly and kit-like. Next loop should attack source asset replacement/material shader integration, not add another overlay/detail metric.
 - Image metrics alone cannot certify AAA quality; this loop uses them only to catch obvious flat/blockout failures and relies on runtime evidence for deterministic features.
 - Generated validation renders now intentionally use SSAO/SSR/shadows instead of forced DXR. Re-enable DXR only behind a separate density/BLAS budget gate.
 - Objective graphics gates are green, but visual inspection still shows asset/shot-fidelity limits: low-poly tree silhouettes, generic canyon composition, and remaining stage-like flatness. This is the next asset-fidelity front, not a blocker for this graphics-pass checkpoint.

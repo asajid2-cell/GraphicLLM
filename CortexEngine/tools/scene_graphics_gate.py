@@ -279,6 +279,7 @@ def evaluate(prompt: str, ir: dict[str, Any], png: Path | None, log_text: str) -
     texture_material_fidelity = graphics.get("texture_material_fidelity") or {}
     source_geometry_fidelity = graphics.get("source_geometry_fidelity") or {}
     renderer_shadow_occlusion_budget = graphics.get("renderer_shadow_occlusion_budget") or {}
+    authored_scene_module = graphics.get("authored_scene_module") or {}
     image = _image_metrics(png)
 
     failures: list[dict[str, Any]] = []
@@ -710,6 +711,84 @@ def evaluate(prompt: str, ir: dict[str, Any], png: Path | None, log_text: str) -
                 renderer_shadow_occlusion_budget=renderer_shadow_occlusion_budget,
                 runtime_shadow_occlusion_budget=runtime_shadow_budget,
                 runtime_shadow_occlusion_budget_ok=runtime_shadow_budget_ok,
+            )
+
+        try:
+            module_id = str(authored_scene_module.get("module_id", "") or "")
+            composition_anchors = int(authored_scene_module.get("composition_anchor_count", 0) or 0)
+            terrain_setpieces = int(authored_scene_module.get("terrain_setpiece_count", 0) or 0)
+            hero_clusters = int(authored_scene_module.get("hero_cluster_count", 0) or 0)
+            foreground_frames = int(authored_scene_module.get("foreground_frame_count", 0) or 0)
+            backdrop_gates = int(authored_scene_module.get("backdrop_gate_count", 0) or 0)
+            lighting_zones = int(authored_scene_module.get("lighting_zone_count", 0) or 0)
+            material_families = int(authored_scene_module.get("material_family_count", 0) or 0)
+            water_shape_segments = int(authored_scene_module.get("water_shape_segment_count", 0) or 0)
+            practical_lights = int(authored_scene_module.get("practical_light_count", 0) or 0)
+        except Exception:
+            module_id = ""
+            composition_anchors = terrain_setpieces = hero_clusters = foreground_frames = 0
+            backdrop_gates = lighting_zones = material_families = water_shape_segments = practical_lights = 0
+        expected_modules = {
+            "campsite_lake_dawn",
+            "desert_canyon_river",
+            "alpine_cabin_lake",
+            "exterior_water_setpiece",
+            "exterior_landscape_setpiece",
+        }
+        has_runtime_authored_module = re.search(
+            r"generative_exterior: authored scene module module=([a-z0-9_]+) "
+            r"anchors=(\d+) terrain_setpieces=(\d+) hero_clusters=(\d+) "
+            r"foreground_frames=(\d+) backdrop_gates=(\d+) lighting_zones=(\d+) "
+            r"material_families=(\d+) water_segments=(\d+) practical_lights=(\d+)",
+            log_text,
+        )
+        runtime_module_ok = False
+        if has_runtime_authored_module:
+            runtime_module = has_runtime_authored_module.group(1)
+            runtime_counts = [int(v) for v in has_runtime_authored_module.groups()[1:]]
+            runtime_module_ok = (
+                runtime_module == module_id
+                and runtime_counts[0] >= 6
+                and runtime_counts[1] >= 4
+                and runtime_counts[2] >= 2
+                and runtime_counts[3] >= 3
+                and runtime_counts[4] >= 3
+                and runtime_counts[5] >= 2
+                and runtime_counts[6] >= 5
+                and (not flags["water"] or runtime_counts[7] >= 6)
+                and runtime_counts[8] >= (2 if (flags["campsite"] or "cabin" in prompt.lower()) else 1)
+            )
+        if (
+            not isinstance(authored_scene_module, dict)
+            or not bool(authored_scene_module.get("enabled"))
+            or module_id not in expected_modules
+            or composition_anchors < 6
+            or terrain_setpieces < 4
+            or hero_clusters < 2
+            or foreground_frames < 3
+            or backdrop_gates < 3
+            or lighting_zones < 2
+            or material_families < 5
+            or (flags["water"] and water_shape_segments < 6)
+            or ((flags["campsite"] or "cabin" in prompt.lower()) and practical_lights < 2)
+            or not runtime_module_ok
+        ):
+            fail(
+                "missing_authored_scene_module",
+                "Generated exterior lacks a cohesive source-authored scene module with foreground/midground/backdrop composition and authored lighting",
+                authored_scene_module=authored_scene_module,
+                module_id=module_id,
+                composition_anchor_count=composition_anchors,
+                terrain_setpiece_count=terrain_setpieces,
+                hero_cluster_count=hero_clusters,
+                foreground_frame_count=foreground_frames,
+                backdrop_gate_count=backdrop_gates,
+                lighting_zone_count=lighting_zones,
+                material_family_count=material_families,
+                water_shape_segment_count=water_shape_segments,
+                practical_light_count=practical_lights,
+                runtime_authored_scene_module=has_runtime_authored_module.group(0) if has_runtime_authored_module else None,
+                runtime_authored_scene_module_ok=runtime_module_ok,
             )
 
         if flags["moonlight"] or "storm" in prompt.lower():

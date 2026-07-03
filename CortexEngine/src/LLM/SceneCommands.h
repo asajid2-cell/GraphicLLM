@@ -68,6 +68,8 @@ struct AddEntityCommand : public SceneCommand {
     float anisotropy = 0.0f;
     float wetness = 0.0f;
     float proceduralMask = 0.0f;
+    float normalScaleOverride = -1.0f;
+    float specularFactorOverride = -1.0f;
     bool hasPreset = false;
     // Classify the entity's scene-material class (for class-gated features such as
     // SSS / reflection-ownership) WITHOUT overriding its glTF albedo/PBR. Use this for

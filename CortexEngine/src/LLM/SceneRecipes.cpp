@@ -311,6 +311,44 @@ void ApplyMaterialLayers(AddEntityCommand& cmd, const MaterialLayerResponse& lay
     cmd.proceduralMask = layers.proceduralMask;
 }
 
+void ApplyIrMaterialOverride(AddEntityCommand& cmd, const nlohmann::json& material) {
+    if (!material.is_object()) {
+        return;
+    }
+
+    auto num = [](const nlohmann::json& j, const char* k, float d) -> float {
+        return (j.contains(k) && j[k].is_number()) ? static_cast<float>(j[k].get<double>()) : d;
+    };
+    auto sat = [&](const char* k, float d) {
+        return std::clamp(num(material, k, d), 0.0f, 1.0f);
+    };
+
+    const std::string preset = material.value("preset", std::string());
+    if (!preset.empty() && preset != "naturalistic") {
+        cmd.presetName = preset;
+        const std::string p = ToLower(preset);
+        const bool softClass = (p == "fabric" || p == "wood" || p == "foliage");
+        cmd.classifyOnly = softClass;
+        cmd.hasPreset = !softClass;
+    }
+
+    cmd.roughness = sat("roughness", cmd.roughness);
+    cmd.ao = sat("ao", cmd.ao);
+    cmd.wetness = sat("wetness", cmd.wetness);
+    cmd.proceduralMask = std::max(cmd.proceduralMask, sat("procedural_mask", cmd.proceduralMask));
+    if (material.contains("normal_scale") && material["normal_scale"].is_number()) {
+        cmd.normalScaleOverride = std::clamp(num(material, "normal_scale", 1.0f), 0.0f, 2.0f);
+    }
+    if (material.contains("specular") && material["specular"].is_number()) {
+        cmd.specularFactorOverride = std::clamp(num(material, "specular", 1.0f), 0.0f, 2.0f);
+    }
+    cmd.clearcoat = std::max(cmd.clearcoat, sat("clearcoat", cmd.clearcoat));
+    cmd.clearcoatRoughness = sat("clearcoat_roughness", cmd.clearcoatRoughness);
+    cmd.sheen = std::max(cmd.sheen, sat("sheen", cmd.sheen));
+    cmd.subsurface = std::max(cmd.subsurface, sat("subsurface", cmd.subsurface));
+    cmd.anisotropy = std::max(cmd.anisotropy, sat("anisotropy", cmd.anisotropy));
+}
+
 // Emit one real catalog asset, normalized so its largest horizontal extent ~=
 // targetFootprint meters, placed at (x,0,z), yawed yawDeg about Y, ground-snapped
 // by the executor. Returns false (and emits nothing) if the asset can't resolve.
@@ -1243,7 +1281,15 @@ void BuildGenerativeExterior(std::vector<std::shared_ptr<SceneCommand>>& out, co
         const float foot = std::clamp(num(o, "foot", 1.0f), 0.15f, 9.0f); // trees run big
         const float baseY = std::clamp(num(o, "y", 0.0f), -2.4f, 3.0f);  // <0 = on the seabed
         const glm::vec4 tint = o.contains("tint") ? readVec4(o["tint"], glm::vec4(1.0f)) : glm::vec4(1.0f);
-        if (Place(out, cat, c, asset, foot, x, z, yaw, tint, baseY)) placed++; else skipped++;
+        if (Place(out, cat, c, asset, foot, x, z, yaw, tint, baseY)) {
+            if (!out.empty() && out.back() && out.back()->type == CommandType::AddEntity) {
+                auto add = std::static_pointer_cast<AddEntityCommand>(out.back());
+                ApplyIrMaterialOverride(*add, o.value("material", nlohmann::json::object()));
+            }
+            placed++;
+        } else {
+            skipped++;
+        }
     }
 
     int lightCount = 0;

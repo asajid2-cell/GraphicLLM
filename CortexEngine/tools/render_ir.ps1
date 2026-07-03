@@ -37,6 +37,16 @@ $env:CORTEX_HEADLESS = "1"
 $env:CORTEX_SHOWCASE = "1"               # showcase lighting (sun/window/fog) + hero camera + 1.5x SSAA
 if ($Night) { $env:CORTEX_SHOWCASE_NIGHT = "1" } else { Remove-Item Env:CORTEX_SHOWCASE_NIGHT -ErrorAction SilentlyContinue }
 if ($Fast) { $env:CORTEX_RENDER_SCALE = "1.0" } else { Remove-Item Env:CORTEX_RENDER_SCALE -ErrorAction SilentlyContinue }
+# Generated IR captures can contain dozens of dense imported meshes plus procedural
+# terrain. The validation-capture path otherwise forces DXR for every run, which
+# makes BLAS construction the first-frame bottleneck and has caused fence timeouts
+# on dense exteriors. Keep SSAO/SSR/shadows on by default; opt into generated DXR
+# explicitly when that path has its own scene-density budget.
+if ($env:CORTEX_ENABLE_GENERATIVE_DXR -and $env:CORTEX_ENABLE_GENERATIVE_DXR -ne "0") {
+    Remove-Item Env:CORTEX_DISABLE_RT -ErrorAction SilentlyContinue
+} else {
+    $env:CORTEX_DISABLE_RT = "1"
+}
 # Yield to the desktop, don't sacrifice quality: background GPU scheduling + gentle
 # frame pacing keep the system responsive during full-SSAA captures.
 $env:CORTEX_LOW_GPU_PRIORITY = "1"

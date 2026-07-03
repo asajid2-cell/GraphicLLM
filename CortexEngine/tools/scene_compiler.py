@@ -66,6 +66,102 @@ def _add(objects: list[dict[str, Any]], asset: str, x: float, z: float, yaw: flo
     return True
 
 
+def _material_for_asset(asset: str, desert: bool, moonlight: bool) -> dict[str, Any]:
+    low = asset.lower()
+    if any(t in low for t in ("tree", "grass", "pine", "plant")):
+        return {
+            "preset": "foliage",
+            "roughness": 0.68 if moonlight else 0.62,
+            "normal_scale": 0.42,
+            "procedural_mask": 0.34,
+            "wetness": 0.12 if not desert else 0.03,
+            "specular": 0.50,
+        }
+    if any(t in low for t in ("rock", "boulder", "stone")):
+        return {
+            "preset": "wet_stone" if not desert else "stone",
+            "roughness": 0.54 if not desert else 0.76,
+            "normal_scale": 0.62,
+            "procedural_mask": 0.48,
+            "wetness": 0.36 if not desert else 0.08,
+            "specular": 0.74 if not desert else 0.48,
+        }
+    if any(t in low for t in ("log", "trunk", "wood")):
+        return {
+            "preset": "wood",
+            "roughness": 0.58,
+            "normal_scale": 0.48,
+            "procedural_mask": 0.46,
+            "wetness": 0.16,
+            "specular": 0.54,
+        }
+    if "tent" in low:
+        return {
+            "preset": "fabric",
+            "roughness": 0.72,
+            "normal_scale": 0.36,
+            "procedural_mask": 0.30,
+            "wetness": 0.08,
+            "specular": 0.38,
+        }
+    return {
+        "preset": "naturalistic",
+        "roughness": 0.70,
+        "normal_scale": 0.34,
+        "procedural_mask": 0.24,
+        "wetness": 0.06,
+        "specular": 0.42,
+    }
+
+
+def _attach_materials(objects: list[dict[str, Any]], desert: bool, moonlight: bool) -> None:
+    for obj in objects:
+        obj["material"] = _material_for_asset(str(obj.get("asset") or ""), desert, moonlight)
+
+
+def _contact_patches(objects: list[dict[str, Any]], water_from_z: float, limit: int = 12) -> list[dict[str, Any]]:
+    patches: list[dict[str, Any]] = []
+    tree_count = 0
+    for obj in objects:
+        asset = str(obj.get("asset") or "").lower()
+        is_grass = "grass" in asset or "plant" in asset
+        is_tree = "tree_" in asset or "pine" in asset
+        if is_grass:
+            continue
+        if is_tree:
+            tree_count += 1
+            if tree_count > 2:
+                continue
+        try:
+            x = float(obj.get("x", 0.0))
+            z = float(obj.get("z", 0.0))
+            foot = float(obj.get("foot", 1.0))
+        except Exception:
+            continue
+        if "tent" in asset:
+            radius_scale = 0.46
+        elif any(t in asset for t in ("rock", "boulder", "stone")):
+            radius_scale = 0.40
+        elif any(t in asset for t in ("log", "trunk", "wood")):
+            radius_scale = 0.42
+        elif is_tree:
+            radius_scale = 0.32
+        else:
+            radius_scale = 0.45
+        radius = _clamp(foot * radius_scale, 0.28, 1.45)
+        near_shore = abs(z - water_from_z) <= 2.6 or z < water_from_z + 1.4
+        patches.append({
+            "x": _round3(x),
+            "z": _round3(z),
+            "radius": _round3(radius),
+            "darkness": 0.38 if near_shore else 0.28,
+            "wetness": 0.56 if near_shore else 0.24,
+        })
+        if len(patches) >= limit:
+            break
+    return patches
+
+
 def _scatter_ring(objects: list[dict[str, Any]], asset: str, count: int, radius_x: float, z_base: float,
                   z_jitter: float, foot: float, seed: str, tint: list[float] | None = None,
                   sides: bool = True, placed: list[tuple[float, float, float]] | None = None) -> None:
@@ -159,6 +255,13 @@ def compile_v3_to_v2(v3: dict[str, Any]) -> dict[str, Any]:
             "kind": ground_kind,
             "extent": extent,
             "color": ground_color,
+            "terrain": {
+                "mode": "heightfield",
+                "grid": 72,
+                "relief_m": 0.42 if not desert else 0.30,
+                "micro_relief_m": 0.075 if not desert else 0.045,
+                "shore_flatten_m": 5.5,
+            },
         },
         "water": {
             "enabled": bool(water_on),
@@ -180,6 +283,7 @@ def compile_v3_to_v2(v3: dict[str, Any]) -> dict[str, Any]:
             "intent": "procedural_ridge_backdrop",
         },
         "structures": [],
+        "graphics_pass": {},
     }
 
     objects: list[dict[str, Any]] = []
@@ -230,6 +334,38 @@ def compile_v3_to_v2(v3: dict[str, Any]) -> dict[str, Any]:
 
     if waterbody.get("type") == "lake" and not desert:
         _add(objects, "canoe", -5.2, -5.9, 16.0, 2.7, placed=placed)
+
+    _attach_materials(objects, desert=desert, moonlight=moonlight)
+    contact_patches = _contact_patches(objects, water_from_z)
+    env["graphics_pass"] = {
+        "version": 1,
+        "terrain": {
+            "heightfield": True,
+            "relief_m": env["ground"]["terrain"]["relief_m"],
+            "shore_integrated": bool(water_on),
+        },
+        "contact": {
+            "decal_count": len(contact_patches),
+            "shore_layer_count": 2 if water_on else 0,
+            "patches": contact_patches,
+        },
+        "materials": {
+            "enabled": True,
+            "ground_normal_scale": 0.82 if not desert else 0.68,
+            "ground_wetness": 0.30 if water_on and not desert else 0.10,
+            "procedural_mask": 0.42 if not desert else 0.28,
+            "roughness": 0.84,
+        },
+        "renderer": {
+            "ssao": True,
+            "ssr": True,
+            "shadows": True,
+            "ssao_radius": 1.10,
+            "ssao_intensity": 2.35 if not moonlight else 2.05,
+            "shadow_pcf_radius": 2.20,
+            "shadow_bias": 0.0024,
+        },
+    }
 
     lights = []
     for practical in lighting.get("practicals", []) or []:

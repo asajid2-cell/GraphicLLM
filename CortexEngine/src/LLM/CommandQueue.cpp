@@ -719,6 +719,12 @@ void CommandQueue::ExecuteAddEntity(AddEntityCommand* cmd, Scene::ECS_Registry* 
         }
         renderable.textures.emissivePath = embeddedMaterial->emissivePath;
     }
+    if (cmd->normalScaleOverride >= 0.0f) {
+        renderable.normalScale = std::clamp(cmd->normalScaleOverride, 0.0f, 2.0f);
+    }
+    if (cmd->specularFactorOverride >= 0.0f) {
+        renderable.specularFactor = std::clamp(cmd->specularFactorOverride, 0.0f, 2.0f);
+    }
     renderable.textures.albedo = renderer->GetPlaceholderTexture();
     renderable.textures.normal = renderer->GetPlaceholderNormal();
     renderable.textures.metallic = renderer->GetPlaceholderMetallic();

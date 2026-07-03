@@ -104,6 +104,104 @@ namespace {
         bool litWindows = true;
     };
 
+    struct GenerativeContactPatch {
+        glm::vec2 position{0.0f, 0.0f};
+        float radius = 0.8f;
+        float darkness = 0.28f;
+        float wetness = 0.24f;
+    };
+
+    float GenerativeTerrainNoise(float x, float z, float phase) {
+        const float a = std::sin(x * 0.33f + z * 0.17f + phase) * 0.48f;
+        const float b = std::sin(x * 0.91f - z * 0.27f + phase * 1.73f) * 0.22f;
+        const float c = std::sin((x + z) * 1.77f + phase * 0.41f) * 0.08f;
+        return a + b + c;
+    }
+
+    float GenerativeTerrainHeight(float worldX,
+                                  float worldZ,
+                                  float relief,
+                                  float microRelief,
+                                  float shoreZ,
+                                  bool waterOn) {
+        const float heroDist = glm::length(glm::vec2(worldX, worldZ - 1.15f));
+        const float heroFlatten = std::clamp((heroDist - 2.8f) / 8.0f, 0.0f, 1.0f);
+        const float shoreDist = waterOn ? std::abs(worldZ - shoreZ) : 99.0f;
+        const float shoreFlatten = waterOn ? std::clamp((shoreDist - 0.8f) / 5.5f, 0.0f, 1.0f) : 1.0f;
+        const float depthBias = std::clamp((worldZ + 1.5f) / 16.0f, -0.35f, 0.65f);
+        const float macro = GenerativeTerrainNoise(worldX, worldZ, 2.37f) * relief;
+        const float micro = GenerativeTerrainNoise(worldX * 2.7f, worldZ * 2.7f, 8.13f) * microRelief;
+        const float mask = std::max(0.16f, heroFlatten) * std::max(0.20f, shoreFlatten);
+        return std::clamp((macro + micro) * mask + depthBias * 0.055f, -0.10f, relief * 1.25f);
+    }
+
+    std::shared_ptr<Scene::MeshData> CreateGenerativeTerrainMesh(float width,
+                                                                 float length,
+                                                                 float centerZ,
+                                                                 float relief,
+                                                                 float microRelief,
+                                                                 float shoreZ,
+                                                                 bool waterOn,
+                                                                 uint32_t gridDim) {
+        auto mesh = std::make_shared<Scene::MeshData>();
+        mesh->kind = Scene::MeshKind::Procedural;
+        gridDim = std::clamp(gridDim, 16u, 128u);
+
+        const uint32_t verts = gridDim + 1u;
+        const float halfW = width * 0.5f;
+        const float halfL = length * 0.5f;
+        mesh->positions.reserve(verts * verts);
+        mesh->normals.resize(verts * verts, glm::vec3(0.0f, 1.0f, 0.0f));
+        mesh->texCoords.reserve(verts * verts);
+
+        auto idx = [verts](uint32_t x, uint32_t z) { return z * verts + x; };
+        for (uint32_t iz = 0; iz <= gridDim; ++iz) {
+            const float vz = static_cast<float>(iz) / static_cast<float>(gridDim);
+            const float localZ = halfL - vz * length;
+            const float worldZ = centerZ + localZ;
+            for (uint32_t ix = 0; ix <= gridDim; ++ix) {
+                const float vx = static_cast<float>(ix) / static_cast<float>(gridDim);
+                const float localX = -halfW + vx * width;
+                const float y = GenerativeTerrainHeight(localX, worldZ, relief, microRelief, shoreZ, waterOn);
+                mesh->positions.emplace_back(localX, y, localZ);
+                mesh->texCoords.emplace_back(vx, vz);
+            }
+        }
+
+        for (uint32_t iz = 0; iz <= gridDim; ++iz) {
+            for (uint32_t ix = 0; ix <= gridDim; ++ix) {
+                const uint32_t xl = ix > 0 ? ix - 1u : ix;
+                const uint32_t xr = ix < gridDim ? ix + 1u : ix;
+                const uint32_t zd = iz > 0 ? iz - 1u : iz;
+                const uint32_t zu = iz < gridDim ? iz + 1u : iz;
+                const glm::vec3 dx = mesh->positions[idx(xr, iz)] - mesh->positions[idx(xl, iz)];
+                const glm::vec3 dz = mesh->positions[idx(ix, zd)] - mesh->positions[idx(ix, zu)];
+                glm::vec3 n = glm::cross(dx, dz);
+                if (glm::length(n) < 1e-5f) {
+                    n = glm::vec3(0.0f, 1.0f, 0.0f);
+                } else {
+                    n = glm::normalize(n);
+                    if (n.y < 0.0f) {
+                        n = -n;
+                    }
+                }
+                mesh->normals[idx(ix, iz)] = n;
+            }
+        }
+
+        for (uint32_t iz = 0; iz < gridDim; ++iz) {
+            for (uint32_t ix = 0; ix < gridDim; ++ix) {
+                const uint32_t a = idx(ix, iz);
+                const uint32_t b = idx(ix + 1u, iz);
+                const uint32_t c = idx(ix, iz + 1u);
+                const uint32_t d = idx(ix + 1u, iz + 1u);
+                mesh->indices.insert(mesh->indices.end(), {a, b, d, a, d, c});
+            }
+        }
+        mesh->UpdateBounds();
+        return mesh;
+    }
+
     std::shared_ptr<Scene::MeshData> CreateGenerativeRidgeMesh(float width,
                                                                float height,
                                                                float baseY,
@@ -2981,11 +3079,27 @@ void Engine::BuildRecipeScene() {
         std::string groundKind = "grass";
         glm::vec3 groundColor{0.24f, 0.34f, 0.16f};
         bool groundColorSet = false;
+        bool terrainHeightfield = false;
+        float terrainRelief = 0.0f;
+        float terrainMicroRelief = 0.0f;
+        uint32_t terrainGrid = 48;
+        bool graphicsMaterials = false;
+        float groundNormalScale = 0.75f;
+        float groundWetness = 0.0f;
+        float groundProceduralMask = 0.20f;
+        float groundRoughness = 0.92f;
+        float graphicsSSAORadius = 0.75f;
+        float graphicsSSAOBias = 0.018f;
+        float graphicsSSAOIntensity = 1.35f;
+        float graphicsShadowBias = 0.0035f;
+        float graphicsShadowPCF = 2.5f;
         std::string skyPreset;   // optional IR override: sky_day | sky_sunset | sky_partly_cloudy
         std::string lookTime;
         std::string lookGrade;
         std::vector<GenerativeRidgeLayer> ridgeLayers;
         std::vector<GenerativeStructure> structures;
+        std::vector<GenerativeContactPatch> contactPatches;
+        int shoreLayerCount = 0;
     } genExt;
     if (recipe == "generative_exterior") {
         if (const char* raw = std::getenv("CORTEX_SCENE_IR_JSON"); raw && *raw) {
@@ -3019,6 +3133,12 @@ void Engine::BuildRecipeScene() {
                     genExt.groundColor = vec3Of(ground, "color", genExt.groundColor);
                     genExt.groundColorSet = true;
                 }
+                const nlohmann::json terrain = ground.value("terrain", nlohmann::json::object());
+                genExt.terrainHeightfield = terrain.value("mode", std::string()) == "heightfield";
+                genExt.terrainRelief = std::clamp(num(terrain, "relief_m", genExt.terrainRelief), 0.0f, 1.4f);
+                genExt.terrainMicroRelief = std::clamp(num(terrain, "micro_relief_m", genExt.terrainMicroRelief), 0.0f, 0.25f);
+                genExt.terrainGrid = static_cast<uint32_t>(std::clamp(num(terrain, "grid", static_cast<float>(genExt.terrainGrid)),
+                                                                       16.0f, 128.0f));
                 const nlohmann::json water = env.value("water", nlohmann::json::object());
                 genExt.waterOn = water.value("enabled", false);
                 genExt.waterLevel = std::clamp(num(water, "level", genExt.waterLevel), 0.02f, 0.4f);
@@ -3034,6 +3154,35 @@ void Engine::BuildRecipeScene() {
                 genExt.waterColorStrength = std::clamp(num(water, "color_strength", genExt.waterColorStrength), 0.0f, 1.0f);
                 genExt.waterShallow = vec3Of(water, "shallow", genExt.waterShallow);
                 genExt.waterDeep = vec3Of(water, "deep", genExt.waterDeep);
+                const nlohmann::json graphics = env.value("graphics_pass", nlohmann::json::object());
+                const nlohmann::json graphicsMaterials = graphics.value("materials", nlohmann::json::object());
+                genExt.graphicsMaterials = graphicsMaterials.value("enabled", false);
+                genExt.groundNormalScale = std::clamp(num(graphicsMaterials, "ground_normal_scale", genExt.groundNormalScale), 0.0f, 1.5f);
+                genExt.groundWetness = std::clamp(num(graphicsMaterials, "ground_wetness", genExt.groundWetness), 0.0f, 1.0f);
+                genExt.groundProceduralMask = std::clamp(num(graphicsMaterials, "procedural_mask", genExt.groundProceduralMask), 0.0f, 1.0f);
+                genExt.groundRoughness = std::clamp(num(graphicsMaterials, "roughness", genExt.groundRoughness), 0.15f, 1.0f);
+                const nlohmann::json graphicsRenderer = graphics.value("renderer", nlohmann::json::object());
+                genExt.graphicsSSAORadius = std::clamp(num(graphicsRenderer, "ssao_radius", genExt.graphicsSSAORadius), 0.20f, 2.5f);
+                genExt.graphicsSSAOIntensity = std::clamp(num(graphicsRenderer, "ssao_intensity", genExt.graphicsSSAOIntensity), 0.5f, 4.5f);
+                genExt.graphicsShadowBias = std::clamp(num(graphicsRenderer, "shadow_bias", genExt.graphicsShadowBias), 0.0003f, 0.010f);
+                genExt.graphicsShadowPCF = std::clamp(num(graphicsRenderer, "shadow_pcf_radius", genExt.graphicsShadowPCF), 0.25f, 5.0f);
+                const nlohmann::json contact = graphics.value("contact", nlohmann::json::object());
+                genExt.shoreLayerCount = static_cast<int>(std::clamp(num(contact, "shore_layer_count", 0.0f), 0.0f, 8.0f));
+                for (const auto& patchJson : contact.value("patches", nlohmann::json::array())) {
+                    if (!patchJson.is_object()) {
+                        continue;
+                    }
+                    GenerativeContactPatch patch{};
+                    patch.position.x = std::clamp(num(patchJson, "x", 0.0f), -genExt.extent * 0.55f, genExt.extent * 0.55f);
+                    patch.position.y = std::clamp(num(patchJson, "z", 0.0f), -genExt.extent * 0.6f, genExt.extent * 0.35f);
+                    patch.radius = std::clamp(num(patchJson, "radius", patch.radius), 0.2f, 3.2f);
+                    patch.darkness = std::clamp(num(patchJson, "darkness", patch.darkness), 0.0f, 1.0f);
+                    patch.wetness = std::clamp(num(patchJson, "wetness", patch.wetness), 0.0f, 1.0f);
+                    genExt.contactPatches.push_back(patch);
+                    if (genExt.contactPatches.size() >= 40) {
+                        break;
+                    }
+                }
                 const nlohmann::json background = env.value("background", nlohmann::json::object());
                 const nlohmann::json ridgeLayers = background.value("ridge_layers", nlohmann::json::array());
                 for (const auto& layer : ridgeLayers) {
@@ -3251,6 +3400,19 @@ void Engine::BuildRecipeScene() {
             // adjusts via CORTEX_AUTOEXPOSURE_MULT.
             renderer->SetAutoExposureEnabled(false);
             renderer->SetExposure(std::clamp((moonlightLook ? 0.98f : 0.80f) * genExt.exposure, 0.35f, 1.45f));
+            renderer->SetSSAOEnabled(true);
+            renderer->SetSSAOParams(genExt.graphicsSSAORadius,
+                                    genExt.graphicsSSAOBias,
+                                    genExt.graphicsSSAOIntensity);
+            renderer->SetSSREnabled(true);
+            renderer->SetSSRParams(48.0f, 0.18f, 0.66f);
+            renderer->SetShadowsEnabled(true);
+            renderer->SetShadowBias(genExt.graphicsShadowBias);
+            renderer->SetShadowPCFRadius(genExt.graphicsShadowPCF);
+            spdlog::info("generative_exterior: graphics renderer quality ssao_radius={:.2f} ssao_intensity={:.2f} shadow_pcf={:.2f} ssr=on shadows=on",
+                         genExt.graphicsSSAORadius,
+                         genExt.graphicsSSAOIntensity,
+                         genExt.graphicsShadowPCF);
             if (genExt.waterOn) {
                 renderer->SetWaterParams(genExt.waterLevel, genExt.waterWave, 9.5f, 0.42f,
                                          0.12f, 0.92f, 0.020f, 0.44f); // gentle swell rolling toward the shore (+Z)
@@ -3298,7 +3460,16 @@ void Engine::BuildRecipeScene() {
             // edge, so the water gains real depth with distance -- shallow green at the
             // shore, deep tint further out -- instead of a uniform 5 cm film over sand.
             const float landLen = groundNear - shoreZ;
-            auto groundPlane = Utils::MeshGenerator::CreatePlane(groundW, landLen);
+            auto groundPlane = genExt.terrainHeightfield
+                ? CreateGenerativeTerrainMesh(groundW,
+                                              landLen,
+                                              (groundNear + shoreZ) * 0.5f,
+                                              genExt.terrainRelief,
+                                              genExt.terrainMicroRelief,
+                                              shoreZ,
+                                              genExt.waterOn,
+                                              genExt.terrainGrid)
+                : Utils::MeshGenerator::CreatePlane(groundW, landLen);
             const float uvTile = genExt.extent / 2.5f;
             for (auto& uv : groundPlane->texCoords) {
                 uv *= glm::vec2(uvTile, uvTile * (landLen / groundW));
@@ -3314,10 +3485,14 @@ void Engine::BuildRecipeScene() {
             auto dressGround = [&](Scene::RenderableComponent& r) {
                 r.albedoColor = glm::vec4(gcol, 1.0f);
                 r.metallic = 0.0f;
-                r.roughness = 0.92f;
+                r.roughness = genExt.graphicsMaterials ? genExt.groundRoughness : 0.92f;
                 r.ao = 1.0f;
                 r.doubleSided = true;
                 r.presetName = genExt.groundKind == "sand" ? "sand" : "naturalistic";
+                r.normalScale = genExt.graphicsMaterials ? genExt.groundNormalScale : r.normalScale;
+                r.wetnessFactor = genExt.graphicsMaterials ? genExt.groundWetness : r.wetnessFactor;
+                r.proceduralMaskStrength = genExt.graphicsMaterials ? genExt.groundProceduralMask : r.proceduralMaskStrength;
+                r.specularFactor = genExt.graphicsMaterials ? 0.72f : r.specularFactor;
                 // Explicitly requested SATURATED ground colours ("red sand") must
                 // actually paint the terrain: tint weight scales with how far the
                 // colour sits from neutral, so natural palettes stay texture-led.
@@ -3352,6 +3527,12 @@ void Engine::BuildRecipeScene() {
                 auto& r = m_registry->AddComponent<Scene::RenderableComponent>(groundE);
                 r.mesh = groundPlane;
                 dressGround(r);
+                if (genExt.terrainHeightfield) {
+                    spdlog::info("generative_exterior: created procedural terrain heightfield grid={} relief={:.2f} micro={:.2f}",
+                                 genExt.terrainGrid,
+                                 genExt.terrainRelief,
+                                 genExt.terrainMicroRelief);
+                }
             }
             if (genExt.waterOn) {
                 // The seabed: a gently tilted plane running from the shoreline (y=0)
@@ -3376,6 +3557,89 @@ void Engine::BuildRecipeScene() {
                     r.mesh = seabedPlane;
                     dressGround(r);
                 }
+            }
+            if (genExt.graphicsMaterials && genExt.waterOn && genExt.shoreLayerCount > 0) {
+                int shoreLayers = 0;
+                const float bandWidths[] = {0.62f, 0.26f};
+                const glm::vec4 bandColors[] = {
+                    glm::vec4(glm::max(gcol * 0.34f, glm::vec3(0.020f)), 0.34f),
+                    glm::vec4(glm::mix(genExt.waterShallow, glm::vec3(0.55f, 0.58f, 0.62f), 0.30f), 0.18f),
+                };
+                for (int i = 0; i < std::min(genExt.shoreLayerCount, 2); ++i) {
+                    auto shoreMesh = Utils::MeshGenerator::CreatePlane(groundW, bandWidths[i]);
+                    auto upShore = renderer->UploadMesh(shoreMesh);
+                    if (upShore.IsErr()) {
+                        spdlog::warn("generative_exterior: shore layer mesh upload failed: {}", upShore.Error());
+                        continue;
+                    }
+                    entt::entity shore = m_registry->CreateEntity();
+                    m_registry->AddComponent<Scene::TagComponent>(
+                        shore, "GenerativeExterior_ShoreGrounding" + std::to_string(i));
+                    auto& t = m_registry->AddComponent<TransformComponent>(shore);
+                    t.position = glm::vec3(0.0f, 0.026f + i * 0.006f, shoreZ + 0.32f + i * 0.40f);
+                    auto& r = m_registry->AddComponent<Scene::RenderableComponent>(shore);
+                    r.mesh = shoreMesh;
+                    r.albedoColor = bandColors[i];
+                    r.metallic = 0.0f;
+                    r.roughness = i == 0 ? 0.78f : 0.86f;
+                    r.ao = 0.72f;
+                    r.normalScale = 0.22f;
+                    r.wetnessFactor = i == 0 ? 0.28f : 0.10f;
+                    r.proceduralMaskStrength = 0.16f;
+                    r.specularFactor = i == 0 ? 0.20f : 0.12f;
+                    r.doubleSided = true;
+                    r.alphaMode = Scene::RenderableComponent::AlphaMode::Blend;
+                    r.renderLayer = Scene::RenderableComponent::RenderLayer::Overlay;
+                    r.presetName = "naturalistic";
+                    shoreLayers++;
+                }
+                if (shoreLayers > 0) {
+                    spdlog::info("generative_exterior: created {} shore grounding layer(s)", shoreLayers);
+                }
+            }
+            if (genExt.graphicsMaterials && !genExt.contactPatches.empty()) {
+                auto contactMesh = Utils::MeshGenerator::CreateDisk(1.0f, 36);
+                auto upContact = renderer->UploadMesh(contactMesh);
+                if (upContact.IsErr()) {
+                    spdlog::warn("generative_exterior: contact patch mesh upload failed: {}", upContact.Error());
+                } else {
+                    int contactCount = 0;
+                    for (const auto& patch : genExt.contactPatches) {
+                        entt::entity contact = m_registry->CreateEntity();
+                        m_registry->AddComponent<Scene::TagComponent>(
+                            contact, "GenerativeExterior_ContactGrounding" + std::to_string(contactCount));
+                        auto& t = m_registry->AddComponent<TransformComponent>(contact);
+                        t.position = glm::vec3(patch.position.x,
+                                               0.018f + static_cast<float>(contactCount % 5) * 0.0015f,
+                                               patch.position.y);
+                        const float squash = 0.56f + 0.18f * std::sin(patch.position.x * 1.7f + patch.position.y * 0.6f);
+                        t.scale = glm::vec3(patch.radius * 0.78f, 1.0f, patch.radius * squash * 0.78f);
+                        auto& r = m_registry->AddComponent<Scene::RenderableComponent>(contact);
+                        r.mesh = contactMesh;
+                        const glm::vec3 dark = glm::max(gcol * (1.0f - patch.darkness * 0.82f), glm::vec3(0.014f));
+                        r.albedoColor = glm::vec4(dark, 0.24f);
+                        r.metallic = 0.0f;
+                        r.roughness = 0.88f;
+                        r.ao = 0.64f;
+                        r.normalScale = 0.12f;
+                        r.wetnessFactor = patch.wetness * 0.42f;
+                        r.proceduralMaskStrength = 0.10f;
+                        r.specularFactor = 0.16f;
+                        r.doubleSided = true;
+                        r.alphaMode = Scene::RenderableComponent::AlphaMode::Blend;
+                        r.renderLayer = Scene::RenderableComponent::RenderLayer::Overlay;
+                        r.presetName = "naturalistic";
+                        contactCount++;
+                    }
+                    spdlog::info("generative_exterior: created contact grounding {} patch(es)", contactCount);
+                }
+            }
+            if (genExt.graphicsMaterials) {
+                spdlog::info("generative_exterior: graphics material pass ground_normal={:.2f} ground_wetness={:.2f} procedural={:.2f} contacts={}",
+                             genExt.groundNormalScale,
+                             genExt.groundWetness,
+                             genExt.groundProceduralMask,
+                             genExt.contactPatches.size());
             }
         }
     }

@@ -422,6 +422,28 @@ Escape: if true renderer-level controls cannot be isolated without enabling unsa
 
 Status: done
 
+### Loop 21: Composition And Staging Fidelity
+
+Invariant: generated exteriors must stage prompt-critical hero elements as a coherent authored scene rather than a metric-passing scatter of repeated props, disconnected planks/logs, and generic pink camp/cabin kits.
+
+Scope:
+
+- in: `tools/scene_graphics_gate.py`, `tools/scene_compiler.py`, `src/Core/Engine_Scenes.cpp`, focused generated-exterior staging/material placement.
+- out: weakening semantic/color gates, forced DXR defaults, unrelated interiors, broad asset-ingest rewrites.
+
+Verifier:
+
+- Current Loop 20 campsite/desert/alpine artifacts fail the strengthened graphics gate with a new composition/staging fidelity failure.
+- New campsite/desert/alpine prompts render VALID and pass quality + graphics gates.
+- Runtime logs prove prompt-aware hero staging, clutter suppression, and palette/material staging reached the generated-exterior runtime path.
+- Release build, Python compile, Director IR validation, known-bad oracles, and kitchen smoke remain green.
+
+Exit: all verifier commands green, artifacts/logs recorded, heartbeat rearmed or retired deliberately, and checkpoint committed.
+
+Escape: if image-level clutter metrics are too brittle, keep them as supporting diagnostics and require IR/runtime evidence plus visual artifact inspection; do not hide disconnected staging by weakening color/quality gates.
+
+Status: running
+
 ## Progress Log
 
 2026-07-03:
@@ -493,6 +515,7 @@ Status: done
 - Loop 20 visual/regression notes:
   - Renderer-level SSAO/shadow settings are now separately contract-gated and runtime-readback verified. This is still a bounded SSAO/shadow-map/contact budget, not forced DXR/RT; final AAA quality remains `HUMAN-GATE`.
   - Remaining `HUMAN-GATE` gap: scene planning and asset staging still read kit-like in places. The next high-leverage front should target generated-scene asset planning/composition quality or terrain/water/backdrop fidelity, not another generic receipt.
+- Loop 21 opened after visual inspection of Loop 20 outputs. Local-loop check: the next blocker is disconnected staging and repeated generic kits, not another renderer telemetry receipt. Retired `aaa-loop20`; heartbeat proof `aaa-loop21-proof` fired by timeout after 1s, and `aaa-loop21` is armed with PID `74184`. Next action: strengthen the graphics gate so Loop 20 artifacts fail a prompt-aware composition/staging fidelity requirement, then implement targeted compiler/runtime staging cleanup.
 - Loop 17 opened after Loop 16 visual inspection and user pushback: the next hard ceiling is source/hero/environment geometry fidelity rather than more overlay layers. Heartbeat proof `aaa-graphics-loop17-proof` fired by timeout after 1s.
 - Loop 17 red proof:
   - Strengthened `tools\scene_graphics_gate.py` to require `graphics_pass.hero_environment_geometry` plus runtime logs for high-detail camp/cabin kits, mountain massing, and irregular tree silhouettes where prompt-relevant.

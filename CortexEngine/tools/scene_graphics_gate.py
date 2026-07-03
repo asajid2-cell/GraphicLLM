@@ -294,6 +294,26 @@ def _source_environment_runtime(log_text: str) -> dict[str, int] | None:
     return {key: int(value) for key, value in zip(keys, m.groups())}
 
 
+def _hero_material_shadow_runtime(log_text: str) -> dict[str, float | int] | None:
+    m = re.search(
+        r"generative_exterior: hero material shadow readability "
+        r"material_panels=(\d+) shadow_receivers=(\d+) "
+        r"fill_lights=(\d+) rim_lights=(\d+) "
+        r"material_contrast=([0-9.]+) exposure_lift=([0-9.]+)",
+        log_text,
+    )
+    if not m:
+        return None
+    return {
+        "material_panels": int(m.group(1)),
+        "shadow_receivers": int(m.group(2)),
+        "fill_lights": int(m.group(3)),
+        "rim_lights": int(m.group(4)),
+        "material_contrast": float(m.group(5)),
+        "exposure_lift": float(m.group(6)),
+    }
+
+
 def _asset_counts(ir: dict[str, Any]) -> dict[str, int]:
     counts = {
         "trees": 0,
@@ -397,6 +417,7 @@ def evaluate(prompt: str, ir: dict[str, Any], png: Path | None, log_text: str) -
     cohesive_staging_cleanup = graphics.get("cohesive_staging_cleanup") or {}
     environment_fidelity = graphics.get("environment_fidelity") or {}
     source_environment_assets = graphics.get("source_environment_assets") or {}
+    hero_material_shadow_readability = graphics.get("hero_material_shadow_readability") or {}
     image = _image_metrics(png)
 
     failures: list[dict[str, Any]] = []
@@ -1182,6 +1203,53 @@ def evaluate(prompt: str, ir: dict[str, Any], png: Path | None, log_text: str) -
                 backdrop_anchor_count=backdrop_anchors,
                 runtime_source_environment_assets=runtime_source_environment,
                 runtime_source_environment_assets_ok=runtime_source_environment_ok,
+            )
+
+        try:
+            hero_material_panels = int(hero_material_shadow_readability.get("hero_material_panel_count", 0) or 0)
+            hero_shadow_receivers = int(hero_material_shadow_readability.get("hero_shadow_receiver_count", 0) or 0)
+            local_fill_lights = int(hero_material_shadow_readability.get("local_fill_light_count", 0) or 0)
+            rim_lights = int(hero_material_shadow_readability.get("rim_light_count", 0) or 0)
+            material_contrast = float(hero_material_shadow_readability.get("material_contrast", 0.0) or 0.0)
+            exposure_lift = float(hero_material_shadow_readability.get("exposure_lift", 0.0) or 0.0)
+        except Exception:
+            hero_material_panels = hero_shadow_receivers = local_fill_lights = rim_lights = 0
+            material_contrast = exposure_lift = 0.0
+        runtime_hero_readability = _hero_material_shadow_runtime(log_text)
+        min_panels = 14 if (flags["campsite"] or "cabin" in prompt.lower()) else 10
+        min_receivers = 10 if (flags["campsite"] or "cabin" in prompt.lower()) else 8
+        runtime_hero_readability_ok = (
+            isinstance(runtime_hero_readability, dict)
+            and runtime_hero_readability.get("material_panels", 0) >= max(hero_material_panels - 2, min_panels)
+            and runtime_hero_readability.get("shadow_receivers", 0) >= max(hero_shadow_receivers - 2, min_receivers)
+            and runtime_hero_readability.get("fill_lights", 0) >= max(local_fill_lights, 2)
+            and runtime_hero_readability.get("rim_lights", 0) >= max(rim_lights - 1, 2)
+            and runtime_hero_readability.get("material_contrast", 0.0) >= max(material_contrast - 0.05, 0.45)
+            and runtime_hero_readability.get("exposure_lift", 0.0) >= max(exposure_lift - 0.03, 0.08)
+        )
+        if (
+            not isinstance(hero_material_shadow_readability, dict)
+            or not bool(hero_material_shadow_readability.get("enabled"))
+            or hero_material_panels < min_panels
+            or hero_shadow_receivers < min_receivers
+            or local_fill_lights < 2
+            or rim_lights < 2
+            or material_contrast < 0.48
+            or exposure_lift < 0.08
+            or not runtime_hero_readability_ok
+        ):
+            fail(
+                "missing_hero_material_shadow_readability",
+                "Generated exterior hero surfaces still read as crushed black/flat kit silhouettes instead of locally shaped material and shadow",
+                hero_material_shadow_readability=hero_material_shadow_readability,
+                hero_material_panel_count=hero_material_panels,
+                hero_shadow_receiver_count=hero_shadow_receivers,
+                local_fill_light_count=local_fill_lights,
+                rim_light_count=rim_lights,
+                material_contrast=material_contrast,
+                exposure_lift=exposure_lift,
+                runtime_hero_material_shadow_readability=runtime_hero_readability,
+                runtime_hero_material_shadow_readability_ok=runtime_hero_readability_ok,
             )
 
         if flags["moonlight"] or "storm" in prompt.lower():

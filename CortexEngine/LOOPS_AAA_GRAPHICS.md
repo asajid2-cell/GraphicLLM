@@ -713,6 +713,19 @@ Status: running
   - Verifier: strengthen `scene_graphics_gate.py` so Loop 26 campsite/desert/alpine fail `missing_hero_material_shadow_readability`; then require new IR/runtime readability evidence and run the standard build/render/gate/oracle suite.
   - Exit: verifier green plus visual inspection shows less black-sheet tent/cabin/canyon read and stronger local material/shadow separation; final AAA call remains `HUMAN-GATE`.
   - Escape: stop if the pass washes out night/desert/campsite color gates, creates visible glow cards/bands, or only changes metadata without visible hero-region improvement.
+- Loop 27 verifier evidence:
+  - Heartbeat proof `aaa-loop27-resume-proof` fired by timeout after 1s on takeover.
+  - Red proof was established before implementation: Loop 26 campsite/desert/alpine artifacts failed the strengthened graphics gate with `missing_hero_material_shadow_readability`.
+  - Implementation: `tools/scene_compiler.py` emits `graphics_pass.hero_material_shadow_readability` and brighter fabric material hints; `tools/scene_graphics_gate.py` requires IR plus runtime hero-readability receipts; `src/Core/Engine_Scenes.cpp` parses the contract and adds hero material panels, shadow receivers, local fill lights, rim lights, and bounded exposure/SSAO/shadow PCF shaping.
+  - Python compile exited 0.
+  - Release rebuild exited 0: `[OK] Build complete in 4.6s`; final no-work rebuild exited 0: `[OK] Build complete in 3.7s`.
+  - `git diff --check` exited 0 except expected CRLF warnings.
+  - Campsite `aaa_hero_read_campsite_loop27e` quality green (`purple_fraction=0.809`, `avg_luma=0.341`, `nonblack_fraction=0.9901`); graphics green (`dark_contact_area_fraction=0.2404`); Director validation green.
+  - Desert `aaa_hero_read_desert_loop27` quality green (`turquoise_fraction=0.3804`, `avg_luma=0.3144`, `nonblack_fraction=0.996`); graphics green (`dark_contact_area_fraction=0.1024`); Director validation green.
+  - Alpine `aaa_hero_read_alpine_loop27` quality green (`avg_luma=0.1297`, `cool_fraction=0.906`, `nonblack_fraction=0.9431`); graphics green (`dark_contact_area_fraction=0.7099`); Director validation green.
+  - Kitchen smoke `regression_kitchen_aaa_loop27` rendered VALID and quality green (`avg_luma=0.4502`, `nonblack_fraction=1.0`).
+  - Known-bad quality oracle `gen_a_foggy_mountain_campsite_beside_0` with `--expect-fail` still reports forbidden fridge assets, missing ridge, focal visibility, and purple-water failures. Known-bad graphics oracle `v3_campsite_ridge_test_0` with `--expect-fail` still fails and now includes `missing_hero_material_shadow_readability`.
+  - Visual inspection: Loop 27 is an improvement, not a solution. The campsite/desert tent is less black than earlier attempts and the alpine cabin has better material/window separation, but all three still read as stage-like, low-poly, and disconnected. The next loop must attack structural world/hero fidelity and material/shadow presentation at a deeper layer.
 - Image metrics alone cannot certify AAA quality; this loop uses them only to catch obvious flat/blockout failures and relies on runtime evidence for deterministic features.
 - Generated validation renders now intentionally use SSAO/SSR/shadows instead of forced DXR. Re-enable DXR only behind a separate density/BLAS budget gate.
 - Objective graphics gates are green, but visual inspection still shows asset/shot-fidelity limits: low-poly tree silhouettes, generic canyon composition, and remaining stage-like flatness. This is the next asset-fidelity front, not a blocker for this graphics-pass checkpoint.

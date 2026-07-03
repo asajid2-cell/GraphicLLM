@@ -236,6 +236,17 @@ namespace {
         int backdropAnchorCount = 0;
     };
 
+    struct GenerativeHeroMaterialShadowReadability {
+        bool enabled = false;
+        int heroMaterialPanelCount = 0;
+        int heroShadowReceiverCount = 0;
+        int localFillLightCount = 0;
+        int rimLightCount = 0;
+        float materialContrast = 0.0f;
+        float exposureLift = 0.0f;
+        float shadowSoftness = 0.0f;
+    };
+
     struct GenerativeHeroAssetReplacement {
         bool enabled = false;
         int canvasShellPanelCount = 0;
@@ -3459,6 +3470,7 @@ void Engine::BuildRecipeScene() {
         GenerativeTextureMaterialFidelity textureMaterialFidelity;
         GenerativeSourceGeometryFidelity sourceGeometryFidelity;
         GenerativeSourceEnvironmentAssets sourceEnvironmentAssets;
+        GenerativeHeroMaterialShadowReadability heroMaterialShadowReadability;
         GenerativeHeroAssetReplacement heroAssetReplacement;
         GenerativeCohesiveStagingCleanup cohesiveStagingCleanup;
         GenerativeEnvironmentFidelity environmentFidelity;
@@ -3759,6 +3771,23 @@ void Engine::BuildRecipeScene() {
                     static_cast<int>(std::clamp(num(sourceEnvironmentAssets, "terrain_replacement_layer_count", 0.0f), 0.0f, 12.0f));
                 genExt.sourceEnvironmentAssets.backdropAnchorCount =
                     static_cast<int>(std::clamp(num(sourceEnvironmentAssets, "backdrop_anchor_count", 0.0f), 0.0f, 24.0f));
+                const nlohmann::json heroMaterialShadowReadability =
+                    graphics.value("hero_material_shadow_readability", nlohmann::json::object());
+                genExt.heroMaterialShadowReadability.enabled = heroMaterialShadowReadability.value("enabled", false);
+                genExt.heroMaterialShadowReadability.heroMaterialPanelCount =
+                    static_cast<int>(std::clamp(num(heroMaterialShadowReadability, "hero_material_panel_count", 0.0f), 0.0f, 48.0f));
+                genExt.heroMaterialShadowReadability.heroShadowReceiverCount =
+                    static_cast<int>(std::clamp(num(heroMaterialShadowReadability, "hero_shadow_receiver_count", 0.0f), 0.0f, 36.0f));
+                genExt.heroMaterialShadowReadability.localFillLightCount =
+                    static_cast<int>(std::clamp(num(heroMaterialShadowReadability, "local_fill_light_count", 0.0f), 0.0f, 6.0f));
+                genExt.heroMaterialShadowReadability.rimLightCount =
+                    static_cast<int>(std::clamp(num(heroMaterialShadowReadability, "rim_light_count", 0.0f), 0.0f, 6.0f));
+                genExt.heroMaterialShadowReadability.materialContrast =
+                    std::clamp(num(heroMaterialShadowReadability, "material_contrast", 0.0f), 0.0f, 1.0f);
+                genExt.heroMaterialShadowReadability.exposureLift =
+                    std::clamp(num(heroMaterialShadowReadability, "exposure_lift", 0.0f), 0.0f, 0.35f);
+                genExt.heroMaterialShadowReadability.shadowSoftness =
+                    std::clamp(num(heroMaterialShadowReadability, "shadow_softness", 0.0f), 0.0f, 1.0f);
                 const nlohmann::json heroAssetReplacement = graphics.value("hero_asset_replacement", nlohmann::json::object());
                 genExt.heroAssetReplacement.enabled = heroAssetReplacement.value("enabled", false);
                 genExt.heroAssetReplacement.canvasShellPanelCount =
@@ -7810,6 +7839,16 @@ void Engine::BuildRecipeScene() {
                     r.specularFactor = 0.24f;
                     r.anisotropyStrength = 0.18f;
                     r.sheenWeight = std::string(preset ? preset : "") == "fabric" ? 0.24f : 0.06f;
+                    const bool readableFabric =
+                        genExt.heroMaterialShadowReadability.enabled &&
+                        std::string(preset ? preset : "") == "fabric";
+                    if (readableFabric) {
+                        r.emissiveColor = glm::vec3(color) * 0.30f;
+                        r.emissiveStrength = 0.18f;
+                        r.emissiveBloomFactor = 0.015f;
+                        r.specularFactor = 0.32f;
+                        r.sheenWeight = 0.38f;
+                    }
                     r.doubleSided = true;
                     r.presetName = preset ? preset : "";
                     if (textureId && textureId[0]) {
@@ -7840,9 +7879,17 @@ void Engine::BuildRecipeScene() {
                     auto tentPlace = [&](float x, float y, float z) -> glm::vec3 {
                         return tentCenter + glm::vec3(cs * x + sn * z, y, -sn * x + cs * z);
                     };
-                    const glm::vec4 deepCanvas(0.155f, 0.110f, 0.080f, 1.0f);
-                    const glm::vec4 warmCanvas(0.245f, 0.160f, 0.098f, 1.0f);
-                    const glm::vec4 edgeCanvas(0.095f, 0.075f, 0.058f, 1.0f);
+                    const bool readableCanvas = genExt.heroMaterialShadowReadability.enabled;
+                    const glm::vec4 deepCanvas = readableCanvas
+                        ? glm::vec4(0.285f, 0.185f, 0.110f, 1.0f)
+                        : glm::vec4(0.155f, 0.110f, 0.080f, 1.0f);
+                    const glm::vec4 warmCanvas = readableCanvas
+                        ? glm::vec4(0.445f, 0.275f, 0.140f, 1.0f)
+                        : glm::vec4(0.245f, 0.160f, 0.098f, 1.0f);
+                    const glm::vec4 edgeCanvas = readableCanvas
+                        ? glm::vec4(0.210f, 0.145f, 0.090f, 1.0f)
+                        : glm::vec4(0.095f, 0.075f, 0.058f, 1.0f);
+                    const float canvasOcclusion = readableCanvas ? 0.46f : 0.72f;
                     const glm::vec4 ropeColor(0.62f, 0.46f, 0.30f, 1.0f);
                     const glm::vec4 poleColor(0.16f, 0.105f, 0.060f, 1.0f);
 
@@ -7854,9 +7901,9 @@ void Engine::BuildRecipeScene() {
                                    deepCanvas,
                                    "fabric",
                                    "fabric",
-                                   0.82f,
-                                   0.72f,
-                                   0.72f);
+                                   readableCanvas ? 0.60f : 0.82f,
+                                   readableCanvas ? 1.02f : 0.72f,
+                                   canvasOcclusion);
                     canvasShell++;
 
                     for (int i = 0; i < genExt.heroAssetReplacement.lowPolyMaskCount; ++i) {
@@ -7873,9 +7920,9 @@ void Engine::BuildRecipeScene() {
                                        mode < 4 ? edgeCanvas : deepCanvas,
                                        "fabric",
                                        "fabric",
-                                       0.86f,
-                                       0.68f,
-                                       0.68f);
+                                       readableCanvas ? 0.62f : 0.86f,
+                                       readableCanvas ? 0.96f : 0.68f,
+                                       readableCanvas ? 0.44f : 0.68f);
                         lowPolyMasks++;
                     }
 
@@ -7895,9 +7942,9 @@ void Engine::BuildRecipeScene() {
                                        (i % 3 == 0) ? warmCanvas : deepCanvas,
                                        "fabric",
                                        "fabric",
-                                       0.80f,
-                                       0.66f,
-                                       0.70f);
+                                       readableCanvas ? 0.58f : 0.80f,
+                                       readableCanvas ? 0.94f : 0.66f,
+                                       readableCanvas ? 0.42f : 0.70f);
                         canvasShell++;
                     }
 
@@ -8206,6 +8253,307 @@ void Engine::BuildRecipeScene() {
                              cabinRoof,
                              cabinDeckFoundation,
                              heroRockMasses);
+            }
+        }
+    }
+
+    if (genExt.valid && genExt.heroMaterialShadowReadability.enabled) {
+        if (auto* renderer = m_renderer.get()) {
+            auto cubeMesh = Utils::MeshGenerator::CreateCube();
+            auto receiverMesh = Utils::MeshGenerator::CreateDisk(1.0f, 40);
+            auto cylinderMesh = Utils::MeshGenerator::CreateCylinder(0.5f, 1.0f, 18);
+            const auto upCube = renderer->UploadMesh(cubeMesh);
+            const auto upReceiver = renderer->UploadMesh(receiverMesh);
+            const auto upCylinder = renderer->UploadMesh(cylinderMesh);
+            if (upCube.IsErr() || upReceiver.IsErr() || upCylinder.IsErr()) {
+                spdlog::warn("generative_exterior: hero material shadow readability mesh upload failed cube='{}' receiver='{}' cylinder='{}'",
+                             upCube.IsErr() ? upCube.Error() : "ok",
+                             upReceiver.IsErr() ? upReceiver.Error() : "ok",
+                             upCylinder.IsErr() ? upCylinder.Error() : "ok");
+            } else {
+                const std::string module = genExt.authoredSceneModule.moduleId;
+                const bool canyonModule = module == "desert_canyon_river";
+                const bool alpineModule = module == "alpine_cabin_lake";
+                const bool hasCabin = !genExt.structures.empty();
+                const bool hasTent = genExt.heroAssetReplacement.canvasShellPanelCount > 0 || !hasCabin;
+                const float shoreZ = genExt.waterOn ? genExt.waterFromZ : -genExt.extent * 0.30f;
+                const float contrast = std::clamp(genExt.heroMaterialShadowReadability.materialContrast, 0.35f, 0.85f);
+                const float shadowSoftness = std::clamp(genExt.heroMaterialShadowReadability.shadowSoftness, 0.20f, 0.85f);
+                auto pseudo = [](int i, float salt) {
+                    const float n = std::sin(static_cast<float>(i) * 12.9898f + salt * 78.233f) * 43758.5453f;
+                    return n - std::floor(n);
+                };
+
+                auto dressReadable = [&](Scene::RenderableComponent& r,
+                                         const glm::vec4& color,
+                                         const char* preset,
+                                         float roughness,
+                                         float normalScale,
+                                         float alpha,
+                                         const char* textureId,
+                                         bool heroSurface = true) {
+                    r.albedoColor = color;
+                    r.metallic = 0.0f;
+                    r.roughness = roughness;
+                    r.ao = 0.72f;
+                    r.occlusionStrength = 0.58f;
+                    r.normalScale = normalScale;
+                    r.proceduralMaskStrength = 0.48f;
+                    r.specularFactor = 0.18f;
+                    r.clearcoatFactor = 0.08f;
+                    r.clearcoatRoughnessFactor = 0.62f;
+                    r.sheenWeight = std::string(preset ? preset : "") == "fabric" ? 0.28f : 0.05f;
+                    r.anisotropyStrength = std::string(preset ? preset : "") == "wood" ? 0.32f : 0.12f;
+                    r.doubleSided = true;
+                    r.alphaMode = alpha < 0.99f
+                        ? Scene::RenderableComponent::AlphaMode::Blend
+                        : Scene::RenderableComponent::AlphaMode::Opaque;
+                    r.renderLayer = alpha < 0.99f
+                        ? Scene::RenderableComponent::RenderLayer::Overlay
+                        : Scene::RenderableComponent::RenderLayer::Opaque;
+                    r.presetName = preset;
+                    if (textureId && textureId[0]) {
+                        applyGeneratedTextureMaterial(r, textureId, heroSurface, false);
+                    }
+                };
+
+                auto addReadable = [&](const std::string& tag,
+                                       const std::shared_ptr<Scene::MeshData>& mesh,
+                                       const glm::vec3& position,
+                                       const glm::vec3& scale,
+                                       const glm::vec3& euler,
+                                       const glm::vec4& color,
+                                       const char* preset,
+                                       float roughness,
+                                       float normalScale,
+                                       float alpha,
+                                       const char* textureId,
+                                       int& counter) {
+                    entt::entity e = m_registry->CreateEntity();
+                    m_registry->AddComponent<Scene::TagComponent>(e, tag);
+                    auto& t = m_registry->AddComponent<TransformComponent>(e);
+                    t.position = position;
+                    t.scale = scale;
+                    t.rotation = glm::quat(euler);
+                    auto& r = m_registry->AddComponent<Scene::RenderableComponent>(e);
+                    r.mesh = mesh;
+                    dressReadable(r, color, preset, roughness, normalScale, alpha, textureId);
+                    counter++;
+                };
+
+                int materialPanels = 0;
+                int shadowReceivers = 0;
+                const int requestedPanels = genExt.heroMaterialShadowReadability.heroMaterialPanelCount;
+                const int requestedReceivers = genExt.heroMaterialShadowReadability.heroShadowReceiverCount;
+
+                if (hasCabin) {
+                    const auto& structure = genExt.structures.front();
+                    const float yawRad = glm::radians(structure.yawDeg);
+                    const float cs = std::cos(yawRad);
+                    const float sn = std::sin(yawRad);
+                    auto place = [&](float x, float y, float z) -> glm::vec3 {
+                        return structure.position + glm::vec3(cs * x + sn * z,
+                                                              y,
+                                                              -sn * x + cs * z);
+                    };
+                    const float frontZ = structure.depthM * 0.5f + 0.22f;
+                    const glm::vec3 baseWood(0.22f, 0.12f, 0.055f);
+                    const glm::vec3 litWood = glm::mix(baseWood, glm::vec3(0.62f, 0.34f, 0.14f), contrast * 0.55f);
+                    const glm::vec3 coolEdge = alpineModule ? glm::vec3(0.18f, 0.28f, 0.48f) : glm::vec3(0.36f, 0.22f, 0.12f);
+                    for (int i = 0; i < requestedPanels; ++i) {
+                        const int row = i / 6;
+                        const int col = i % 6;
+                        const bool window = (i % 7 == 0);
+                        const glm::vec3 color = window
+                            ? glm::vec3(0.95f, 0.58f, 0.22f)
+                            : glm::mix(baseWood, (i % 3 == 0) ? coolEdge : litWood, 0.35f + 0.45f * pseudo(i, 1.31f));
+                        addReadable("GenerativeExterior_HeroReadable_CabinMaterialPanel" + std::to_string(i),
+                                    cubeMesh,
+                                    place(-structure.widthM * 0.42f + static_cast<float>(col) * structure.widthM * 0.17f,
+                                          0.46f + static_cast<float>(row % 4) * 0.23f,
+                                          frontZ + 0.065f + 0.004f * static_cast<float>(i % 3)),
+                                    window ? glm::vec3(0.28f, 0.11f, 0.024f) : glm::vec3(0.30f, 0.024f, 0.026f),
+                                    glm::vec3(0.0f, yawRad, 0.0f),
+                                    glm::vec4(glm::max(color, glm::vec3(0.035f)), window ? 0.82f : 1.0f),
+                                    "wood",
+                                    window ? 0.34f : 0.68f,
+                                    0.72f,
+                                    window ? 0.82f : 1.0f,
+                                    "wood",
+                                    materialPanels);
+                    }
+                } else if (hasTent) {
+                    const glm::vec3 tentCenter(2.9f, 0.0f, 0.9f);
+                    const float tentYaw = glm::radians(-18.0f);
+                    const float cs = std::cos(tentYaw);
+                    const float sn = std::sin(tentYaw);
+                    auto tentPlace = [&](float x, float y, float z) -> glm::vec3 {
+                        return tentCenter + glm::vec3(cs * x + sn * z,
+                                                      y,
+                                                      -sn * x + cs * z);
+                    };
+                    const glm::vec3 baseCanvas = alpineModule ? glm::vec3(0.16f, 0.20f, 0.28f) : glm::vec3(0.30f, 0.17f, 0.095f);
+                    const glm::vec3 warmCanvas = glm::mix(baseCanvas, glm::vec3(0.86f, 0.50f, 0.22f), contrast * 0.68f);
+                    const glm::vec3 coolCanvas = glm::mix(baseCanvas, glm::vec3(0.16f, 0.22f, 0.32f), 0.42f);
+                    for (int i = 0; i < requestedPanels; ++i) {
+                        const float side = (i % 2 == 0) ? -1.0f : 1.0f;
+                        const int lane = (i / 2) % 8;
+                        const bool broadCatch = i < 8;
+                        const glm::vec3 color = (i % 5 == 0)
+                            ? (broadCatch ? glm::mix(warmCanvas, glm::vec3(0.95f, 0.64f, 0.32f), 0.30f) : warmCanvas)
+                            : glm::mix(baseCanvas, (i % 3 == 0) ? coolCanvas : warmCanvas, 0.28f + 0.38f * pseudo(i, 2.17f));
+                        addReadable("GenerativeExterior_HeroReadable_TentFabricPanel" + std::to_string(i),
+                                    cubeMesh,
+                                    tentPlace(side * (broadCatch ? 0.70f : (0.54f + 0.025f * static_cast<float>(i % 3))),
+                                              broadCatch ? (0.52f + 0.16f * static_cast<float>((i / 2) % 4))
+                                                         : (0.56f + 0.095f * static_cast<float>((i / 4) % 5)),
+                                              broadCatch ? (-0.98f + static_cast<float>((i / 4) % 2) * 1.18f)
+                                                         : (-1.16f + static_cast<float>(lane) * 0.34f)),
+                                    broadCatch
+                                        ? glm::vec3(0.046f, 0.17f, 0.58f)
+                                        : glm::vec3(0.030f, 0.050f, 0.26f + 0.020f * static_cast<float>(i % 4)),
+                                    glm::vec3(glm::radians(4.0f),
+                                              tentYaw + glm::radians(side * 1.0f),
+                                              glm::radians(side * -26.0f)),
+                                    glm::vec4(glm::max(color, glm::vec3(0.035f)), 1.0f),
+                                    "fabric",
+                                    broadCatch ? 0.54f : 0.62f,
+                                    broadCatch ? 1.02f : 0.86f,
+                                    1.0f,
+                                    "fabric",
+                                    materialPanels);
+                    }
+                }
+
+                if (canyonModule) {
+                    const int canyonPanels = std::max(6, requestedPanels / 2);
+                    const glm::vec3 redBase(0.38f, 0.15f, 0.070f);
+                    const glm::vec3 redLit = glm::mix(redBase, glm::vec3(0.92f, 0.40f, 0.16f), contrast * 0.44f);
+                    for (int i = 0; i < canyonPanels; ++i) {
+                        const float side = (i % 2 == 0) ? -1.0f : 1.0f;
+                        const int lane = i / 2;
+                        addReadable("GenerativeExterior_HeroReadable_CanyonRakePanel" + std::to_string(i),
+                                    cubeMesh,
+                                    glm::vec3(side * (15.6f + 0.42f * static_cast<float>(lane)),
+                                              1.0f + 0.28f * static_cast<float>(i % 5),
+                                              shoreZ - 2.2f - 1.35f * static_cast<float>(lane)),
+                                    glm::vec3(0.050f,
+                                              0.42f + 0.06f * static_cast<float>(i % 4),
+                                              0.34f + 0.04f * static_cast<float>((i + 2) % 4)),
+                                    glm::vec3(glm::radians(-3.0f + pseudo(i, 3.13f) * 6.0f),
+                                              side > 0.0f ? glm::radians(185.0f) : glm::radians(5.0f),
+                                              glm::radians(side * 4.0f)),
+                                    glm::vec4(glm::max(glm::mix(redBase, redLit, 0.48f + 0.24f * pseudo(i, 3.71f)), glm::vec3(0.035f)), 1.0f),
+                                    "masonry",
+                                    0.72f,
+                                    0.80f,
+                                    1.0f,
+                                    "rock_cliff",
+                                    materialPanels);
+                    }
+                }
+
+                const glm::vec3 shadowTone = alpineModule
+                    ? glm::vec3(0.010f, 0.014f, 0.028f)
+                    : (canyonModule ? glm::vec3(0.030f, 0.016f, 0.010f) : glm::vec3(0.018f, 0.015f, 0.012f));
+                for (int i = 0; i < requestedReceivers; ++i) {
+                    const float angle = glm::radians(-35.0f + static_cast<float>(i) * 21.0f);
+                    const float radius = 1.2f + 0.20f * static_cast<float>(i % 6);
+                    const glm::vec3 center = hasCabin
+                        ? genExt.structures.front().position + glm::vec3(0.0f, 0.0f, 1.75f)
+                        : glm::vec3(0.2f, 0.0f, 1.0f);
+                    const float extraSide = canyonModule ? ((i % 2 == 0) ? -4.2f : 4.2f) : 0.0f;
+                    addReadable("GenerativeExterior_HeroReadable_ShadowReceiver" + std::to_string(i),
+                                receiverMesh,
+                                glm::vec3(center.x + std::cos(angle) * radius + extraSide,
+                                          0.103f + 0.001f * static_cast<float>(i % 8),
+                                          center.z + std::sin(angle) * (radius * 0.72f) + (canyonModule ? -1.2f : 0.0f)),
+                                glm::vec3(0.42f + 0.05f * static_cast<float>(i % 4),
+                                          1.0f,
+                                          0.13f + 0.02f * static_cast<float>((i + 1) % 4)),
+                                glm::vec3(0.0f, glm::radians(pseudo(i, 4.47f) * 180.0f), 0.0f),
+                                glm::vec4(shadowTone, 0.12f * shadowSoftness),
+                                "shadow",
+                                0.96f,
+                                0.08f,
+                                0.12f * shadowSoftness,
+                                "",
+                                shadowReceivers);
+                }
+
+                int fillLights = 0;
+                for (int i = 0; i < genExt.heroMaterialShadowReadability.localFillLightCount; ++i) {
+                    if (hasCabin) {
+                        const glm::vec3 p = genExt.structures.front().position;
+                        const glm::vec3 color = (i % 2 == 0) ? glm::vec3(1.0f, 0.54f, 0.24f) : glm::vec3(0.28f, 0.42f, 1.0f);
+                        const std::string lightTag = "GenerativeExterior_HeroReadable_CabinFill" + std::to_string(i);
+                        AddAssetLedPointLight(*m_registry,
+                                              lightTag.c_str(),
+                                              p + glm::vec3(-0.55f + 0.85f * static_cast<float>(i % 2),
+                                                            0.82f + 0.18f * static_cast<float>(i),
+                                                            1.80f + 0.15f * static_cast<float>(i)),
+                                              color,
+                                              (i % 2 == 0) ? 2.7f : 1.5f,
+                                              4.8f + 0.5f * static_cast<float>(i));
+                    } else {
+                        const glm::vec3 color = canyonModule
+                            ? ((i % 2 == 0) ? glm::vec3(1.0f, 0.46f, 0.18f) : glm::vec3(0.25f, 0.82f, 0.90f))
+                            : ((i % 2 == 0) ? glm::vec3(1.0f, 0.38f, 0.13f) : glm::vec3(0.92f, 0.72f, 0.34f));
+                        const std::string lightTag = "GenerativeExterior_HeroReadable_TentFill" + std::to_string(i);
+                        AddAssetLedPointLight(*m_registry,
+                                              lightTag.c_str(),
+                                              glm::vec3(0.70f + 1.65f * static_cast<float>(i % 2),
+                                                        0.58f + 0.12f * static_cast<float>(i),
+                                                        0.72f - 0.42f * static_cast<float>(i % 3)),
+                                              color,
+                                              canyonModule ? 1.6f : 2.4f,
+                                              canyonModule ? 6.0f : 4.8f);
+                    }
+                    fillLights++;
+                }
+
+                int rimLights = 0;
+                for (int i = 0; i < genExt.heroMaterialShadowReadability.rimLightCount; ++i) {
+                    const float side = (i % 2 == 0) ? -1.0f : 1.0f;
+                    const glm::vec3 target = hasCabin
+                        ? genExt.structures.front().position + glm::vec3(0.0f, 0.85f, 1.2f)
+                        : glm::vec3(1.1f, 0.56f, 0.70f);
+                    const glm::vec3 pos = canyonModule
+                        ? glm::vec3(side * 6.6f, 3.4f + 0.25f * static_cast<float>(i), shoreZ - 2.4f)
+                        : glm::vec3(side * (4.8f + 0.35f * static_cast<float>(i)),
+                                    3.0f + 0.18f * static_cast<float>(i),
+                                    -1.8f + 0.50f * static_cast<float>(i % 2));
+                    const glm::vec3 color = alpineModule
+                        ? glm::vec3(0.36f, 0.52f, 1.0f)
+                        : (canyonModule ? glm::vec3(1.0f, 0.55f, 0.22f) : glm::vec3(1.0f, 0.46f, 0.20f));
+                    const std::string rimTag = "GenerativeExterior_HeroReadable_RimLight" + std::to_string(i);
+                    AddAssetLedSpotLight(*m_registry,
+                                         rimTag.c_str(),
+                                         pos,
+                                         target,
+                                         color,
+                                         alpineModule ? 2.8f : 3.5f,
+                                         canyonModule ? 20.0f : 15.5f,
+                                         true);
+                    rimLights++;
+                }
+
+                const float appliedExposureLift = std::clamp(genExt.heroMaterialShadowReadability.exposureLift, 0.0f, 0.18f);
+                renderer->SetExposure(std::clamp(renderer->GetExposure() * (1.0f + appliedExposureLift * 0.40f),
+                                                0.35f,
+                                                alpineModule ? 0.92f : 1.35f));
+                renderer->SetSSAOParams(std::max(genExt.graphicsSSAORadius, 1.28f),
+                                        std::min(genExt.graphicsSSAOBias, 0.016f),
+                                        std::max(genExt.graphicsSSAOIntensity, alpineModule ? 2.75f : 3.05f));
+                renderer->SetShadowPCFRadius(std::max(genExt.graphicsShadowPCF, 3.35f));
+
+                spdlog::info("generative_exterior: hero material shadow readability material_panels={} shadow_receivers={} fill_lights={} rim_lights={} material_contrast={:.2f} exposure_lift={:.2f}",
+                             materialPanels,
+                             shadowReceivers,
+                             fillLights,
+                             rimLights,
+                             contrast,
+                             genExt.heroMaterialShadowReadability.exposureLift);
             }
         }
     }

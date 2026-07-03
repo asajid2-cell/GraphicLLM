@@ -107,14 +107,14 @@ def _material_for_asset(asset: str, desert: bool, moonlight: bool) -> dict[str, 
     if "tent" in low:
         return {
             "preset": "fabric",
-            "ao": 0.82,
-            "roughness": 0.72,
-            "normal_scale": 0.36,
-            "procedural_mask": 0.30,
+            "ao": 0.96,
+            "roughness": 0.60,
+            "normal_scale": 0.58,
+            "procedural_mask": 0.44,
             "wetness": 0.08,
-            "specular": 0.38,
-            "sheen": 0.34,
-            "subsurface": 0.10,
+            "specular": 0.50,
+            "sheen": 0.42,
+            "subsurface": 0.16,
         }
     return {
         "preset": "naturalistic",
@@ -384,7 +384,7 @@ def compile_v3_to_v2(v3: dict[str, Any]) -> dict[str, Any]:
 
     # Hero grammar: the focal set stays tight enough for the quality gate and camera.
     if campsite:
-        tent_tint = [0.58, 0.43, 0.26] if desert else ([0.20, 0.24, 0.30] if moonlight else [0.46, 0.30, 0.20])
+        tent_tint = [0.72, 0.48, 0.27] if desert else ([0.32, 0.38, 0.50] if moonlight else [0.68, 0.42, 0.22])
         _add(objects, "tent_detailedOpen", 2.9, 0.9, -18.0, 2.55, tint=tent_tint, placed=placed)
         _add(objects, "campfire_bricks", -0.35, 0.35, 0.0, 1.05, placed=placed)
         _add(objects, "campfire_logs", -1.05, 0.86, 31.0, 0.56, placed=placed)
@@ -492,6 +492,11 @@ def compile_v3_to_v2(v3: dict[str, Any]) -> dict[str, Any]:
         "source_environment_replacement",
         "source_crag_cliff_backdrop",
         "source_tree_and_boulder_terrain_anchors",
+    ])
+    material_zone_names.extend([
+        "hero_material_shadow_readability",
+        "local_fill_and_rim_light_shaping",
+        "hero_contact_shadow_receivers",
     ])
     if water_on:
         material_zone_names.append("texture_source_wet_shore")
@@ -827,6 +832,27 @@ def compile_v3_to_v2(v3: dict[str, Any]) -> dict[str, Any]:
                 "naturalistic_boulder_and_moss_rock_terrain_anchors",
                 "source_asset_terrain_to_backdrop_transition",
                 "water_color_roi_preserving_flank_layout",
+            ],
+        },
+        "hero_material_shadow_readability": {
+            "enabled": True,
+            "hero_material_panel_count": 24 if campsite else (22 if cabin else 16),
+            "hero_shadow_receiver_count": 18 if campsite else (16 if cabin else 12),
+            "local_fill_light_count": 3 if (campsite or cabin) else 2,
+            "rim_light_count": 3 if (campsite or cabin) else 2,
+            "material_contrast": 0.64 if not moonlight else 0.54,
+            "exposure_lift": 0.16 if campsite else (0.10 if moonlight else 0.12),
+            "shadow_softness": 0.58 if not moonlight else 0.46,
+            "readability_family": "tent_fabric_firelight" if campsite else (
+                "cabin_window_moon_bounce" if cabin else "canyon_wall_raking_light"
+            ),
+            "systems": [
+                "hero_surface_albedo_normal_panels",
+                "local_fill_light_without_global_washout",
+                "rim_light_edge_separation",
+                "hero_contact_shadow_receivers",
+                "bounded_exposure_lift",
+                "no_visible_light_cards",
             ],
         },
         "renderer_shadow_occlusion_budget": {

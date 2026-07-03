@@ -519,6 +519,12 @@ def compile_v3_to_v2(v3: dict[str, Any]) -> dict[str, Any]:
         "raking_shadow_band_field",
         "scene_wide_pbr_response_tuning",
     ])
+    material_zone_names.extend([
+        "source_asset_readability_lift",
+        "backdrop_albedo_floor_balance",
+        "crushed_black_mass_split_highlights",
+        "ridge_and_cliff_readability_guard",
+    ])
     if water_on:
         material_zone_names.append("texture_source_wet_shore")
         material_zone_names.append("authored_curved_shore_water_corridor")
@@ -939,6 +945,25 @@ def compile_v3_to_v2(v3: dict[str, Any]) -> dict[str, Any]:
                 "existing_surface_pbr_response_tuning",
                 "local_probe_volume_material_grade",
                 "contact_shadow_band_field",
+            ],
+        },
+        "source_readability_balance": {
+            "enabled": True,
+            "source_surface_lift_count": 34 if not cabin else 28,
+            "backdrop_surface_lift_count": 14 if not desert else 12,
+            "black_mass_split_count": 10 if not cabin else 8,
+            "albedo_floor": 0.125 if not moonlight else 0.105,
+            "frame_nonblack_floor": 0.92 if not moonlight else 0.82,
+            "frame_luma_floor": 0.24 if desert else (0.20 if not moonlight else 0.10),
+            "readability_family": "dawn_source_lift" if campsite else (
+                "canyon_black_mass_split" if desert else "moonlit_source_readability"
+            ),
+            "systems": [
+                "source_asset_albedo_floor",
+                "backdrop_and_ridge_readability_lift",
+                "black_mass_split_highlight_geometry",
+                "frame_nonblack_image_guard",
+                "source_material_occlusion_rebalance",
             ],
         },
         "renderer_shadow_occlusion_budget": {

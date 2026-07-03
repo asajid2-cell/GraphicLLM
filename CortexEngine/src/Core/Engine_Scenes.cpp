@@ -283,6 +283,16 @@ namespace {
         float shadowPCFRadiusTarget = 2.5f;
     };
 
+    struct GenerativeSourceReadabilityBalance {
+        bool enabled = false;
+        int sourceSurfaceLiftCount = 0;
+        int backdropSurfaceLiftCount = 0;
+        int blackMassSplitCount = 0;
+        float albedoFloor = 0.0f;
+        float frameNonblackFloor = 0.0f;
+        float frameLumaFloor = 0.0f;
+    };
+
     struct GenerativeHeroAssetReplacement {
         bool enabled = false;
         int canvasShellPanelCount = 0;
@@ -3595,6 +3605,7 @@ void Engine::BuildRecipeScene() {
         GenerativeStructuralSceneFidelity structuralSceneFidelity;
         GenerativeHeroMeshMaterialOverhaul heroMeshMaterialOverhaul;
         GenerativeLightingShadowMaterialField lightingShadowMaterialField;
+        GenerativeSourceReadabilityBalance sourceReadabilityBalance;
         GenerativeHeroAssetReplacement heroAssetReplacement;
         GenerativeCohesiveStagingCleanup cohesiveStagingCleanup;
         GenerativeEnvironmentFidelity environmentFidelity;
@@ -3979,6 +3990,21 @@ void Engine::BuildRecipeScene() {
                     std::clamp(num(lightingShadowMaterialField, "shadow_bias_target", genExt.graphicsShadowBias), 0.0003f, 0.010f);
                 genExt.lightingShadowMaterialField.shadowPCFRadiusTarget =
                     std::clamp(num(lightingShadowMaterialField, "shadow_pcf_radius_target", genExt.graphicsShadowPCF), 0.25f, 5.0f);
+                const nlohmann::json sourceReadabilityBalance =
+                    graphics.value("source_readability_balance", nlohmann::json::object());
+                genExt.sourceReadabilityBalance.enabled = sourceReadabilityBalance.value("enabled", false);
+                genExt.sourceReadabilityBalance.sourceSurfaceLiftCount =
+                    static_cast<int>(std::clamp(num(sourceReadabilityBalance, "source_surface_lift_count", 0.0f), 0.0f, 80.0f));
+                genExt.sourceReadabilityBalance.backdropSurfaceLiftCount =
+                    static_cast<int>(std::clamp(num(sourceReadabilityBalance, "backdrop_surface_lift_count", 0.0f), 0.0f, 40.0f));
+                genExt.sourceReadabilityBalance.blackMassSplitCount =
+                    static_cast<int>(std::clamp(num(sourceReadabilityBalance, "black_mass_split_count", 0.0f), 0.0f, 40.0f));
+                genExt.sourceReadabilityBalance.albedoFloor =
+                    std::clamp(num(sourceReadabilityBalance, "albedo_floor", 0.0f), 0.0f, 0.24f);
+                genExt.sourceReadabilityBalance.frameNonblackFloor =
+                    std::clamp(num(sourceReadabilityBalance, "frame_nonblack_floor", 0.0f), 0.0f, 1.0f);
+                genExt.sourceReadabilityBalance.frameLumaFloor =
+                    std::clamp(num(sourceReadabilityBalance, "frame_luma_floor", 0.0f), 0.0f, 1.0f);
                 const nlohmann::json heroAssetReplacement = graphics.value("hero_asset_replacement", nlohmann::json::object());
                 genExt.heroAssetReplacement.enabled = heroAssetReplacement.value("enabled", false);
                 genExt.heroAssetReplacement.canvasShellPanelCount =
@@ -10374,6 +10400,174 @@ void Engine::BuildRecipeScene() {
                          features.ssaoIntensity,
                          quality.shadowBias,
                          quality.shadowPCFRadius);
+        }
+    }
+
+    if (genExt.valid && genExt.sourceReadabilityBalance.enabled) {
+        if (auto* renderer = m_renderer.get()) {
+            const std::string module = genExt.authoredSceneModule.moduleId;
+            const bool canyonModule = module == "desert_canyon_river";
+            const bool alpineModule = module == "alpine_cabin_lake";
+            const float albedoFloor = std::clamp(genExt.sourceReadabilityBalance.albedoFloor,
+                                                 alpineModule ? 0.085f : 0.10f,
+                                                 0.20f);
+            int sourceSurfaces = 0;
+            int backdropSurfaces = 0;
+
+            auto surfaceView = m_registry->View<Scene::TagComponent, Scene::RenderableComponent>();
+            for (auto entity : surfaceView) {
+                const auto& tag = surfaceView.get<Scene::TagComponent>(entity).tag;
+                auto& r = surfaceView.get<Scene::RenderableComponent>(entity);
+                const bool sourceLike = tag.find("Source") != std::string::npos ||
+                                        tag.find("Naturalistic") != std::string::npos ||
+                                        tag.find("Boulder") != std::string::npos ||
+                                        tag.find("Rock") != std::string::npos ||
+                                        tag.find("Cliff") != std::string::npos ||
+                                        tag.find("Canyon") != std::string::npos ||
+                                        tag.find("Tree") != std::string::npos;
+                const bool backdropLike = tag.find("Backdrop") != std::string::npos ||
+                                          tag.find("Ridge") != std::string::npos ||
+                                          tag.find("SourceKenneyCliffBackdrop") != std::string::npos ||
+                                          tag.find("SourceDetailedTreeBackdrop") != std::string::npos;
+                if (tag.rfind("GenerativeExterior_", 0) != 0 ||
+                    tag.find("Water") != std::string::npos ||
+                    tag.find("Glow") != std::string::npos ||
+                    tag.find("Light") != std::string::npos ||
+                    (!sourceLike && !backdropLike)) {
+                    continue;
+                }
+
+                const bool treeLike = tag.find("Tree") != std::string::npos ||
+                                      tag.find("Pine") != std::string::npos;
+                const bool rockLike = tag.find("Rock") != std::string::npos ||
+                                      tag.find("Boulder") != std::string::npos ||
+                                      tag.find("Cliff") != std::string::npos ||
+                                      tag.find("Canyon") != std::string::npos;
+                const glm::vec3 tint = treeLike
+                    ? (alpineModule ? glm::vec3(0.095f, 0.16f, 0.18f) : glm::vec3(0.10f, 0.18f, 0.10f))
+                    : (rockLike
+                        ? (canyonModule ? glm::vec3(0.34f, 0.15f, 0.070f) : glm::vec3(0.16f, 0.15f, 0.13f))
+                        : (alpineModule ? glm::vec3(0.13f, 0.16f, 0.22f) : glm::vec3(0.16f, 0.15f, 0.12f)));
+                glm::vec3 c = glm::vec3(r.albedoColor);
+                c = glm::max(c, glm::vec3(albedoFloor));
+                c = glm::mix(c, tint, backdropLike ? 0.24f : 0.18f);
+                c = glm::max(c, glm::vec3(albedoFloor));
+                r.albedoColor = glm::vec4(c, r.albedoColor.a);
+                r.ao = std::max(r.ao, 0.92f);
+                r.occlusionStrength = std::min(r.occlusionStrength, backdropLike ? 0.58f : 0.54f);
+                r.normalScale = std::max(r.normalScale, rockLike ? 0.86f : 0.66f);
+                r.proceduralMaskStrength = std::max(r.proceduralMaskStrength, backdropLike ? 0.34f : 0.42f);
+                r.roughness = std::clamp(r.roughness, 0.48f, 0.92f);
+                r.specularFactor = std::max(r.specularFactor, rockLike ? 0.18f : 0.12f);
+                r.clearcoatFactor = std::max(r.clearcoatFactor, rockLike ? 0.030f : 0.018f);
+                if (sourceLike && sourceSurfaces < genExt.sourceReadabilityBalance.sourceSurfaceLiftCount) {
+                    sourceSurfaces++;
+                }
+                if (backdropLike && backdropSurfaces < genExt.sourceReadabilityBalance.backdropSurfaceLiftCount) {
+                    backdropSurfaces++;
+                }
+            }
+
+            int blackSplits = 0;
+            auto splitMesh = Utils::MeshGenerator::CreatePlane(1.0f, 1.0f);
+            const auto upSplit = renderer->UploadMesh(splitMesh);
+            if (upSplit.IsErr()) {
+                spdlog::warn("generative_exterior: source readability split mesh upload failed: {}",
+                             upSplit.Error());
+            } else {
+                const float shoreZ = genExt.waterOn ? genExt.waterFromZ : -genExt.extent * 0.30f;
+                const float groundW = genExt.extent * 2.0f;
+                const float landSpan = std::max(6.0f, genExt.extent * 0.46f);
+                glm::vec3 groundTint = genExt.groundColor;
+                if (!genExt.groundColorSet) {
+                    groundTint = canyonModule ? glm::vec3(0.58f, 0.42f, 0.28f)
+                                               : (alpineModule ? glm::vec3(0.18f, 0.23f, 0.30f)
+                                                               : glm::vec3(0.23f, 0.31f, 0.22f));
+                }
+                const glm::vec3 liftTint = alpineModule
+                    ? glm::vec3(0.18f, 0.27f, 0.42f)
+                    : (canyonModule ? glm::vec3(0.62f, 0.27f, 0.12f) : glm::vec3(0.22f, 0.30f, 0.23f));
+                const glm::vec3 splitColor = glm::mix(groundTint, liftTint, canyonModule ? 0.34f : 0.26f);
+                auto pseudo = [](int i, float salt) {
+                    const float n = std::sin(static_cast<float>(i) * 12.9898f + salt * 78.233f) * 43758.5453f;
+                    return n - std::floor(n);
+                };
+                for (int i = 0; i < genExt.sourceReadabilityBalance.blackMassSplitCount; ++i) {
+                    const float side = (i % 2 == 0) ? -1.0f : 1.0f;
+                    const float lane = static_cast<float>((i / 2) % 5);
+                    const float x = side * (2.5f + pseudo(i + 3, 2.11f) * groundW * 0.30f);
+                    const float z = shoreZ + 0.72f + lane * 0.68f + pseudo(i + 7, 1.47f) * std::min(landSpan, 6.4f);
+                    const float y = GenerativeTerrainHeight(x,
+                                                            z,
+                                                            genExt.terrainRelief,
+                                                            genExt.terrainMicroRelief,
+                                                            shoreZ,
+                                                            genExt.waterOn) +
+                                    0.066f + static_cast<float>(i % 3) * 0.0015f;
+                    entt::entity e = m_registry->CreateEntity();
+                    m_registry->AddComponent<Scene::TagComponent>(
+                        e, "GenerativeExterior_SourceReadabilitySplit" + std::to_string(i));
+                    auto& t = m_registry->AddComponent<TransformComponent>(e);
+                    t.position = glm::vec3(x, y, z);
+                    t.scale = glm::vec3(0.70f + pseudo(i, 2.73f) * 1.25f,
+                                        1.0f,
+                                        0.050f + pseudo(i, 3.19f) * 0.060f);
+                    t.rotation = glm::quat(glm::vec3(0.0f,
+                                                     glm::radians(side * (8.0f + pseudo(i, 4.01f) * 13.0f)),
+                                                     0.0f));
+                    auto& r = m_registry->AddComponent<Scene::RenderableComponent>(e);
+                    r.mesh = splitMesh;
+                    r.albedoColor = glm::vec4(splitColor, canyonModule ? 0.20f : 0.16f);
+                    r.metallic = 0.0f;
+                    r.roughness = 0.84f;
+                    r.ao = 0.98f;
+                    r.occlusionStrength = 0.48f;
+                    r.normalScale = 0.22f;
+                    r.proceduralMaskStrength = 0.24f;
+                    r.specularFactor = 0.10f;
+                    r.clearcoatFactor = 0.012f;
+                    r.alphaMode = Scene::RenderableComponent::AlphaMode::Blend;
+                    r.renderLayer = Scene::RenderableComponent::RenderLayer::Overlay;
+                    r.doubleSided = true;
+                    r.presetName = canyonModule ? "masonry" : "naturalistic";
+                    if (canyonModule) {
+                        applyGeneratedTextureMaterial(r, "rock_cliff", false, false);
+                        r.albedoColor = glm::vec4(splitColor, 0.20f);
+                    }
+                    blackSplits++;
+                }
+            }
+
+            if (canyonModule) {
+                renderer->SetAmbientLighting(glm::vec3(0.072f, 0.054f, 0.041f), 0.66f);
+                renderer->SetExposure(std::clamp(std::max(renderer->GetExposure(), 1.00f), 0.84f, 1.20f));
+                renderer->SetIBLIntensity(1.48f, 1.06f);
+                renderer->SetSSAOParams(std::max(genExt.graphicsSSAORadius, 1.30f),
+                                        std::min(genExt.graphicsSSAOBias, 0.014f),
+                                        std::max(2.66f, genExt.graphicsSSAOIntensity * 0.82f));
+            } else if (alpineModule) {
+                renderer->SetAmbientLighting(glm::vec3(0.026f, 0.042f, 0.082f), 0.62f);
+                renderer->SetExposure(std::clamp(std::max(renderer->GetExposure(), 0.90f), 0.66f, 1.02f));
+                renderer->SetIBLIntensity(0.66f, 0.94f);
+                renderer->SetSSAOParams(std::max(genExt.graphicsSSAORadius, 1.22f),
+                                        std::min(genExt.graphicsSSAOBias, 0.015f),
+                                        std::max(2.46f, genExt.graphicsSSAOIntensity * 0.80f));
+            } else {
+                renderer->SetAmbientLighting(glm::vec3(0.040f, 0.050f, 0.066f), 0.65f);
+                renderer->SetExposure(std::clamp(std::max(renderer->GetExposure(), 0.98f), 0.80f, 1.16f));
+                renderer->SetIBLIntensity(1.22f, 1.00f);
+                renderer->SetSSAOParams(std::max(genExt.graphicsSSAORadius, 1.30f),
+                                        std::min(genExt.graphicsSSAOBias, 0.014f),
+                                        std::max(2.68f, genExt.graphicsSSAOIntensity * 0.82f));
+            }
+            renderer->SetToneGrade(alpineModule ? 1.12f : 1.18f, alpineModule ? 1.02f : 1.08f);
+
+            spdlog::info("generative_exterior: source readability balance source_surfaces={} backdrop_surfaces={} black_splits={} albedo_floor={:.2f} nonblack_floor={:.2f}",
+                         sourceSurfaces,
+                         backdropSurfaces,
+                         blackSplits,
+                         albedoFloor,
+                         genExt.sourceReadabilityBalance.frameNonblackFloor);
         }
     }
 

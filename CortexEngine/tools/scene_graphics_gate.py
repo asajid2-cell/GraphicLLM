@@ -374,6 +374,24 @@ def _lighting_shadow_material_field_runtime(log_text: str) -> dict[str, float | 
     }
 
 
+def _source_readability_runtime(log_text: str) -> dict[str, float | int] | None:
+    m = re.search(
+        r"generative_exterior: source readability balance "
+        r"source_surfaces=(\d+) backdrop_surfaces=(\d+) black_splits=(\d+) "
+        r"albedo_floor=([0-9.]+) nonblack_floor=([0-9.]+)",
+        log_text,
+    )
+    if not m:
+        return None
+    return {
+        "source_surfaces": int(m.group(1)),
+        "backdrop_surfaces": int(m.group(2)),
+        "black_splits": int(m.group(3)),
+        "albedo_floor": float(m.group(4)),
+        "nonblack_floor": float(m.group(5)),
+    }
+
+
 def _asset_counts(ir: dict[str, Any]) -> dict[str, int]:
     counts = {
         "trees": 0,
@@ -402,6 +420,18 @@ def _image_metrics(path: Path | None) -> dict[str, Any]:
         return {}
     im = Image.open(path).convert("RGB")
     w, h = im.size
+    full_samples = 0
+    full_luma = 0.0
+    full_nonblack = 0
+    for y in range(0, h, 3):
+        for x in range(0, w, 3):
+            r, g, b = im.getpixel((x, y))
+            l = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255.0
+            full_luma += l
+            if l >= 0.035:
+                full_nonblack += 1
+            full_samples += 1
+    full_samples = max(full_samples, 1)
     # Lower-mid ground band: where planar terrain and ungrounded props dominate.
     box = (int(w * 0.06), int(h * 0.48), int(w * 0.94), int(h * 0.93))
     roi = im.crop(box)
@@ -435,6 +465,9 @@ def _image_metrics(path: Path | None) -> dict[str, Any]:
             samples += 1
     samples = max(samples, 1)
     return {
+        "frame_avg_luma": round(full_luma / full_samples, 4),
+        "frame_nonblack_fraction": round(full_nonblack / full_samples, 4),
+        "frame_black_fraction": round(1.0 - (full_nonblack / full_samples), 4),
         "ground_box": box,
         "ground_edge_density": round(edge_sum / samples, 4),
         "ground_vertical_detail": round(vertical_sum / samples, 4),
@@ -481,6 +514,7 @@ def evaluate(prompt: str, ir: dict[str, Any], png: Path | None, log_text: str) -
     structural_scene_fidelity = graphics.get("structural_scene_fidelity") or {}
     hero_mesh_material_overhaul = graphics.get("hero_mesh_material_overhaul") or {}
     lighting_shadow_material_field = graphics.get("lighting_shadow_material_field") or {}
+    source_readability_balance = graphics.get("source_readability_balance") or {}
     image = _image_metrics(png)
 
     failures: list[dict[str, Any]] = []
@@ -1497,6 +1531,56 @@ def evaluate(prompt: str, ir: dict[str, Any], png: Path | None, log_text: str) -
                 shadow_pcf_radius_target=shadow_pcf_target,
                 runtime_lighting_shadow_material_field=runtime_lighting_field,
                 runtime_lighting_shadow_material_field_ok=runtime_lighting_field_ok,
+            )
+
+        try:
+            source_lifts = int(source_readability_balance.get("source_surface_lift_count", 0) or 0)
+            backdrop_lifts = int(source_readability_balance.get("backdrop_surface_lift_count", 0) or 0)
+            black_splits = int(source_readability_balance.get("black_mass_split_count", 0) or 0)
+            albedo_floor = float(source_readability_balance.get("albedo_floor", 0.0) or 0.0)
+            nonblack_floor = float(source_readability_balance.get("frame_nonblack_floor", 0.0) or 0.0)
+            luma_floor = float(source_readability_balance.get("frame_luma_floor", 0.0) or 0.0)
+        except Exception:
+            source_lifts = backdrop_lifts = black_splits = 0
+            albedo_floor = nonblack_floor = luma_floor = 0.0
+        runtime_source_readability = _source_readability_runtime(log_text)
+        frame_nonblack = float(image.get("frame_nonblack_fraction", 0.0) or 0.0)
+        frame_luma = float(image.get("frame_avg_luma", 0.0) or 0.0)
+        runtime_source_readability_ok = (
+            isinstance(runtime_source_readability, dict)
+            and runtime_source_readability.get("source_surfaces", 0) >= max(18, source_lifts - 6)
+            and runtime_source_readability.get("backdrop_surfaces", 0) >= max(6, backdrop_lifts - 3)
+            and runtime_source_readability.get("black_splits", 0) >= max(8, black_splits - 4)
+            and runtime_source_readability.get("albedo_floor", 0.0) >= max(0.08, albedo_floor - 0.02)
+            and runtime_source_readability.get("nonblack_floor", 0.0) >= max(0.78, nonblack_floor - 0.02)
+        )
+        if (
+            not isinstance(source_readability_balance, dict)
+            or not bool(source_readability_balance.get("enabled"))
+            or source_lifts < 18
+            or backdrop_lifts < 6
+            or black_splits < 8
+            or albedo_floor < 0.08
+            or nonblack_floor < (0.82 if flags["moonlight"] else 0.90)
+            or luma_floor < (0.09 if flags["moonlight"] else 0.20)
+            or frame_nonblack < nonblack_floor
+            or frame_luma < luma_floor
+            or not runtime_source_readability_ok
+        ):
+            fail(
+                "missing_source_readability_balance",
+                "Generated exterior has crushed black source/backdrop masses or lacks a source-material readability rebalance",
+                source_readability_balance=source_readability_balance,
+                source_surface_lift_count=source_lifts,
+                backdrop_surface_lift_count=backdrop_lifts,
+                black_mass_split_count=black_splits,
+                albedo_floor=albedo_floor,
+                frame_nonblack_floor=nonblack_floor,
+                frame_luma_floor=luma_floor,
+                frame_nonblack_fraction=frame_nonblack,
+                frame_avg_luma=frame_luma,
+                runtime_source_readability_balance=runtime_source_readability,
+                runtime_source_readability_balance_ok=runtime_source_readability_ok,
             )
 
         if flags["moonlight"] or "storm" in prompt.lower():

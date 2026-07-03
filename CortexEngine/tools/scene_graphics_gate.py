@@ -227,6 +227,25 @@ def _hero_asset_replacement_runtime(log_text: str) -> dict[str, int] | None:
     return {key: int(value) for key, value in zip(keys, m.groups())}
 
 
+def _cohesive_staging_cleanup_runtime(log_text: str) -> dict[str, float | int] | None:
+    m = re.search(
+        r"generative_exterior: cohesive staging cleanup "
+        r"cluster_radius=([0-9.]+) stray_budget=(\d+) sightline_clearance=([0-9.]+) "
+        r"anchored_props=(\d+) foreground_relocated=(\d+) palette_unified=(\d+)",
+        log_text,
+    )
+    if not m:
+        return None
+    return {
+        "cluster_radius": float(m.group(1)),
+        "stray_budget": int(m.group(2)),
+        "sightline_clearance": float(m.group(3)),
+        "anchored_props": int(m.group(4)),
+        "foreground_relocated": int(m.group(5)),
+        "palette_unified": int(m.group(6)),
+    }
+
+
 def _asset_counts(ir: dict[str, Any]) -> dict[str, int]:
     counts = {
         "trees": 0,
@@ -327,6 +346,7 @@ def evaluate(prompt: str, ir: dict[str, Any], png: Path | None, log_text: str) -
     authored_scene_module = graphics.get("authored_scene_module") or {}
     cinematic_material_lighting = graphics.get("cinematic_material_lighting") or {}
     hero_asset_replacement = graphics.get("hero_asset_replacement") or {}
+    cohesive_staging_cleanup = graphics.get("cohesive_staging_cleanup") or {}
     image = _image_metrics(png)
 
     failures: list[dict[str, Any]] = []
@@ -952,6 +972,53 @@ def evaluate(prompt: str, ir: dict[str, Any], png: Path | None, log_text: str) -
                 hero_rock_mass_count=hero_rock_masses,
                 runtime_hero_asset_replacement=runtime_replacement,
                 runtime_hero_asset_replacement_ok=runtime_replacement_ok,
+            )
+
+        try:
+            cluster_radius = float(cohesive_staging_cleanup.get("hero_cluster_radius_m", 0.0) or 0.0)
+            stray_budget = int(cohesive_staging_cleanup.get("stray_dressing_budget", 99) or 99)
+            sightline_clearance = float(cohesive_staging_cleanup.get("central_sightline_clearance_m", 0.0) or 0.0)
+            anchored_props = int(cohesive_staging_cleanup.get("anchored_prop_count", 0) or 0)
+            foreground_relocated = int(cohesive_staging_cleanup.get("foreground_relocation_count", 0) or 0)
+            palette_unified = int(cohesive_staging_cleanup.get("palette_unification_count", 0) or 0)
+        except Exception:
+            cluster_radius = sightline_clearance = 0.0
+            stray_budget = 99
+            anchored_props = foreground_relocated = palette_unified = 0
+        runtime_staging = _cohesive_staging_cleanup_runtime(log_text)
+        runtime_staging_ok = (
+            isinstance(runtime_staging, dict)
+            and runtime_staging.get("cluster_radius", 99.0) <= max(cluster_radius + 0.25, 0.25)
+            and runtime_staging.get("stray_budget", 99) <= max(stray_budget, 0)
+            and runtime_staging.get("sightline_clearance", 0.0) >= max(sightline_clearance - 0.25, 0.0)
+            and runtime_staging.get("anchored_props", 0) >= max(anchored_props - 2, 0)
+            and runtime_staging.get("foreground_relocated", 0) >= max(foreground_relocated - 1, 0)
+            and runtime_staging.get("palette_unified", 0) >= max(palette_unified - 2, 0)
+        )
+        if (
+            not isinstance(cohesive_staging_cleanup, dict)
+            or not bool(cohesive_staging_cleanup.get("enabled"))
+            or cluster_radius <= 0.0
+            or cluster_radius > 3.25
+            or stray_budget > 3
+            or sightline_clearance < 3.0
+            or anchored_props < (12 if (flags["campsite"] or "cabin" in prompt.lower()) else 6)
+            or foreground_relocated < 3
+            or palette_unified < 8
+            or not runtime_staging_ok
+        ):
+            fail(
+                "missing_cohesive_staging_cleanup",
+                "Generated exterior still has disconnected prop scatter instead of clustered hero staging and a clear central sightline",
+                cohesive_staging_cleanup=cohesive_staging_cleanup,
+                hero_cluster_radius_m=cluster_radius,
+                stray_dressing_budget=stray_budget,
+                central_sightline_clearance_m=sightline_clearance,
+                anchored_prop_count=anchored_props,
+                foreground_relocation_count=foreground_relocated,
+                palette_unification_count=palette_unified,
+                runtime_cohesive_staging_cleanup=runtime_staging,
+                runtime_cohesive_staging_cleanup_ok=runtime_staging_ok,
             )
 
         if flags["moonlight"] or "storm" in prompt.lower():

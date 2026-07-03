@@ -238,6 +238,16 @@ namespace {
         int heroRockMassCount = 0;
     };
 
+    struct GenerativeCohesiveStagingCleanup {
+        bool enabled = false;
+        float heroClusterRadiusM = 0.0f;
+        int strayDressingBudget = 99;
+        float centralSightlineClearanceM = 0.0f;
+        int anchoredPropCount = 0;
+        int foregroundRelocationCount = 0;
+        int paletteUnificationCount = 0;
+    };
+
     struct GenerativeRendererShadowOcclusionBudget {
         bool enabled = false;
         bool rendererSSAO = false;
@@ -3422,6 +3432,7 @@ void Engine::BuildRecipeScene() {
         GenerativeTextureMaterialFidelity textureMaterialFidelity;
         GenerativeSourceGeometryFidelity sourceGeometryFidelity;
         GenerativeHeroAssetReplacement heroAssetReplacement;
+        GenerativeCohesiveStagingCleanup cohesiveStagingCleanup;
         GenerativeRendererShadowOcclusionBudget rendererShadowOcclusionBudget;
         GenerativeCinematicMaterialLighting cinematicMaterialLighting;
         GenerativeAtmosphereFidelity atmosphereFidelity;
@@ -3722,6 +3733,21 @@ void Engine::BuildRecipeScene() {
                     static_cast<int>(std::clamp(num(heroAssetReplacement, "cabin_deck_foundation_count", 0.0f), 0.0f, 32.0f));
                 genExt.heroAssetReplacement.heroRockMassCount =
                     static_cast<int>(std::clamp(num(heroAssetReplacement, "hero_rock_mass_count", 0.0f), 0.0f, 32.0f));
+                const nlohmann::json cohesiveStagingCleanup =
+                    graphics.value("cohesive_staging_cleanup", nlohmann::json::object());
+                genExt.cohesiveStagingCleanup.enabled = cohesiveStagingCleanup.value("enabled", false);
+                genExt.cohesiveStagingCleanup.heroClusterRadiusM =
+                    std::clamp(num(cohesiveStagingCleanup, "hero_cluster_radius_m", 0.0f), 0.0f, 8.0f);
+                genExt.cohesiveStagingCleanup.strayDressingBudget =
+                    static_cast<int>(std::clamp(num(cohesiveStagingCleanup, "stray_dressing_budget", 99.0f), 0.0f, 99.0f));
+                genExt.cohesiveStagingCleanup.centralSightlineClearanceM =
+                    std::clamp(num(cohesiveStagingCleanup, "central_sightline_clearance_m", 0.0f), 0.0f, 12.0f);
+                genExt.cohesiveStagingCleanup.anchoredPropCount =
+                    static_cast<int>(std::clamp(num(cohesiveStagingCleanup, "anchored_prop_count", 0.0f), 0.0f, 48.0f));
+                genExt.cohesiveStagingCleanup.foregroundRelocationCount =
+                    static_cast<int>(std::clamp(num(cohesiveStagingCleanup, "foreground_relocation_count", 0.0f), 0.0f, 16.0f));
+                genExt.cohesiveStagingCleanup.paletteUnificationCount =
+                    static_cast<int>(std::clamp(num(cohesiveStagingCleanup, "palette_unification_count", 0.0f), 0.0f, 64.0f));
                 const nlohmann::json atmosphereFidelity = graphics.value("atmosphere_fidelity", nlohmann::json::object());
                 genExt.atmosphereFidelity.enabled = atmosphereFidelity.value("enabled", false);
                 genExt.atmosphereFidelity.nightSkyControl = atmosphereFidelity.value("night_sky_control", false);
@@ -6417,14 +6443,19 @@ void Engine::BuildRecipeScene() {
                 const int foregroundTarget = std::max(3, genExt.authoredSceneModule.foregroundFrameCount);
                 for (int i = 0; i < foregroundTarget; ++i) {
                     const float side = (i % 2 == 0) ? -1.0f : 1.0f;
-                    const float x = side * (3.8f + 0.78f * static_cast<float>(i));
-                    const float z = 4.85f - 0.18f * static_cast<float>(i);
+                    const bool cohesive = genExt.cohesiveStagingCleanup.enabled;
+                    const float x = cohesive
+                        ? side * (5.6f + 0.52f * static_cast<float>(i))
+                        : side * (3.8f + 0.78f * static_cast<float>(i));
+                    const float z = cohesive
+                        ? 5.05f + 0.08f * static_cast<float>(i)
+                        : 4.85f - 0.18f * static_cast<float>(i);
                     addModulePart("GenerativeExterior_AuthoredForegroundFrame" + std::to_string(i),
                                   shardMesh,
                                   glm::vec3(x, 0.10f + 0.018f * static_cast<float>(i % 2), z),
-                                  glm::vec3(0.36f + 0.04f * static_cast<float>(i % 3),
-                                            0.18f,
-                                            0.30f + 0.03f * static_cast<float>(i % 2)),
+                                  glm::vec3((cohesive ? 0.30f : 0.36f) + 0.04f * static_cast<float>(i % 3),
+                                            cohesive ? 0.14f : 0.18f,
+                                            (cohesive ? 0.24f : 0.30f) + 0.03f * static_cast<float>(i % 2)),
                                   glm::vec3(glm::radians(-2.0f + 1.0f * static_cast<float>(i % 3)),
                                             glm::radians(side * (18.0f + 9.0f * static_cast<float>(i))),
                                             glm::radians(side * 2.5f)),
@@ -6465,12 +6496,21 @@ void Engine::BuildRecipeScene() {
                 }
 
                 if (campsiteModule) {
+                    const bool cohesiveCamp = genExt.cohesiveStagingCleanup.enabled;
                     addModulePart("GenerativeExterior_AuthoredCampPad",
                                   cubeMesh,
-                                  glm::vec3(1.38f, 0.036f, 1.10f),
-                                  glm::vec3(4.8f, 0.060f, 2.72f),
+                                  cohesiveCamp ? glm::vec3(0.92f, 0.034f, 0.98f) : glm::vec3(1.38f, 0.036f, 1.10f),
+                                  cohesiveCamp ? glm::vec3(2.72f, 0.034f, 1.36f) : glm::vec3(4.8f, 0.060f, 2.72f),
                                   glm::vec3(0.0f, glm::radians(-10.0f), 0.0f),
                                   darkBank);
+                    if (cohesiveCamp) {
+                        addModulePart("GenerativeExterior_AuthoredCampfireGroundPatch",
+                                      cubeMesh,
+                                      glm::vec3(-0.24f, 0.035f, 0.42f),
+                                      glm::vec3(1.18f, 0.032f, 0.82f),
+                                      glm::vec3(0.0f, glm::radians(8.0f), 0.0f),
+                                      darkBank);
+                    }
                     addModulePart("GenerativeExterior_AuthoredTentShadowBacking",
                                   cubeMesh,
                                   glm::vec3(3.34f, 0.42f, 0.30f),
@@ -6495,7 +6535,7 @@ void Engine::BuildRecipeScene() {
                                   glm::vec3(0.36f, 0.11f, 0.32f),
                                   glm::vec3(0.0f, glm::radians(12.0f), 0.0f),
                                   warmGlow);
-                    terrainSetpieces += 1;
+                    terrainSetpieces += cohesiveCamp ? 2 : 1;
                     heroClusters += 3;
                     compositionAnchors += 5;
                     AddAssetLedPointLight(*m_registry, "GenerativeExterior_AuthoredCampfireKey", glm::vec3(-0.32f, 0.72f, 0.42f), glm::vec3(1.0f, 0.38f, 0.12f), 4.9f, 6.0f);
@@ -6597,6 +6637,16 @@ void Engine::BuildRecipeScene() {
                              practicalLights);
             }
         }
+    }
+
+    if (genExt.valid && genExt.cohesiveStagingCleanup.enabled) {
+        spdlog::info("generative_exterior: cohesive staging cleanup cluster_radius={:.2f} stray_budget={} sightline_clearance={:.2f} anchored_props={} foreground_relocated={} palette_unified={}",
+                     genExt.cohesiveStagingCleanup.heroClusterRadiusM,
+                     genExt.cohesiveStagingCleanup.strayDressingBudget,
+                     genExt.cohesiveStagingCleanup.centralSightlineClearanceM,
+                     genExt.cohesiveStagingCleanup.anchoredPropCount,
+                     genExt.cohesiveStagingCleanup.foregroundRelocationCount,
+                     genExt.cohesiveStagingCleanup.paletteUnificationCount);
     }
 
     if (genExt.valid && genExt.waterOn) {
@@ -7052,12 +7102,19 @@ void Engine::BuildRecipeScene() {
                 for (int i = 0; i < genExt.assetFidelity.foregroundDressingClusters; ++i) {
                     const float side = (i % 2 == 0) ? -1.0f : 1.0f;
                     const float yaw = glm::radians(31.0f * static_cast<float>(i));
+                    const bool cohesive = genExt.cohesiveStagingCleanup.enabled;
                     addPart("GenerativeExterior_Foreground_Twig" + std::to_string(i),
                             cubeMesh,
-                            glm::vec3(side * (2.2f + 0.35f * i), 0.075f, 4.25f - 0.28f * i),
-                            glm::vec3(0.72f, 0.050f, 0.065f),
+                            cohesive
+                                ? glm::vec3(side * (5.25f + 0.22f * i), 0.067f, 4.92f + 0.08f * i)
+                                : glm::vec3(side * (2.2f + 0.35f * i), 0.075f, 4.25f - 0.28f * i),
+                            cohesive
+                                ? glm::vec3(0.42f, 0.038f, 0.050f)
+                                : glm::vec3(0.72f, 0.050f, 0.065f),
                             glm::vec3(0.0f, yaw, glm::radians(2.0f * (i % 3 - 1))),
-                            glm::vec4(0.17f, 0.095f, 0.045f, 1.0f),
+                            cohesive
+                                ? glm::vec4(0.105f, 0.070f, 0.045f, 1.0f)
+                                : glm::vec4(0.17f, 0.095f, 0.045f, 1.0f),
                             "wood",
                             0.86f);
                     foregroundCount++;
@@ -7351,6 +7408,7 @@ void Engine::BuildRecipeScene() {
                         return tentCenter + glm::vec3(cs * x + sn * z, y, -sn * x + cs * z);
                     };
                     const int target = genExt.heroEnvironmentGeometry.highDetailCampPieceCount;
+                    const bool cohesive = genExt.cohesiveStagingCleanup.enabled;
                     for (int i = 0; i < target; ++i) {
                         const int mode = i % 6;
                         if (mode == 0) {
@@ -7387,9 +7445,13 @@ void Engine::BuildRecipeScene() {
                         } else if (mode == 2) {
                             addPart("GenerativeExterior_HighDetailCamp_Bedroll" + std::to_string(i),
                                     cylinderMesh,
-                                    glm::vec3(-1.40f + 0.32f * static_cast<float>((i / 6) % 5),
-                                              0.19f,
-                                              1.76f + 0.13f * static_cast<float>((i / 6) % 3)),
+                                    cohesive
+                                        ? tentPlace(-0.92f + 0.24f * static_cast<float>((i / 6) % 5),
+                                                    0.19f,
+                                                    1.10f + 0.09f * static_cast<float>((i / 6) % 3))
+                                        : glm::vec3(-1.40f + 0.32f * static_cast<float>((i / 6) % 5),
+                                                    0.19f,
+                                                    1.76f + 0.13f * static_cast<float>((i / 6) % 3)),
                                     glm::vec3(0.18f, 0.48f, 0.18f),
                                     glm::vec3(glm::radians(88.0f),
                                               glm::radians(23.0f * static_cast<float>(i)),
@@ -7403,9 +7465,13 @@ void Engine::BuildRecipeScene() {
                         } else if (mode == 3) {
                             addPart("GenerativeExterior_HighDetailCamp_LogSeat" + std::to_string(i),
                                     cylinderMesh,
-                                    glm::vec3(-0.92f + 0.38f * static_cast<float>((i / 6) % 6),
-                                              0.22f,
-                                              -0.54f - 0.18f * static_cast<float>((i / 6) % 3)),
+                                    cohesive
+                                        ? glm::vec3(-0.74f + 0.30f * static_cast<float>((i / 6) % 6),
+                                                    0.22f,
+                                                    -0.18f - 0.10f * static_cast<float>((i / 6) % 3))
+                                        : glm::vec3(-0.92f + 0.38f * static_cast<float>((i / 6) % 6),
+                                                    0.22f,
+                                                    -0.54f - 0.18f * static_cast<float>((i / 6) % 3)),
                                     glm::vec3(0.11f, 0.88f, 0.11f),
                                     glm::vec3(glm::radians(88.0f),
                                               glm::radians(18.0f + 22.0f * static_cast<float>(i)),
@@ -7433,9 +7499,13 @@ void Engine::BuildRecipeScene() {
                         } else {
                             addPart("GenerativeExterior_HighDetailCamp_PackLantern" + std::to_string(i),
                                     cubeMesh,
-                                    glm::vec3(1.05f + 0.18f * static_cast<float>((i / 6) % 4),
-                                              0.32f,
-                                              1.58f + 0.15f * static_cast<float>((i / 6) % 3)),
+                                    cohesive
+                                        ? tentPlace(0.94f + 0.12f * static_cast<float>((i / 6) % 4),
+                                                    0.32f,
+                                                    0.96f + 0.10f * static_cast<float>((i / 6) % 3))
+                                        : glm::vec3(1.05f + 0.18f * static_cast<float>((i / 6) % 4),
+                                                    0.32f,
+                                                    1.58f + 0.15f * static_cast<float>((i / 6) % 3)),
                                     glm::vec3(0.20f, 0.32f, 0.16f),
                                     glm::vec3(glm::radians(-2.0f + pseudo(i, 10.77f) * 4.0f),
                                               glm::radians(27.0f * static_cast<float>(i)),

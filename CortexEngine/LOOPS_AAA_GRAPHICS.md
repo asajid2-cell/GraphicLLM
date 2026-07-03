@@ -644,6 +644,34 @@ Status: running
   - Kitchen smoke `regression_kitchen_aaa_loop23b` quality green (`avg_luma=0.4177`, `nonblack_fraction=1.0`).
   - Known-bad quality oracle `gen_a_foggy_mountain_campsite_beside_0` still fails with the fridge/missing-ridge/focal/purple-water failures. Known-bad graphics oracle `v3_campsite_ridge_test_0` still fails and now includes `missing_hero_asset_replacement`.
   - Visual residual: the replacement pass changes the dominant tent/cabin forms, but the campsite/desert frames still read cluttered, disconnected, and game-kit-like. Next loop should attack cohesive staging/pruning and shot composition rather than adding more detail geometry.
+- Loop 24 contract:
+  - Invariant: generated exteriors must cluster camp/cabin props around coherent hero axes and keep foreground dressing out of the central sightline instead of scattering detail across the frame.
+  - Entry: Loop 23 checkpoint is committed at `8338e8a` and exposes cluttered `loop23b` artifacts.
+  - Scope in: `tools/scene_compiler.py`, `tools/scene_graphics_gate.py`, `src/Core/Engine_Scenes.cpp`, campaign ledgers.
+  - Scope out: weakening `tools/scene_quality_gate.py`, deleting existing graphics gates, forcing DXR, parallel render validation.
+  - Verifier: first make `scene_graphics_gate.py` reject Loop 23b campsite/desert/alpine with `missing_cohesive_staging_cleanup`; then require new IR/runtime evidence and run Python compile, Release build, sequential campsite/desert/alpine renders, quality gates, graphics gates, Director validation, known-bad oracles, and kitchen smoke.
+  - Exit: verifier green plus visual inspection shows fewer center-lane loose props and clearer hero staging; final AAA call remains `HUMAN-GATE`.
+  - Escape: stop if cleanup merely adds cover cards, hides prompt-critical water/hero objects, or breaks previous geometry/material/occlusion gates.
+- Loop 24 verifier evidence:
+  - Heartbeat proof: `node Z:\328\CMPUT328-A2\codexworks\301\heartbeat\bin\hb.mjs wait --label aaa-loop24-proof --timeout 1 --poll 1` fired by timeout after 1s.
+  - Red proof: `aaa_hero_replace_campsite_loop23b`, `aaa_hero_replace_desert_loop23b`, and `aaa_hero_replace_alpine_loop23b` fail the strengthened graphics gate with only `missing_cohesive_staging_cleanup`.
+  - Implementation: `tools/scene_compiler.py` emits `graphics_pass.cohesive_staging_cleanup`; `tools/scene_graphics_gate.py` requires IR/runtime evidence; `src\Core\Engine_Scenes.cpp` pushes foreground frames/twigs to the side lanes, shrinks/splits the campsite pad, clusters bedroll/log-seat/lantern pieces around the tent/fire axis, and logs `generative_exterior: cohesive staging cleanup`.
+  - Takeover heartbeat proof: `node Z:\328\CMPUT328-A2\codexworks\301\heartbeat\bin\hb.mjs wait --label codex-aaa-proof --timeout 1 --poll 1` fired by timeout after 1s.
+  - Build/regression: `python -m py_compile tools\scene_compiler.py tools\scene_graphics_gate.py tools\scene_quality_gate.py tools\scene_gen.py` exited 0; `git diff --check` exited 0 except CRLF warnings; Release rebuild exited 0 (`[OK] Build complete in 3.5s`, no work needed).
+  - Final campsite `aaa_cohesive_campsite_loop24c` quality green (`purple_fraction=0.8788`, `nonblack_fraction=0.9843`), graphics green (`dark_contact_fraction=0.0197`, `dark_contact_area_fraction=0.3283`), Director validation green, runtime cleanup receipt present.
+  - Final desert `aaa_cohesive_desert_loop24c` quality green (`turquoise_fraction=0.4152`, `nonblack_fraction=0.9931`), graphics green (`dark_contact_fraction=0.0095`, `dark_contact_area_fraction=0.1778`), Director validation green, runtime cleanup receipt present.
+  - Final alpine `aaa_cohesive_alpine_loop24c` quality green (`avg_luma=0.0925`, `cool_fraction=0.8882`, `nonblack_fraction=0.7576`), graphics green (`dark_contact_fraction=0.0365`, `dark_contact_area_fraction=0.8824`), Director validation green, runtime cleanup receipt present.
+  - Kitchen smoke `regression_kitchen_aaa_loop24` rendered VALID and quality gate exited 0 (`avg_luma=0.4479`, `nonblack_fraction=1.0`).
+  - Known-bad quality oracle `gen_a_foggy_mountain_campsite_beside_0` with `--expect-fail` still reports forbidden fridge assets, missing ridge, focal visibility, and purple-water failures. Known-bad graphics oracle `v3_campsite_ridge_test_0` with `--expect-fail` still fails and now includes `missing_cohesive_staging_cleanup`.
+  - Visual inspection: the pass reduces some central clutter and removes desert grass scatter, but it does not solve the user's actual fidelity complaint. The latest stills remain flat, stylized, low-poly, and stage-like. Next loop must attack environment/lighting/material integration at a larger structural layer: sky/atmosphere, water depth/reflection bands, terrain relief, directional shadows, and backdrop integration.
+- Loop 25 contract:
+  - Invariant: generated exteriors must stop reading as flat stage planes; sky/atmosphere, water, terrain, backdrop, and directional light/shadow must be integrated as one environment pass.
+  - Entry: Loop 24 checkpoint is green, but `aaa_cohesive_*_loop24c` artifacts are visually rejected as flat/stylized despite passing objective gates.
+  - Scope in: `tools/scene_compiler.py`, `tools/scene_graphics_gate.py`, `src/Core/Engine_Scenes.cpp`, campaign ledgers, novel generated exterior artifacts.
+  - Scope out: weakening `tools/scene_quality_gate.py`, forcing generated DXR by default, adding disconnected prop clutter, parallel render validation.
+  - Verifier: first make `scene_graphics_gate.py` reject Loop 24 campsite/desert/alpine artifacts with `missing_environment_fidelity_pass`; then require new IR/runtime evidence and run Python compile, Release build, sequential campsite/desert/alpine renders, quality gates, graphics gates, Director validation, known-bad oracles, and kitchen smoke.
+  - Exit: verifier green plus visual inspection shows less empty gray sky/hard horizon/flat water-plane staging and stronger directional light/shadow read; final AAA call remains `HUMAN-GATE`.
+  - Escape: stop if the implementation creates visible light cards, black bands/puddles, covers water/color ROIs, or only adds metadata without a visible structural change.
 - Image metrics alone cannot certify AAA quality; this loop uses them only to catch obvious flat/blockout failures and relies on runtime evidence for deterministic features.
 - Generated validation renders now intentionally use SSAO/SSR/shadows instead of forced DXR. Re-enable DXR only behind a separate density/BLAS budget gate.
 - Objective graphics gates are green, but visual inspection still shows asset/shot-fidelity limits: low-poly tree silhouettes, generic canyon composition, and remaining stage-like flatness. This is the next asset-fidelity front, not a blocker for this graphics-pass checkpoint.

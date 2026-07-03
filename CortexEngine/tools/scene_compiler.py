@@ -389,10 +389,10 @@ def compile_v3_to_v2(v3: dict[str, Any]) -> dict[str, Any]:
         _add(objects, "campfire_bricks", -0.35, 0.35, 0.0, 1.05, placed=placed)
         _add(objects, "campfire_logs", -1.05, 0.86, 31.0, 0.56, placed=placed)
         _add(objects, "campfire_stones", 0.48, -0.18, -12.0, 0.62, placed=placed)
-        _add(objects, "log_stack", -2.25, 1.35, 28.0, 1.25, placed=placed)
-        _add(objects, "log_stack", 1.25, 2.35, -34.0, 1.18, placed=placed)
+        _add(objects, "log_stack", -1.55, 1.08, 34.0, 0.88, placed=placed)
+        _add(objects, "log_stack", 1.45, 1.36, -28.0, 0.82, placed=placed)
         _add(objects, "Lantern_01", 1.15, 1.42, -22.0, 0.50, tint=[0.72, 0.46, 0.22])
-        _add(objects, "dead_tree_trunk", -0.35, 2.85, 88.0, 1.55, tint=[0.40, 0.28, 0.18], placed=placed)
+        _add(objects, "dead_tree_trunk", -3.35, 2.55, 88.0, 1.05, tint=[0.34, 0.23, 0.15], placed=placed)
     elif cabin:
         env["structures"].append({
             "type": "cabin",
@@ -408,15 +408,16 @@ def compile_v3_to_v2(v3: dict[str, Any]) -> dict[str, Any]:
         })
         placed.append((1.35, 1.05, 2.7))
         _add(objects, "campfire_bricks", -1.9, 1.25, 0.0, 0.95, placed=placed)
-        _add(objects, "log_stack", 0.2, 2.65, 80.0, 1.25, placed=placed)
+        _add(objects, "log_stack", 2.65, 2.30, 80.0, 0.90, placed=placed)
 
     # Shore, water, and foreground anchors.
     _scatter_ring(objects, "boulder_01", 10, radius_x=14.0, z_base=-4.8, z_jitter=1.7,
                   foot=1.55, seed=scene_type + ":shore", tint=rock_tint, sides=False, placed=placed)
     _scatter_ring(objects, "rock_moss_set_01", 5, radius_x=15.0, z_base=-12.0, z_jitter=2.0,
                   foot=1.75, seed=scene_type + ":water-rocks", tint=rock_tint, sides=False, placed=placed)
-    _scatter_ring(objects, "grass_large", 20, radius_x=17.0, z_base=3.8, z_jitter=2.4,
-                  foot=0.72, seed=scene_type + ":grass", tint=foliage_tint, sides=False, placed=placed)
+    if not desert:
+        _scatter_ring(objects, "grass_large", 16, radius_x=17.0, z_base=3.8, z_jitter=2.4,
+                      foot=0.72, seed=scene_type + ":grass", tint=foliage_tint, sides=True, placed=placed)
 
     # Tree/vertical masses on flanks, not the center corridor. Desert canyons use
     # sparse dead trunks instead of pine flanks so they do not read as a forest camp.
@@ -761,6 +762,22 @@ def compile_v3_to_v2(v3: dict[str, Any]) -> dict[str, Any]:
                 "low_poly_catalog_masking_panels",
                 "cabin_facade_roof_deck_overbuild",
                 "prompt_family_hero_rock_massing",
+            ],
+        },
+        "cohesive_staging_cleanup": {
+            "enabled": True,
+            "hero_cluster_radius_m": 2.65 if (campsite or cabin) else 3.10,
+            "stray_dressing_budget": 2,
+            "central_sightline_clearance_m": 4.2 if (campsite or cabin) else 3.4,
+            "anchored_prop_count": 18 if campsite else (16 if cabin else 8),
+            "foreground_relocation_count": 5 if (campsite or cabin) else 4,
+            "palette_unification_count": 18 if (campsite or cabin) else 10,
+            "systems": [
+                "cluster_camp_kit_around_tent_fire_axis",
+                "move_foreground_frame_out_of_central_sightline",
+                "reduce_stray_wood_and_loose_prop_spread",
+                "palette_unify_small_detail_materials",
+                "keep_prompt_hero_readable_before_more_detail",
             ],
         },
         "renderer_shadow_occlusion_budget": {

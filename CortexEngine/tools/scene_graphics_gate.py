@@ -338,6 +338,19 @@ def _structural_scene_runtime(log_text: str) -> dict[str, float | int] | None:
     }
 
 
+def _hero_mesh_material_runtime(log_text: str) -> dict[str, int] | None:
+    m = re.search(
+        r"generative_exterior: hero mesh material overhaul "
+        r"tent_shells=(\d+) cabin_cladding=(\d+) roof_layers=(\d+) "
+        r"canyon_meshes=(\d+) pbr_layers=(\d+) silhouette_masks=(\d+)",
+        log_text,
+    )
+    if not m:
+        return None
+    keys = ("tent_shells", "cabin_cladding", "roof_layers", "canyon_meshes", "pbr_layers", "silhouette_masks")
+    return {key: int(value) for key, value in zip(keys, m.groups())}
+
+
 def _asset_counts(ir: dict[str, Any]) -> dict[str, int]:
     counts = {
         "trees": 0,
@@ -443,6 +456,7 @@ def evaluate(prompt: str, ir: dict[str, Any], png: Path | None, log_text: str) -
     source_environment_assets = graphics.get("source_environment_assets") or {}
     hero_material_shadow_readability = graphics.get("hero_material_shadow_readability") or {}
     structural_scene_fidelity = graphics.get("structural_scene_fidelity") or {}
+    hero_mesh_material_overhaul = graphics.get("hero_mesh_material_overhaul") or {}
     image = _image_metrics(png)
 
     failures: list[dict[str, Any]] = []
@@ -1351,6 +1365,56 @@ def evaluate(prompt: str, ir: dict[str, Any], png: Path | None, log_text: str) -
                 nonplanar_shore_segment_count=structural_shore_segments,
                 runtime_structural_scene_fidelity=runtime_structural_scene,
                 runtime_structural_scene_fidelity_ok=runtime_structural_ok,
+            )
+
+        try:
+            tent_shells = int(hero_mesh_material_overhaul.get("tent_shell_count", 0) or 0)
+            cabin_cladding = int(hero_mesh_material_overhaul.get("cabin_cladding_count", 0) or 0)
+            roof_layers = int(hero_mesh_material_overhaul.get("roof_layer_count", 0) or 0)
+            canyon_meshes = int(hero_mesh_material_overhaul.get("canyon_hero_mesh_count", 0) or 0)
+            pbr_layers = int(hero_mesh_material_overhaul.get("pbr_material_layer_count", 0) or 0)
+            silhouette_masks = int(hero_mesh_material_overhaul.get("lowpoly_silhouette_mask_count", 0) or 0)
+        except Exception:
+            tent_shells = cabin_cladding = roof_layers = canyon_meshes = pbr_layers = silhouette_masks = 0
+        runtime_hero_mesh_material = _hero_mesh_material_runtime(log_text)
+        min_tent_shells = 1 if flags["campsite"] and "cabin" not in prompt.lower() else 0
+        min_cabin_cladding = 14 if "cabin" in prompt.lower() else 0
+        min_roof_layers = 8 if "cabin" in prompt.lower() else 0
+        min_canyon_meshes = 8 if flags["desert"] or "canyon" in prompt.lower() else 0
+        min_pbr_layers = 6
+        min_silhouette_masks = 4 if (flags["campsite"] or "cabin" in prompt.lower() or flags["desert"]) else 2
+        runtime_hero_mesh_material_ok = (
+            isinstance(runtime_hero_mesh_material, dict)
+            and runtime_hero_mesh_material.get("tent_shells", 0) >= max(tent_shells, min_tent_shells)
+            and runtime_hero_mesh_material.get("cabin_cladding", 0) >= max(cabin_cladding - 2, min_cabin_cladding)
+            and runtime_hero_mesh_material.get("roof_layers", 0) >= max(roof_layers - 1, min_roof_layers)
+            and runtime_hero_mesh_material.get("canyon_meshes", 0) >= max(canyon_meshes - 2, min_canyon_meshes)
+            and runtime_hero_mesh_material.get("pbr_layers", 0) >= max(pbr_layers - 1, min_pbr_layers)
+            and runtime_hero_mesh_material.get("silhouette_masks", 0) >= max(silhouette_masks - 1, min_silhouette_masks)
+        )
+        if (
+            not isinstance(hero_mesh_material_overhaul, dict)
+            or not bool(hero_mesh_material_overhaul.get("enabled"))
+            or tent_shells < min_tent_shells
+            or cabin_cladding < min_cabin_cladding
+            or roof_layers < min_roof_layers
+            or canyon_meshes < min_canyon_meshes
+            or pbr_layers < min_pbr_layers
+            or silhouette_masks < min_silhouette_masks
+            or not runtime_hero_mesh_material_ok
+        ):
+            fail(
+                "missing_hero_mesh_material_overhaul",
+                "Dominant generated heroes still rely on kit silhouettes instead of rebuilt hero meshes with layered PBR material response",
+                hero_mesh_material_overhaul=hero_mesh_material_overhaul,
+                tent_shell_count=tent_shells,
+                cabin_cladding_count=cabin_cladding,
+                roof_layer_count=roof_layers,
+                canyon_hero_mesh_count=canyon_meshes,
+                pbr_material_layer_count=pbr_layers,
+                lowpoly_silhouette_mask_count=silhouette_masks,
+                runtime_hero_mesh_material_overhaul=runtime_hero_mesh_material,
+                runtime_hero_mesh_material_overhaul_ok=runtime_hero_mesh_material_ok,
             )
 
         if flags["moonlight"] or "storm" in prompt.lower():

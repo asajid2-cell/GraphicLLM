@@ -505,6 +505,13 @@ def compile_v3_to_v2(v3: dict[str, Any]) -> dict[str, Any]:
         "shadow_caster_scene_structure",
         "nonplanar_shore_bank_geometry",
     ])
+    material_zone_names.extend([
+        "rebuilt_hero_mesh_shell",
+        "layered_pbr_hero_materials",
+        "lowpoly_silhouette_masking",
+        "cabin_cladding_roof_shingles",
+        "canyon_hero_mesh_overbuild",
+    ])
     if water_on:
         material_zone_names.append("texture_source_wet_shore")
         material_zone_names.append("authored_curved_shore_water_corridor")
@@ -883,6 +890,25 @@ def compile_v3_to_v2(v3: dict[str, Any]) -> dict[str, Any]:
                 "material_blend_patches_with_texture_hooks",
                 "real_shadow_caster_geometry_and_local_lights",
                 "nonplanar_shore_bank_transition",
+            ],
+        },
+        "hero_mesh_material_overhaul": {
+            "enabled": True,
+            "tent_shell_count": 1 if campsite else 0,
+            "cabin_cladding_count": 20 if cabin else 0,
+            "roof_layer_count": 10 if cabin else 0,
+            "canyon_hero_mesh_count": 12 if canyon else 0,
+            "pbr_material_layer_count": 8 if (campsite or cabin or canyon) else 6,
+            "lowpoly_silhouette_mask_count": 6 if campsite else (6 if cabin else 4),
+            "overhaul_family": "aframe_canvas_pbr_shell" if campsite else (
+                "cabin_cladding_roof_pbr" if cabin else "canyon_rock_mesh_pbr"
+            ),
+            "systems": [
+                "procedural_rebuilt_hero_mesh",
+                "source_texture_driven_pbr_layers",
+                "lowpoly_silhouette_masking_without_light_cards",
+                "prompt_family_hero_cladding",
+                "shadow_casting_hero_forms",
             ],
         },
         "renderer_shadow_occlusion_budget": {

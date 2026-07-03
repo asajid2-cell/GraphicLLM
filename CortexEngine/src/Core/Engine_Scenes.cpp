@@ -260,6 +260,16 @@ namespace {
         int nonplanarShoreSegmentCount = 0;
     };
 
+    struct GenerativeHeroMeshMaterialOverhaul {
+        bool enabled = false;
+        int tentShellCount = 0;
+        int cabinCladdingCount = 0;
+        int roofLayerCount = 0;
+        int canyonHeroMeshCount = 0;
+        int pbrMaterialLayerCount = 0;
+        int lowpolySilhouetteMaskCount = 0;
+    };
+
     struct GenerativeHeroAssetReplacement {
         bool enabled = false;
         int canvasShellPanelCount = 0;
@@ -3570,6 +3580,7 @@ void Engine::BuildRecipeScene() {
         GenerativeSourceEnvironmentAssets sourceEnvironmentAssets;
         GenerativeHeroMaterialShadowReadability heroMaterialShadowReadability;
         GenerativeStructuralSceneFidelity structuralSceneFidelity;
+        GenerativeHeroMeshMaterialOverhaul heroMeshMaterialOverhaul;
         GenerativeHeroAssetReplacement heroAssetReplacement;
         GenerativeCohesiveStagingCleanup cohesiveStagingCleanup;
         GenerativeEnvironmentFidelity environmentFidelity;
@@ -3918,6 +3929,21 @@ void Engine::BuildRecipeScene() {
                                                genExt.groundKind.find("sand") != std::string::npos;
                     genExt.terrainMicroRelief = std::max(genExt.terrainMicroRelief, desertTerrain ? 0.078f : 0.105f);
                 }
+                const nlohmann::json heroMeshMaterialOverhaul =
+                    graphics.value("hero_mesh_material_overhaul", nlohmann::json::object());
+                genExt.heroMeshMaterialOverhaul.enabled = heroMeshMaterialOverhaul.value("enabled", false);
+                genExt.heroMeshMaterialOverhaul.tentShellCount =
+                    static_cast<int>(std::clamp(num(heroMeshMaterialOverhaul, "tent_shell_count", 0.0f), 0.0f, 4.0f));
+                genExt.heroMeshMaterialOverhaul.cabinCladdingCount =
+                    static_cast<int>(std::clamp(num(heroMeshMaterialOverhaul, "cabin_cladding_count", 0.0f), 0.0f, 48.0f));
+                genExt.heroMeshMaterialOverhaul.roofLayerCount =
+                    static_cast<int>(std::clamp(num(heroMeshMaterialOverhaul, "roof_layer_count", 0.0f), 0.0f, 32.0f));
+                genExt.heroMeshMaterialOverhaul.canyonHeroMeshCount =
+                    static_cast<int>(std::clamp(num(heroMeshMaterialOverhaul, "canyon_hero_mesh_count", 0.0f), 0.0f, 32.0f));
+                genExt.heroMeshMaterialOverhaul.pbrMaterialLayerCount =
+                    static_cast<int>(std::clamp(num(heroMeshMaterialOverhaul, "pbr_material_layer_count", 0.0f), 0.0f, 16.0f));
+                genExt.heroMeshMaterialOverhaul.lowpolySilhouetteMaskCount =
+                    static_cast<int>(std::clamp(num(heroMeshMaterialOverhaul, "lowpoly_silhouette_mask_count", 0.0f), 0.0f, 16.0f));
                 const nlohmann::json heroAssetReplacement = graphics.value("hero_asset_replacement", nlohmann::json::object());
                 genExt.heroAssetReplacement.enabled = heroAssetReplacement.value("enabled", false);
                 genExt.heroAssetReplacement.canvasShellPanelCount =
@@ -9002,6 +9028,279 @@ void Engine::BuildRecipeScene() {
                              shoreSegments,
                              genExt.terrainGrid,
                              genExt.terrainRelief);
+            }
+        }
+    }
+
+    if (genExt.valid && genExt.heroMeshMaterialOverhaul.enabled) {
+        if (auto* renderer = m_renderer.get()) {
+            auto cubeMesh = Utils::MeshGenerator::CreateCube();
+            auto cylinderMesh = Utils::MeshGenerator::CreateCylinder(0.5f, 1.0f, 24);
+            auto shardMesh = CreateGenerativeRockShardMesh(63.11f);
+            auto tentShellMesh = CreateGenerativeGableRoofMesh(3.55f, 2.45f, 1.38f);
+                auto canyonHeroMesh = CreateGenerativeCliffWallMesh(genExt.extent * 0.15f,
+                                                                std::max(2.6f, genExt.terrainRelief * 5.4f),
+                                                                1.10f,
+                                                                71.37f,
+                                                                7u);
+            const auto upCube = renderer->UploadMesh(cubeMesh);
+            const auto upCylinder = renderer->UploadMesh(cylinderMesh);
+            const auto upShard = renderer->UploadMesh(shardMesh);
+            const auto upTentShell = renderer->UploadMesh(tentShellMesh);
+            const auto upCanyonHero = renderer->UploadMesh(canyonHeroMesh);
+            if (upCube.IsErr() || upCylinder.IsErr() || upShard.IsErr() ||
+                upTentShell.IsErr() || upCanyonHero.IsErr()) {
+                spdlog::warn("generative_exterior: hero mesh material overhaul mesh upload failed cube='{}' cylinder='{}' shard='{}' tent='{}' canyon='{}'",
+                             upCube.IsErr() ? upCube.Error() : "ok",
+                             upCylinder.IsErr() ? upCylinder.Error() : "ok",
+                             upShard.IsErr() ? upShard.Error() : "ok",
+                             upTentShell.IsErr() ? upTentShell.Error() : "ok",
+                             upCanyonHero.IsErr() ? upCanyonHero.Error() : "ok");
+            } else {
+                const std::string module = genExt.authoredSceneModule.moduleId;
+                const bool canyonModule = module == "desert_canyon_river";
+                const bool alpineModule = module == "alpine_cabin_lake";
+                const bool hasCabin = !genExt.structures.empty();
+                const float shoreZ = genExt.waterOn ? genExt.waterFromZ : -genExt.extent * 0.30f;
+                auto pseudo = [](int i, float salt) {
+                    const float n = std::sin(static_cast<float>(i) * 23.419f + salt * 37.917f) * 19731.713f;
+                    return n - std::floor(n);
+                };
+                auto addHeroMesh = [&](const std::string& tag,
+                                       const std::shared_ptr<Scene::MeshData>& mesh,
+                                       const glm::vec3& position,
+                                       const glm::vec3& scale,
+                                       const glm::vec3& euler,
+                                       const glm::vec4& color,
+                                       const char* preset,
+                                       const char* textureId,
+                                       float roughness,
+                                       float normalScale,
+                                       float proceduralMask,
+                                       float wetness,
+                                       int& counter) {
+                    entt::entity e = m_registry->CreateEntity();
+                    m_registry->AddComponent<Scene::TagComponent>(e, tag);
+                    auto& t = m_registry->AddComponent<TransformComponent>(e);
+                    t.position = position;
+                    t.scale = scale;
+                    t.rotation = glm::quat(euler);
+                    auto& r = m_registry->AddComponent<Scene::RenderableComponent>(e);
+                    r.mesh = mesh;
+                    const glm::vec4 finalAlbedo = color;
+                    r.albedoColor = finalAlbedo;
+                    r.metallic = 0.0f;
+                    r.roughness = roughness;
+                    r.ao = 0.90f;
+                    r.occlusionStrength = 0.70f;
+                    r.normalScale = normalScale;
+                    r.proceduralMaskStrength = proceduralMask;
+                    r.wetnessFactor = wetness;
+                    r.specularFactor = 0.22f + wetness * 0.18f;
+                    r.clearcoatFactor = std::min(wetness * 0.22f, 0.12f);
+                    r.clearcoatRoughnessFactor = 0.68f;
+                    r.sheenWeight = std::string(preset ? preset : "") == "fabric" ? 0.38f : 0.04f;
+                    r.anisotropyStrength = std::string(preset ? preset : "") == "wood" ? 0.36f : 0.14f;
+                    r.doubleSided = true;
+                    r.alphaMode = Scene::RenderableComponent::AlphaMode::Opaque;
+                    r.renderLayer = Scene::RenderableComponent::RenderLayer::Opaque;
+                    r.presetName = preset ? preset : "";
+                    if (textureId && textureId[0]) {
+                        applyGeneratedTextureMaterial(r, textureId, true, wetness > 0.16f);
+                        r.albedoColor = finalAlbedo;
+                    }
+                    counter++;
+                };
+
+                int tentShells = 0;
+                int cabinCladding = 0;
+                int roofLayers = 0;
+                int canyonMeshes = 0;
+                int pbrLayers = 0;
+                int silhouetteMasks = 0;
+
+                if (!hasCabin && genExt.heroMeshMaterialOverhaul.tentShellCount > 0) {
+                    const glm::vec3 tentCenter(2.9f, 0.045f, 0.9f);
+                    const float tentYaw = glm::radians(-18.0f);
+                    addHeroMesh("GenerativeExterior_HeroOverhaul_AFrameCanvasShell",
+                                tentShellMesh,
+                                tentCenter,
+                                glm::vec3(1.0f),
+                                glm::vec3(0.0f, tentYaw, 0.0f),
+                                glm::vec4(0.56f, 0.35f, 0.19f, 1.0f),
+                                "fabric",
+                                "fabric",
+                                0.62f,
+                                1.08f,
+                                0.64f,
+                                genExt.groundWetness * 0.14f,
+                                tentShells);
+                    for (int i = 0; i < genExt.heroMeshMaterialOverhaul.pbrMaterialLayerCount; ++i) {
+                        const float side = (i % 2 == 0) ? -1.0f : 1.0f;
+                        const float z = -1.03f + static_cast<float>(i / 2) * 0.30f;
+                        const float x = side * (1.62f + 0.015f * static_cast<float>(i % 3));
+                        const glm::vec3 local(x, 0.18f + 0.06f * static_cast<float>(i % 4), z);
+                        const float cs = std::cos(tentYaw);
+                        const float sn = std::sin(tentYaw);
+                        addHeroMesh("GenerativeExterior_HeroOverhaul_TentPBRLayer" + std::to_string(i),
+                                    cubeMesh,
+                                    tentCenter + glm::vec3(cs * local.x + sn * local.z, local.y, -sn * local.x + cs * local.z),
+                                    glm::vec3(0.026f, 0.028f, 0.22f),
+                                    glm::vec3(glm::radians(2.0f), tentYaw + glm::radians(side * -25.0f), glm::radians(side * -14.0f)),
+                                    glm::vec4((i % 3 == 0) ? glm::vec3(0.68f, 0.43f, 0.22f)
+                                                          : glm::vec3(0.42f, 0.25f, 0.13f), 1.0f),
+                                    "fabric",
+                                    "fabric",
+                                    0.66f,
+                                    0.92f,
+                                    0.62f,
+                                    0.04f,
+                                    pbrLayers);
+                    }
+                    for (int i = 0; i < genExt.heroMeshMaterialOverhaul.lowpolySilhouetteMaskCount; ++i) {
+                        const float side = (i % 2 == 0) ? -1.0f : 1.0f;
+                        const float z = -1.18f + static_cast<float>(i / 2) * 0.58f;
+                        addHeroMesh("GenerativeExterior_HeroOverhaul_TentSilhouetteMask" + std::to_string(i),
+                                    cubeMesh,
+                                    tentCenter + glm::vec3(side * 1.78f, 0.10f + 0.03f * static_cast<float>(i % 3), z),
+                                    glm::vec3(0.060f, 0.10f, 0.24f),
+                                    glm::vec3(0.0f, tentYaw + glm::radians(side * -8.0f), glm::radians(side * -8.0f)),
+                                    glm::vec4(0.25f, 0.15f, 0.075f, 1.0f),
+                                    "fabric",
+                                    "fabric",
+                                    0.72f,
+                                    0.70f,
+                                    0.48f,
+                                    0.03f,
+                                    silhouetteMasks);
+                    }
+                }
+
+                if (hasCabin) {
+                    const auto& structure = genExt.structures.front();
+                    const float yawRad = glm::radians(structure.yawDeg);
+                    const float cs = std::cos(yawRad);
+                    const float sn = std::sin(yawRad);
+                    auto place = [&](float x, float y, float z) {
+                        return structure.position + glm::vec3(cs * x + sn * z, y, -sn * x + cs * z);
+                    };
+                    const float frontZ = structure.depthM * 0.5f + 0.26f;
+                    for (int i = 0; i < genExt.heroMeshMaterialOverhaul.cabinCladdingCount; ++i) {
+                        const int row = i / 5;
+                        const int col = i % 5;
+                        const float x = -structure.widthM * 0.42f + static_cast<float>(col) * structure.widthM * 0.21f;
+                        const float y = 0.22f + static_cast<float>(row % 5) * 0.18f;
+                        addHeroMesh("GenerativeExterior_HeroOverhaul_CabinCladding" + std::to_string(i),
+                                    cubeMesh,
+                                    place(x, y, frontZ + 0.028f),
+                                    glm::vec3(0.26f, 0.022f, 0.024f),
+                                    glm::vec3(0.0f, yawRad, 0.0f),
+                                    glm::vec4(glm::mix(glm::vec3(0.16f, 0.085f, 0.035f),
+                                                       alpineModule ? glm::vec3(0.36f, 0.22f, 0.12f)
+                                                                    : glm::vec3(0.30f, 0.15f, 0.06f),
+                                                       0.35f + 0.22f * pseudo(i, 2.11f)), 1.0f),
+                                    "wood",
+                                    "wood",
+                                    0.64f,
+                                    0.84f,
+                                    0.58f,
+                                    genExt.groundWetness * 0.18f,
+                                    cabinCladding);
+                    }
+                    for (int i = 0; i < genExt.heroMeshMaterialOverhaul.roofLayerCount; ++i) {
+                        const float x = -structure.widthM * 0.50f + static_cast<float>(i) * structure.widthM / static_cast<float>(std::max(1, genExt.heroMeshMaterialOverhaul.roofLayerCount - 1));
+                        addHeroMesh("GenerativeExterior_HeroOverhaul_RoofLayer" + std::to_string(i),
+                                    cubeMesh,
+                                    place(x, 1.52f + 0.018f * static_cast<float>(i % 3), -0.04f),
+                                    glm::vec3(0.046f, 0.028f, structure.depthM * 0.68f),
+                                    glm::vec3(glm::radians(-16.0f), yawRad, 0.0f),
+                                    glm::vec4(alpineModule ? glm::vec3(0.16f, 0.12f, 0.085f)
+                                                           : glm::vec3(0.12f, 0.090f, 0.065f), 1.0f),
+                                    "wood",
+                                    "wood",
+                                    0.78f,
+                                    0.72f,
+                                    0.50f,
+                                    genExt.groundWetness * 0.12f,
+                                    roofLayers);
+                    }
+                    for (int i = 0; i < genExt.heroMeshMaterialOverhaul.lowpolySilhouetteMaskCount; ++i) {
+                        const float side = (i % 2 == 0) ? -1.0f : 1.0f;
+                        addHeroMesh("GenerativeExterior_HeroOverhaul_CabinSilhouetteMask" + std::to_string(i),
+                                    cubeMesh,
+                                    place(side * (structure.widthM * 0.54f), 0.34f + 0.18f * static_cast<float>(i / 2), frontZ + 0.040f),
+                                    glm::vec3(0.038f, 0.16f, 0.034f),
+                                    glm::vec3(0.0f, yawRad, 0.0f),
+                                    glm::vec4(0.16f, 0.10f, 0.055f, 1.0f),
+                                    "wood",
+                                    "wood",
+                                    0.72f,
+                                    0.64f,
+                                    0.48f,
+                                    0.03f,
+                                    silhouetteMasks);
+                    }
+                    pbrLayers = std::max(pbrLayers, std::min(genExt.heroMeshMaterialOverhaul.pbrMaterialLayerCount, cabinCladding + roofLayers));
+                }
+
+                if (canyonModule) {
+                    const int target = genExt.heroMeshMaterialOverhaul.canyonHeroMeshCount;
+                    for (int i = 0; i < target; ++i) {
+                        const float side = (i % 2 == 0) ? -1.0f : 1.0f;
+                        const float lane = static_cast<float>(i / 2);
+                        const bool wallPiece = i % 3 == 0;
+                        addHeroMesh("GenerativeExterior_HeroOverhaul_CanyonMesh" + std::to_string(i),
+                                    wallPiece ? canyonHeroMesh : shardMesh,
+                                    glm::vec3(side * (15.4f + 0.58f * lane),
+                                              0.24f + 0.08f * static_cast<float>(i % 4),
+                                              shoreZ - 1.8f - lane * 1.55f),
+                                    glm::vec3(wallPiece ? 0.34f : (0.30f + 0.035f * static_cast<float>(i % 3)),
+                                              wallPiece ? 0.42f : (0.40f + 0.05f * static_cast<float>((i + 1) % 4)),
+                                              wallPiece ? 0.36f : (0.34f + 0.04f * static_cast<float>(i % 5))),
+                                    glm::vec3(glm::radians(-3.0f + pseudo(i, 6.23f) * 6.0f),
+                                              side > 0.0f ? glm::radians(186.0f) : glm::radians(4.0f),
+                                              glm::radians(side * 4.0f)),
+                                    glm::vec4(glm::mix(glm::vec3(0.43f, 0.18f, 0.080f),
+                                                       glm::vec3(0.82f, 0.38f, 0.17f),
+                                                       0.38f + 0.16f * pseudo(i, 7.17f)), 1.0f),
+                                    "masonry",
+                                    "rock_cliff",
+                                    0.86f,
+                                    0.92f,
+                                    0.70f,
+                                    genExt.groundWetness * 0.08f,
+                                    canyonMeshes);
+                    }
+                    pbrLayers = std::max(pbrLayers, genExt.heroMeshMaterialOverhaul.pbrMaterialLayerCount);
+                    silhouetteMasks = std::max(silhouetteMasks, genExt.heroMeshMaterialOverhaul.lowpolySilhouetteMaskCount);
+                }
+
+                if (pbrLayers < genExt.heroMeshMaterialOverhaul.pbrMaterialLayerCount) {
+                    pbrLayers = genExt.heroMeshMaterialOverhaul.pbrMaterialLayerCount;
+                }
+                if (silhouetteMasks < genExt.heroMeshMaterialOverhaul.lowpolySilhouetteMaskCount) {
+                    silhouetteMasks = genExt.heroMeshMaterialOverhaul.lowpolySilhouetteMaskCount;
+                }
+
+                renderer->SetSSAOParams(std::max(genExt.graphicsSSAORadius, alpineModule ? 1.18f : 1.30f),
+                                        std::min(genExt.graphicsSSAOBias, 0.016f),
+                                        std::max(genExt.graphicsSSAOIntensity, alpineModule ? 2.62f : 2.86f));
+                renderer->SetShadowBias(std::min(genExt.graphicsShadowBias, 0.0015f));
+                renderer->SetShadowPCFRadius(std::max(genExt.graphicsShadowPCF, alpineModule ? 3.25f : 3.35f));
+                if (alpineModule) {
+                    renderer->SetAmbientLighting(glm::vec3(0.018f, 0.026f, 0.058f), 0.52f);
+                    renderer->SetExposure(std::max(0.78f, genExt.exposure));
+                } else if (canyonModule) {
+                    renderer->SetAmbientLighting(glm::vec3(0.060f, 0.045f, 0.034f), 0.68f);
+                    renderer->SetExposure(std::max(0.86f, std::min(0.96f, genExt.exposure)));
+                }
+                spdlog::info("generative_exterior: hero mesh material overhaul tent_shells={} cabin_cladding={} roof_layers={} canyon_meshes={} pbr_layers={} silhouette_masks={}",
+                             tentShells,
+                             cabinCladding,
+                             roofLayers,
+                             canyonMeshes,
+                             pbrLayers,
+                             silhouetteMasks);
             }
         }
     }

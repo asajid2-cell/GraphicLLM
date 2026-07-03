@@ -482,9 +482,15 @@ def compile_v3_to_v2(v3: dict[str, Any]) -> dict[str, Any]:
         "authored_backdrop_gate",
         "authored_lighting_zones",
     ])
+    material_zone_names.extend([
+        "cinematic_triplanar_material_relief",
+        "cinematic_shadow_caster_receivers",
+        "cinematic_volumetric_light_slices",
+    ])
     if water_on:
         material_zone_names.append("texture_source_wet_shore")
         material_zone_names.append("authored_curved_shore_water_corridor")
+        material_zone_names.append("cinematic_wet_dry_roughness_transition")
     if not desert:
         material_zone_names.append("irregular_tree_silhouettes")
     env["shot"] = {
@@ -504,6 +510,11 @@ def compile_v3_to_v2(v3: dict[str, Any]) -> dict[str, Any]:
     renderer_shadow_bias = 0.0020
     contact_receiver_patch_budget = 72 if not moonlight else 40
     soft_penumbra_patch_budget = 40 if not moonlight else 32
+    cinematic_relief_patches = 34 if canyon else (30 if campsite else 26)
+    cinematic_shadow_casters = 12 if (campsite or canyon) else 9
+    cinematic_contact_receivers = 30 if not moonlight else 20
+    cinematic_local_lights = 3 if (campsite or cabin) else 2
+    cinematic_volumetric_slices = 6 if (fog or moonlight or campsite) else 4
     env["graphics_pass"] = {
         "version": 2,
         "authored_scene_module": {
@@ -747,6 +758,29 @@ def compile_v3_to_v2(v3: dict[str, Any]) -> dict[str, Any]:
                 "readback_verified_shadow_map_controls",
                 "bounded_receiver_contact_support",
                 "generated_dxr_opt_in_only",
+            ],
+        },
+        "cinematic_material_lighting": {
+            "enabled": True,
+            "triplanar_detail_layer_count": 8 if canyon else 7,
+            "terrain_relief_patch_count": cinematic_relief_patches,
+            "shadow_caster_count": cinematic_shadow_casters,
+            "contact_receiver_count": cinematic_contact_receivers,
+            "localized_light_count": cinematic_local_lights,
+            "volumetric_light_slice_count": cinematic_volumetric_slices,
+            "wet_roughness_variation_count": 12 if water_on else 0,
+            "source_texture_weight": 0.82 if not desert else 0.76,
+            "normal_detail_scale": 0.96 if not desert else 0.84,
+            "roughness_variation": 0.62 if water_on else 0.48,
+            "shadow_caster_policy": "module_physical_occluders_plus_shadow_mapped_practicals",
+            "systems": [
+                "triplanar_source_texture_material_relief",
+                "terrain_relief_patch_meshes",
+                "localized_shadow_caster_geometry",
+                "terrain_toned_contact_receiver_materials",
+                "module_specific_practical_light_pools",
+                "volumetric_light_and_fog_slices",
+                "wet_dry_shore_roughness_variation",
             ],
         },
         "atmosphere_fidelity": {

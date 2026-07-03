@@ -182,6 +182,27 @@ def _renderer_shadow_runtime(log_text: str) -> dict[str, Any] | None:
     }
 
 
+def _cinematic_material_lighting_runtime(log_text: str) -> dict[str, int] | None:
+    m = re.search(
+        r"generative_exterior: cinematic material lighting "
+        r"triplanar_layers=(\d+) relief_patches=(\d+) shadow_casters=(\d+) "
+        r"contact_receivers=(\d+) localized_lights=(\d+) volumetric_slices=(\d+) wet_variation=(\d+)",
+        log_text,
+    )
+    if not m:
+        return None
+    keys = (
+        "triplanar_layers",
+        "relief_patches",
+        "shadow_casters",
+        "contact_receivers",
+        "localized_lights",
+        "volumetric_slices",
+        "wet_variation",
+    )
+    return {key: int(value) for key, value in zip(keys, m.groups())}
+
+
 def _asset_counts(ir: dict[str, Any]) -> dict[str, int]:
     counts = {
         "trees": 0,
@@ -280,6 +301,7 @@ def evaluate(prompt: str, ir: dict[str, Any], png: Path | None, log_text: str) -
     source_geometry_fidelity = graphics.get("source_geometry_fidelity") or {}
     renderer_shadow_occlusion_budget = graphics.get("renderer_shadow_occlusion_budget") or {}
     authored_scene_module = graphics.get("authored_scene_module") or {}
+    cinematic_material_lighting = graphics.get("cinematic_material_lighting") or {}
     image = _image_metrics(png)
 
     failures: list[dict[str, Any]] = []
@@ -789,6 +811,62 @@ def evaluate(prompt: str, ir: dict[str, Any], png: Path | None, log_text: str) -
                 practical_light_count=practical_lights,
                 runtime_authored_scene_module=has_runtime_authored_module.group(0) if has_runtime_authored_module else None,
                 runtime_authored_scene_module_ok=runtime_module_ok,
+            )
+
+        try:
+            triplanar_layers = int(cinematic_material_lighting.get("triplanar_detail_layer_count", 0) or 0)
+            relief_patches = int(cinematic_material_lighting.get("terrain_relief_patch_count", 0) or 0)
+            shadow_casters = int(cinematic_material_lighting.get("shadow_caster_count", 0) or 0)
+            contact_receivers = int(cinematic_material_lighting.get("contact_receiver_count", 0) or 0)
+            localized_lights = int(cinematic_material_lighting.get("localized_light_count", 0) or 0)
+            volumetric_slices = int(cinematic_material_lighting.get("volumetric_light_slice_count", 0) or 0)
+            wet_variation = int(cinematic_material_lighting.get("wet_roughness_variation_count", 0) or 0)
+            source_texture_weight = float(cinematic_material_lighting.get("source_texture_weight", 0.0) or 0.0)
+            normal_detail_scale = float(cinematic_material_lighting.get("normal_detail_scale", 0.0) or 0.0)
+        except Exception:
+            triplanar_layers = relief_patches = shadow_casters = contact_receivers = 0
+            localized_lights = volumetric_slices = wet_variation = 0
+            source_texture_weight = normal_detail_scale = 0.0
+        runtime_cinematic = _cinematic_material_lighting_runtime(log_text)
+        runtime_cinematic_ok = (
+            isinstance(runtime_cinematic, dict)
+            and runtime_cinematic.get("triplanar_layers", 0) >= 6
+            and runtime_cinematic.get("relief_patches", 0) >= 16
+            and runtime_cinematic.get("shadow_casters", 0) >= 6
+            and runtime_cinematic.get("contact_receivers", 0) >= 12
+            and runtime_cinematic.get("localized_lights", 0) >= 2
+            and runtime_cinematic.get("volumetric_slices", 0) >= 3
+            and (not flags["water"] or runtime_cinematic.get("wet_variation", 0) >= 6)
+        )
+        if (
+            not isinstance(cinematic_material_lighting, dict)
+            or not bool(cinematic_material_lighting.get("enabled"))
+            or triplanar_layers < 6
+            or relief_patches < 16
+            or shadow_casters < 6
+            or contact_receivers < 12
+            or localized_lights < 2
+            or volumetric_slices < 3
+            or source_texture_weight < 0.65
+            or normal_detail_scale < 0.75
+            or (flags["water"] and wet_variation < 6)
+            or not runtime_cinematic_ok
+        ):
+            fail(
+                "missing_cinematic_material_lighting_pass",
+                "Generated exterior lacks integrated triplanar material relief, localized shadow casters/receivers, and cinematic light/fog slices",
+                cinematic_material_lighting=cinematic_material_lighting,
+                triplanar_detail_layer_count=triplanar_layers,
+                terrain_relief_patch_count=relief_patches,
+                shadow_caster_count=shadow_casters,
+                contact_receiver_count=contact_receivers,
+                localized_light_count=localized_lights,
+                volumetric_light_slice_count=volumetric_slices,
+                wet_roughness_variation_count=wet_variation,
+                source_texture_weight=source_texture_weight,
+                normal_detail_scale=normal_detail_scale,
+                runtime_cinematic_material_lighting=runtime_cinematic,
+                runtime_cinematic_material_lighting_ok=runtime_cinematic_ok,
             )
 
         if flags["moonlight"] or "storm" in prompt.lower():

@@ -240,6 +240,20 @@ namespace {
         float rendererContactBlend = 0.0f;
     };
 
+    struct GenerativeCinematicMaterialLighting {
+        bool enabled = false;
+        int triplanarDetailLayerCount = 0;
+        int terrainReliefPatchCount = 0;
+        int shadowCasterCount = 0;
+        int contactReceiverCount = 0;
+        int localizedLightCount = 0;
+        int volumetricLightSliceCount = 0;
+        int wetRoughnessVariationCount = 0;
+        float sourceTextureWeight = 0.0f;
+        float normalDetailScale = 0.0f;
+        float roughnessVariation = 0.0f;
+    };
+
     struct GenerativeTextureMaterialRuntimeCounts {
         int terrain = 0;
         int rock = 0;
@@ -3395,6 +3409,7 @@ void Engine::BuildRecipeScene() {
         GenerativeTextureMaterialFidelity textureMaterialFidelity;
         GenerativeSourceGeometryFidelity sourceGeometryFidelity;
         GenerativeRendererShadowOcclusionBudget rendererShadowOcclusionBudget;
+        GenerativeCinematicMaterialLighting cinematicMaterialLighting;
         GenerativeAtmosphereFidelity atmosphereFidelity;
         GenerativeGeometryRealism geometryRealism;
         GenerativeAuthoredSceneModule authoredSceneModule;
@@ -3505,6 +3520,29 @@ void Engine::BuildRecipeScene() {
                     genExt.graphicsShadowBias = genExt.rendererShadowOcclusionBudget.shadowBias;
                     genExt.graphicsShadowPCF = genExt.rendererShadowOcclusionBudget.shadowPCFRadius;
                 }
+                const nlohmann::json cinematicMaterialLighting =
+                    graphics.value("cinematic_material_lighting", nlohmann::json::object());
+                genExt.cinematicMaterialLighting.enabled = cinematicMaterialLighting.value("enabled", false);
+                genExt.cinematicMaterialLighting.triplanarDetailLayerCount =
+                    static_cast<int>(std::clamp(num(cinematicMaterialLighting, "triplanar_detail_layer_count", 0.0f), 0.0f, 16.0f));
+                genExt.cinematicMaterialLighting.terrainReliefPatchCount =
+                    static_cast<int>(std::clamp(num(cinematicMaterialLighting, "terrain_relief_patch_count", 0.0f), 0.0f, 48.0f));
+                genExt.cinematicMaterialLighting.shadowCasterCount =
+                    static_cast<int>(std::clamp(num(cinematicMaterialLighting, "shadow_caster_count", 0.0f), 0.0f, 24.0f));
+                genExt.cinematicMaterialLighting.contactReceiverCount =
+                    static_cast<int>(std::clamp(num(cinematicMaterialLighting, "contact_receiver_count", 0.0f), 0.0f, 48.0f));
+                genExt.cinematicMaterialLighting.localizedLightCount =
+                    static_cast<int>(std::clamp(num(cinematicMaterialLighting, "localized_light_count", 0.0f), 0.0f, 6.0f));
+                genExt.cinematicMaterialLighting.volumetricLightSliceCount =
+                    static_cast<int>(std::clamp(num(cinematicMaterialLighting, "volumetric_light_slice_count", 0.0f), 0.0f, 10.0f));
+                genExt.cinematicMaterialLighting.wetRoughnessVariationCount =
+                    static_cast<int>(std::clamp(num(cinematicMaterialLighting, "wet_roughness_variation_count", 0.0f), 0.0f, 20.0f));
+                genExt.cinematicMaterialLighting.sourceTextureWeight =
+                    std::clamp(num(cinematicMaterialLighting, "source_texture_weight", 0.0f), 0.0f, 1.0f);
+                genExt.cinematicMaterialLighting.normalDetailScale =
+                    std::clamp(num(cinematicMaterialLighting, "normal_detail_scale", 0.0f), 0.0f, 1.5f);
+                genExt.cinematicMaterialLighting.roughnessVariation =
+                    std::clamp(num(cinematicMaterialLighting, "roughness_variation", 0.0f), 0.0f, 1.0f);
                 const nlohmann::json authoredSceneModule =
                     graphics.value("authored_scene_module", nlohmann::json::object());
                 genExt.authoredSceneModule.enabled = authoredSceneModule.value("enabled", false);
@@ -4774,6 +4812,300 @@ void Engine::BuildRecipeScene() {
                                  wetlineBands,
                                  glintCount,
                                  submergedRocks);
+                }
+            }
+            if (genExt.cinematicMaterialLighting.enabled) {
+                auto planeMesh = Utils::MeshGenerator::CreatePlane(1.0f, 1.0f);
+                auto receiverMesh = Utils::MeshGenerator::CreateDisk(1.0f, 36);
+                auto casterMesh = CreateGenerativeRockShardMesh(37.21f);
+                auto cubeMesh = Utils::MeshGenerator::CreateCube();
+                auto cylinderMesh = Utils::MeshGenerator::CreateCylinder(0.5f, 1.0f, 16);
+                const auto upPlane = renderer->UploadMesh(planeMesh);
+                const auto upReceiver = renderer->UploadMesh(receiverMesh);
+                const auto upCaster = renderer->UploadMesh(casterMesh);
+                const auto upCube = renderer->UploadMesh(cubeMesh);
+                const auto upCylinder = renderer->UploadMesh(cylinderMesh);
+                if (upPlane.IsErr() || upReceiver.IsErr() || upCaster.IsErr() || upCube.IsErr() || upCylinder.IsErr()) {
+                    spdlog::warn("generative_exterior: cinematic material lighting mesh upload failed plane='{}' receiver='{}' caster='{}' cube='{}' cylinder='{}'",
+                                 upPlane.IsErr() ? upPlane.Error() : "ok",
+                                 upReceiver.IsErr() ? upReceiver.Error() : "ok",
+                                 upCaster.IsErr() ? upCaster.Error() : "ok",
+                                 upCube.IsErr() ? upCube.Error() : "ok",
+                                 upCylinder.IsErr() ? upCylinder.Error() : "ok");
+                } else {
+                    auto pseudo = [](int i, float salt) {
+                        const float n = std::sin(static_cast<float>(i) * 12.9898f + salt * 78.233f) * 43758.5453f;
+                        return n - std::floor(n);
+                    };
+                    const std::string module = genExt.authoredSceneModule.moduleId;
+                    const bool canyonModule = module == "desert_canyon_river";
+                    const bool alpineModule = module == "alpine_cabin_lake";
+                    const bool campsiteModule = module == "campsite_lake_dawn" || (!alpineModule && !canyonModule);
+                    const glm::vec3 baseRock = canyonModule
+                        ? glm::vec3(0.55f, 0.22f, 0.12f)
+                        : glm::mix(gcol, glm::vec3(0.18f, 0.17f, 0.15f), 0.42f);
+                    const glm::vec3 shadowTone = glm::max(receiverBase * (alpineModule ? 0.58f : 0.70f), glm::vec3(0.014f));
+                    const float landSpan = std::max(4.0f, groundNear - shoreZ);
+                    const float sourceTextureWeight = genExt.cinematicMaterialLighting.sourceTextureWeight;
+                    const float normalScale = std::max(genExt.cinematicMaterialLighting.normalDetailScale, 0.78f);
+
+                    auto dressTerrainOverlay = [&](Scene::RenderableComponent& r,
+                                                   const glm::vec4& color,
+                                                   const char* preset,
+                                                   float roughness,
+                                                   float wetness,
+                                                   float clearcoat,
+                                                   float alpha) {
+                        r.albedoColor = color;
+                        r.metallic = 0.0f;
+                        r.roughness = roughness;
+                        r.ao = 0.58f;
+                        r.occlusionStrength = 0.78f;
+                        r.normalScale = normalScale;
+                        r.wetnessFactor = wetness;
+                        r.proceduralMaskStrength = 0.52f + 0.20f * sourceTextureWeight;
+                        r.specularFactor = 0.10f + clearcoat * 0.44f;
+                        r.clearcoatFactor = clearcoat;
+                        r.clearcoatRoughnessFactor = 0.58f;
+                        r.sheenWeight = 0.05f;
+                        r.anisotropyStrength = 0.16f;
+                        r.doubleSided = true;
+                        r.alphaMode = alpha < 0.99f
+                            ? Scene::RenderableComponent::AlphaMode::Blend
+                            : Scene::RenderableComponent::AlphaMode::Opaque;
+                        r.renderLayer = alpha < 0.99f
+                            ? Scene::RenderableComponent::RenderLayer::Overlay
+                            : Scene::RenderableComponent::RenderLayer::Opaque;
+                        r.presetName = preset;
+                    };
+
+                    auto addPatch = [&](const std::string& tag,
+                                        const std::shared_ptr<Scene::MeshData>& mesh,
+                                        const glm::vec3& position,
+                                        const glm::vec3& scale,
+                                        const glm::vec3& euler,
+                                        const glm::vec4& color,
+                                        const char* preset,
+                                        float roughness,
+                                        float wetness,
+                                        float clearcoat,
+                                        float alpha,
+                                        const char* textureId,
+                                        bool heroSurface = false,
+                                        bool shoreSurface = false) {
+                        entt::entity e = m_registry->CreateEntity();
+                        m_registry->AddComponent<Scene::TagComponent>(e, tag);
+                        auto& t = m_registry->AddComponent<TransformComponent>(e);
+                        t.position = position;
+                        t.scale = scale;
+                        t.rotation = glm::quat(euler);
+                        auto& r = m_registry->AddComponent<Scene::RenderableComponent>(e);
+                        r.mesh = mesh;
+                        dressTerrainOverlay(r, color, preset, roughness, wetness, clearcoat, alpha);
+                        if (textureId && textureId[0]) {
+                            applyGeneratedTextureMaterial(r, textureId, heroSurface, shoreSurface);
+                        }
+                    };
+
+                    int triplanarLayers = 0;
+                    for (int i = 0; i < genExt.cinematicMaterialLighting.triplanarDetailLayerCount; ++i) {
+                        const float lane = static_cast<float>(i % 4);
+                        const float z = shoreZ + 0.92f + lane * 0.82f + pseudo(i, 1.27f) * 0.36f;
+                        const float x = (pseudo(i + 11, 1.83f) - 0.5f) * groundW * 0.42f;
+                        const glm::vec3 detailColor = glm::mix(gcol * 0.72f, baseRock, canyonModule ? 0.46f : 0.24f + 0.04f * static_cast<float>(i % 3));
+                        addPatch("GenerativeExterior_CinematicTriplanarLayer" + std::to_string(i),
+                                 planeMesh,
+                                 glm::vec3(x, 0.078f + static_cast<float>(i % 5) * 0.0010f, z),
+                                 glm::vec3(1.10f + pseudo(i, 2.31f) * 1.35f,
+                                           1.0f,
+                                           0.08f + pseudo(i, 2.91f) * 0.075f),
+                                 glm::vec3(0.0f, glm::radians(-18.0f + pseudo(i, 3.19f) * 36.0f), 0.0f),
+                                 glm::vec4(glm::max(detailColor, glm::vec3(0.018f)), 0.042f),
+                                 canyonModule ? "masonry" : "naturalistic",
+                                 0.78f,
+                                 genExt.groundWetness * 0.42f,
+                                 0.08f,
+                                 0.042f,
+                                 "",
+                                 false,
+                                 false);
+                        triplanarLayers++;
+                    }
+
+                    int reliefPatches = 0;
+                    for (int i = 0; i < genExt.cinematicMaterialLighting.terrainReliefPatchCount; ++i) {
+                        const float sideBias = (i % 2 == 0) ? -1.0f : 1.0f;
+                        const float x = sideBias * (1.4f + pseudo(i + 101, 1.59f) * groundW * 0.42f);
+                        const float z = shoreZ + 0.55f + pseudo(i + 113, 2.47f) * std::min(landSpan, 9.5f);
+                        const float s = 0.18f + pseudo(i, 3.07f) * (canyonModule ? 0.24f : 0.20f);
+                        const glm::vec3 patchColor = glm::mix(baseRock, gcol, canyonModule ? 0.30f : 0.56f + 0.10f * pseudo(i, 4.11f));
+                        addPatch("GenerativeExterior_CinematicReliefPatch" + std::to_string(i),
+                                 casterMesh,
+                                 glm::vec3(x, 0.075f + 0.010f * pseudo(i, 2.03f), z),
+                                 glm::vec3(s * (1.35f + pseudo(i, 1.21f) * 0.70f),
+                                           s * 0.13f,
+                                           s * (0.55f + pseudo(i, 1.61f) * 0.48f)),
+                                 glm::vec3(glm::radians(-3.0f + pseudo(i, 1.07f) * 6.0f),
+                                           glm::radians(pseudo(i, 1.91f) * 360.0f),
+                                           glm::radians(-4.0f + pseudo(i, 2.23f) * 8.0f)),
+                                 glm::vec4(glm::max(patchColor, glm::vec3(0.016f)), 1.0f),
+                                 canyonModule ? "masonry" : "naturalistic",
+                                 0.86f,
+                                 genExt.groundWetness * 0.34f,
+                                 0.05f,
+                                 1.0f,
+                                 "");
+                        reliefPatches++;
+                    }
+
+                    int shadowCasters = 0;
+                    for (int i = 0; i < genExt.cinematicMaterialLighting.shadowCasterCount; ++i) {
+                        const bool nearHero = i < std::max(4, genExt.cinematicMaterialLighting.shadowCasterCount / 2);
+                        const float angle = glm::radians(-35.0f + static_cast<float>(i) * 18.0f);
+                        const float radius = nearHero ? (2.45f + 0.22f * static_cast<float>(i % 4)) : (5.6f + 0.38f * static_cast<float>(i % 5));
+                        const float x = std::cos(angle) * radius + (canyonModule ? ((i % 2 == 0) ? -4.6f : 4.6f) : 0.0f);
+                        const float z = (nearHero ? 1.28f : shoreZ + 1.55f) + std::sin(angle) * (nearHero ? 1.25f : 1.8f);
+                        const float h = 0.12f + 0.035f * static_cast<float>(i % 4);
+                        addPatch("GenerativeExterior_CinematicShadowCaster" + std::to_string(i),
+                                 (i % 3 == 0) ? cylinderMesh : casterMesh,
+                                 glm::vec3(x, 0.050f + h * 0.42f, z),
+                                 glm::vec3(0.070f + 0.020f * static_cast<float>(i % 3),
+                                           h,
+                                           0.12f + 0.025f * static_cast<float>((i + 1) % 3)),
+                                 glm::vec3(glm::radians((i % 3 == 0) ? 86.0f : (-2.0f + 1.2f * static_cast<float>(i % 4))),
+                                           glm::radians(-24.0f + 19.0f * static_cast<float>(i)),
+                                           glm::radians(3.0f * static_cast<float>(i % 3 - 1))),
+                                 glm::vec4(glm::max(glm::mix(baseRock, gcol, 0.42f), glm::vec3(0.040f)), 1.0f),
+                                 (i % 3 == 0) ? "wood" : "masonry",
+                                 0.82f,
+                                 genExt.groundWetness * 0.16f,
+                                 0.02f,
+                                 1.0f,
+                                 "",
+                                 true,
+                                 false);
+                        shadowCasters++;
+                    }
+
+                    int contactReceivers = 0;
+                    for (int i = 0; i < genExt.cinematicMaterialLighting.contactReceiverCount; ++i) {
+                        const float x = (pseudo(i + 307, 1.37f) - 0.5f) * groundW * 0.64f;
+                        const float z = shoreZ + 0.52f + pseudo(i + 313, 2.11f) * std::min(landSpan, 6.8f);
+                        addPatch("GenerativeExterior_CinematicContactReceiver" + std::to_string(i),
+                                 receiverMesh,
+                                 glm::vec3(x, 0.091f + static_cast<float>(i % 6) * 0.001f, z),
+                                 glm::vec3(0.30f + pseudo(i, 2.73f) * 0.42f,
+                                           1.0f,
+                                           0.08f + pseudo(i, 3.49f) * 0.12f),
+                                 glm::vec3(0.0f, glm::radians(pseudo(i, 4.03f) * 180.0f), 0.0f),
+                                 glm::vec4(shadowTone, 0.070f),
+                                 "shadow",
+                                 0.94f,
+                                 genExt.groundWetness * 0.10f,
+                                 0.0f,
+                                 0.070f,
+                                 "");
+                        contactReceivers++;
+                    }
+
+                    int wetVariation = 0;
+                    if (genExt.waterOn) {
+                        for (int i = 0; i < genExt.cinematicMaterialLighting.wetRoughnessVariationCount; ++i) {
+                            const float x = (pseudo(i + 409, 1.67f) - 0.5f) * groundW * 0.76f;
+                            const float z = shoreZ + 0.10f + pseudo(i + 421, 2.37f) * 1.35f;
+                            const glm::vec3 wetColor = glm::mix(gcol * 0.42f, genExt.waterShallow * 0.62f, 0.22f + 0.08f * pseudo(i, 2.01f));
+                            addPatch("GenerativeExterior_CinematicWetRoughness" + std::to_string(i),
+                                     planeMesh,
+                                     glm::vec3(x, 0.094f + static_cast<float>(i % 4) * 0.001f, z),
+                                     glm::vec3(0.82f + pseudo(i, 2.71f) * 1.15f,
+                                               1.0f,
+                                               0.055f + pseudo(i, 3.13f) * 0.060f),
+                                     glm::vec3(0.0f, glm::radians(-9.0f + pseudo(i, 3.71f) * 18.0f), 0.0f),
+                                     glm::vec4(glm::max(wetColor, glm::vec3(0.014f)), 0.045f),
+                                     "wet_masonry",
+                                     0.34f + 0.18f * pseudo(i, 4.41f),
+                                     0.82f,
+                                     0.32f,
+                                     0.045f,
+                                     "",
+                                     false,
+                                     true);
+                            wetVariation++;
+                        }
+                    }
+
+                    int volumetricSlices = 0;
+                    const glm::vec3 sliceColor = alpineModule
+                        ? glm::vec3(0.34f, 0.46f, 0.86f)
+                        : (canyonModule ? glm::vec3(1.0f, 0.56f, 0.28f) : glm::vec3(1.0f, 0.48f, 0.22f));
+                    for (int i = 0; i < genExt.cinematicMaterialLighting.volumetricLightSliceCount; ++i) {
+                        const float side = (i % 2 == 0) ? -1.0f : 1.0f;
+                        const float z = shoreZ - 1.10f - 0.48f * static_cast<float>(i % 4);
+                        addPatch("GenerativeExterior_CinematicVolumetricSlice" + std::to_string(i),
+                                 cubeMesh,
+                                 glm::vec3(side * (groundW * 0.34f + 0.52f * static_cast<float>(i % 3)),
+                                           1.55f + 0.14f * static_cast<float>(i / 2),
+                                           z),
+                                 glm::vec3(0.018f,
+                                           0.70f + 0.10f * static_cast<float>(i % 3),
+                                           0.30f + 0.05f * static_cast<float>(i % 2)),
+                                 glm::vec3(glm::radians(-10.0f + 3.0f * static_cast<float>(i % 3)),
+                                           glm::radians(side * (18.0f + 3.0f * static_cast<float>(i))),
+                                           glm::radians(side * 4.0f)),
+                                 glm::vec4(glm::mix(sliceColor, glm::vec3(0.42f, 0.44f, 0.46f), 0.78f),
+                                           alpineModule ? 0.006f : 0.005f),
+                                 "naturalistic",
+                                 0.92f,
+                                 0.0f,
+                                 0.0f,
+                                 alpineModule ? 0.006f : 0.005f,
+                                 "");
+                        volumetricSlices++;
+                    }
+
+                    int localizedLights = 0;
+                    if (campsiteModule) {
+                        AddAssetLedSpotLight(*m_registry, "GenerativeExterior_CinematicCampfireShadowKey",
+                                             glm::vec3(-2.4f, 2.0f, 2.65f), glm::vec3(1.2f, 0.35f, 0.62f),
+                                             glm::vec3(1.0f, 0.42f, 0.16f), 4.8f, 13.0f, true);
+                        AddAssetLedSpotLight(*m_registry, "GenerativeExterior_CinematicDawnGroundRake",
+                                             glm::vec3(5.8f, 3.2f, -2.4f), glm::vec3(0.2f, 0.18f, 1.2f),
+                                             glm::vec3(1.0f, 0.56f, 0.24f), 4.2f, 18.0f, true);
+                        AddAssetLedPointLight(*m_registry, "GenerativeExterior_CinematicTentWarmBounce",
+                                              glm::vec3(2.35f, 0.70f, 0.86f), glm::vec3(1.0f, 0.32f, 0.16f), 2.2f, 4.2f);
+                        localizedLights = 3;
+                    } else if (canyonModule) {
+                        AddAssetLedSpotLight(*m_registry, "GenerativeExterior_CinematicCanyonWallShadowKey",
+                                             glm::vec3(-6.5f, 4.1f, -2.2f), glm::vec3(2.0f, 0.62f, -7.0f),
+                                             glm::vec3(1.0f, 0.62f, 0.30f), 5.2f, 22.0f, true);
+                        AddAssetLedSpotLight(*m_registry, "GenerativeExterior_CinematicRiverRim",
+                                             glm::vec3(4.6f, 2.6f, 0.4f), glm::vec3(0.0f, 0.22f, shoreZ - 1.5f),
+                                             glm::vec3(0.36f, 0.82f, 0.92f), 2.8f, 15.0f, true);
+                        localizedLights = 2;
+                    } else {
+                        AddAssetLedSpotLight(*m_registry, "GenerativeExterior_CinematicMoonShadowKey",
+                                             glm::vec3(-4.8f, 4.4f, -1.8f), glm::vec3(0.8f, 0.42f, 1.5f),
+                                             glm::vec3(0.38f, 0.52f, 1.0f), 4.2f, 18.0f, true);
+                        AddAssetLedPointLight(*m_registry, "GenerativeExterior_CinematicCabinBounce",
+                                              glm::vec3(0.2f, 0.78f, 2.1f), glm::vec3(1.0f, 0.54f, 0.24f), 2.5f, 4.6f);
+                        localizedLights = 2;
+                    }
+
+                    renderer->SetSSAOParams(std::max(genExt.graphicsSSAORadius, 1.32f),
+                                            std::min(genExt.graphicsSSAOBias, 0.016f),
+                                            std::max(genExt.graphicsSSAOIntensity, alpineModule ? 2.72f : 2.95f));
+                    renderer->SetShadowBias(std::min(genExt.graphicsShadowBias, 0.0015f));
+                    renderer->SetShadowPCFRadius(std::max(genExt.graphicsShadowPCF, 3.25f));
+                    renderer->SetGodRayIntensity(std::max(canyonModule ? 0.12f : 0.24f, alpineModule ? 0.16f : 0.20f));
+
+                    spdlog::info("generative_exterior: cinematic material lighting triplanar_layers={} relief_patches={} shadow_casters={} contact_receivers={} localized_lights={} volumetric_slices={} wet_variation={}",
+                                 triplanarLayers,
+                                 reliefPatches,
+                                 shadowCasters,
+                                 contactReceivers,
+                                 localizedLights,
+                                 volumetricSlices,
+                                 wetVariation);
                 }
             }
             if (genExt.worldGeometry.enabled) {

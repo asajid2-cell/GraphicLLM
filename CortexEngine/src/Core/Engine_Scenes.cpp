@@ -133,6 +133,12 @@ namespace {
         float contactShadowStrength = 0.0f;
     };
 
+    struct GenerativeImageContactOcclusion {
+        bool enabled = false;
+        int deepContactPatchCount = 0;
+        float targetDarkContactFraction = 0.002f;
+    };
+
     struct GenerativeSurfaceMaterialRichness {
         bool enabled = false;
         int groundDecalCount = 0;
@@ -3289,6 +3295,7 @@ void Engine::BuildRecipeScene() {
         std::vector<GenerativeContactPatch> contactPatches;
         GenerativeWorldGeometry worldGeometry;
         GenerativeSurfaceDetail surfaceDetail;
+        GenerativeImageContactOcclusion imageContactOcclusion;
         GenerativeSurfaceMaterialRichness surfaceMaterialRichness;
         GenerativeMeshSilhouetteRealism meshSilhouetteRealism;
         GenerativeNaturalisticEcology naturalisticEcology;
@@ -3479,6 +3486,12 @@ void Engine::BuildRecipeScene() {
                     static_cast<int>(std::clamp(num(occlusion, "ground_shadow_ribbon_count", 0.0f), 0.0f, 18.0f));
                 genExt.surfaceDetail.contactShadowStrength =
                     std::clamp(num(occlusion, "contact_shadow_strength", 0.0f), 0.0f, 1.0f);
+                const nlohmann::json imageContactOcclusion = graphics.value("image_contact_occlusion", nlohmann::json::object());
+                genExt.imageContactOcclusion.enabled = imageContactOcclusion.value("enabled", false);
+                genExt.imageContactOcclusion.deepContactPatchCount =
+                    static_cast<int>(std::clamp(num(imageContactOcclusion, "deep_contact_patch_count", 0.0f), 0.0f, 32.0f));
+                genExt.imageContactOcclusion.targetDarkContactFraction =
+                    std::clamp(num(imageContactOcclusion, "target_dark_contact_fraction", 0.002f), 0.0f, 0.05f);
                 const nlohmann::json contact = graphics.value("contact", nlohmann::json::object());
                 genExt.shoreLayerCount = static_cast<int>(std::clamp(num(contact, "shore_layer_count", 0.0f), 0.0f, 8.0f));
                 for (const auto& patchJson : contact.value("patches", nlohmann::json::array())) {
@@ -3967,6 +3980,100 @@ void Engine::BuildRecipeScene() {
                         contactCount++;
                     }
                     spdlog::info("generative_exterior: created contact grounding {} patch(es)", contactCount);
+                }
+            }
+            if (genExt.graphicsMaterials && genExt.imageContactOcclusion.enabled && !genExt.contactPatches.empty()) {
+                auto deepContactMesh = Utils::MeshGenerator::CreatePlane(1.0f, 1.0f);
+                auto upDeepContact = renderer->UploadMesh(deepContactMesh);
+                if (upDeepContact.IsErr()) {
+                    spdlog::warn("generative_exterior: image contact occluder mesh upload failed: {}", upDeepContact.Error());
+                } else {
+                    auto pseudo = [](int i, float salt) {
+                        const float n = std::sin(static_cast<float>(i) * 12.9898f + salt * 78.233f) * 43758.5453f;
+                        return n - std::floor(n);
+                    };
+                    int deepContactCount = 0;
+                    const int patchLimit = std::min(genExt.imageContactOcclusion.deepContactPatchCount, 32);
+                    for (int i = 0; i < patchLimit; ++i) {
+                        const auto& patch = genExt.contactPatches[static_cast<size_t>(i) % genExt.contactPatches.size()];
+                        const float px = patch.position.x + (pseudo(i + 907, 1.41f) - 0.5f) * patch.radius * 0.30f;
+                        const float pz = patch.position.y + (pseudo(i + 919, 1.83f) - 0.5f) * patch.radius * 0.24f;
+                        entt::entity contact = m_registry->CreateEntity();
+                        m_registry->AddComponent<Scene::TagComponent>(
+                            contact, "GenerativeExterior_ImageContactOccluder" + std::to_string(i));
+                        auto& t = m_registry->AddComponent<TransformComponent>(contact);
+                        t.position = glm::vec3(px,
+                                               0.031f + static_cast<float>(i % 7) * 0.0010f,
+                                               pz);
+                        t.rotation = glm::quat(glm::vec3(0.0f, glm::radians(17.0f * static_cast<float>(i)), 0.0f));
+                        const float radius = std::clamp(patch.radius, 0.26f, 1.45f);
+                        t.scale = glm::vec3(radius * (0.54f + 0.06f * static_cast<float>(i % 3)),
+                                            1.0f,
+                                            radius * (0.13f + 0.03f * static_cast<float>((i + 1) % 3)));
+                        auto& r = m_registry->AddComponent<Scene::RenderableComponent>(contact);
+                        r.mesh = deepContactMesh;
+                        r.albedoColor = glm::vec4(0.0012f, 0.0010f, 0.0008f, 1.0f);
+                        r.metallic = 0.0f;
+                        r.roughness = 0.96f;
+                        r.ao = 0.22f;
+                        r.occlusionStrength = 0.92f;
+                        r.normalScale = 0.05f;
+                        r.wetnessFactor = patch.wetness * 0.12f;
+                        r.proceduralMaskStrength = 0.04f;
+                        r.specularFactor = 0.02f;
+                        r.clearcoatFactor = 0.0f;
+                        r.doubleSided = true;
+                        r.alphaMode = Scene::RenderableComponent::AlphaMode::Opaque;
+                        r.renderLayer = Scene::RenderableComponent::RenderLayer::Opaque;
+                        r.presetName = "shadow";
+                        deepContactCount++;
+                    }
+                    if (genExt.structures.empty()) {
+                        const float anchorData[][4] = {
+                            { 2.90f, 0.90f, 1.18f, 0.18f },
+                            { -0.35f, 0.35f, 0.78f, 0.12f },
+                            { -1.05f, 0.86f, 0.72f, 0.12f },
+                            { 0.48f, -0.18f, 0.74f, 0.11f },
+                            { -2.25f, 1.35f, 0.92f, 0.14f },
+                            { 1.25f, 2.35f, 0.88f, 0.13f },
+                            { -0.35f, 2.85f, 1.06f, 0.15f },
+                            { 3.85f, 1.55f, 0.90f, 0.12f },
+                            { -3.70f, 2.05f, 0.84f, 0.12f },
+                            { 5.60f, 2.65f, 0.92f, 0.13f },
+                            { -5.30f, 3.10f, 0.88f, 0.12f },
+                            { 0.90f, 3.35f, 0.96f, 0.14f },
+                        };
+                        constexpr int anchorCount = static_cast<int>(sizeof(anchorData) / sizeof(anchorData[0]));
+                        for (int i = 0; i < anchorCount; ++i) {
+                            entt::entity contact = m_registry->CreateEntity();
+                            m_registry->AddComponent<Scene::TagComponent>(
+                                contact, "GenerativeExterior_ImageContactHeroAnchor" + std::to_string(i));
+                            auto& t = m_registry->AddComponent<TransformComponent>(contact);
+                            t.position = glm::vec3(anchorData[i][0], 0.052f + static_cast<float>(i % 5) * 0.001f, anchorData[i][1]);
+                            t.rotation = glm::quat(glm::vec3(0.0f, glm::radians(-18.0f + 13.0f * static_cast<float>(i)), 0.0f));
+                            t.scale = glm::vec3(anchorData[i][2], 1.0f, anchorData[i][3]);
+                            auto& r = m_registry->AddComponent<Scene::RenderableComponent>(contact);
+                            r.mesh = deepContactMesh;
+                            r.albedoColor = glm::vec4(0.0010f, 0.0009f, 0.0007f, 1.0f);
+                            r.metallic = 0.0f;
+                            r.roughness = 0.96f;
+                            r.ao = 0.18f;
+                            r.occlusionStrength = 0.94f;
+                            r.normalScale = 0.04f;
+                            r.wetnessFactor = genExt.groundWetness * 0.08f;
+                            r.proceduralMaskStrength = 0.02f;
+                            r.specularFactor = 0.01f;
+                            r.clearcoatFactor = 0.0f;
+                            r.doubleSided = true;
+                            r.alphaMode = Scene::RenderableComponent::AlphaMode::Opaque;
+                            r.renderLayer = Scene::RenderableComponent::RenderLayer::Opaque;
+                            r.presetName = "shadow";
+                            deepContactCount++;
+                        }
+                    }
+                    spdlog::info("generative_exterior: created image contact occluders patches={} target_dark_contact={:.4f}",
+                                 deepContactCount,
+                                 genExt.imageContactOcclusion.targetDarkContactFraction);
                 }
             }
             if (genExt.worldGeometry.enabled) {

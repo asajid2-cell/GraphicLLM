@@ -180,6 +180,7 @@ def _image_metrics(path: Path | None) -> dict[str, Any]:
     edge_sum = 0.0
     vertical_sum = 0.0
     dark_contact = 0
+    dark_contact_area = 0
     for y in range(1, rh - 1, 2):
         for x in range(1, rw - 1, 2):
             r, g, b = px[x, y]
@@ -196,6 +197,8 @@ def _image_metrics(path: Path | None) -> dict[str, Any]:
             gy = abs(ly1 - ly0)
             edge_sum += math.sqrt(gx * gx + gy * gy)
             vertical_sum += gy
+            if l < 0.10:
+                dark_contact_area += 1
             if l < 0.075 and (gx + gy) > 0.055:
                 dark_contact += 1
             samples += 1
@@ -205,6 +208,7 @@ def _image_metrics(path: Path | None) -> dict[str, Any]:
         "ground_edge_density": round(edge_sum / samples, 4),
         "ground_vertical_detail": round(vertical_sum / samples, 4),
         "dark_contact_fraction": round(dark_contact / samples, 4),
+        "dark_contact_area_fraction": round(dark_contact_area / samples, 4),
         "sample_count": samples,
     }
 
@@ -229,6 +233,7 @@ def evaluate(prompt: str, ir: dict[str, Any], png: Path | None, log_text: str) -
     lighting = graphics.get("lighting") or {}
     surface_detail = graphics.get("surface_detail") or {}
     occlusion = graphics.get("occlusion") or {}
+    image_contact_occlusion = graphics.get("image_contact_occlusion") or {}
     image = _image_metrics(png)
 
     failures: list[dict[str, Any]] = []
@@ -541,6 +546,29 @@ def evaluate(prompt: str, ir: dict[str, Any], png: Path | None, log_text: str) -
             )
 
         try:
+            deep_contact_patches = int(image_contact_occlusion.get("deep_contact_patch_count", 0) or 0)
+            target_dark_contact = float(image_contact_occlusion.get("target_dark_contact_fraction", 0.002) or 0.002)
+            target_dark_contact_area = float(image_contact_occlusion.get("target_dark_contact_area_fraction", 0.004) or 0.004)
+        except Exception:
+            deep_contact_patches = 0
+            target_dark_contact = 0.002
+            target_dark_contact_area = 0.004
+        has_runtime_image_contact = "generative_exterior: created image contact occluders" in log_text
+        if (
+            not isinstance(image_contact_occlusion, dict)
+            or not bool(image_contact_occlusion.get("enabled"))
+            or deep_contact_patches < 8
+            or not has_runtime_image_contact
+        ):
+            fail(
+                "missing_image_contact_occlusion_pass",
+                "Scene lacks a deep contact-occlusion pass for visually grounded props",
+                image_contact_occlusion=image_contact_occlusion,
+                deep_contact_patch_count=deep_contact_patches,
+                runtime_image_contact_occlusion=has_runtime_image_contact,
+            )
+
+        try:
             foreground_occluders = int(world_geometry.get("foreground_occluder_count", 0) or 0)
             depth_bands = int(shot.get("depth_band_count", world_geometry.get("depth_band_count", 0)) or 0)
             ridge_layers = int(world_geometry.get("ridge_layer_count", 0) or 0)
@@ -621,8 +649,18 @@ def evaluate(prompt: str, ir: dict[str, Any], png: Path | None, log_text: str) -
         if image:
             if image["ground_vertical_detail"] < 0.010:
                 fail("low_ground_surface_detail", "Ground band has too little vertical/detail variation", image=image)
-            elif image["dark_contact_fraction"] < 0.002:
-                warn("weak_image_contact_metric", "Image contact-shadow metric is weak; IR/runtime contact evidence still required", image=image)
+            elif (
+                image["dark_contact_fraction"] < target_dark_contact
+                and image.get("dark_contact_area_fraction", 0.0) < target_dark_contact_area
+            ):
+                fail(
+                    "weak_contact_shadow_image_metric",
+                    "Rendered ground band has too little hard dark contact-shadow evidence",
+                    image=image,
+                    image_contact_occlusion=image_contact_occlusion,
+                    target_dark_contact_fraction=target_dark_contact,
+                    target_dark_contact_area_fraction=target_dark_contact_area,
+                )
         else:
             warn("image_metrics_skipped", "PNG/Pillow unavailable; only IR/runtime graphics evidence was checked")
 

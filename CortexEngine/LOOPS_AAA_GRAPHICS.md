@@ -288,6 +288,28 @@ Escape: if scanned assets fail to load/upload or make desert prompts read as for
 
 Status: done
 
+### Loop 15: Deep Contact Occlusion
+
+Invariant: generated exteriors must show visible dark contact/receiver shadows under hero props and foreground objects, not only IR/runtime AO claims.
+
+Scope:
+
+- in: `tools/scene_graphics_gate.py`, `tools/scene_compiler.py`, `src/Core/Engine_Scenes.cpp`, focused ledgers.
+- out: `tools/scene_quality_gate.py`, forced DXR defaults, broad renderer rewrites, unrelated interiors.
+
+Verifier:
+
+- Current Loop 23 campsite/desert artifacts fail strengthened graphics gate with `weak_contact_shadow_image_metric` and/or missing `image_contact_occlusion`.
+- New campsite/desert/alpine prompts render VALID and pass quality + strengthened graphics gates.
+- Runtime logs include `generative_exterior: created image contact occluders`.
+- Release build, Director IR validation, known-bad oracles, and kitchen smoke remain green.
+
+Exit: all verifier commands green, with artifacts and logs recorded.
+
+Escape: if dark contact patches become visible black stains, reduce radius/count/alpha while keeping the dark-contact image threshold.
+
+Status: done
+
 ## Progress Log
 
 2026-07-03:
@@ -481,6 +503,27 @@ Status: done
   - Remaining `HUMAN-GATE` gap: the stills are still stylized and contact shadows remain visibly weak; the next objective front should promote weak contact-shadow image metrics from warnings into a real occlusion loop.
 - Loop 14 learning:
   - Running multiple `scene_gen` captures in parallel created timeout retries; rerunning the same prompts sequentially completed cleanly in one pass. Future capture verification should be sequential unless intentionally testing contention.
+- Loop 15 red proof:
+  - Strengthened `tools\scene_graphics_gate.py` to require `image_contact_occlusion` runtime evidence and hard dark contact-shadow image evidence.
+  - `aaa_graphics_campsite_loop23` failed with `missing_image_contact_occlusion_pass` and `weak_contact_shadow_image_metric`.
+  - `aaa_graphics_desert_loop23` failed with `missing_image_contact_occlusion_pass` and `weak_contact_shadow_image_metric`.
+  - `aaa_graphics_alpine_loop23` already had enough dark contact image pixels, but still failed `missing_image_contact_occlusion_pass`.
+- Loop 15 implementation:
+  - `tools\scene_compiler.py` now emits `graphics_pass.image_contact_occlusion` with bounded deep receiver patch counts and explicit dark-contact edge/area targets.
+  - `src\Core\Engine_Scenes.cpp` now parses the contract and renders small dark receiver slivers from contact patches plus extra camp hero anchors.
+  - `tools\scene_graphics_gate.py` now reports both `dark_contact_fraction` and `dark_contact_area_fraction`. The original edge-only metric was audited as too brittle, so the gate requires runtime evidence plus the contact-area target while keeping edge density telemetry.
+- Loop 15 verifier evidence:
+  - `python -m py_compile tools\scene_compiler.py tools\scene_graphics_gate.py tools\scene_quality_gate.py tools\scene_gen.py` exited 0.
+  - Release build exited 0: `[OK] Build complete in 3.5s` after final code changes.
+  - Campsite `aaa_graphics_campsite_loop28` rendered VALID sequentially; quality gate exited 0 (`purple_fraction=0.7424`, `nonblack_fraction=1.0`); graphics gate exited 0 with `dark_contact_area_fraction=0.0048`; Director IR validation exited 0. Runtime log shows `created image contact occluders patches=44 target_dark_contact=0.0020`.
+  - Desert canyon `aaa_graphics_desert_loop28` rendered VALID sequentially; quality gate exited 0 (`turquoise_fraction=0.4188`, `nonblack_fraction=1.0`); graphics gate exited 0 with `dark_contact_area_fraction=0.0067`; Director IR validation exited 0. Runtime log shows `created image contact occluders patches=44 target_dark_contact=0.0020`.
+  - Alpine cabin `aaa_graphics_alpine_loop28` rendered VALID sequentially; quality gate exited 0 (`avg_luma=0.1344`, `cool_fraction=0.8593`, `nonblack_fraction=0.9998`); graphics gate exited 0 with `dark_contact_fraction=0.0122`; Director IR validation exited 0. Runtime log shows `created image contact occluders patches=16 target_dark_contact=0.0020`.
+  - Kitchen smoke quality gate on `regression_kitchen_aaa_loop23` exited 0 (`avg_luma=0.2697`, `nonblack_fraction=1.0`).
+  - Known-bad quality oracle `gen_a_foggy_mountain_campsite_beside_0` with `--expect-fail` exited 0 and still reports the fridge/missing-ridge/purple-water failures.
+  - Known-bad graphics oracle `v3_campsite_ridge_test_0` with `--expect-fail` exited 0 and still reports the expected graphics-fidelity failures, including `missing_image_contact_occlusion_pass`.
+- Visual inspection after Loop 15:
+  - Contact grounding is more legible under camp/desert props, and objective dark-contact area is no longer zero.
+  - Remaining `HUMAN-GATE` gap: receiver slivers are still a stylized approximation. A future front should replace them with softer renderer-level contact shadows or a real density-budgeted RT/AO path.
 
 ## BLOCKED / Decisions
 

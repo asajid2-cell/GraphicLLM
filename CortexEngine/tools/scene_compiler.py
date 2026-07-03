@@ -445,6 +445,17 @@ def compile_v3_to_v2(v3: dict[str, Any]) -> dict[str, Any]:
             "contact_shadow_strength": 0.78 if not moonlight else 0.68,
             "ambient_occlusion_multiplier": 1.26 if not moonlight else 1.14,
         },
+        "image_contact_occlusion": {
+            "enabled": True,
+            "deep_contact_patch_count": 32 if not moonlight else 16,
+            "target_dark_contact_fraction": 0.002,
+            "target_dark_contact_area_fraction": 0.004,
+            "systems": [
+                "deep_receiver_shadow_patches",
+                "hero_prop_contact_anchors",
+                "foreground_object_grounding",
+            ],
+        },
         "surface_detail": {
             "enabled": True,
             "pebble_count": 42 if not canyon else 34,

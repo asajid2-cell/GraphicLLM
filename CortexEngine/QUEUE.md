@@ -396,3 +396,8 @@
   remains negative, so this can only be accepted as a bounded checkpoint. After clean acceptance,
   the next active item must attack the remaining structural image failures: flat water/shore,
   cardboard terrain/backdrops, and toy hero camp geometry.
+- 2026-07-06: `tools/run_genscene_acceptance.ps1 -Tag phase4_source_asset_dominance_20260706`
+  wrote green `CURRENT.md`. Result: PASS for clean tree, ratchet freeze, Python compile,
+  curation, graphics reset, Release build, structural scene gate, and phase0 policy. Loop 4
+  remains open and visual truth remains negative. Next active item is continuous terrain/water/
+  hero-geometry structure, not more source-asset count work.

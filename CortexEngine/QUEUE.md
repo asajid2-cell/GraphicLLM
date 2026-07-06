@@ -329,3 +329,11 @@
   `gen_a_sunny_desert_canyon_campsite_w_0.png`. Visual truth remains negative: shots are
   cleaner and more coherent, but cardboard backdrops, flat water/shore reads, and simple hero
   geometry still block the AAA goal.
+- 2026-07-06: `tools/run_genscene_acceptance.ps1 -Tag phase4_declutter_camera_20260706`
+  wrote green `CURRENT.md`. Result: PASS for clean tree, ratchet freeze, Python compile,
+  curation, graphics reset, Release build, structural scene gate, and phase0 policy.
+  Accepted candidates were campsite `gen_a_foggy_mountain_campsite_beside_1.png`, alpine
+  `gen_a_stormy_alpine_lake_with_a_smal_0.png`, and desert
+  `gen_a_sunny_desert_canyon_campsite_w_0.png`. Loop 4 remains open; next active item should
+  attack remaining flat water/shore bands, cardboard backdrop masses, and hero-asset material
+  fidelity rather than declaring this a quality solve.

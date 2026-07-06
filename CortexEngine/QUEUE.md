@@ -83,3 +83,7 @@
   adjustment; desert turquoise ROI recovered to `turquoise_fraction=0.4073`. Visual residuals
   remain: lakes are still broad/flat, foreground dressing is still noisy, and assets remain
   stylized.
+- 2026-07-06: `tools/run_genscene_acceptance.ps1 -Tag phase4_shaped_water_20260706`
+  wrote green `CURRENT.md`. Result: PASS for clean tree, ratchet freeze, Python compile,
+  curation, graphics reset, structural scene gate, Release build, and phase0 policy.
+  Loop 4 remains open; next item is foreground/material/asset coherence.

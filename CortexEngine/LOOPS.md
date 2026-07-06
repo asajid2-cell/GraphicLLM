@@ -282,3 +282,7 @@ Status: pending.
   passed ratchet freeze, Python compile, curation, graphics reset, and structural scene gates,
   and failed only expected dirty-tree gates. Visual truth remains negative; this removes one
   structural flat-sheet failure but does not solve asset/material/composition quality.
+- 2026-07-06: Loop 4 iteration 2 accepted. Full runner
+  `tools/run_genscene_acceptance.ps1 -Tag phase4_shaped_water_20260706` passed clean tree,
+  ratchet freeze, Python compile, curation, graphics reset, structural scene gate, Release build,
+  and phase0 policy, and rewrote `CURRENT.md` to accepted tag `phase4_shaped_water_20260706`.

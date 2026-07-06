@@ -524,3 +524,10 @@ Status: pending.
   Visual truth remains negative: this is only a visible-card subtraction checkpoint. Remaining
   orange rectangular ghosting likely comes from emissive/practical/bloom behavior, not the
   now-zeroed compiler card budgets.
+- 2026-07-06: Loop 4 iteration 12 accepted. Full runner
+  `tools/run_genscene_acceptance.ps1 -Tag phase4_visible_card_cleanup_20260706` passed clean
+  tree, ratchet freeze, Python compile, curation, graphics reset, Release build, structural
+  scene gate, and phase0 policy, and rewrote `CURRENT.md` to accepted tag
+  `phase4_visible_card_cleanup_20260706`. Visual truth remains negative; Loop 4 stays open.
+  Next active work should diagnose the remaining orange rectangular ghosting and replace weak
+  hero/background forms through real emissive, bloom, material, asset, and lighting systems.

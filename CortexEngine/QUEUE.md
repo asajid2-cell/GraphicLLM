@@ -228,3 +228,9 @@
   `purple_water_roi_fail` by strengthening purple/violet water material. Visual truth remains
   negative; accept only as a bounded visible-card cleanup checkpoint, then continue into the
   suspected bloom/emissive/practical-light ghosting and weak hero/background forms.
+- 2026-07-06: `tools/run_genscene_acceptance.ps1 -Tag phase4_visible_card_cleanup_20260706`
+  wrote green `CURRENT.md`. Result: PASS for clean tree, ratchet freeze, Python compile,
+  curation, graphics reset, Release build, structural scene gate, and phase0 policy. Loop 4
+  remains open. Next active item is suspected bloom/emissive/practical-light ghosting and
+  weak hero/background form, because visible-card compiler budgets are now zero but the latest
+  stills are not visually coherent AA/AAA shots.

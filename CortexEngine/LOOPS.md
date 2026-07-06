@@ -303,3 +303,8 @@ Status: pending.
   passed ratchet freeze, Python compile, curation, graphics reset, and structural scene gates,
   and failed only expected dirty-tree gates. Visual truth remains negative; next work should
   target hero mesh/material replacement and actual material response, not more count trimming.
+- 2026-07-06: Loop 4 iteration 3 accepted. Full runner
+  `tools/run_genscene_acceptance.ps1 -Tag phase4_composition_cleanup_20260706` passed clean tree,
+  ratchet freeze, Python compile, curation, graphics reset, structural scene gate, Release build,
+  and phase0 policy, and rewrote `CURRENT.md` to accepted tag
+  `phase4_composition_cleanup_20260706`.

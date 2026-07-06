@@ -95,3 +95,7 @@
   zeros foreground dressing clusters and micro-detail overlays, and keeps canonical semantic
   plus graphics gates green. Visual residuals remain: hero campsite detail is still busy,
   water/lake materials remain too flat, and source assets are still below the target fidelity.
+- 2026-07-06: `tools/run_genscene_acceptance.ps1 -Tag phase4_composition_cleanup_20260706`
+  wrote green `CURRENT.md`. Result: PASS for clean tree, ratchet freeze, Python compile,
+  curation, graphics reset, structural scene gate, Release build, and phase0 policy.
+  Loop 4 remains open; next item is hero mesh/material replacement and material response.

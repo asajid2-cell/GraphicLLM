@@ -620,3 +620,13 @@ Status: pending.
   `gen_a_sunny_desert_canyon_campsite_w_0.png`. Visual truth remains negative: bounded water
   reads better, but front shore edges, low-fidelity backdrop masses, lighting, and hero assets
   still block a coherent AA/AAA result.
+- 2026-07-06: Loop 4 iteration 16 accepted. Full runner
+  `tools/run_genscene_acceptance.ps1 -Tag phase4_shaped_waterbed_20260706` passed clean tree,
+  ratchet freeze, Python compile, curation, graphics reset, Release build, structural scene gate,
+  and phase0 policy, and rewrote `CURRENT.md` to accepted tag
+  `phase4_shaped_waterbed_20260706`. Selected accepted candidates were campsite
+  `gen_a_foggy_mountain_campsite_beside_1.png`, alpine
+  `gen_a_stormy_alpine_lake_with_a_smal_0.png`, and desert
+  `gen_a_sunny_desert_canyon_campsite_w_1.png`. Visual truth remains negative; Loop 4 stays
+  open. Next work should target coherent backdrop/terrain/lighting form, not more water-footprint
+  cleanup unless it blocks a real prompt.

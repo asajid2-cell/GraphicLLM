@@ -300,3 +300,11 @@
   `gen_a_sunny_desert_canyon_campsite_w_0.png`. Visual truth remains negative: water bodies are
   better bounded and less like full-frame color sheets, but the front edge, backdrop massing,
   lighting, and hero assets are still below AA/AAA quality.
+- 2026-07-06: `tools/run_genscene_acceptance.ps1 -Tag phase4_shaped_waterbed_20260706`
+  wrote green `CURRENT.md`. Result: PASS for clean tree, ratchet freeze, Python compile,
+  curation, graphics reset, Release build, structural scene gate, and phase0 policy. Loop 4
+  remains open. Selected accepted candidates were campsite
+  `gen_a_foggy_mountain_campsite_beside_1.png`, alpine
+  `gen_a_stormy_alpine_lake_with_a_smal_0.png`, and desert
+  `gen_a_sunny_desert_canyon_campsite_w_1.png`. Next active item is backdrop/terrain/lighting
+  cohesion: water footprints are cleaner, but the frames still read staged and low-fidelity.

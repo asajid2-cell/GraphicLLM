@@ -429,3 +429,19 @@ Status: pending.
   `gen_a_sunny_desert_canyon_campsite_w_0.png`. Visual truth remains negative; next Loop 4 work
   must leave the current camera/material cleanup lane and attack still-flat water surface response,
   cardboard ridge/backdrop geometry, and real asset-library replacement.
+- 2026-07-06: Loop 4 iteration 9 dirty probe attacked real water/backdrop systems instead of
+  proxy overlays. The diff reshapes generated lakes into cove/tapered water meshes, gives
+  procedural ridge layers actual depth/faceted normals, lowers authored water tint-as-emission,
+  makes the water shader derive depth from shore-to-far UV rather than treating every edge as
+  shallow, and restores desert turquoise readability with a river-only palette correction.
+  Heartbeats `genscene-water-ridge-build3`, `genscene-water-ridge-build4`,
+  `genscene-water-ridge-canonical-renders2`, and `genscene-water-ridge-dirty-probe` fired during
+  build/render/probe waits. Manual Release builds passed, canonical focused renders stayed valid
+  after correcting a real `turquoise_water_roi_fail`, and dirty probe
+  `tools/run_genscene_acceptance.ps1 -Tag phase4_water_ridge_depth_dirty_probe_20260706 -SkipBuild`
+  passed ratchet freeze, Python compile, curation, graphics reset, and structural scene gates,
+  failing only expected dirty-tree policy gates. Selected candidates were campsite
+  `gen_a_foggy_mountain_campsite_beside_1.png`, alpine
+  `gen_a_stormy_alpine_lake_with_a_smal_0.png`, and desert
+  `gen_a_sunny_desert_canyon_campsite_w_0.png`. Visual truth remains negative: water is less
+  neon and ridges are less purely flat, but scenes still read staged/disconnected and not AA/AAA.

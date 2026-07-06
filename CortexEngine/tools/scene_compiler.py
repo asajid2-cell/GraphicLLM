@@ -256,11 +256,11 @@ def compile_v3_to_v2(v3: dict[str, Any]) -> dict[str, Any]:
     water_intent = str(waterbody.get("color_intent") or "").lower()
     stylized_water = water_intent in {"purple", "violet", "turquoise", "blue"}
     if canyon and water_intent == "turquoise":
-        water_shallow = [0.0, 2.70, 3.95]
-        water_deep = [0.0, 1.16, 2.20]
+        water_shallow = [0.02, 1.58, 2.25]
+        water_deep = [0.0, 0.58, 1.24]
     if water_intent in {"purple", "violet"}:
-        water_shallow = [0.92, 0.04, 1.62]
-        water_deep = [0.31, 0.00, 0.86]
+        water_shallow = [0.55, 0.035, 1.02]
+        water_deep = [0.18, 0.00, 0.50]
     if moonlight and not stylized_water:
         water_shallow = [0.11, 0.30, 0.52]
         water_deep = [0.01, 0.045, 0.17]
@@ -333,7 +333,7 @@ def compile_v3_to_v2(v3: dict[str, Any]) -> dict[str, Any]:
             "fresnel": 0.20 if stylized_water else 0.44,
             "viscosity": 0.76 if stylized_water else 0.50,
             "body_thickness": 1.05 if stylized_water else 0.82,
-            "color_strength": 0.88 if stylized_water else 0.0,
+            "color_strength": 0.48 if stylized_water else 0.0,
         },
         "background": {
             "ridge_layers": ridge_layers,
@@ -360,7 +360,7 @@ def compile_v3_to_v2(v3: dict[str, Any]) -> dict[str, Any]:
             "absorption": max(env["water"]["absorption"], 1.05),
             "foam": max(env["water"]["foam"], 0.20),
             "body_thickness": max(env["water"]["body_thickness"], 1.18),
-            "color_strength": 0.84 if stylized_water else env["water"]["color_strength"],
+            "color_strength": 0.46 if stylized_water else env["water"]["color_strength"],
         })
     elif authored_module_id == "desert_canyon_river":
         env["sun"].update({
@@ -374,14 +374,14 @@ def compile_v3_to_v2(v3: dict[str, Any]) -> dict[str, Any]:
         env["fog"] = {"density": max(env["fog"]["density"], 0.012), "start": 8.0}
         env["exposure"] = min(env["exposure"], 0.84)
         env["water"].update({
-            "shallow": [0.0, 2.88, 4.20],
-            "deep": [0.0, 1.22, 2.34],
+            "shallow": [0.02, 1.95, 2.62],
+            "deep": [0.0, 0.78, 1.48],
             "roughness": min(env["water"]["roughness"], 0.052),
             "fresnel": 0.18,
             "absorption": max(env["water"]["absorption"], 1.22),
             "foam": max(env["water"]["foam"], 0.24),
             "body_thickness": max(env["water"]["body_thickness"], 1.34),
-            "color_strength": 0.92,
+            "color_strength": 0.58,
         })
     elif authored_module_id == "alpine_cabin_lake":
         env["sun"].update({

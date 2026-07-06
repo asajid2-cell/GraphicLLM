@@ -541,13 +541,17 @@ namespace {
             };
             const float bend = std::sin(v * glm::pi<float>() * 2.0f - 0.45f);
             const float secondary = std::sin(v * glm::pi<float>() * 5.0f + 0.8f);
-            const float centerX = riverLike ? bend * halfMaxWidth * 0.18f : bend * halfMaxWidth * 0.045f;
+            const float cove = std::sin(smooth(v) * glm::pi<float>());
+            const float farTaper = riverLike ? 1.0f : (1.0f - 0.38f * smooth(std::max(0.0f, (v - 0.70f) / 0.30f)));
+            const float centerX = riverLike
+                ? bend * halfMaxWidth * 0.20f
+                : (bend * 0.055f + secondary * 0.012f) * halfMaxWidth;
             const float widthFactor = riverLike
                 ? (0.20f + 0.055f * smooth(v) + 0.022f * secondary)
-                : (0.26f + 0.42f * smooth(v) + 0.030f * secondary);
+                : ((0.22f + 0.36f * cove + 0.055f * smooth(v) + 0.026f * secondary) * farTaper);
             const float halfWidth = std::clamp(halfMaxWidth * widthFactor,
-                                               halfMaxWidth * (riverLike ? 0.16f : 0.20f),
-                                               halfMaxWidth * (riverLike ? 0.34f : 0.74f));
+                                               halfMaxWidth * (riverLike ? 0.16f : 0.18f),
+                                               halfMaxWidth * (riverLike ? 0.34f : 0.62f));
             return Sample{centerX, halfWidth};
         };
 
@@ -608,13 +612,17 @@ namespace {
             };
             const float bend = std::sin(v * glm::pi<float>() * 2.0f - 0.45f);
             const float secondary = std::sin(v * glm::pi<float>() * 5.0f + 0.8f);
-            const float centerX = riverLike ? bend * halfMaxWidth * 0.18f : bend * halfMaxWidth * 0.045f;
+            const float cove = std::sin(smooth(v) * glm::pi<float>());
+            const float farTaper = riverLike ? 1.0f : (1.0f - 0.38f * smooth(std::max(0.0f, (v - 0.70f) / 0.30f)));
+            const float centerX = riverLike
+                ? bend * halfMaxWidth * 0.20f
+                : (bend * 0.055f + secondary * 0.012f) * halfMaxWidth;
             const float widthFactor = riverLike
                 ? (0.20f + 0.055f * smooth(v) + 0.022f * secondary)
-                : (0.26f + 0.42f * smooth(v) + 0.030f * secondary);
+                : ((0.22f + 0.36f * cove + 0.055f * smooth(v) + 0.026f * secondary) * farTaper);
             const float halfWidth = std::clamp(halfMaxWidth * widthFactor,
-                                               halfMaxWidth * (riverLike ? 0.16f : 0.20f),
-                                               halfMaxWidth * (riverLike ? 0.34f : 0.74f));
+                                               halfMaxWidth * (riverLike ? 0.16f : 0.18f),
+                                               halfMaxWidth * (riverLike ? 0.34f : 0.62f));
             return Sample{centerX, halfWidth};
         };
         auto pushVertex = [&](float x, float y, float z, float u, float v) {
@@ -766,33 +774,81 @@ namespace {
     std::shared_ptr<Scene::MeshData> CreateGenerativeRidgeMesh(float width,
                                                                float height,
                                                                float baseY,
-                                                               float phase) {
+                                                               float phase,
+                                                               float depth = 0.0f) {
         auto mesh = std::make_shared<Scene::MeshData>();
         mesh->kind = Scene::MeshKind::Procedural;
-        constexpr uint32_t kSegments = 28;
-        mesh->positions.reserve((kSegments + 1) * 2);
-        mesh->normals.reserve((kSegments + 1) * 2);
-        mesh->texCoords.reserve((kSegments + 1) * 2);
+        constexpr uint32_t kSegments = 40;
+        constexpr uint32_t kRows = 4;
+        depth = std::max(depth, 0.0f);
+        mesh->positions.reserve((kSegments + 1) * kRows);
+        mesh->normals.resize((kSegments + 1) * kRows, glm::vec3(0.0f));
+        mesh->texCoords.reserve((kSegments + 1) * kRows);
+
+        auto idx = [](uint32_t segment, uint32_t row) {
+            return segment * kRows + row;
+        };
+
         for (uint32_t i = 0; i <= kSegments; ++i) {
             const float u = static_cast<float>(i) / static_cast<float>(kSegments);
             const float x = (u - 0.5f) * width;
             const float n0 = std::sin(u * 19.0f + phase) * 0.18f;
             const float n1 = std::sin(u * 43.0f + phase * 1.7f) * 0.10f;
+            const float n2 = std::sin(u * 7.0f - phase * 0.31f) * 0.06f;
             const float ridge = std::clamp(0.54f + n0 + n1, 0.30f, 0.92f);
             const float yTop = baseY + height * ridge;
-            mesh->positions.emplace_back(x, baseY, 0.0f);
-            mesh->positions.emplace_back(x, yTop, 0.0f);
-            mesh->normals.emplace_back(0.0f, 0.0f, 1.0f);
-            mesh->normals.emplace_back(0.0f, 0.0f, 1.0f);
-            mesh->texCoords.emplace_back(u, 1.0f);
-            mesh->texCoords.emplace_back(u, 0.0f);
+            const float shoulder = std::sin(u * 31.0f + phase * 0.8f) * 0.12f;
+            const float xWarp = std::sin(u * 13.0f + phase) * depth * 0.035f;
+            const float zToe = depth * (0.34f + n2);
+            const float zFace = depth * (0.08f + shoulder * 0.18f);
+            const float zShoulder = -depth * (0.18f + shoulder * 0.12f);
+            const float zCrest = -depth * (0.43f + n2 * 0.40f);
+            const glm::vec3 rows[kRows] = {
+                glm::vec3(x - xWarp * 0.18f, baseY - depth * 0.018f, zToe),
+                glm::vec3(x + xWarp, glm::mix(baseY, yTop, 0.38f) + shoulder * height * 0.030f, zFace),
+                glm::vec3(x + xWarp * 0.45f, glm::mix(baseY, yTop, 0.72f) - shoulder * height * 0.020f, zShoulder),
+                glm::vec3(x, yTop, zCrest),
+            };
+            for (uint32_t row = 0; row < kRows; ++row) {
+                const float v = static_cast<float>(row) / static_cast<float>(kRows - 1u);
+                mesh->positions.emplace_back(rows[row]);
+                mesh->texCoords.emplace_back(u * 3.0f, 1.0f - v);
+            }
         }
         for (uint32_t i = 0; i < kSegments; ++i) {
-            const uint32_t b0 = i * 2u;
-            const uint32_t t0 = b0 + 1u;
-            const uint32_t b1 = b0 + 2u;
-            const uint32_t t1 = b0 + 3u;
-            mesh->indices.insert(mesh->indices.end(), { b0, b1, t1, b0, t1, t0 });
+            for (uint32_t row = 0; row + 1u < kRows; ++row) {
+                const uint32_t a = idx(i, row);
+                const uint32_t b = idx(i + 1u, row);
+                const uint32_t c = idx(i, row + 1u);
+                const uint32_t d = idx(i + 1u, row + 1u);
+                mesh->indices.insert(mesh->indices.end(), {a, b, d, a, d, c});
+            }
+        }
+
+        for (size_t tri = 0; tri + 2 < mesh->indices.size(); tri += 3) {
+            const uint32_t ia = mesh->indices[tri];
+            const uint32_t ib = mesh->indices[tri + 1];
+            const uint32_t ic = mesh->indices[tri + 2];
+            glm::vec3 n = glm::cross(mesh->positions[ib] - mesh->positions[ia],
+                                     mesh->positions[ic] - mesh->positions[ia]);
+            if (glm::length(n) < 1e-5f) {
+                n = glm::vec3(0.0f, 0.0f, 1.0f);
+            } else {
+                n = glm::normalize(n);
+                if (n.z < 0.0f) {
+                    n = -n;
+                }
+            }
+            mesh->normals[ia] += n;
+            mesh->normals[ib] += n;
+            mesh->normals[ic] += n;
+        }
+        for (auto& n : mesh->normals) {
+            if (glm::length(n) < 1e-5f) {
+                n = glm::vec3(0.0f, 0.0f, 1.0f);
+            } else {
+                n = glm::normalize(n);
+            }
         }
         mesh->UpdateBounds();
         return mesh;
@@ -7337,36 +7393,39 @@ void Engine::BuildRecipeScene() {
                 t.scale = glm::vec3(1.0f);
                 auto& r = m_registry->AddComponent<Scene::RenderableComponent>(water);
                 r.mesh = waterMesh;
-                r.albedoColor = glm::vec4(genExt.waterShallow, riverLike ? 0.86f : 0.84f);
+                r.albedoColor = glm::vec4(genExt.waterShallow, riverLike ? 0.78f : 0.74f);
                 r.metallic = 0.0f;
                 r.roughness = genExt.waterRough;
                 r.ao = 1.0f;
-                r.occlusionStrength = 0.84f;
-                r.clearcoatFactor = 0.42f;
-                r.clearcoatRoughnessFactor = std::clamp(genExt.waterRough + 0.12f, 0.08f, 0.65f);
-                r.specularFactor = 1.18f;
-                r.anisotropyStrength = 0.20f;
+                r.occlusionStrength = 0.92f;
+                r.clearcoatFactor = riverLike ? 0.36f : 0.32f;
+                r.clearcoatRoughnessFactor = std::clamp(genExt.waterRough + 0.18f, 0.12f, 0.72f);
+                r.specularFactor = riverLike ? 1.08f : 0.96f;
+                r.anisotropyStrength = riverLike ? 0.22f : 0.16f;
                 r.presetName = "water";
                 r.castsSunShadow = false;
                 Scene::WaterSurfaceComponent sea{};
-                sea.absorption = genExt.waterAbsorption;   // v3 controls explicit color readability
+                sea.absorption = std::min(genExt.waterAbsorption + (riverLike ? 0.10f : 0.18f), 1.5f);
                 sea.foamStrength = genExt.waterFoam;
-                sea.viscosity = genExt.waterViscosity;
-                sea.emissiveHeat = genExt.waterColorStrength * (riverLike ? 0.82f : 0.72f); // authored tint without turning lakes into light cards
-                sea.bodyThickness = genExt.waterBodyThickness;
-                sea.sloshStrength = riverLike ? 0.44f : 0.36f;
-                sea.meniscusStrength = riverLike ? 0.52f : 0.46f;
-                sea.flowSpeed = riverLike ? 0.92f : 0.58f;
+                sea.viscosity = std::min(genExt.waterViscosity, riverLike ? 0.46f : 0.58f);
+                sea.emissiveHeat = genExt.waterColorStrength * (riverLike ? 0.40f : 0.30f);
+                sea.bodyThickness = std::min(genExt.waterBodyThickness + (riverLike ? 0.16f : 0.24f), 2.0f);
+                sea.sloshStrength = riverLike ? 0.48f : 0.42f;
+                sea.meniscusStrength = riverLike ? 0.48f : 0.40f;
+                sea.flowSpeed = riverLike ? 0.98f : 0.64f;
                 sea.shallowTint = genExt.waterShallow;
                 sea.deepTint = genExt.waterDeep;
                 m_registry->AddComponent<Scene::WaterSurfaceComponent>(water, sea);
-                spdlog::info("generative_exterior: structural water surface component=WaterSurfaceComponent shape={} width={:.2f} length={:.2f} vertices={} triangles={} level={:.2f} gerstner_shader=on shallow=({:.2f},{:.2f},{:.2f})",
+                spdlog::info("generative_exterior: structural water surface component=WaterSurfaceComponent shape={} width={:.2f} length={:.2f} vertices={} triangles={} level={:.2f} gerstner_shader=on absorption={:.2f} body={:.2f} tint_strength={:.2f} shallow=({:.2f},{:.2f},{:.2f})",
                              riverLike ? "s_curve_river" : "curved_lake_cove",
                              genExt.extent * 2.0f,
                              waterLen,
                              waterMesh->positions.size(),
                              waterMesh->indices.size() / 3u,
                              genExt.waterLevel,
+                             sea.absorption,
+                             sea.bodyThickness,
+                             sea.emissiveHeat,
                              genExt.waterShallow.r,
                              genExt.waterShallow.g,
                              genExt.waterShallow.b);
@@ -10433,7 +10492,8 @@ void Engine::BuildRecipeScene() {
                 auto ridgeMesh = CreateGenerativeRidgeMesh(width,
                                                            layer.heightM,
                                                            baseY,
-                                                           1.73f + static_cast<float>(i) * 4.91f);
+                                                           1.73f + static_cast<float>(i) * 4.91f,
+                                                           std::clamp(layer.distanceM * 0.075f, 3.0f, 9.5f));
                 auto up = renderer->UploadMesh(ridgeMesh);
                 if (up.IsErr()) {
                     spdlog::warn("generative_exterior: ridge mesh upload failed: {}", up.Error());
@@ -10446,12 +10506,20 @@ void Engine::BuildRecipeScene() {
                 t.position = glm::vec3(0.0f, 0.0f, -layer.distanceM);
                 auto& r = m_registry->AddComponent<Scene::RenderableComponent>(ridge);
                 r.mesh = ridgeMesh;
-                const float depthFade = std::clamp(1.0f - static_cast<float>(i) * 0.18f, 0.55f, 1.0f);
-                r.albedoColor = glm::vec4(glm::max(layer.color * depthFade, glm::vec3(0.035f)), 1.0f);
+                const float depthFade = std::clamp(1.0f - static_cast<float>(i) * 0.14f, 0.62f, 1.0f);
+                const glm::vec3 skyLift = glm::vec3(0.055f, 0.070f, 0.090f);
+                const glm::vec3 facetTint = glm::mix(layer.color * depthFade,
+                                                     layer.color * 1.22f + skyLift,
+                                                     0.22f);
+                r.albedoColor = glm::vec4(glm::max(facetTint, glm::vec3(0.045f)), 1.0f);
                 r.metallic = 0.0f;
-                r.roughness = 0.98f;
-                r.ao = 1.0f;
-                r.doubleSided = true;
+                r.roughness = 0.92f;
+                r.ao = 0.95f;
+                r.occlusionStrength = 0.64f;
+                r.normalScale = 0.34f;
+                r.proceduralMaskStrength = 0.28f;
+                r.specularFactor = 0.08f;
+                r.doubleSided = false;
                 r.presetName = "naturalistic";
                 ridgeCount++;
             }
@@ -10468,7 +10536,8 @@ void Engine::BuildRecipeScene() {
                     auto detailMesh = CreateGenerativeRidgeMesh(width,
                                                                 height,
                                                                 baseY,
-                                                                9.37f + static_cast<float>(i) * 3.41f);
+                                                                9.37f + static_cast<float>(i) * 3.41f,
+                                                                std::clamp(source.distanceM * 0.035f, 1.8f, 4.6f));
                     auto up = renderer->UploadMesh(detailMesh);
                     if (up.IsErr()) {
                         spdlog::warn("generative_exterior: backdrop detail ridge upload failed: {}", up.Error());
@@ -10483,14 +10552,18 @@ void Engine::BuildRecipeScene() {
                                            -source.distanceM + 4.5f + static_cast<float>(i) * 2.15f);
                     auto& r = m_registry->AddComponent<Scene::RenderableComponent>(detail);
                     r.mesh = detailMesh;
-                    const glm::vec3 notchColor = glm::mix(source.color, glm::vec3(0.025f, 0.030f, 0.040f), 0.24f + 0.08f * (i % 2));
-                    r.albedoColor = glm::vec4(glm::max(notchColor, glm::vec3(0.030f)), 1.0f);
+                    const glm::vec3 notchColor = glm::mix(source.color * 1.18f + glm::vec3(0.035f, 0.045f, 0.060f),
+                                                          glm::vec3(0.025f, 0.030f, 0.040f),
+                                                          0.16f + 0.06f * (i % 2));
+                    r.albedoColor = glm::vec4(glm::max(notchColor, glm::vec3(0.040f)), 1.0f);
                     r.metallic = 0.0f;
-                    r.roughness = 0.99f;
-                    r.ao = 1.0f;
-                    r.normalScale = 0.18f;
-                    r.proceduralMaskStrength = 0.18f;
-                    r.doubleSided = true;
+                    r.roughness = 0.93f;
+                    r.ao = 0.94f;
+                    r.occlusionStrength = 0.66f;
+                    r.normalScale = 0.32f;
+                    r.proceduralMaskStrength = 0.30f;
+                    r.specularFactor = 0.07f;
+                    r.doubleSided = false;
                     r.presetName = "naturalistic";
                     backdropDetailCount++;
                 }

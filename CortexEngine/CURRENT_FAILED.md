@@ -2,22 +2,22 @@
 
 Overall: **RED - DO NOT ACCEPT. Fix or revert before anything else.**
 
-- Tag: `phase4_grounded_composition_material_dirty_probe_20260706`
-- Date: 2026-07-06 09:05
-- Accepted tag: `phase4_hero_asset_form_20260706`
-- Previous tag: `phase4_hero_asset_form_20260706`
-- HEAD: ffad9cd Accept GenScene hero asset form checkpoint
-- Tracked tree: DIRTY:  M CortexEngine/CURRENT_FAILED.md;  M CortexEngine/src/Core/Engine_Scenes.cpp;  M CortexEngine/tools/scene_compiler.py
+- Tag: `phase4_water_ridge_depth_dirty_probe_20260706`
+- Date: 2026-07-06 09:51
+- Accepted tag: `phase4_grounded_composition_material_20260706`
+- Previous tag: `phase4_grounded_composition_material_20260706`
+- HEAD: 045e10b Accept GenScene grounded composition checkpoint
+- Tracked tree: DIRTY:  M CortexEngine/assets/shaders/Water.hlsl;  M CortexEngine/src/Core/Engine_Scenes.cpp;  M CortexEngine/tools/scene_compiler.py
 
 ## Gates
 
-- **clean_tree**: FAIL -- Z:\328\CMPUT328-A2\codexworks\301\graphics\CortexEngine\artifacts\genscene_acceptance\phase4_grounded_composition_material_dirty_probe_20260706\git_status.txt
+- **clean_tree**: FAIL -- Z:\328\CMPUT328-A2\codexworks\301\graphics\CortexEngine\artifacts\genscene_acceptance\phase4_water_ridge_depth_dirty_probe_20260706\git_status.txt
 - **gate_ratchet_freeze**: PASS -- no added missing_* hard gates in scene_graphics_gate.py
-- **python_compile**: PASS -- Z:\328\CMPUT328-A2\codexworks\301\graphics\CortexEngine\artifacts\genscene_acceptance\phase4_grounded_composition_material_dirty_probe_20260706\python_compile.log
-- **curation_gate**: PASS -- Z:\328\CMPUT328-A2\codexworks\301\graphics\CortexEngine\artifacts\genscene_acceptance\phase4_grounded_composition_material_dirty_probe_20260706\curation_gate.log
-- **graphics_gate_reset**: PASS -- Z:\328\CMPUT328-A2\codexworks\301\graphics\CortexEngine\artifacts\genscene_acceptance\phase4_grounded_composition_material_dirty_probe_20260706\graphics_gate_reset.log
+- **python_compile**: PASS -- Z:\328\CMPUT328-A2\codexworks\301\graphics\CortexEngine\artifacts\genscene_acceptance\phase4_water_ridge_depth_dirty_probe_20260706\python_compile.log
+- **curation_gate**: PASS -- Z:\328\CMPUT328-A2\codexworks\301\graphics\CortexEngine\artifacts\genscene_acceptance\phase4_water_ridge_depth_dirty_probe_20260706\curation_gate.log
+- **graphics_gate_reset**: PASS -- Z:\328\CMPUT328-A2\codexworks\301\graphics\CortexEngine\artifacts\genscene_acceptance\phase4_water_ridge_depth_dirty_probe_20260706\graphics_gate_reset.log
 - **release_build**: PASS -- skipped by -SkipBuild
-- **structural_scene_gate**: PASS -- Z:\328\CMPUT328-A2\codexworks\301\graphics\CortexEngine\artifacts\genscene_acceptance\phase4_grounded_composition_material_dirty_probe_20260706\structural_scene_gate.log
+- **structural_scene_gate**: PASS -- Z:\328\CMPUT328-A2\codexworks\301\graphics\CortexEngine\artifacts\genscene_acceptance\phase4_water_ridge_depth_dirty_probe_20260706\structural_scene_gate.log
 - **phase0_policy**: FAIL -- dirty tree and old overlay-gate changes must not be accepted by assertion
 
 ## Residuals
@@ -26,6 +26,6 @@ Overall: **RED - DO NOT ACCEPT. Fix or revert before anything else.**
 
 ## Regression
 
-    Previous accepted tag: phase4_hero_asset_form_20260706
+    Previous accepted tag: phase4_grounded_composition_material_20260706
 
 Next steps live in `QUEUE.md` and `PLAN.md`. This file is state, nothing else.

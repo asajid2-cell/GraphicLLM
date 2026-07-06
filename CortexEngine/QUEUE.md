@@ -176,3 +176,14 @@
   remains open. Next active item is not more camera/material cleanup; target the remaining
   structural visual ceiling: water shader/surface depth, mountain/backdrop geometry, and real
   non-Kenney asset replacement.
+- 2026-07-06: Loop 4 water/ridge depth dirty probe
+  `tools/run_genscene_acceptance.ps1 -Tag phase4_water_ridge_depth_dirty_probe_20260706 -SkipBuild`
+  wrote red `CURRENT_FAILED.md` as expected after manual Release builds. It passed ratchet freeze,
+  Python compile, curation, graphics reset, and structural scene gates, and failed only
+  `clean_tree` plus `phase0_policy` because the implementation was intentionally uncommitted.
+  The change moves water/backdrop work into real systems: cove/tapered generated water meshes,
+  shore-to-far water shader depth, lower authored water glow, and faceted ridge-mass geometry.
+  A real desert `turquoise_water_roi_fail` appeared during focused renders and was fixed with a
+  river-only material correction before the probe. Visual truth remains negative: cleaner, but
+  still staged/disconnected and below AA/AAA. Accept only as a bounded water/backdrop systems
+  checkpoint, then continue to asset replacement, terrain composition, and stronger lighting.

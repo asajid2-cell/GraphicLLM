@@ -639,3 +639,16 @@ Status: pending.
   local-minimum failure Claude called out, so the next slice must replace backdrop/terrain form
   through continuous terrain/material/lighting systems or remove weak geometry, not add another
   metric-friendly layer.
+- 2026-07-06: Loop 4 iteration 18 dirty probe cleaned composition and visible clutter without
+  adding gates. It zeros the remaining structural terrain/material patch emitters and backdrop
+  detail ridge accretion, cuts random ecology/source-placement budgets, narrows water footprints,
+  lifts purple water material enough to keep the prompt read, and uses tighter module-specific
+  cameras for campsite, cabin, and canyon. Probe
+  `tools/run_genscene_acceptance.ps1 -Tag phase4_declutter_camera_dirty_probe2_20260706` passed
+  ratchet freeze, Python compile, curation, graphics reset, Release build, and structural scene
+  gates, failing only expected dirty-tree policy. Selected candidates were campsite
+  `gen_a_foggy_mountain_campsite_beside_1.png`, alpine
+  `gen_a_stormy_alpine_lake_with_a_smal_0.png`, and desert
+  `gen_a_sunny_desert_canyon_campsite_w_0.png`. Visual truth remains negative: this is a
+  cleanup/framing checkpoint, not the AAA solve. Next work should replace the remaining flat
+  water/shore and cardboard backdrop/hero geometry with real material/terrain/asset systems.

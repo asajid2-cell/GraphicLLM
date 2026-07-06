@@ -5199,7 +5199,7 @@ void Engine::BuildRecipeScene() {
                 const bool riverLike = genExt.authoredSceneModule.moduleId == "desert_canyon_river";
                 const float seaLen = genExt.waterFromZ - groundFar;
                 const float seaMidZ = (genExt.waterFromZ + groundFar) * 0.5f;
-                const float waterBodyWidth = genExt.extent * (riverLike ? 1.55f : 1.65f);
+                const float waterBodyWidth = genExt.extent * (riverLike ? 1.08f : 1.38f);
                 auto farGroundPlane = CreateGenerativeTerrainMesh(groundW,
                                                                    seaLen,
                                                                    seaMidZ,
@@ -5285,7 +5285,7 @@ void Engine::BuildRecipeScene() {
                     glm::vec4(glm::max(glm::mix(gcol * 0.42f, genExt.waterDeep, 0.06f), glm::vec3(0.016f)), 1.0f),
                 };
                 const bool riverLike = genExt.authoredSceneModule.moduleId == "desert_canyon_river";
-                const float waterBodyWidth = genExt.extent * (riverLike ? 1.55f : 1.65f);
+                const float waterBodyWidth = genExt.extent * (riverLike ? 1.08f : 1.38f);
                 const float bankLen = std::max(genExt.waterFromZ - groundFar, 1.0f);
                 const float bankMidZ = (genExt.waterFromZ + groundFar) * 0.5f;
                 for (int i = 0; i < std::min(genExt.shoreLayerCount, 2); ++i) {
@@ -7701,7 +7701,7 @@ void Engine::BuildRecipeScene() {
             const float waterLen = genExt.waterFromZ - farEdge;
             const float waterMidZ = (genExt.waterFromZ + farEdge) * 0.5f;
             const bool riverLike = genExt.authoredSceneModule.moduleId == "desert_canyon_river";
-            const float waterBodyWidth = genExt.extent * (riverLike ? 1.55f : 1.65f);
+            const float waterBodyWidth = genExt.extent * (riverLike ? 1.08f : 1.38f);
             auto waterMesh = CreateGenerativeWaterBodyMesh(waterBodyWidth,
                                                            waterLen,
                                                            riverLike,
@@ -11461,20 +11461,24 @@ void Engine::BuildRecipeScene() {
             camFov = 52.0f;
         } else if (recipe == "generative_exterior") {
             if (genExt.valid && !genExt.structures.empty()) {
-                // Cabin exteriors need more distance; otherwise the authored cabin
-                // becomes a cropped wall and loses the lake/mountain context.
-                camPos = glm::vec3(0.0f, 3.05f, 11.0f);
-                target = glm::vec3(0.0f, 0.10f, -6.5f);
-                camFov = 55.0f;
-                spdlog::info("generative_exterior: shot camera pass profile=balanced_cabin_hero pos=(0.00,3.05,11.00) target=(0.00,0.10,-6.50) fov=55.0");
+                camPos = glm::vec3(0.25f, 2.05f, 7.35f);
+                target = glm::vec3(1.10f, 0.48f, -0.45f);
+                camFov = 44.0f;
+                spdlog::info("generative_exterior: shot camera pass profile=tight_cabin_lake_hero pos=(0.25,2.05,7.35) target=(1.10,0.48,-0.45) fov=44.0");
             } else {
-                // Closer exterior hero shot: keeps the water/horizon depth cue, but
-                // gives the campsite/desert hero cluster enough frame weight that
-                // the water remains context instead of becoming the whole image.
-                camPos = glm::vec3(0.35f, 2.05f, 7.25f);
-                target = glm::vec3(0.85f, 0.20f, -2.20f);
-                camFov = 46.0f;
-                spdlog::info("generative_exterior: shot camera pass profile=closer_grounded_hero pos=(0.35,2.05,7.25) target=(0.85,0.20,-2.20) fov=46.0");
+                const bool canyonShot = genExt.valid &&
+                    genExt.authoredSceneModule.moduleId == "desert_canyon_river";
+                if (canyonShot) {
+                    camPos = glm::vec3(0.55f, 1.62f, 6.35f);
+                    target = glm::vec3(0.20f, 0.24f, -3.20f);
+                    camFov = 42.0f;
+                    spdlog::info("generative_exterior: shot camera pass profile=tight_canyon_river_hero pos=(0.55,1.62,6.35) target=(0.20,0.24,-3.20) fov=42.0");
+                } else {
+                    camPos = glm::vec3(1.00f, 1.55f, 5.95f);
+                    target = glm::vec3(1.55f, 0.34f, -0.85f);
+                    camFov = 42.0f;
+                    spdlog::info("generative_exterior: shot camera pass profile=tight_campsite_lake_hero pos=(1.00,1.55,5.95) target=(1.55,0.34,-0.85) fov=42.0");
+                }
             }
         }
         // Showcase hero framing: low, front-centre, looking up at the blinded window so the

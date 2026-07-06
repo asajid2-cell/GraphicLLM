@@ -368,9 +368,9 @@ def compile_v3_to_v2(v3: dict[str, Any]) -> dict[str, Any]:
         })
         if water_intent in {"purple", "violet"}:
             env["water"].update({
-                "shallow": [0.64, 0.025, 1.18],
-                "deep": [0.24, 0.0, 0.64],
-                "color_strength": 0.56,
+                "shallow": [0.64, 0.020, 1.34],
+                "deep": [0.25, 0.0, 0.82],
+                "color_strength": 0.62,
             })
     elif authored_module_id == "desert_canyon_river":
         env["sun"].update({
@@ -572,8 +572,8 @@ def compile_v3_to_v2(v3: dict[str, Any]) -> dict[str, Any]:
     renderer_shadow_bias = 0.0014
     contact_receiver_patch_budget = 0
     soft_penumbra_patch_budget = 0
-    cinematic_relief_patches = 18 if canyon else (16 if campsite else 14)
-    cinematic_shadow_casters = 8 if (campsite or canyon) else 6
+    cinematic_relief_patches = 0
+    cinematic_shadow_casters = 5 if (campsite or canyon) else 4
     cinematic_contact_receivers = 0
     cinematic_local_lights = 3 if (campsite or cabin) else 2
     cinematic_volumetric_slices = 0
@@ -715,13 +715,13 @@ def compile_v3_to_v2(v3: dict[str, Any]) -> dict[str, Any]:
         },
         "naturalistic_ecology": {
             "enabled": True,
-            "grass_cluster_count": 24 if not desert else 0,
-            "bush_cluster_count": 10 if not desert else 1,
-            "fern_cluster_count": 9 if not desert else 0,
-            "trunk_count": 5 if not desert else 2,
-            "branch_count": 6 if not desert else 6,
-            "stump_count": 4 if not desert else 2,
-            "moss_rock_count": 10 if not desert else 7,
+            "grass_cluster_count": 8 if not desert else 0,
+            "bush_cluster_count": 4 if not desert else 1,
+            "fern_cluster_count": 2 if not desert else 0,
+            "trunk_count": 1 if not desert else 1,
+            "branch_count": 1 if not desert else 1,
+            "stump_count": 1 if not desert else 1,
+            "moss_rock_count": 4 if not desert else 3,
             "systems": [
                 "scanned_grass_clumps",
                 "scanned_ferns_or_bushes",
@@ -735,7 +735,7 @@ def compile_v3_to_v2(v3: dict[str, Any]) -> dict[str, Any]:
             "hero_detail_count": (4 if campsite else 3) + (6 if cabin else 0),
             "camp_detail_count": 0,
             "cabin_facade_detail_count": 6 if cabin else 0,
-            "backdrop_detail_layers": 5 if canyon else 4,
+            "backdrop_detail_layers": 0,
             "foreground_dressing_clusters": 0,
             "detail_systems": [
                 "tent_seams",
@@ -754,9 +754,9 @@ def compile_v3_to_v2(v3: dict[str, Any]) -> dict[str, Any]:
             "high_detail_cabin_piece_count": 5 if cabin else 0,
             "mountain_mass_layer_count": 5 if (water_on or canyon or cabin) else 3,
             "cliff_mass_piece_count": 14 if canyon else 0,
-            "shoreline_prop_count": 4 if water_on else 0,
+            "shoreline_prop_count": 1 if water_on else 0,
             "irregular_tree_silhouette_count": 0,
-            "support_prop_count": 3 if campsite else (3 if cabin else 2),
+            "support_prop_count": 1 if campsite else (2 if cabin else 1),
             "detail_systems": [
                 "high_detail_camp_kit",
                 "high_detail_cabin_kit",
@@ -797,8 +797,8 @@ def compile_v3_to_v2(v3: dict[str, Any]) -> dict[str, Any]:
             "source_asset_set_count": 4,
             "scanned_lantern_count": 3 if (campsite or cabin) else 0,
             "scanned_utility_prop_count": 1 if cabin else 0,
-            "scanned_anchor_rock_count": 9 if water_on else 6,
-            "hero_anchor_count": 12 if campsite else (10 if cabin else 6),
+            "scanned_anchor_rock_count": 5 if water_on else 4,
+            "hero_anchor_count": 7 if campsite else (7 if cabin else 4),
             "systems": [
                 "scanned_lantern_pbr_mesh",
                 "scanned_table_or_barrel_pbr_mesh",
@@ -836,9 +836,9 @@ def compile_v3_to_v2(v3: dict[str, Any]) -> dict[str, Any]:
             "hero_cluster_radius_m": 2.65 if (campsite or cabin) else 3.10,
             "stray_dressing_budget": 0,
             "central_sightline_clearance_m": 4.2 if (campsite or cabin) else 3.4,
-            "anchored_prop_count": 18 if campsite else (16 if cabin else 8),
-            "foreground_relocation_count": 5 if (campsite or cabin) else 4,
-            "palette_unification_count": 18 if (campsite or cabin) else 10,
+            "anchored_prop_count": 9 if campsite else (9 if cabin else 5),
+            "foreground_relocation_count": 3 if (campsite or cabin) else 2,
+            "palette_unification_count": 12 if (campsite or cabin) else 7,
             "systems": [
                 "cluster_camp_kit_around_tent_fire_axis",
                 "move_foreground_frame_out_of_central_sightline",
@@ -873,12 +873,12 @@ def compile_v3_to_v2(v3: dict[str, Any]) -> dict[str, Any]:
         "source_environment_assets": {
             "enabled": True,
             "source_asset_set_count": 9 if canyon else 8,
-            "fetched_rock_mass_count": 14 if canyon else 8,
-            "kenney_cliff_backdrop_count": 3 if canyon else 1,
-            "detailed_tree_backdrop_count": 0 if desert else 2,
-            "naturalistic_anchor_count": 9 if water_on else 6,
-            "terrain_replacement_layer_count": 6 if canyon else 5,
-            "backdrop_anchor_count": 15 if canyon else 12,
+            "fetched_rock_mass_count": 6 if canyon else 4,
+            "kenney_cliff_backdrop_count": 0,
+            "detailed_tree_backdrop_count": 0 if desert else 1,
+            "naturalistic_anchor_count": 4 if water_on else 3,
+            "terrain_replacement_layer_count": 2 if canyon else 2,
+            "backdrop_anchor_count": 8 if canyon else 6,
             "replacement_family": "source_canyon_wall_backdrop" if canyon else (
                 "source_alpine_tree_rock_backdrop" if cabin else "source_lake_mountain_backdrop"
             ),
@@ -916,13 +916,13 @@ def compile_v3_to_v2(v3: dict[str, Any]) -> dict[str, Any]:
             "enabled": True,
             "terrain_tessellation_grid": env["ground"]["terrain"]["grid"],
             "terrain_relief_m": env["ground"]["terrain"]["relief_m"],
-            "terrain_displacement_tile_count": 1,
-            "terrain_displacement_layer_count": 1,
-            "hero_foundation_count": 5 if campsite else (5 if cabin else 3),
-            "shadow_caster_count": 5 if not moonlight else 4,
-            "material_blend_patch_count": 1 if canyon else 2,
-            "light_volume_count": 3 if not moonlight else 2,
-            "nonplanar_shore_segment_count": (2 if canyon else 3) if water_on else 0,
+            "terrain_displacement_tile_count": 0,
+            "terrain_displacement_layer_count": 0,
+            "hero_foundation_count": 3 if campsite else (4 if cabin else 2),
+            "shadow_caster_count": 3 if not moonlight else 2,
+            "material_blend_patch_count": 0,
+            "light_volume_count": 2 if not moonlight else 1,
+            "nonplanar_shore_segment_count": 0,
             "foundation_family": "embedded_tent_pad_and_fire_ring" if campsite else (
                 "stone_cabin_foundation_and_deck_contact" if cabin else "canyon_bank_embedded_camp"
             ),

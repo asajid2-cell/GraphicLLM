@@ -214,3 +214,8 @@
   material read, and darkens/shortens canyon wet-shore patches. Visual truth remains negative:
   accept only as a bounded artifact/readability checkpoint, then continue with debris removal,
   coherent hero/background replacement, and stronger lighting/material form.
+- 2026-07-06: `tools/run_genscene_acceptance.ps1 -Tag phase4_shore_strip_cleanup_20260706`
+  wrote green `CURRENT.md`. Result: PASS for clean tree, ratchet freeze, Python compile,
+  curation, graphics reset, Release build, structural scene gate, and phase0 policy. Loop 4
+  remains open. Next active item is still real visual coherence: remove remaining strip/clutter
+  artifacts and replace weak hero/background forms with higher-fidelity geometry/materials.

@@ -496,3 +496,13 @@ Status: pending.
   `[0.5259, 0.5893, 0.6013]` and turquoise fraction `0.432`. Visual truth remains negative:
   pale strip artifacts and primitive staging are reduced but still visible, so this is only a
   bounded shoreline/river-readability checkpoint.
+- 2026-07-06: Loop 4 iteration 11 accepted. Full runner
+  `tools/run_genscene_acceptance.ps1 -Tag phase4_shore_strip_cleanup_20260706` passed clean tree,
+  ratchet freeze, Python compile, curation, graphics reset, Release build, structural scene gate,
+  and phase0 policy, and rewrote `CURRENT.md` to accepted tag
+  `phase4_shore_strip_cleanup_20260706`. Selected accepted candidates were campsite
+  `gen_a_foggy_mountain_campsite_beside_0.png`, alpine
+  `gen_a_stormy_alpine_lake_with_a_smal_2.png`, and desert
+  `gen_a_sunny_desert_canyon_campsite_w_0.png`. Visual truth remains negative; next active work
+  should attack remaining strip/clutter artifacts and weak hero/background form, not declare this
+  a quality solve.

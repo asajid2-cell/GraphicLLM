@@ -160,3 +160,13 @@
   heroes, but visual truth remains negative. Accept only as cleanup; next active item must attack
   the remaining real visual ceiling: primitive tent/cabin forms, flat water/shore integration,
   and backdrop/material lighting depth.
+- 2026-07-06: Loop 4 grounded composition/material dirty probe
+  `tools/run_genscene_acceptance.ps1 -Tag phase4_grounded_composition_material_dirty_probe_20260706 -SkipBuild`
+  wrote red `CURRENT_FAILED.md` as expected after a manual VsDevCmd-backed Release build. It
+  passed ratchet freeze, Python compile, curation, graphics reset, and structural scene gates,
+  and failed only dirty-tree policy gates. The change is a limited real visual pass: curved
+  shore-bank geometry instead of full-width shore strips, a subdivided/open-front canvas tent,
+  hero-grounded campsite/desert camera defaults, lower water emissive/alpha, dry red-brown dirt
+  material response, and brighter canyon ambient/exposure. Visual truth remains negative: accept
+  only as a bounded geometry/material/composition checkpoint; next active work must attack the
+  still-flat water surface, cardboard mountain/backdrop forms, and weak asset library ceiling.

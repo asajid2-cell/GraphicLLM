@@ -534,10 +534,11 @@ namespace {
             t = std::clamp(t, 0.0f, 1.0f);
             return t * t * (3.0f - 2.0f * t);
         };
-
-        for (uint32_t iz = 0; iz <= zSegments; ++iz) {
-            const float v = static_cast<float>(iz) / static_cast<float>(zSegments);
-            const float localZ = halfLength - v * length;
+        auto profile = [&](float v) {
+            struct Sample {
+                float centerX;
+                float halfWidth;
+            };
             const float bend = std::sin(v * glm::pi<float>() * 2.0f - 0.45f);
             const float secondary = std::sin(v * glm::pi<float>() * 5.0f + 0.8f);
             const float centerX = riverLike ? bend * halfMaxWidth * 0.18f : bend * halfMaxWidth * 0.045f;
@@ -547,6 +548,13 @@ namespace {
             const float halfWidth = std::clamp(halfMaxWidth * widthFactor,
                                                halfMaxWidth * (riverLike ? 0.16f : 0.20f),
                                                halfMaxWidth * (riverLike ? 0.34f : 0.74f));
+            return Sample{centerX, halfWidth};
+        };
+
+        for (uint32_t iz = 0; iz <= zSegments; ++iz) {
+            const float v = static_cast<float>(iz) / static_cast<float>(zSegments);
+            const float localZ = halfLength - v * length;
+            const auto sample = profile(v);
 
             for (uint32_t ix = 0; ix <= xSegments; ++ix) {
                 const float u = static_cast<float>(ix) / static_cast<float>(xSegments);
@@ -554,7 +562,7 @@ namespace {
                 const float edgeWeight = std::pow(std::abs(side), 1.8f);
                 const float scallop = (std::sin(v * 17.0f + side * 3.4f) * 0.035f +
                                        std::sin(v * 31.0f - side * 6.1f) * 0.018f) * edgeWeight;
-                const float localX = centerX + side * halfWidth * (1.0f + scallop);
+                const float localX = sample.centerX + side * sample.halfWidth * (1.0f + scallop);
                 mesh->positions.emplace_back(localX, 0.0f, localZ);
                 mesh->normals.emplace_back(0.0f, 1.0f, 0.0f);
                 mesh->texCoords.emplace_back(u, v);
@@ -571,6 +579,100 @@ namespace {
                 mesh->indices.insert(mesh->indices.end(), {a, b, d, a, d, c});
             }
         }
+
+        mesh->UpdateBounds();
+        return mesh;
+    }
+
+    std::shared_ptr<Scene::MeshData> CreateGenerativeShoreBankMesh(float maxWidth,
+                                                                   float length,
+                                                                   bool riverLike,
+                                                                   float bankWidth,
+                                                                   uint32_t zSegments = 48u) {
+        auto mesh = std::make_shared<Scene::MeshData>();
+        mesh->kind = Scene::MeshKind::Procedural;
+        zSegments = std::clamp(zSegments, 8u, 96u);
+        bankWidth = std::max(0.12f, bankWidth);
+
+        const float halfLength = length * 0.5f;
+        const float halfMaxWidth = maxWidth * 0.5f;
+
+        auto smooth = [](float t) {
+            t = std::clamp(t, 0.0f, 1.0f);
+            return t * t * (3.0f - 2.0f * t);
+        };
+        auto profile = [&](float v) {
+            struct Sample {
+                float centerX;
+                float halfWidth;
+            };
+            const float bend = std::sin(v * glm::pi<float>() * 2.0f - 0.45f);
+            const float secondary = std::sin(v * glm::pi<float>() * 5.0f + 0.8f);
+            const float centerX = riverLike ? bend * halfMaxWidth * 0.18f : bend * halfMaxWidth * 0.045f;
+            const float widthFactor = riverLike
+                ? (0.20f + 0.055f * smooth(v) + 0.022f * secondary)
+                : (0.26f + 0.42f * smooth(v) + 0.030f * secondary);
+            const float halfWidth = std::clamp(halfMaxWidth * widthFactor,
+                                               halfMaxWidth * (riverLike ? 0.16f : 0.20f),
+                                               halfMaxWidth * (riverLike ? 0.34f : 0.74f));
+            return Sample{centerX, halfWidth};
+        };
+        auto pushVertex = [&](float x, float y, float z, float u, float v) {
+            mesh->positions.emplace_back(x, y, z);
+            mesh->normals.emplace_back(0.0f, 1.0f, 0.0f);
+            mesh->texCoords.emplace_back(u, v);
+        };
+        auto idx = [](uint32_t row, uint32_t col) {
+            return row * 4u + col;
+        };
+
+        mesh->positions.reserve((zSegments + 1u) * 4u + 4u);
+        mesh->normals.reserve((zSegments + 1u) * 4u + 4u);
+        mesh->texCoords.reserve((zSegments + 1u) * 4u + 4u);
+
+        for (uint32_t iz = 0; iz <= zSegments; ++iz) {
+            const float v = static_cast<float>(iz) / static_cast<float>(zSegments);
+            const float localZ = halfLength - v * length;
+            const auto sample = profile(v);
+            const float edgeNoise = 0.82f + 0.20f * std::sin(v * 19.0f + 1.7f);
+            const float outer = bankWidth * edgeNoise;
+            const float leftInner = sample.centerX - sample.halfWidth * 0.985f;
+            const float leftOuter = sample.centerX - sample.halfWidth - outer;
+            const float rightInner = sample.centerX + sample.halfWidth * 0.985f;
+            const float rightOuter = sample.centerX + sample.halfWidth + outer;
+            const float innerY = 0.016f + 0.004f * std::sin(v * 13.0f);
+            const float outerY = 0.003f + 0.002f * std::sin(v * 17.0f + 0.5f);
+            pushVertex(leftOuter, outerY, localZ, 0.0f, v);
+            pushVertex(leftInner, innerY, localZ, 0.22f, v);
+            pushVertex(rightInner, innerY, localZ, 0.78f, v);
+            pushVertex(rightOuter, outerY, localZ, 1.0f, v);
+        }
+
+        for (uint32_t iz = 0; iz < zSegments; ++iz) {
+            const uint32_t lo0 = idx(iz, 0u);
+            const uint32_t li0 = idx(iz, 1u);
+            const uint32_t ri0 = idx(iz, 2u);
+            const uint32_t ro0 = idx(iz, 3u);
+            const uint32_t lo1 = idx(iz + 1u, 0u);
+            const uint32_t li1 = idx(iz + 1u, 1u);
+            const uint32_t ri1 = idx(iz + 1u, 2u);
+            const uint32_t ro1 = idx(iz + 1u, 3u);
+            mesh->indices.insert(mesh->indices.end(), {lo0, li0, li1, lo0, li1, lo1});
+            mesh->indices.insert(mesh->indices.end(), {ri0, ro0, ro1, ri0, ro1, ri1});
+        }
+
+        const auto nearSample = profile(0.0f);
+        const float capOuterZ = halfLength + bankWidth * (riverLike ? 0.75f : 1.10f);
+        const float capHalfWidth = nearSample.halfWidth + bankWidth * (riverLike ? 1.20f : 1.55f);
+        const uint32_t capBase = static_cast<uint32_t>(mesh->positions.size());
+        pushVertex(nearSample.centerX - capHalfWidth, 0.004f, capOuterZ, 0.0f, 0.0f);
+        pushVertex(nearSample.centerX - nearSample.halfWidth * 0.985f, 0.018f, halfLength, 0.25f, 0.12f);
+        pushVertex(nearSample.centerX + nearSample.halfWidth * 0.985f, 0.018f, halfLength, 0.75f, 0.12f);
+        pushVertex(nearSample.centerX + capHalfWidth, 0.004f, capOuterZ, 1.0f, 0.0f);
+        mesh->indices.insert(mesh->indices.end(), {
+            capBase, capBase + 1u, capBase + 2u,
+            capBase, capBase + 2u, capBase + 3u
+        });
 
         mesh->UpdateBounds();
         return mesh;
@@ -847,6 +949,106 @@ namespace {
         addTri(rb, lb, pb);       // back gable
         addQuad(lb, lf, pf, pb);  // left roof slope
         addQuad(rf, rb, pb, pf);  // right roof slope
+        mesh->UpdateBounds();
+        return mesh;
+    }
+
+    std::shared_ptr<Scene::MeshData> CreateGenerativeCanvasTentMesh(float width,
+                                                                    float depth,
+                                                                    float height,
+                                                                    uint32_t lengthSegments = 10u,
+                                                                    uint32_t slopeSegments = 4u) {
+        auto mesh = std::make_shared<Scene::MeshData>();
+        mesh->kind = Scene::MeshKind::Procedural;
+        lengthSegments = std::clamp(lengthSegments, 3u, 18u);
+        slopeSegments = std::clamp(slopeSegments, 2u, 8u);
+
+        const float hx = width * 0.5f;
+        const float hz = depth * 0.5f;
+
+        auto addTri = [&](const glm::vec3& a,
+                          const glm::vec3& b,
+                          const glm::vec3& c,
+                          const glm::vec2& uva,
+                          const glm::vec2& uvb,
+                          const glm::vec2& uvc) {
+            const uint32_t base = static_cast<uint32_t>(mesh->positions.size());
+            glm::vec3 n = glm::cross(b - a, c - a);
+            if (glm::length(n) < 1e-5f) {
+                n = glm::vec3(0.0f, 1.0f, 0.0f);
+            } else {
+                n = glm::normalize(n);
+            }
+            mesh->positions.insert(mesh->positions.end(), {a, b, c});
+            mesh->normals.insert(mesh->normals.end(), {n, n, n});
+            mesh->texCoords.insert(mesh->texCoords.end(), {uva, uvb, uvc});
+            mesh->indices.insert(mesh->indices.end(), {base, base + 1u, base + 2u});
+        };
+        auto addQuad = [&](const glm::vec3& a,
+                           const glm::vec3& b,
+                           const glm::vec3& c,
+                           const glm::vec3& d,
+                           const glm::vec2& uva,
+                           const glm::vec2& uvb,
+                           const glm::vec2& uvc,
+                           const glm::vec2& uvd) {
+            addTri(a, b, c, uva, uvb, uvc);
+            addTri(a, c, d, uva, uvc, uvd);
+        };
+        auto tentPoint = [&](float side, uint32_t slope, uint32_t lane) {
+            const float u = static_cast<float>(slope) / static_cast<float>(slopeSegments);
+            const float v = static_cast<float>(lane) / static_cast<float>(lengthSegments);
+            const float z = -hz + v * depth;
+            const float fabricWave = std::sin(v * glm::pi<float>() * 4.0f + side * 0.8f) * 0.026f +
+                                     std::sin(v * glm::pi<float>() * 9.0f + u * 2.1f) * 0.012f;
+            const float belly = std::sin(u * glm::pi<float>());
+            const float x = side * (hx * (1.0f - u) + 0.030f * u) + side * fabricWave * belly;
+            const float y = std::max(0.0f, height * u - std::abs(fabricWave) * belly * 0.55f);
+            return glm::vec3(x, y, z);
+        };
+
+        for (float side : {-1.0f, 1.0f}) {
+            for (uint32_t lane = 0; lane < lengthSegments; ++lane) {
+                for (uint32_t slope = 0; slope < slopeSegments; ++slope) {
+                    const glm::vec3 a = tentPoint(side, slope, lane);
+                    const glm::vec3 b = tentPoint(side, slope + 1u, lane);
+                    const glm::vec3 c = tentPoint(side, slope + 1u, lane + 1u);
+                    const glm::vec3 d = tentPoint(side, slope, lane + 1u);
+                    const float u0 = static_cast<float>(slope) / static_cast<float>(slopeSegments);
+                    const float u1 = static_cast<float>(slope + 1u) / static_cast<float>(slopeSegments);
+                    const float v0 = static_cast<float>(lane) / static_cast<float>(lengthSegments);
+                    const float v1 = static_cast<float>(lane + 1u) / static_cast<float>(lengthSegments);
+                    if (side < 0.0f) {
+                        addQuad(a, b, c, d,
+                                glm::vec2(u0, v0), glm::vec2(u1, v0), glm::vec2(u1, v1), glm::vec2(u0, v1));
+                    } else {
+                        addQuad(d, c, b, a,
+                                glm::vec2(u0, v1), glm::vec2(u1, v1), glm::vec2(u1, v0), glm::vec2(u0, v0));
+                    }
+                }
+            }
+        }
+
+        const glm::vec3 frontLeft(-hx, 0.0f, hz);
+        const glm::vec3 frontRight(hx, 0.0f, hz);
+        const glm::vec3 frontPeak(0.0f, height * 0.985f, hz + 0.020f);
+        const glm::vec3 frontDoorLeft(-hx * 0.30f, 0.0f, hz + 0.018f);
+        const glm::vec3 frontDoorRight(hx * 0.30f, 0.0f, hz + 0.018f);
+        const glm::vec3 frontDoorPeak(0.0f, height * 0.58f, hz + 0.028f);
+        const glm::vec3 backLeft(-hx, 0.0f, -hz);
+        const glm::vec3 backRight(hx, 0.0f, -hz);
+        const glm::vec3 backPeak(0.0f, height * 0.985f, -hz - 0.020f);
+        addTri(frontLeft, frontDoorLeft, frontPeak,
+               glm::vec2(0.0f, 1.0f), glm::vec2(0.36f, 1.0f), glm::vec2(0.5f, 0.0f));
+        addTri(frontDoorRight, frontRight, frontPeak,
+               glm::vec2(0.64f, 1.0f), glm::vec2(1.0f, 1.0f), glm::vec2(0.5f, 0.0f));
+        addTri(frontDoorLeft, frontDoorPeak, frontPeak,
+               glm::vec2(0.36f, 1.0f), glm::vec2(0.5f, 0.42f), glm::vec2(0.5f, 0.0f));
+        addTri(frontDoorPeak, frontDoorRight, frontPeak,
+               glm::vec2(0.5f, 0.42f), glm::vec2(0.64f, 1.0f), glm::vec2(0.5f, 0.0f));
+        addTri(backRight, backLeft, backPeak,
+               glm::vec2(0.0f, 1.0f), glm::vec2(1.0f, 1.0f), glm::vec2(0.5f, 0.0f));
+
         mesh->UpdateBounds();
         return mesh;
     }
@@ -4789,6 +4991,16 @@ void Engine::BuildRecipeScene() {
                     applyGeneratedTextureMaterial(r, "terrain_rock");
                 } else if (genExt.groundKind == "dirt") {
                     applyGeneratedTextureMaterial(r, "terrain_sand");
+                    const glm::vec3 dryDirtBase(0.62f, 0.46f, 0.34f);
+                    r.albedoColor = glm::vec4(glm::mix(dryDirtBase, gcol, std::max(tintW, 0.62f)), 1.0f);
+                    r.normalScale = 0.42f;
+                    r.wetnessFactor = std::min(r.wetnessFactor, 0.025f);
+                    r.proceduralMaskStrength = std::min(r.proceduralMaskStrength, 0.28f);
+                    r.specularFactor = 0.18f;
+                    r.clearcoatFactor = 0.015f;
+                    r.clearcoatRoughnessFactor = 0.86f;
+                    r.occlusionStrength = std::max(r.occlusionStrength, 0.82f);
+                    r.roughness = std::max(r.roughness, 0.88f);
                 } else {
                     applyGeneratedTextureMaterial(r, "terrain_grass");
                 }
@@ -4844,13 +5056,20 @@ void Engine::BuildRecipeScene() {
             }
             if (genExt.graphicsMaterials && genExt.waterOn && genExt.shoreLayerCount > 0) {
                 int shoreLayers = 0;
-                const float bandWidths[] = {0.62f, 0.26f};
+                const float bandWidths[] = {0.72f, 0.34f};
                 const glm::vec4 bandColors[] = {
-                    glm::vec4(glm::max(gcol * 0.34f, glm::vec3(0.020f)), 0.34f),
-                    glm::vec4(glm::mix(genExt.waterShallow, glm::vec3(0.55f, 0.58f, 0.62f), 0.30f), 0.18f),
+                    glm::vec4(glm::max(gcol * 0.38f, glm::vec3(0.020f)), 0.46f),
+                    glm::vec4(glm::mix(genExt.waterShallow, glm::vec3(0.42f, 0.43f, 0.42f), 0.38f), 0.24f),
                 };
+                const bool riverLike = genExt.authoredSceneModule.moduleId == "desert_canyon_river";
+                const float bankLen = std::max(shoreZ - groundFar, 1.0f);
+                const float bankMidZ = (shoreZ + groundFar) * 0.5f;
                 for (int i = 0; i < std::min(genExt.shoreLayerCount, 2); ++i) {
-                    auto shoreMesh = Utils::MeshGenerator::CreatePlane(groundW, bandWidths[i]);
+                    auto shoreMesh = CreateGenerativeShoreBankMesh(groundW,
+                                                                   bankLen,
+                                                                   riverLike,
+                                                                   bandWidths[i],
+                                                                   riverLike ? 64u : 56u);
                     auto upShore = renderer->UploadMesh(shoreMesh);
                     if (upShore.IsErr()) {
                         spdlog::warn("generative_exterior: shore layer mesh upload failed: {}", upShore.Error());
@@ -4860,19 +5079,19 @@ void Engine::BuildRecipeScene() {
                     m_registry->AddComponent<Scene::TagComponent>(
                         shore, "GenerativeExterior_ShoreGrounding" + std::to_string(i));
                     auto& t = m_registry->AddComponent<TransformComponent>(shore);
-                    t.position = glm::vec3(0.0f, 0.026f + i * 0.006f, shoreZ + 0.32f + i * 0.40f);
+                    t.position = glm::vec3(0.0f, 0.018f + i * 0.005f, bankMidZ);
                     auto& r = m_registry->AddComponent<Scene::RenderableComponent>(shore);
                     r.mesh = shoreMesh;
                     r.albedoColor = bandColors[i];
                     r.metallic = 0.0f;
                     r.roughness = i == 0 ? 0.78f : 0.86f;
                     r.ao = 0.72f;
-                    r.occlusionStrength = 0.70f;
-                    r.normalScale = 0.22f;
-                    r.wetnessFactor = i == 0 ? 0.28f : 0.10f;
-                    r.proceduralMaskStrength = 0.16f;
-                    r.specularFactor = i == 0 ? 0.20f : 0.12f;
-                    r.clearcoatFactor = i == 0 ? 0.18f : 0.06f;
+                    r.occlusionStrength = 0.78f;
+                    r.normalScale = 0.36f;
+                    r.wetnessFactor = i == 0 ? 0.46f : 0.18f;
+                    r.proceduralMaskStrength = 0.30f;
+                    r.specularFactor = i == 0 ? 0.26f : 0.14f;
+                    r.clearcoatFactor = i == 0 ? 0.22f : 0.08f;
                     r.clearcoatRoughnessFactor = 0.66f;
                     r.doubleSided = true;
                     r.alphaMode = Scene::RenderableComponent::AlphaMode::Blend;
@@ -4881,7 +5100,7 @@ void Engine::BuildRecipeScene() {
                     shoreLayers++;
                 }
                 if (shoreLayers > 0) {
-                    spdlog::info("generative_exterior: created {} shore grounding layer(s)", shoreLayers);
+                    spdlog::info("generative_exterior: created {} curved shore grounding bank layer(s)", shoreLayers);
                 }
             }
             if (genExt.graphicsMaterials && !genExt.contactPatches.empty()) {
@@ -7118,7 +7337,7 @@ void Engine::BuildRecipeScene() {
                 t.scale = glm::vec3(1.0f);
                 auto& r = m_registry->AddComponent<Scene::RenderableComponent>(water);
                 r.mesh = waterMesh;
-                r.albedoColor = glm::vec4(genExt.waterShallow, 0.94f);
+                r.albedoColor = glm::vec4(genExt.waterShallow, riverLike ? 0.86f : 0.84f);
                 r.metallic = 0.0f;
                 r.roughness = genExt.waterRough;
                 r.ao = 1.0f;
@@ -7133,7 +7352,7 @@ void Engine::BuildRecipeScene() {
                 sea.absorption = genExt.waterAbsorption;   // v3 controls explicit color readability
                 sea.foamStrength = genExt.waterFoam;
                 sea.viscosity = genExt.waterViscosity;
-                sea.emissiveHeat = genExt.waterColorStrength; // water shader uses this as authored color strength for liquidType::Water
+                sea.emissiveHeat = genExt.waterColorStrength * (riverLike ? 0.82f : 0.72f); // authored tint without turning lakes into light cards
                 sea.bodyThickness = genExt.waterBodyThickness;
                 sea.sloshStrength = riverLike ? 0.44f : 0.36f;
                 sea.meniscusStrength = riverLike ? 0.52f : 0.46f;
@@ -8111,7 +8330,7 @@ void Engine::BuildRecipeScene() {
             auto cubeMesh = Utils::MeshGenerator::CreateCube();
             auto cylinderMesh = Utils::MeshGenerator::CreateCylinder(0.5f, 1.0f, 24);
             auto shardMesh = CreateGenerativeRockShardMesh(44.17f);
-            auto tentShellMesh = CreateGenerativeGableRoofMesh(2.95f, 2.85f, 1.34f);
+            auto tentShellMesh = CreateGenerativeCanvasTentMesh(3.25f, 3.05f, 1.42f, 10u, 4u);
             auto cabinRoofMesh = CreateGenerativeGableRoofMesh(4.55f, 3.82f, 1.34f);
 
             const auto upCube = renderer->UploadMesh(cubeMesh);
@@ -8299,6 +8518,18 @@ void Engine::BuildRecipeScene() {
                         }
                         fabricLayers++;
                     }
+                    addReplacement("GenerativeExterior_HeroReplacement_TentDoorShadow",
+                                   cubeMesh,
+                                   tentPlace(0.0f, 0.38f, 1.53f),
+                                   glm::vec3(0.52f, 0.48f, 0.035f),
+                                   glm::vec3(0.0f, tentYaw, 0.0f),
+                                   glm::vec4(0.040f, 0.030f, 0.023f, 1.0f),
+                                   "fabric",
+                                   "fabric",
+                                   0.90f,
+                                   0.44f,
+                                   0.86f);
+                    fabricLayers++;
 
                     for (int i = 0; i < genExt.heroAssetReplacement.structuralPoleCount; ++i) {
                         const int mode = i % 5;
@@ -9199,7 +9430,7 @@ void Engine::BuildRecipeScene() {
             auto cubeMesh = Utils::MeshGenerator::CreateCube();
             auto cylinderMesh = Utils::MeshGenerator::CreateCylinder(0.5f, 1.0f, 24);
             auto shardMesh = CreateGenerativeRockShardMesh(63.11f);
-            auto tentShellMesh = CreateGenerativeGableRoofMesh(3.55f, 2.45f, 1.38f);
+            auto tentShellMesh = CreateGenerativeCanvasTentMesh(3.75f, 2.85f, 1.52f, 12u, 4u);
                 auto canyonHeroMesh = CreateGenerativeCliffWallMesh(genExt.extent * 0.15f,
                                                                 std::max(2.6f, genExt.terrainRelief * 5.4f),
                                                                 1.10f,
@@ -10650,12 +10881,12 @@ void Engine::BuildRecipeScene() {
             }
 
             if (canyonModule) {
-                renderer->SetAmbientLighting(glm::vec3(0.072f, 0.054f, 0.041f), 0.66f);
-                renderer->SetExposure(std::clamp(std::max(renderer->GetExposure(), 1.00f), 0.84f, 1.20f));
-                renderer->SetIBLIntensity(1.48f, 1.06f);
+                renderer->SetAmbientLighting(glm::vec3(0.115f, 0.078f, 0.052f), 0.88f);
+                renderer->SetExposure(std::clamp(std::max(renderer->GetExposure(), 1.12f), 0.98f, 1.28f));
+                renderer->SetIBLIntensity(1.62f, 1.12f);
                 renderer->SetSSAOParams(std::max(genExt.graphicsSSAORadius, 1.30f),
                                         std::min(genExt.graphicsSSAOBias, 0.014f),
-                                        std::max(2.66f, genExt.graphicsSSAOIntensity * 0.82f));
+                                        std::max(2.34f, genExt.graphicsSSAOIntensity * 0.72f));
             } else if (alpineModule) {
                 renderer->SetAmbientLighting(glm::vec3(0.026f, 0.042f, 0.082f), 0.62f);
                 renderer->SetExposure(std::clamp(std::max(renderer->GetExposure(), 0.90f), 0.66f, 1.02f));
@@ -10814,11 +11045,12 @@ void Engine::BuildRecipeScene() {
                 spdlog::info("generative_exterior: shot camera pass profile=balanced_cabin_hero pos=(0.00,3.05,11.00) target=(0.00,0.10,-6.50) fov=55.0");
             } else {
                 // Closer exterior hero shot: keeps the water/horizon depth cue, but
-                // moves campsite/desert hero props out of tiny blockout scale.
-                camPos = glm::vec3(0.0f, 2.25f, 8.0f);
-                target = glm::vec3(0.0f, -0.04f, -6.5f);
-                camFov = 52.0f;
-                spdlog::info("generative_exterior: shot camera pass profile=closer_midground_hero pos=(0.00,2.25,8.00) target=(0.00,-0.04,-6.50) fov=52.0");
+                // gives the campsite/desert hero cluster enough frame weight that
+                // the water remains context instead of becoming the whole image.
+                camPos = glm::vec3(0.35f, 2.05f, 7.25f);
+                target = glm::vec3(0.85f, 0.20f, -2.20f);
+                camFov = 46.0f;
+                spdlog::info("generative_exterior: shot camera pass profile=closer_grounded_hero pos=(0.35,2.05,7.25) target=(0.85,0.20,-2.20) fov=46.0");
             }
         }
         // Showcase hero framing: low, front-centre, looking up at the blinded window so the

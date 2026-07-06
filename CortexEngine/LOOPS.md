@@ -404,3 +404,18 @@ Status: pending.
   `gen_a_sunny_desert_canyon_campsite_w_0.png`. Visual truth remains negative: cleaner, but still
   primitive tent/cabin silhouettes, luminous sheet water, flat ridge backdrops, and non-AAA
   material form.
+- 2026-07-06: Loop 4 iteration 8 dirty probe
+  `tools/run_genscene_acceptance.ps1 -Tag phase4_grounded_composition_material_dirty_probe_20260706 -SkipBuild`
+  ran after an explicit VsDevCmd-backed Release build of the dirty C++ diff. Heartbeat
+  `genscene-grounded-composition-dirty-probe` re-armed on 60s beats and then fired on PID exit.
+  The diff adds curved shore-bank geometry that follows the generated water outline, replaces the
+  solid tent wedge with a subdivided canvas mesh and dark entrance opening, moves campsite/desert
+  default camera framing toward the hero cluster, reduces water light-card alpha/emissive strength,
+  fixes dirt terrain tint after texture binding, and raises only canyon ambient/exposure to avoid
+  crushed foregrounds. The probe passed ratchet freeze, Python compile, curation, graphics reset,
+  and structural scene gates, and failed only expected dirty-tree policy gates. Selected candidates:
+  campsite `gen_a_foggy_mountain_campsite_beside_1.png`, alpine
+  `gen_a_stormy_alpine_lake_with_a_smal_2.png`, desert
+  `gen_a_sunny_desert_canyon_campsite_w_0.png`. Visual truth remains negative: composition and
+  tent/ground material read are better, but water is still broad, mountains remain flat bands, and
+  desert still selects a dark brown frame because brighter candidates wash out the turquoise ROI.

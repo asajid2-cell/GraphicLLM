@@ -823,3 +823,32 @@ Status: pending.
   still lack convincing backdrop massing, hero asset fidelity, and high-end lighting/material
   response. Loop 4 remains open; next active item should be a larger visual system front, not
   another small water-color or camera tweak.
+- 2026-07-06: Loop 4 iteration 25 started as an artifact-removal and renderer-owned exterior
+  quality slice. Orientation trusted `CURRENT.md` at accepted tag
+  `phase4_integrated_terrain_water_20260706`; git status was clean on `main`. Heartbeat
+  `genscene-loop25-proof` fired on a 2s timeout before long waits. Scope is limited to
+  `tools/scene_compiler.py`, `src/Core/Engine_Scenes.cpp`, and ledgers. Hypothesis: demoting
+  remaining visible synthetic line/card emitters (rain streak cubes, red-rock strata/crack/ridge
+  cubes, source terrain replacement layers, procedural ridge/backdrop detail layers, and shadow
+  band overlays) while explicitly routing exterior depth through renderer-owned SSAO, shadows,
+  fog, SSR, and optional DXR request receipts will make the selected frames cleaner and more
+  coherent without adding metric-target geometry. Kill criteria: reject if semantic/structural
+  gates fail, if prompt water ROI regresses, if fallback/Kenney assets return, if runtime receipts
+  still show visible artifact emitters, or if manual still inspection shows the scene got emptier,
+  flatter, or more obviously synthetic.
+- 2026-07-06: Loop 4 iteration 25 rejected after dirty probes
+  `phase4_artifact_renderer_lighting_dirty_probe3_20260706` and
+  `phase4_artifact_renderer_lighting_dirty_probe4_20260706`. Both probes passed ratchet freeze,
+  Python compile, curation, graphics reset, and structural scene gates after manual Release
+  builds through the VS dev environment, and failed only the expected dirty-tree policy gates.
+  Heartbeat `genscene-loop25-dirty-probe4` fired first on timeout at 180s and then on process
+  exit after the runner completed. Manual visual inspection rejected the slice: campsite stayed
+  an empty low-fidelity stage with slab backdrops and flat purple water, alpine remained a
+  close-up cabin against flat water/ice massing, and desert still showed an obvious long straight
+  shore strip plus toy camp geometry. The mountain-massing tweak made probe 3 worse and was
+  backed out before probe 4; the remaining artifact-demotion/renderer-receipt slice still did
+  not improve the visual truth enough to checkpoint. Production diffs and dirty
+  `CURRENT_FAILED.md` were reverted; do not retry this as another emitter-demotion pass. Next
+  work must replace visible structure: continuous authored terrain/backdrop composition,
+  real hero assets/materials, and renderer lighting integration that changes the image, not
+  another receipt-only cleanup.

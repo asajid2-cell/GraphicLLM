@@ -413,3 +413,17 @@
   remains open and visual truth remains negative. Next active item is a higher-leverage visual
   system pass: backdrop/terrain massing, hero asset fidelity, or renderer/material lighting depth,
   not more water color-ratio tuning or overlay/card proof geometry.
+- 2026-07-06: active item is Loop 4 iteration 25, artifact-removal plus renderer-owned exterior
+  quality. Demote remaining visible synthetic emitters that survived the terrain-water checkpoint
+  and add runtime receipts for renderer-owned SSAO/shadow/fog/SSR/optional-DXR exterior depth.
+  This is not a new metric pass: no new `missing_*` hard gates, no water color-ratio tuning, no
+  new card/proof geometry, and no weakening of the acceptance runner.
+- 2026-07-06: rejected Loop 4 iteration 25 after dirty probes
+  `phase4_artifact_renderer_lighting_dirty_probe3_20260706` and
+  `phase4_artifact_renderer_lighting_dirty_probe4_20260706`. The probes were structurally green
+  but visually failed: campsite/alpine/desert remained flat, staged, and strip-dominated despite
+  the emitter demotion receipts. Production source and dirty `CURRENT_FAILED.md` were reverted.
+  Next active item is a high-leverage structural replacement slice: real terrain/backdrop
+  composition, hero asset/material replacement, or renderer lighting that materially changes the
+  selected frames. Do not spend the next iteration on receipt-only cleanup, water color ratios, or
+  another overlay/card/strip emitter.

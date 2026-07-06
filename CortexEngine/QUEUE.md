@@ -234,3 +234,12 @@
   remains open. Next active item is suspected bloom/emissive/practical-light ghosting and
   weak hero/background form, because visible-card compiler budgets are now zero but the latest
   stills are not visually coherent AA/AAA shots.
+- 2026-07-06: Loop 4 emissive/bloom cleanup dirty probe
+  `tools/run_genscene_acceptance.ps1 -Tag phase4_emissive_bloom_cleanup_dirty_probe2_20260706`
+  wrote red `CURRENT_FAILED.md` as expected. It passed ratchet freeze, Python compile, curation,
+  graphics reset, Release build, and structural scene gates, and failed only `clean_tree` plus
+  `phase0_policy` because the implementation was intentionally uncommitted. The change reduces
+  generated exterior bloom smearing, adds per-material emissive bloom control, removes the cabin
+  warm-light spill slab, and shrinks the camp/cabin visible glow geometry. Visual truth remains
+  negative; accept only as an artifact cleanup checkpoint, then continue with water/shore band
+  removal, backdrop massing, and higher-fidelity hero/background forms.

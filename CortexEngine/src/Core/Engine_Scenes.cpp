@@ -1259,6 +1259,7 @@ namespace {
         Scene::RenderableComponent::AlphaMode alphaMode = Scene::RenderableComponent::AlphaMode::Opaque;
         Scene::RenderableComponent::RenderLayer layer = Scene::RenderableComponent::RenderLayer::Opaque;
         const char* preset = "masonry";
+        float emissiveBloomFactor = -1.0f;
         std::string albedoTexture;
         std::string normalTexture;
         std::string roughnessTexture;
@@ -1452,6 +1453,7 @@ namespace {
             ? ReadJsonVec3Or(data["emissive"], material.emissive)
             : material.emissive;
         material.emissiveStrength = data.value("emissive_strength", material.emissiveStrength);
+        material.emissiveBloomFactor = data.value("emissive_bloom_factor", material.emissiveBloomFactor);
         material.wetness = data.value("wetness", material.wetness);
         material.proceduralMask = data.value("procedural_mask", material.proceduralMask);
         material.albedoTexture = data.value("albedo_texture", std::string{});
@@ -1706,7 +1708,9 @@ namespace {
         r.ior = material.ior;
         r.emissiveColor = material.emissive;
         r.emissiveStrength = material.emissiveStrength;
-        r.emissiveBloomFactor = glm::length(material.emissive) > 0.0f ? 0.55f : 0.0f;
+        r.emissiveBloomFactor = material.emissiveBloomFactor >= 0.0f
+            ? material.emissiveBloomFactor
+            : (glm::length(material.emissive) > 0.0f ? 0.55f : 0.0f);
         r.wetnessFactor = material.wetness;
         r.proceduralMaskStrength = material.proceduralMask;
         r.doubleSided = material.doubleSided;
@@ -4855,7 +4859,7 @@ void Engine::BuildRecipeScene() {
                     renderer->SetColorGrade(0.18f, 0.055f);
                     renderer->SetToneGrade(1.24f, 1.13f);
                     renderer->SetExposure(std::min(0.88f, genExt.exposure));
-                    renderer->SetBloomIntensity(0.24f);
+                    renderer->SetBloomIntensity(0.12f);
                     renderer->SetFogParams(std::max(genExt.fogDensity, 0.026f), 0.05f, 0.42f, 4.0f);
                     renderer->SetGodRayIntensity(0.18f);
                 } else if (module == "desert_canyon_river") {
@@ -4867,7 +4871,7 @@ void Engine::BuildRecipeScene() {
                     renderer->SetColorGrade(0.20f, 0.020f);
                     renderer->SetToneGrade(1.22f, 1.10f);
                     renderer->SetExposure(std::min(0.86f, genExt.exposure));
-                    renderer->SetBloomIntensity(0.12f);
+                    renderer->SetBloomIntensity(0.06f);
                     renderer->SetFogParams(std::max(genExt.fogDensity, 0.012f), 0.05f, 0.40f, 8.0f);
                 } else if (module == "alpine_cabin_lake") {
                     renderer->SetSunDirection(glm::normalize(glm::vec3(-0.36f, 0.32f, -0.88f)));
@@ -4878,7 +4882,7 @@ void Engine::BuildRecipeScene() {
                     renderer->SetColorGrade(0.015f, 0.40f);
                     renderer->SetToneGrade(1.18f, 1.06f);
                     renderer->SetExposure(std::min(0.74f, genExt.exposure));
-                    renderer->SetBloomIntensity(0.22f);
+                    renderer->SetBloomIntensity(0.08f);
                     renderer->SetFogParams(std::max(genExt.fogDensity, 0.024f), 0.05f, 0.42f, 5.0f);
                 } else {
                     renderer->SetAmbientLighting(glm::vec3(0.060f, 0.070f, 0.078f), 0.72f);
@@ -4941,7 +4945,14 @@ void Engine::BuildRecipeScene() {
                              genExt.environmentFidelity.waterDepthContrast);
             }
         }
-        renderer->SetBloomShape(outdoor ? 1.05f : 1.02f, outdoor ? 0.45f : 0.50f, outdoor ? 2.0f : 0.82f);
+        if (genExt.valid && genExt.authoredSceneModule.enabled) {
+            const std::string& module = genExt.authoredSceneModule.moduleId;
+            renderer->SetBloomShape(module == "alpine_cabin_lake" ? 1.38f : 1.28f,
+                                    module == "alpine_cabin_lake" ? 0.18f : 0.22f,
+                                    module == "alpine_cabin_lake" ? 0.75f : 0.95f);
+        } else {
+            renderer->SetBloomShape(outdoor ? 1.05f : 1.02f, outdoor ? 0.45f : 0.50f, outdoor ? 2.0f : 0.82f);
+        }
         renderer->SetParticlesEnabled(true);
         renderer->SetParticleDensityScale(outdoor ? 0.90f : 1.05f);
         renderer->SetParticleTuning(outdoor ? 1.05f : 1.22f,
@@ -7157,12 +7168,31 @@ void Engine::BuildRecipeScene() {
                     "fabric"
                 };
                 const AssetLedMaterialSettings warmGlow{
-                    glm::vec4(1.0f, 0.48f, 0.16f, 1.0f),
-                    0.0f, 0.34f, 0.0f, 1.5f, glm::vec3(1.0f, 0.36f, 0.10f), 3.8f,
+                    glm::vec4(0.88f, 0.36f, 0.12f, 1.0f),
+                    0.0f, 0.38f, 0.0f, 1.5f, glm::vec3(1.0f, 0.30f, 0.08f), 1.25f,
                     0.0f, 0.08f, true,
                     Scene::RenderableComponent::AlphaMode::Opaque,
                     Scene::RenderableComponent::RenderLayer::Opaque,
-                    "emissive"
+                    "emissive",
+                    0.08f
+                };
+                const AssetLedMaterialSettings emberGlow{
+                    glm::vec4(1.0f, 0.24f, 0.06f, 0.58f),
+                    0.0f, 0.46f, 0.0f, 1.5f, glm::vec3(1.0f, 0.18f, 0.04f), 0.46f,
+                    0.0f, 0.05f, true,
+                    Scene::RenderableComponent::AlphaMode::Blend,
+                    Scene::RenderableComponent::RenderLayer::Overlay,
+                    "emissive",
+                    0.02f
+                };
+                const AssetLedMaterialSettings windowGlassGlow{
+                    glm::vec4(1.0f, 0.58f, 0.24f, 0.90f),
+                    0.0f, 0.26f, 0.0f, 1.5f, glm::vec3(1.0f, 0.42f, 0.16f), 1.10f,
+                    0.0f, 0.04f, false,
+                    Scene::RenderableComponent::AlphaMode::Opaque,
+                    Scene::RenderableComponent::RenderLayer::Opaque,
+                    "emissive",
+                    0.06f
                 };
 
                 auto addModulePart = [&](const std::string& tag,
@@ -7383,11 +7413,11 @@ void Engine::BuildRecipeScene() {
                         scannedCampAnchors++;
                     }
                     addModulePart("GenerativeExterior_AuthoredFireGlowCore",
-                                  cubeMesh,
-                                  glm::vec3(-0.34f, 0.18f, 0.42f),
-                                  glm::vec3(0.36f, 0.11f, 0.32f),
+                                  cylinderMesh,
+                                  glm::vec3(-0.34f, 0.125f, 0.42f),
+                                  glm::vec3(0.065f, 0.050f, 0.065f),
                                   glm::vec3(0.0f, glm::radians(12.0f), 0.0f),
-                                  warmGlow);
+                                  emberGlow);
                     terrainSetpieces += cohesiveCamp ? 2 : 1;
                     heroClusters += 3;
                     compositionAnchors += 5 + scannedCampAnchors;
@@ -7396,8 +7426,8 @@ void Engine::BuildRecipeScene() {
                                      (placedNaturalLogA ? 1 : 0) + (placedNaturalLogB ? 1 : 0),
                                      scannedCampAnchors);
                     }
-                    AddAssetLedPointLight(*m_registry, "GenerativeExterior_AuthoredCampfireKey", glm::vec3(-0.32f, 0.72f, 0.42f), glm::vec3(1.0f, 0.38f, 0.12f), 4.9f, 6.0f);
-                    AddAssetLedPointLight(*m_registry, "GenerativeExterior_AuthoredLanternFill", glm::vec3(1.15f, 0.86f, 1.42f), glm::vec3(1.0f, 0.58f, 0.22f), 2.8f, 4.2f);
+                    AddAssetLedPointLight(*m_registry, "GenerativeExterior_AuthoredCampfireKey", glm::vec3(-0.32f, 0.72f, 0.42f), glm::vec3(1.0f, 0.38f, 0.12f), 3.2f, 5.0f);
+                    AddAssetLedPointLight(*m_registry, "GenerativeExterior_AuthoredLanternFill", glm::vec3(1.15f, 0.86f, 1.42f), glm::vec3(1.0f, 0.58f, 0.22f), 1.6f, 3.4f);
                     AddAssetLedSpotLight(*m_registry, "GenerativeExterior_AuthoredDawnRim", glm::vec3(-5.2f, 4.4f, -2.8f), glm::vec3(0.5f, 0.42f, 0.6f), glm::vec3(1.0f, 0.44f, 0.18f), 5.4f, 18.0f, false);
                     practicalLights += 3;
                     lightingZones += 4;
@@ -7440,13 +7470,13 @@ void Engine::BuildRecipeScene() {
                                   glm::vec3(4.4f, 0.12f, 1.34f),
                                   glm::vec3(0.0f, glm::radians(-10.0f), 0.0f),
                                   warmWood);
-                    for (int i = 0; i < 5; ++i) {
+                    for (int i = 0; i < 3; ++i) {
                         addModulePart("GenerativeExterior_AuthoredCabinWindowGlow" + std::to_string(i),
                                       cubeMesh,
-                                      glm::vec3(0.38f + 0.38f * static_cast<float>(i % 3), 1.08f + 0.12f * static_cast<float>(i / 3), 2.72f),
-                                      glm::vec3(0.18f, 0.20f, 0.030f),
+                                      glm::vec3(0.42f + 0.36f * static_cast<float>(i), 1.08f, 2.72f),
+                                      glm::vec3(0.12f, 0.15f, 0.018f),
                                       glm::vec3(0.0f, glm::radians(-10.0f), 0.0f),
-                                      warmGlow);
+                                      windowGlassGlow);
                     }
                     for (int i = 0; i < 4; ++i) {
                         addModulePart("GenerativeExterior_AuthoredDockPlank" + std::to_string(i),
@@ -7459,8 +7489,8 @@ void Engine::BuildRecipeScene() {
                     terrainSetpieces += 2;
                     heroClusters += 3;
                     compositionAnchors += 6;
-                    AddAssetLedPointLight(*m_registry, "GenerativeExterior_AuthoredCabinInteriorGlow", glm::vec3(1.12f, 1.18f, 2.45f), glm::vec3(1.0f, 0.55f, 0.22f), 5.2f, 6.0f);
-                    AddAssetLedPointLight(*m_registry, "GenerativeExterior_AuthoredPorchLantern", glm::vec3(-0.30f, 0.92f, 2.15f), glm::vec3(1.0f, 0.62f, 0.30f), 2.6f, 4.0f);
+                    AddAssetLedPointLight(*m_registry, "GenerativeExterior_AuthoredCabinInteriorGlow", glm::vec3(1.12f, 1.18f, 2.45f), glm::vec3(1.0f, 0.55f, 0.22f), 2.4f, 4.6f);
+                    AddAssetLedPointLight(*m_registry, "GenerativeExterior_AuthoredPorchLantern", glm::vec3(-0.30f, 0.92f, 2.15f), glm::vec3(1.0f, 0.62f, 0.30f), 1.3f, 3.2f);
                     AddAssetLedSpotLight(*m_registry, "GenerativeExterior_AuthoredMoonRim", glm::vec3(-5.5f, 5.2f, -3.8f), glm::vec3(0.5f, 0.75f, 0.8f), glm::vec3(0.38f, 0.50f, 1.0f), 4.4f, 18.0f, false);
                     AddAssetLedPointLight(*m_registry, "GenerativeExterior_AuthoredColdWaterFill", glm::vec3(-2.4f, 0.68f, shoreZ - 1.8f), glm::vec3(0.20f, 0.34f, 0.92f), 1.4f, 7.5f);
                     practicalLights += 4;
@@ -7629,7 +7659,7 @@ void Engine::BuildRecipeScene() {
                         r.presetName = preset;
                         r.emissiveColor = emissive;
                         r.emissiveStrength = emissiveStrength;
-                        r.emissiveBloomFactor = glm::length(emissive) > 0.0f ? 0.42f : 0.0f;
+                        r.emissiveBloomFactor = glm::length(emissive) > 0.0f ? 0.08f : 0.0f;
                         const std::string presetName = preset ? preset : "";
                         if (presetName == "wood") {
                             applyGeneratedTextureMaterial(r, "wood", true);
@@ -7657,13 +7687,13 @@ void Engine::BuildRecipeScene() {
                                 0.82f);
 
                     const glm::vec3 windowGlow = structure.litWindows
-                        ? glm::vec3(1.0f, 0.53f, 0.19f)
+                        ? glm::vec3(1.0f, 0.42f, 0.14f)
                         : glm::vec3(0.0f);
-                    const float windowEmit = structure.litWindows ? 4.8f : 1.0f;
+                    const float windowEmit = structure.litWindows ? 1.35f : 1.0f;
                     addCubePart("GenerativeExterior_Cabin_Window_L",
                                 glm::vec3(w * 0.22f, h * 0.64f, frontZ + 0.01f),
                                 glm::vec3(w * 0.18f, h * 0.24f, 0.055f),
-                                glm::vec4(1.0f, 0.58f, 0.24f, 1.0f),
+                                glm::vec4(0.82f, 0.42f, 0.18f, 1.0f),
                                 "naturalistic",
                                 0.18f,
                                 windowGlow,
@@ -7671,7 +7701,7 @@ void Engine::BuildRecipeScene() {
                     addCubePart("GenerativeExterior_Cabin_Window_R",
                                 glm::vec3(w * 0.41f, h * 0.64f, frontZ + 0.01f),
                                 glm::vec3(w * 0.16f, h * 0.22f, 0.055f),
-                                glm::vec4(1.0f, 0.58f, 0.24f, 1.0f),
+                                glm::vec4(0.82f, 0.42f, 0.18f, 1.0f),
                                 "naturalistic",
                                 0.18f,
                                 windowGlow,
@@ -7794,15 +7824,6 @@ void Engine::BuildRecipeScene() {
                                     "wood",
                                     0.88f);
                         cabinDetailCount++;
-                        addCubePart("GenerativeExterior_Cabin_WarmLightSpill",
-                                    glm::vec3(w * 0.18f, 0.030f, d * 0.5f + 1.12f),
-                                    glm::vec3(w * 0.52f, 0.030f, 0.52f),
-                                    glm::vec4(1.0f, 0.48f, 0.16f, 0.54f),
-                                    "naturalistic",
-                                    0.56f,
-                                    structure.litWindows ? glm::vec3(1.0f, 0.32f, 0.10f) : glm::vec3(0.0f),
-                                    structure.litWindows ? 1.8f : 1.0f);
-                        cabinDetailCount++;
                     }
 
                     if (structure.litWindows) {
@@ -7813,8 +7834,8 @@ void Engine::BuildRecipeScene() {
                         auto& l = m_registry->AddComponent<Scene::LightComponent>(lamp);
                         l.type = Scene::LightType::Point;
                         l.color = glm::vec3(1.0f, 0.48f, 0.18f);
-                        l.intensity = 4.2f;
-                        l.range = 5.8f;
+                        l.intensity = 2.0f;
+                        l.range = 4.2f;
                         l.castsShadows = false;
                     }
                     cabinCount++;
@@ -7863,7 +7884,7 @@ void Engine::BuildRecipeScene() {
                     r.presetName = preset;
                     r.emissiveColor = emissive;
                     r.emissiveStrength = emissiveStrength;
-                    r.emissiveBloomFactor = glm::length(emissive) > 0.0f ? 0.55f : 0.0f;
+                    r.emissiveBloomFactor = glm::length(emissive) > 0.0f ? 0.08f : 0.0f;
                 };
                 auto addPart = [&](const std::string& tag,
                                    const std::shared_ptr<Scene::MeshData>& mesh,

@@ -531,3 +531,18 @@ Status: pending.
   `phase4_visible_card_cleanup_20260706`. Visual truth remains negative; Loop 4 stays open.
   Next active work should diagnose the remaining orange rectangular ghosting and replace weak
   hero/background forms through real emissive, bloom, material, asset, and lighting systems.
+- 2026-07-06: Loop 4 iteration 13 dirty probe attacked the remaining orange rectangular
+  ghosting through real emissive/bloom controls, not compiler cards. The engine now supports
+  per-material `emissiveBloomFactor` for asset-led materials, generated exterior bloom intensity
+  and bloom max contribution are lower, large cabin warm-light spill mesh was removed, cabin
+  window/campfire visible emissive geometry was reduced, and warm point lights were kept as the
+  actual illumination path. Probe 1 passed the real gates but left a visible campsite ember
+  block, so the fire core was shrunk and dimmed before probe 2. Dirty probe
+  `tools/run_genscene_acceptance.ps1 -Tag phase4_emissive_bloom_cleanup_dirty_probe2_20260706`
+  passed ratchet freeze, Python compile, curation, graphics reset, Release build, and structural
+  scene gates, failing only expected `clean_tree` plus `phase0_policy`. Selected candidates were
+  campsite `gen_a_foggy_mountain_campsite_beside_0.png`, alpine
+  `gen_a_stormy_alpine_lake_with_a_smal_0.png`, and desert
+  `gen_a_sunny_desert_canyon_campsite_w_1.png`. Visual truth remains negative: alpine glow bars
+  are much cleaner, but water/shore strip artifacts, billboard ridges, and primitive hero forms
+  still dominate the quality failure.

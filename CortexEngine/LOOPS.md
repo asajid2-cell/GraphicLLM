@@ -202,6 +202,10 @@ Iteration 2 evidence: generated water now uses a procedural shaped mesh (`curved
 `s_curve_river`) under `WaterSurfaceComponent` instead of a single rectangle, and environment
 water/reflection overlay bands are disabled. Direct canonical gates passed after widening the
 river enough to preserve the turquoise semantic read.
+Iteration 3 evidence: composition controls no longer force foreground/water-strip minimums, and
+compiler budgets zero micro-detail overlays and foreground dressing clusters. Canonical gates
+remain green, with campsite selector producing a `good` frame, but visual truth remains below
+target because hero/camp material geometry is still busy and stylized.
 
 ### Loop 5: Synthesis
 
@@ -286,3 +290,16 @@ Status: pending.
   `tools/run_genscene_acceptance.ps1 -Tag phase4_shaped_water_20260706` passed clean tree,
   ratchet freeze, Python compile, curation, graphics reset, structural scene gate, Release build,
   and phase0 policy, and rewrote `CURRENT.md` to accepted tag `phase4_shaped_water_20260706`.
+- 2026-07-06: Loop 4 iteration 3 reduced forced composition clutter. Compiler budgets now set
+  foreground occluders to side anchors, authored foreground frames to 1-2, water shape accents
+  to 2, foreground dressing clusters to 0, and surface pebbles/creases/wet glints to 0. Runtime
+  authored-module code now honors exact `foreground_frame_count` and `water_shape_segment_count`
+  instead of forcing minimums of 3 and 6. Release build passed. Canonical selected renders:
+  campsite `build/bin/logs/gen_a_foggy_mountain_campsite_beside_1.png` (selector score 4,
+  verdict `good`), alpine `build/bin/logs/gen_a_stormy_alpine_lake_with_a_smal_0.png`, and
+  desert `build/bin/logs/gen_a_sunny_desert_canyon_campsite_w_2.png`. Direct quality and graphics
+  gates passed for all three; desert turquoise ROI held at `turquoise_fraction=0.4063`.
+  Dirty probe `tools/run_genscene_acceptance.ps1 -Tag phase4_composition_cleanup_dirty_probe_20260706 -SkipBuild`
+  passed ratchet freeze, Python compile, curation, graphics reset, and structural scene gates,
+  and failed only expected dirty-tree gates. Visual truth remains negative; next work should
+  target hero mesh/material replacement and actual material response, not more count trimming.

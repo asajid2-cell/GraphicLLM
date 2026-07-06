@@ -87,3 +87,11 @@
   wrote green `CURRENT.md`. Result: PASS for clean tree, ratchet freeze, Python compile,
   curation, graphics reset, structural scene gate, Release build, and phase0 policy.
   Loop 4 remains open; next item is foreground/material/asset coherence.
+- 2026-07-06: Loop 4 dirty verifier probe
+  `tools/run_genscene_acceptance.ps1 -Tag phase4_composition_cleanup_dirty_probe_20260706 -SkipBuild`
+  wrote red `CURRENT_FAILED.md` as expected. The composition cleanup passed ratchet freeze,
+  Python compile, curation, graphics reset, and structural scene gates; it failed only
+  dirty-tree policy gates. The change removes forced minimum foreground/water strip counts,
+  zeros foreground dressing clusters and micro-detail overlays, and keeps canonical semantic
+  plus graphics gates green. Visual residuals remain: hero campsite detail is still busy,
+  water/lake materials remain too flat, and source assets are still below the target fidelity.

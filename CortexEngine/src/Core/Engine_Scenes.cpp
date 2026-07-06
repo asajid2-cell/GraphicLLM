@@ -6906,7 +6906,7 @@ void Engine::BuildRecipeScene() {
                     compositionAnchors++;
                 }
 
-                const int foregroundTarget = std::max(3, genExt.authoredSceneModule.foregroundFrameCount);
+                const int foregroundTarget = std::max(0, genExt.authoredSceneModule.foregroundFrameCount);
                 for (int i = 0; i < foregroundTarget; ++i) {
                     const float side = (i % 2 == 0) ? -1.0f : 1.0f;
                     const bool cohesive = genExt.cohesiveStagingCleanup.enabled;
@@ -6931,7 +6931,7 @@ void Engine::BuildRecipeScene() {
                 }
 
                 if (genExt.waterOn) {
-                    const int waterTarget = std::max(6, genExt.authoredSceneModule.waterShapeSegmentCount);
+                    const int waterTarget = std::max(0, genExt.authoredSceneModule.waterShapeSegmentCount);
                     for (int i = 0; i < waterTarget; ++i) {
                         const float lane = static_cast<float>(i % 3);
                         const float x = (static_cast<float>(i) - static_cast<float>(waterTarget - 1) * 0.5f) *

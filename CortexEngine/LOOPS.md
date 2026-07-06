@@ -164,7 +164,10 @@ Verifier:
 - Three canonical prompts render sequentially and pass semantic plus render-health gates.
 - Visual judge/human gate is required before claiming the loop visually done.
 
-Status: pending.
+Status: done. Evidence: `tools/run_genscene_acceptance.ps1 -Tag phase3_structural_terrain_water_20260706`
+wrote green `CURRENT.md`; campsite, alpine, and desert direct quality + graphics gates passed,
+and all three logs contained shared-FBM terrain plus `WaterSurfaceComponent` water receipts.
+Visual truth remains negative and is carried into Loop 4.
 
 ### Loop 4: Authored Lighting, Materials, Assets, Composition
 
@@ -234,3 +237,6 @@ Status: pending.
   negative: the scenes still show broad water sheets, patch debris, and kit silhouettes.
   Dirty probe `phase3_structural_terrain_water_dirty_probe_20260706 -SkipBuild` passed the new
   `structural_scene_gate` and failed only expected dirty-tree gates.
+- 2026-07-06: Loop 3 accepted. Full runner `phase3_structural_terrain_water_20260706`
+  passed clean tree, ratchet freeze, Python compile, curation, graphics reset, structural
+  scene gate, Release build, and phase0 policy.

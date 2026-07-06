@@ -207,3 +207,7 @@ Status: pending.
 - 2026-07-06: Loop 0 accepted. Rejected Loop 43 production diff, committed the campaign-state
   scaffold, then ran `tools/run_genscene_acceptance.ps1 -Tag phase0_clean_freeze_20260706`
   from a clean tree. The runner wrote green `CURRENT.md`.
+- 2026-07-06: Loop 1 curation implementation added `tools/curate_gallery.py`, an empty
+  `docs/media/genscene/manifest.json`, staging promotion mode, and a runner `curation_gate`.
+  Dirty probe `phase1_curation_dirty_probe_20260706 -SkipBuild` passed `curation_gate`,
+  `python_compile`, and `gate_ratchet_freeze`; it failed only the expected dirty-tree gates.

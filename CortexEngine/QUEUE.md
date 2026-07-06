@@ -30,3 +30,8 @@
   wrote green `CURRENT.md`. Result: PASS for `clean_tree`, `gate_ratchet_freeze`,
   `python_compile`, `release_build`, and `phase0_policy`. Loop 0 freeze/checkpoint is accepted;
   next active item is Phase 1 curation.
+- 2026-07-06: Loop 1 dirty verifier probe
+  `tools/run_genscene_acceptance.ps1 -Tag phase1_curation_dirty_probe_20260706 -SkipBuild`
+  wrote red `CURRENT_FAILED.md` as expected. `curation_gate`, `python_compile`, and
+  `gate_ratchet_freeze` passed; `clean_tree` and `phase0_policy` failed because the curation
+  implementation was intentionally uncommitted.

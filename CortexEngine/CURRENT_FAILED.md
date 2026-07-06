@@ -2,19 +2,20 @@
 
 Overall: **RED - DO NOT ACCEPT. Fix or revert before anything else.**
 
-- Tag: `phase0_post_reject_scaffold_dirty_20260706`
-- Date: 2026-07-06 05:04
-- Accepted tag: `seed_pre_genscene_pivot_20260706`
-- Previous tag: `seed_pre_genscene_pivot_20260706`
-- HEAD: 1c0e332 Add per-render shader pipeline evidence gate
-- Tracked tree: DIRTY:  M CortexEngine/.gitignore;  M CortexEngine/CAMPAIGN.md;  M CortexEngine/CAMPAIGN_AAA_GRAPHICS.md;  M CortexEngine/LOOPS.md;  M CortexEngine/LOOPS_AAA_GRAPHICS.md; ?? CortexEngine/CURRENT.md; ?? CortexEngine/CURRENT_FAILED.md; ?? CortexEngine/HANDOFF.md; ?? CortexEngine/PLAN.md; ?? CortexEngine/QUEUE.md; ?? CortexEngine/docs/GENSCENE_NEXT_LEVEL_PLAN.md; ?? CortexEngine/tools/run_genscene_acceptance.ps1
+- Tag: `phase1_curation_dirty_probe_20260706`
+- Date: 2026-07-06 05:09
+- Accepted tag: `phase0_clean_freeze_20260706`
+- Previous tag: `phase0_clean_freeze_20260706`
+- HEAD: 6d73292 Accept GenScene phase0 freeze
+- Tracked tree: DIRTY:  M CortexEngine/tools/run_genscene_acceptance.ps1; ?? CortexEngine/docs/media/genscene/; ?? CortexEngine/tools/curate_gallery.py
 
 ## Gates
 
-- **clean_tree**: FAIL -- Z:\328\CMPUT328-A2\codexworks\301\graphics\CortexEngine\artifacts\genscene_acceptance\phase0_post_reject_scaffold_dirty_20260706\git_status.txt
+- **clean_tree**: FAIL -- Z:\328\CMPUT328-A2\codexworks\301\graphics\CortexEngine\artifacts\genscene_acceptance\phase1_curation_dirty_probe_20260706\git_status.txt
 - **gate_ratchet_freeze**: PASS -- no added missing_* hard gates in scene_graphics_gate.py
-- **python_compile**: PASS -- Z:\328\CMPUT328-A2\codexworks\301\graphics\CortexEngine\artifacts\genscene_acceptance\phase0_post_reject_scaffold_dirty_20260706\python_compile.log
-- **release_build**: PASS -- Z:\328\CMPUT328-A2\codexworks\301\graphics\CortexEngine\artifacts\genscene_acceptance\phase0_post_reject_scaffold_dirty_20260706\release_build.log
+- **python_compile**: PASS -- Z:\328\CMPUT328-A2\codexworks\301\graphics\CortexEngine\artifacts\genscene_acceptance\phase1_curation_dirty_probe_20260706\python_compile.log
+- **curation_gate**: PASS -- Z:\328\CMPUT328-A2\codexworks\301\graphics\CortexEngine\artifacts\genscene_acceptance\phase1_curation_dirty_probe_20260706\curation_gate.log
+- **release_build**: PASS -- skipped by -SkipBuild
 - **phase0_policy**: FAIL -- dirty tree and old overlay-gate changes must not be accepted by assertion
 
 ## Residuals
@@ -23,6 +24,6 @@ Overall: **RED - DO NOT ACCEPT. Fix or revert before anything else.**
 
 ## Regression
 
-    Previous accepted tag: seed_pre_genscene_pivot_20260706
+    Previous accepted tag: phase0_clean_freeze_20260706
 
 Next steps live in `QUEUE.md` and `PLAN.md`. This file is state, nothing else.

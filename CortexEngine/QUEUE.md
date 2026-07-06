@@ -58,3 +58,13 @@
   Loop 3 structural terrain/water is accepted. Visual residual remains negative: generated
   stills are semantically cleaner and structurally instrumented, but still show broad water
   sheets, patch debris, and kit silhouettes.
+- 2026-07-06: Loop 4 dirty verifier probe
+  `tools/run_genscene_acceptance.ps1 -Tag phase4_overlay_subtraction_dirty_probe_20260706 -SkipBuild`
+  wrote red `CURRENT_FAILED.md` as expected. The subtraction diff passed ratchet freeze,
+  Python compile, curation, graphics reset, and structural scene gates; it failed only
+  `clean_tree` and `phase0_policy` because the implementation was intentionally uncommitted.
+  Direct canonical renders also passed semantic and graphics gates:
+  `gen_a_foggy_mountain_campsite_beside_2.png`,
+  `gen_a_stormy_alpine_lake_with_a_smal_0.png`, and
+  `gen_a_sunny_desert_canyon_campsite_w_2.png`. Visual truth remains negative; this is
+  accepted only as debris subtraction, not as AAA quality.

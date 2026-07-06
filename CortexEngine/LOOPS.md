@@ -193,7 +193,11 @@ Verifier:
 - Judge rubric reports per-axis verdicts; any veto keeps the loop open.
 - User/HUMAN-GATE decides whether the result is actually good enough.
 
-Status: pending.
+Status: running. Iteration 1 evidence: overlay/proof-debris subtraction reduced compiler
+budgets for contact cards, foam strips, ground decals, material-response cards, and synthetic
+shadow bands without adding hard pixel gates. Direct canonical prompts rendered sequentially
+and passed semantic plus render-health gates, but visual truth remains negative: water is still
+sheet-like, asset silhouettes remain kit-like, and foreground debris is still visible.
 
 ### Loop 5: Synthesis
 
@@ -240,3 +244,16 @@ Status: pending.
 - 2026-07-06: Loop 3 accepted. Full runner `phase3_structural_terrain_water_20260706`
   passed clean tree, ratchet freeze, Python compile, curation, graphics reset, structural
   scene gate, Release build, and phase0 policy.
+- 2026-07-06: Loop 4 iteration 1 implemented subtraction instead of new overlays: reduced
+  `scene_compiler.py` budgets for contact patches, shore layers, deep contact cards, foam/ripple
+  strips, ground decals, material-response cards, and shadow bands. `python -m py_compile`
+  passed for the compiler/generator/gates. Three canonical prompts rendered sequentially:
+  campsite best `build/bin/logs/gen_a_foggy_mountain_campsite_beside_2.png`, alpine best
+  `build/bin/logs/gen_a_stormy_alpine_lake_with_a_smal_0.png`, desert best
+  `build/bin/logs/gen_a_sunny_desert_canyon_campsite_w_2.png`. Direct `scene_quality_gate.py`
+  and `scene_graphics_gate.py` passed for all three, including desert turquoise ROI
+  `turquoise_fraction=0.3981`. Dirty probe
+  `tools/run_genscene_acceptance.ps1 -Tag phase4_overlay_subtraction_dirty_probe_20260706 -SkipBuild`
+  passed ratchet freeze, Python compile, curation, graphics reset, and structural scene gates,
+  and failed only expected dirty-tree gates. Visual truth remains negative; next Loop 4 work
+  must be structural lighting/material/composition, not another debris-count tweak.

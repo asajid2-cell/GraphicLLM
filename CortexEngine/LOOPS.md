@@ -383,3 +383,24 @@ Status: pending.
   `gen_a_sunny_desert_canyon_campsite_w_0.png`. Visual truth remains negative; next Loop 4 work
   must tackle real asset/composition/material form, because renderer-owned shadow/water cleanup
   alone still leaves low-poly hero props and sheet-like lakes.
+- 2026-07-06: Loop 4 iteration 7 first dirty probe
+  `tools/run_genscene_acceptance.ps1 -Tag phase4_hero_asset_form_dirty_probe_20260706`
+  built Release and passed ratchet freeze, Python compile, curation, graphics reset, campsite
+  and alpine structural gates, but failed desert `scene_quality_gate.py` on
+  `turquoise_water_roi_fail` after the river was narrowed. This was rejected as a real semantic
+  regression, not a gate problem. Visual inspection also showed the primitive camp-detail
+  emitters were still producing stick/slab clutter.
+- 2026-07-06: Loop 4 iteration 7 second dirty probe
+  `tools/run_genscene_acceptance.ps1 -Tag phase4_hero_asset_form_dirty_probe2_20260706`
+  re-armed heartbeat every 60s until PID exit, built Release, and passed ratchet freeze,
+  Python compile, curation, graphics reset, and all structural scene gates. It failed only
+  expected dirty-tree policy gates. The implementation demotes the large catalog tent to a small
+  semantic marker, removes loose log/canoe clutter, reduces stylized pine/cliff counts, boosts
+  naturalistic/source anchors, zeros campsite primitive detail emitters and low-poly mask paths,
+  keeps one tent construction path, narrows structural water near shore, and restores turquoise
+  river readability. Selected candidates were campsite
+  `gen_a_foggy_mountain_campsite_beside_0.png`, alpine
+  `gen_a_stormy_alpine_lake_with_a_smal_0.png`, and desert
+  `gen_a_sunny_desert_canyon_campsite_w_0.png`. Visual truth remains negative: cleaner, but still
+  primitive tent/cabin silhouettes, luminous sheet water, flat ridge backdrops, and non-AAA
+  material form.

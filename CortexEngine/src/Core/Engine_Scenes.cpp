@@ -542,11 +542,11 @@ namespace {
             const float secondary = std::sin(v * glm::pi<float>() * 5.0f + 0.8f);
             const float centerX = riverLike ? bend * halfMaxWidth * 0.18f : bend * halfMaxWidth * 0.045f;
             const float widthFactor = riverLike
-                ? (0.30f + 0.09f * smooth(v) + 0.030f * secondary)
-                : (0.46f + 0.42f * smooth(v) + 0.035f * secondary);
+                ? (0.20f + 0.055f * smooth(v) + 0.022f * secondary)
+                : (0.26f + 0.42f * smooth(v) + 0.030f * secondary);
             const float halfWidth = std::clamp(halfMaxWidth * widthFactor,
-                                               halfMaxWidth * (riverLike ? 0.24f : 0.34f),
-                                               halfMaxWidth * (riverLike ? 0.48f : 0.94f));
+                                               halfMaxWidth * (riverLike ? 0.16f : 0.20f),
+                                               halfMaxWidth * (riverLike ? 0.34f : 0.74f));
 
             for (uint32_t ix = 0; ix <= xSegments; ++ix) {
                 const float u = static_cast<float>(ix) / static_cast<float>(xSegments);

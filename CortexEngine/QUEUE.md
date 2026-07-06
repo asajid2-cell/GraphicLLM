@@ -147,3 +147,16 @@
   remains open. Next active item is a real asset/composition/material-form pass: low-poly tent,
   cabin, tree, rock, and canyon silhouettes still dominate, and lakes still read as broad sheets
   despite the renderer-owned cleanup.
+- 2026-07-06: Loop 4 hero asset/composition dirty probe
+  `tools/run_genscene_acceptance.ps1 -Tag phase4_hero_asset_form_dirty_probe_20260706`
+  wrote red `CURRENT_FAILED.md` with a real `structural_scene_gate` failure: desert selected
+  render failed `turquoise_water_roi_fail` after the river geometry was narrowed. Do not retry
+  that exact water narrowing without also preserving prompt color readability.
+- 2026-07-06: Loop 4 hero asset/composition dirty probe
+  `tools/run_genscene_acceptance.ps1 -Tag phase4_hero_asset_form_dirty_probe2_20260706`
+  wrote red `CURRENT_FAILED.md` as expected. It passed ratchet freeze, Python compile, curation,
+  graphics reset, Release build, and structural scene gates, and failed only dirty-tree policy
+  gates. The change removes several primitive clutter sources and demotes stylized catalog
+  heroes, but visual truth remains negative. Accept only as cleanup; next active item must attack
+  the remaining real visual ceiling: primitive tent/cabin forms, flat water/shore integration,
+  and backdrop/material lighting depth.

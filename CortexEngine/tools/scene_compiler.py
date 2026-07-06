@@ -256,8 +256,8 @@ def compile_v3_to_v2(v3: dict[str, Any]) -> dict[str, Any]:
     water_intent = str(waterbody.get("color_intent") or "").lower()
     stylized_water = water_intent in {"purple", "violet", "turquoise", "blue"}
     if canyon and water_intent == "turquoise":
-        water_shallow = [0.0, 2.25, 3.05]
-        water_deep = [0.0, 1.05, 1.58]
+        water_shallow = [0.0, 2.95, 4.35]
+        water_deep = [0.0, 1.32, 2.52]
     if water_intent in {"purple", "violet"}:
         water_shallow = [1.10, 0.02, 1.85]
         water_deep = [0.36, 0.00, 0.92]
@@ -374,8 +374,8 @@ def compile_v3_to_v2(v3: dict[str, Any]) -> dict[str, Any]:
         env["fog"] = {"density": max(env["fog"]["density"], 0.012), "start": 8.0}
         env["exposure"] = min(env["exposure"], 0.84)
         env["water"].update({
-            "shallow": [0.0, 2.75, 4.10],
-            "deep": [0.0, 1.18, 2.24],
+            "shallow": [0.0, 3.05, 4.55],
+            "deep": [0.0, 1.36, 2.64],
             "roughness": min(env["water"]["roughness"], 0.052),
             "fresnel": 0.18,
             "absorption": max(env["water"]["absorption"], 1.22),
@@ -405,14 +405,13 @@ def compile_v3_to_v2(v3: dict[str, Any]) -> dict[str, Any]:
     # Hero grammar: the focal set stays tight enough for the quality gate and camera.
     if campsite:
         tent_tint = [0.72, 0.48, 0.27] if desert else ([0.32, 0.38, 0.50] if moonlight else [0.68, 0.42, 0.22])
-        _add(objects, "tent_detailedOpen", 2.9, 0.9, -18.0, 2.55, tint=tent_tint, placed=placed)
+        _add(objects, "tent_smallClosed", 3.15, 1.18, -18.0, 0.92, tint=tent_tint, placed=placed)
         _add(objects, "campfire_bricks", -0.35, 0.35, 0.0, 1.05, placed=placed)
         _add(objects, "campfire_logs", -1.05, 0.86, 31.0, 0.56, placed=placed)
         _add(objects, "campfire_stones", 0.48, -0.18, -12.0, 0.62, placed=placed)
-        _add(objects, "log_stack", -1.55, 1.08, 34.0, 0.88, placed=placed)
-        _add(objects, "log_stack", 1.45, 1.36, -28.0, 0.82, placed=placed)
         _add(objects, "Lantern_01", 1.15, 1.42, -22.0, 0.50, tint=[0.72, 0.46, 0.22])
-        _add(objects, "dead_tree_trunk", -3.35, 2.55, 88.0, 1.05, tint=[0.34, 0.23, 0.15], placed=placed)
+        _add(objects, "dead_tree_trunk", -3.35, 2.55, 88.0, 0.82, tint=[0.34, 0.23, 0.15], placed=placed)
+        _add(objects, "tree_stump_01", 2.20, 2.62, -12.0, 0.56, tint=[0.28, 0.19, 0.11], placed=placed)
     elif cabin:
         env["structures"].append({
             "type": "cabin",
@@ -428,16 +427,16 @@ def compile_v3_to_v2(v3: dict[str, Any]) -> dict[str, Any]:
         })
         placed.append((1.35, 1.05, 2.7))
         _add(objects, "campfire_bricks", -1.9, 1.25, 0.0, 0.95, placed=placed)
-        _add(objects, "log_stack", 2.65, 2.30, 80.0, 0.90, placed=placed)
+        _add(objects, "dead_tree_trunk", 2.70, 2.38, 80.0, 0.72, placed=placed)
 
     # Shore, water, and foreground anchors.
-    _scatter_ring(objects, "boulder_01", 10, radius_x=14.0, z_base=-4.8, z_jitter=1.7,
+    _scatter_ring(objects, "boulder_01", 7, radius_x=13.5, z_base=-4.4, z_jitter=1.6,
                   foot=1.55, seed=scene_type + ":shore", tint=rock_tint, sides=False, placed=placed)
-    _scatter_ring(objects, "rock_moss_set_01", 5, radius_x=15.0, z_base=-12.0, z_jitter=2.0,
+    _scatter_ring(objects, "rock_moss_set_01", 3, radius_x=14.0, z_base=-11.4, z_jitter=1.8,
                   foot=1.75, seed=scene_type + ":water-rocks", tint=rock_tint, sides=False, placed=placed)
     if not desert:
-        _scatter_ring(objects, "grass_large", 16, radius_x=17.0, z_base=3.8, z_jitter=2.4,
-                      foot=0.72, seed=scene_type + ":grass", tint=foliage_tint, sides=True, placed=placed)
+        _scatter_ring(objects, "grass_bermuda_01", 8, radius_x=13.0, z_base=3.8, z_jitter=2.0,
+                      foot=0.56, seed=scene_type + ":grass", tint=foliage_tint, sides=True, placed=placed)
 
     # Tree/vertical masses on flanks, not the center corridor. Desert canyons use
     # sparse dead trunks instead of pine flanks so they do not read as a forest camp.
@@ -457,13 +456,9 @@ def compile_v3_to_v2(v3: dict[str, Any]) -> dict[str, Any]:
             for asset, x, z, yaw, foot in cliff_specs:
                 _add(objects, asset, x, z, yaw, foot, tint=rock_tint, placed=placed)
     else:
-        _scatter_ring(objects, "tree_pineTallA_detailed", 14, radius_x=18.0, z_base=-1.3, z_jitter=3.8,
+        _scatter_ring(objects, "tree_pineTallA_detailed", 5, radius_x=19.0, z_base=-1.8, z_jitter=3.4,
                       foot=3.0, seed=scene_type + ":trees", tint=foliage_tint,
                       placed=placed)
-
-    if waterbody.get("type") == "lake" and not desert:
-        _add(objects, "canoe", -5.2, -5.9, 16.0, 2.7, placed=placed)
-        _add(objects, "canoe_paddle", -6.8, -5.15, -18.0, 0.82, tint=[0.46, 0.27, 0.12], placed=placed)
 
     _attach_materials(objects, desert=desert, moonlight=moonlight)
     contact_patches: list[dict[str, Any]] = []
@@ -699,7 +694,7 @@ def compile_v3_to_v2(v3: dict[str, Any]) -> dict[str, Any]:
             "enabled": True,
             "cliff_mesh_vertical_bands": 6 if canyon else 0,
             "cliff_overhang_count": 12 if canyon else 0,
-            "hero_bevel_detail_count": 7 if (campsite or cabin) else 5,
+            "hero_bevel_detail_count": 0 if campsite else (7 if cabin else 5),
             "prop_depth_layer_count": 4 if (campsite or cabin) else 3,
             "systems": [
                 "faceted_cliff_wall_mesh",
@@ -710,13 +705,13 @@ def compile_v3_to_v2(v3: dict[str, Any]) -> dict[str, Any]:
         },
         "naturalistic_ecology": {
             "enabled": True,
-            "grass_cluster_count": 20 if not desert else 0,
-            "bush_cluster_count": 8 if not desert else 1,
-            "fern_cluster_count": 7 if not desert else 0,
-            "trunk_count": 4 if not desert else 2,
-            "branch_count": 6 if not desert else 8,
-            "stump_count": 3 if not desert else 2,
-            "moss_rock_count": 8 if not desert else 7,
+            "grass_cluster_count": 24 if not desert else 0,
+            "bush_cluster_count": 10 if not desert else 1,
+            "fern_cluster_count": 9 if not desert else 0,
+            "trunk_count": 5 if not desert else 2,
+            "branch_count": 6 if not desert else 6,
+            "stump_count": 4 if not desert else 2,
+            "moss_rock_count": 10 if not desert else 7,
             "systems": [
                 "scanned_grass_clumps",
                 "scanned_ferns_or_bushes",
@@ -728,7 +723,7 @@ def compile_v3_to_v2(v3: dict[str, Any]) -> dict[str, Any]:
         "asset_fidelity": {
             "enabled": True,
             "hero_detail_count": (4 if campsite else 3) + (6 if cabin else 0),
-            "camp_detail_count": 4 if campsite else 0,
+            "camp_detail_count": 0,
             "cabin_facade_detail_count": 6 if cabin else 0,
             "backdrop_detail_layers": 5 if canyon else 4,
             "foreground_dressing_clusters": 0,
@@ -745,7 +740,7 @@ def compile_v3_to_v2(v3: dict[str, Any]) -> dict[str, Any]:
         },
         "hero_environment_geometry": {
             "enabled": True,
-            "high_detail_camp_piece_count": 4 if campsite else 0,
+            "high_detail_camp_piece_count": 0,
             "high_detail_cabin_piece_count": 5 if cabin else 0,
             "mountain_mass_layer_count": 5 if (water_on or canyon or cabin) else 3,
             "cliff_mass_piece_count": 14 if canyon else 0,
@@ -791,9 +786,9 @@ def compile_v3_to_v2(v3: dict[str, Any]) -> dict[str, Any]:
             "enabled": True,
             "source_asset_set_count": 4,
             "scanned_lantern_count": 3 if (campsite or cabin) else 0,
-            "scanned_utility_prop_count": 1 if (campsite or cabin) else 0,
-            "scanned_anchor_rock_count": 8 if water_on else 5,
-            "hero_anchor_count": 11 if campsite else (10 if cabin else 6),
+            "scanned_utility_prop_count": 1 if cabin else 0,
+            "scanned_anchor_rock_count": 9 if water_on else 6,
+            "hero_anchor_count": 12 if campsite else (10 if cabin else 6),
             "systems": [
                 "scanned_lantern_pbr_mesh",
                 "scanned_table_or_barrel_pbr_mesh",
@@ -808,9 +803,9 @@ def compile_v3_to_v2(v3: dict[str, Any]) -> dict[str, Any]:
                     "canyon_hero_massing" if canyon else "landscape_hero_overbuild"
                 )
             ),
-            "canvas_shell_panel_count": 3 if campsite else 0,
-            "fabric_layer_count": 4 if campsite else 0,
-            "structural_pole_count": 4 if campsite else 0,
+            "canvas_shell_panel_count": 5 if campsite else 0,
+            "fabric_layer_count": 5 if campsite else 0,
+            "structural_pole_count": 3 if campsite else 0,
             "rope_stake_count": 4 if campsite else 0,
             "low_poly_mask_count": 0,
             "cabin_facade_module_count": 6 if cabin else 0,
@@ -868,10 +863,10 @@ def compile_v3_to_v2(v3: dict[str, Any]) -> dict[str, Any]:
         "source_environment_assets": {
             "enabled": True,
             "source_asset_set_count": 9 if canyon else 8,
-            "fetched_rock_mass_count": 12 if canyon else 9,
-            "kenney_cliff_backdrop_count": 8 if canyon else 4,
-            "detailed_tree_backdrop_count": 0 if desert else 9,
-            "naturalistic_anchor_count": 7 if water_on else 5,
+            "fetched_rock_mass_count": 14 if canyon else 8,
+            "kenney_cliff_backdrop_count": 3 if canyon else 1,
+            "detailed_tree_backdrop_count": 0 if desert else 4,
+            "naturalistic_anchor_count": 9 if water_on else 6,
             "terrain_replacement_layer_count": 6 if canyon else 5,
             "backdrop_anchor_count": 15 if canyon else 12,
             "replacement_family": "source_canyon_wall_backdrop" if canyon else (
@@ -932,12 +927,12 @@ def compile_v3_to_v2(v3: dict[str, Any]) -> dict[str, Any]:
         },
         "hero_mesh_material_overhaul": {
             "enabled": True,
-            "tent_shell_count": 1 if campsite else 0,
+            "tent_shell_count": 0,
             "cabin_cladding_count": 10 if cabin else 0,
             "roof_layer_count": 5 if cabin else 0,
             "canyon_hero_mesh_count": 8 if canyon else 0,
-            "pbr_material_layer_count": 6 if (campsite or cabin or canyon) else 4,
-            "lowpoly_silhouette_mask_count": 1 if campsite else (2 if cabin else 1),
+            "pbr_material_layer_count": 0 if campsite else (6 if (cabin or canyon) else 4),
+            "lowpoly_silhouette_mask_count": 0,
             "overhaul_family": "aframe_canvas_pbr_shell" if campsite else (
                 "cabin_cladding_roof_pbr" if cabin else "canyon_rock_mesh_pbr"
             ),

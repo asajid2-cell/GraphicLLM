@@ -4666,15 +4666,15 @@ void Engine::BuildRecipeScene() {
                                        alpineModule ? 4.8f : (campsiteModule ? 3.6f : 6.5f));
                 if (genExt.waterOn) {
                     renderer->SetWaterParams(genExt.waterLevel,
-                                             std::max(genExt.waterWave, alpineModule ? 0.040f : 0.056f),
-                                             canyonModule ? 8.8f : 9.2f,
-                                             0.46f,
-                                             0.16f,
-                                             0.96f,
-                                             0.024f,
-                                             0.50f);
+                                             std::max(genExt.waterWave, canyonModule ? 0.052f : (alpineModule ? 0.044f : 0.062f)),
+                                             canyonModule ? 6.6f : (alpineModule ? 7.4f : 7.8f),
+                                             canyonModule ? 0.62f : 0.54f,
+                                             canyonModule ? 0.64f : 0.22f,
+                                             canyonModule ? 0.76f : 0.98f,
+                                             canyonModule ? 0.030f : 0.036f,
+                                             canyonModule ? 0.58f : 0.64f);
                     renderer->SetWaterOptics(std::max(genExt.waterRough, alpineModule ? 0.080f : 0.065f),
-                                             std::max(genExt.waterFresnel, 0.82f));
+                                             std::max(genExt.waterFresnel, canyonModule ? 0.72f : 0.92f));
                 }
                 spdlog::info("generative_exterior: environment renderer sky_lift={:.2f} ssao_intensity={:.2f} shadow_pcf={:.2f} water_depth_contrast={:.2f}",
                              skyLift,
@@ -7128,14 +7128,16 @@ void Engine::BuildRecipeScene() {
                 r.specularFactor = 1.18f;
                 r.anisotropyStrength = 0.20f;
                 r.presetName = "water";
+                r.castsSunShadow = false;
                 Scene::WaterSurfaceComponent sea{};
                 sea.absorption = genExt.waterAbsorption;   // v3 controls explicit color readability
                 sea.foamStrength = genExt.waterFoam;
                 sea.viscosity = genExt.waterViscosity;
                 sea.emissiveHeat = genExt.waterColorStrength; // water shader uses this as authored color strength for liquidType::Water
                 sea.bodyThickness = genExt.waterBodyThickness;
-                sea.meniscusStrength = 0.38f;
-                sea.flowSpeed = 0.46f;
+                sea.sloshStrength = riverLike ? 0.44f : 0.36f;
+                sea.meniscusStrength = riverLike ? 0.52f : 0.46f;
+                sea.flowSpeed = riverLike ? 0.92f : 0.58f;
                 sea.shallowTint = genExt.waterShallow;
                 sea.deepTint = genExt.waterDeep;
                 m_registry->AddComponent<Scene::WaterSurfaceComponent>(water, sea);
@@ -10344,48 +10346,50 @@ void Engine::BuildRecipeScene() {
             }
 
             int shadowBands = 0;
-            auto bandMesh = Utils::MeshGenerator::CreateDisk(1.0f, 48);
-            const auto upBand = renderer->UploadMesh(bandMesh);
-            if (upBand.IsErr()) {
-                spdlog::warn("generative_exterior: lighting shadow material field band mesh upload failed: {}",
-                             upBand.Error());
-            } else {
-                const glm::vec3 bandColor = alpineModule
-                    ? glm::vec3(0.025f, 0.034f, 0.052f)
-                    : (canyonModule ? glm::vec3(0.048f, 0.041f, 0.036f) : glm::vec3(0.030f, 0.044f, 0.040f));
-                const float shoreZ = genExt.waterOn ? genExt.waterFromZ : -genExt.extent * 0.30f;
-                for (int i = 0; i < genExt.lightingShadowMaterialField.contactShadowBandCount; ++i) {
-                    const float side = (i % 2 == 0) ? -1.0f : 1.0f;
-                    const float lane = static_cast<float>(i / 2);
-                    const float x = side * (0.55f + 0.22f * static_cast<float>(i % 6)) +
-                                    (canyonModule ? side * 1.65f : 0.0f);
-                    const float z = (canyonModule ? (shoreZ - 1.8f - lane * 0.42f)
-                                                   : (0.82f + lane * 0.18f));
-                    entt::entity e = m_registry->CreateEntity();
-                    m_registry->AddComponent<Scene::TagComponent>(
-                        e, "GenerativeExterior_LightingShadowFieldBand" + std::to_string(i));
-                    auto& t = m_registry->AddComponent<TransformComponent>(e);
-                    t.position = glm::vec3(x, 0.118f + 0.001f * static_cast<float>(i % 5), z);
-                    t.scale = glm::vec3(0.28f + 0.025f * static_cast<float>(i % 4),
-                                        1.0f,
-                                        0.060f + 0.010f * static_cast<float>((i + 2) % 4));
-                    t.rotation = glm::quat(glm::vec3(0.0f,
-                                                     glm::radians(-36.0f + 13.0f * static_cast<float>(i)),
-                                                     0.0f));
-                    auto& r = m_registry->AddComponent<Scene::RenderableComponent>(e);
-                    r.mesh = bandMesh;
-                    r.albedoColor = glm::vec4(bandColor, alpineModule ? 0.10f : 0.085f);
-                    r.metallic = 0.0f;
-                    r.roughness = 0.98f;
-                    r.ao = 0.55f;
-                    r.occlusionStrength = 0.50f;
-                    r.normalScale = 0.04f;
-                    r.alphaMode = Scene::RenderableComponent::AlphaMode::Blend;
-                    r.renderLayer = Scene::RenderableComponent::RenderLayer::Overlay;
-                    r.doubleSided = true;
-                    r.castsSunShadow = false;
-                    r.presetName = "shadow";
-                    shadowBands++;
+            if (genExt.lightingShadowMaterialField.contactShadowBandCount > 0) {
+                auto bandMesh = Utils::MeshGenerator::CreateDisk(1.0f, 48);
+                const auto upBand = renderer->UploadMesh(bandMesh);
+                if (upBand.IsErr()) {
+                    spdlog::warn("generative_exterior: lighting shadow material field band mesh upload failed: {}",
+                                 upBand.Error());
+                } else {
+                    const glm::vec3 bandColor = alpineModule
+                        ? glm::vec3(0.025f, 0.034f, 0.052f)
+                        : (canyonModule ? glm::vec3(0.048f, 0.041f, 0.036f) : glm::vec3(0.030f, 0.044f, 0.040f));
+                    const float shoreZ = genExt.waterOn ? genExt.waterFromZ : -genExt.extent * 0.30f;
+                    for (int i = 0; i < genExt.lightingShadowMaterialField.contactShadowBandCount; ++i) {
+                        const float side = (i % 2 == 0) ? -1.0f : 1.0f;
+                        const float lane = static_cast<float>(i / 2);
+                        const float x = side * (0.55f + 0.22f * static_cast<float>(i % 6)) +
+                                        (canyonModule ? side * 1.65f : 0.0f);
+                        const float z = (canyonModule ? (shoreZ - 1.8f - lane * 0.42f)
+                                                       : (0.82f + lane * 0.18f));
+                        entt::entity e = m_registry->CreateEntity();
+                        m_registry->AddComponent<Scene::TagComponent>(
+                            e, "GenerativeExterior_LightingShadowFieldBand" + std::to_string(i));
+                        auto& t = m_registry->AddComponent<TransformComponent>(e);
+                        t.position = glm::vec3(x, 0.118f + 0.001f * static_cast<float>(i % 5), z);
+                        t.scale = glm::vec3(0.28f + 0.025f * static_cast<float>(i % 4),
+                                            1.0f,
+                                            0.060f + 0.010f * static_cast<float>((i + 2) % 4));
+                        t.rotation = glm::quat(glm::vec3(0.0f,
+                                                         glm::radians(-36.0f + 13.0f * static_cast<float>(i)),
+                                                         0.0f));
+                        auto& r = m_registry->AddComponent<Scene::RenderableComponent>(e);
+                        r.mesh = bandMesh;
+                        r.albedoColor = glm::vec4(bandColor, alpineModule ? 0.10f : 0.085f);
+                        r.metallic = 0.0f;
+                        r.roughness = 0.98f;
+                        r.ao = 0.55f;
+                        r.occlusionStrength = 0.50f;
+                        r.normalScale = 0.04f;
+                        r.alphaMode = Scene::RenderableComponent::AlphaMode::Blend;
+                        r.renderLayer = Scene::RenderableComponent::RenderLayer::Overlay;
+                        r.doubleSided = true;
+                        r.castsSunShadow = false;
+                        r.presetName = "shadow";
+                        shadowBands++;
+                    }
                 }
             }
 
@@ -10482,6 +10486,10 @@ void Engine::BuildRecipeScene() {
                                              genExt.lightingShadowMaterialField.shadowBiasTarget));
             renderer->SetShadowPCFRadius(std::max(genExt.graphicsShadowPCF,
                                                   genExt.lightingShadowMaterialField.shadowPCFRadiusTarget));
+            renderer->SetCascadeSplitLambda(alpineModule ? 0.74f : 0.82f);
+            renderer->AdjustCascadeResolutionScale(0, (alpineModule ? 1.55f : 1.85f) - renderer->GetCascadeResolutionScale(0));
+            renderer->AdjustCascadeResolutionScale(1, 1.35f - renderer->GetCascadeResolutionScale(1));
+            renderer->AdjustCascadeResolutionScale(2, 1.10f - renderer->GetCascadeResolutionScale(2));
             renderer->SetToneGrade(alpineModule ? 1.20f : 1.28f, alpineModule ? 1.02f : 1.12f);
             renderer->SetCinematicPostEnabled(true);
             renderer->SetCinematicPost(alpineModule ? 0.12f : 0.10f, 0.03f);
@@ -10489,7 +10497,7 @@ void Engine::BuildRecipeScene() {
 
             const auto features = renderer->GetFeatureState();
             const auto quality = renderer->GetQualityState();
-            spdlog::info("generative_exterior: lighting shadow material field shadowed_lights={} material_surfaces={} shadow_bands={} probe_volumes={} key_fill={:.2f} ambient={:.2f} ssao={:.2f} shadow_bias={:.4f} shadow_pcf={:.2f}",
+            spdlog::info("generative_exterior: lighting shadow material field shadowed_lights={} material_surfaces={} shadow_bands={} probe_volumes={} key_fill={:.2f} ambient={:.2f} ssao={:.2f} shadow_bias={:.4f} shadow_pcf={:.2f} cascade_lambda={:.2f}",
                          shadowedLights,
                          materialSurfaces,
                          shadowBands,
@@ -10498,7 +10506,8 @@ void Engine::BuildRecipeScene() {
                          appliedAmbient,
                          features.ssaoIntensity,
                          quality.shadowBias,
-                         quality.shadowPCFRadius);
+                         quality.shadowPCFRadius,
+                         quality.cascadeSplitLambda);
         }
     }
 

@@ -466,7 +466,7 @@ def compile_v3_to_v2(v3: dict[str, Any]) -> dict[str, Any]:
         _add(objects, "canoe_paddle", -6.8, -5.15, -18.0, 0.82, tint=[0.46, 0.27, 0.12], placed=placed)
 
     _attach_materials(objects, desert=desert, moonlight=moonlight)
-    contact_patches = _contact_patches(objects, water_from_z, limit=5)
+    contact_patches: list[dict[str, Any]] = []
     foreground_occluders = 2 if canyon else 1
     shoreline_segments = 3 if water_on else 0
     material_zone_names = [
@@ -480,13 +480,12 @@ def compile_v3_to_v2(v3: dict[str, Any]) -> dict[str, Any]:
         material_zone_names.extend(["red_rock_cliff_faces", "red_rock_strata", "foreground_silhouette_rocks"])
     elif campsite:
         material_zone_names.append("camp_hero_fabric_wood")
-    material_zone_names.extend(["terrain_micro_pebbles", "soft_occlusion_ribbons"])
+    material_zone_names.extend(["terrain_micro_pebbles", "renderer_ssao_contact_grounding"])
     if water_on:
         material_zone_names.extend([
-            "shore_foam_wetline",
-            "wet_specular_glints",
-            "shoreline_laced_foam",
-            "water_ripple_reflection_glints",
+            "shore_material_transition",
+            "water_subsystem_specular_response",
+            "shaped_water_mesh",
             "submerged_edge_rock_wetlines",
         ])
     material_zone_names.extend(["hero_environment_geometry", "mountain_cliff_massing", "shoreline_prop_geometry"])
@@ -566,11 +565,11 @@ def compile_v3_to_v2(v3: dict[str, Any]) -> dict[str, Any]:
         renderer_ssao_intensity = 2.80
         renderer_shadow_pcf = 3.30
     renderer_shadow_bias = 0.0014
-    contact_receiver_patch_budget = 72 if not moonlight else 40
-    soft_penumbra_patch_budget = 40 if not moonlight else 32
+    contact_receiver_patch_budget = 0
+    soft_penumbra_patch_budget = 0
     cinematic_relief_patches = 34 if canyon else (30 if campsite else 26)
     cinematic_shadow_casters = 12 if (campsite or canyon) else 9
-    cinematic_contact_receivers = 30 if not moonlight else 20
+    cinematic_contact_receivers = 0
     cinematic_local_lights = 3 if (campsite or cabin) else 2
     cinematic_volumetric_slices = 6 if (fog or moonlight or campsite) else 4
     env["graphics_pass"] = {
@@ -585,7 +584,7 @@ def compile_v3_to_v2(v3: dict[str, Any]) -> dict[str, Any]:
             "backdrop_gate_count": 4 if canyon else 3,
             "lighting_zone_count": 4 if (campsite or cabin) else 3,
             "material_family_count": 7 if water_on else 5,
-            "water_shape_segment_count": 2 if water_on else 0,
+            "water_shape_segment_count": 0,
             "practical_light_count": 2 if authored_module_id == "desert_canyon_river" else (3 if campsite else (4 if cabin else 1)),
             "contrast_key": "warm_low_dawn" if authored_module_id == "campsite_lake_dawn" else (
                 "hot_canyon_side_key" if authored_module_id == "desert_canyon_river" else (
@@ -637,47 +636,42 @@ def compile_v3_to_v2(v3: dict[str, Any]) -> dict[str, Any]:
         },
         "occlusion": {
             "enabled": True,
-            "ground_shadow_ribbon_count": 11 if not desert else 9,
-            "contact_shadow_strength": 0.78 if not moonlight else 0.68,
+            "ground_shadow_ribbon_count": 0,
+            "contact_shadow_strength": 0.0,
             "ambient_occlusion_multiplier": 1.26 if not moonlight else 1.14,
         },
         "image_contact_occlusion": {
-            "enabled": True,
+            "enabled": False,
             "deep_contact_patch_count": 0,
             "target_dark_contact_fraction": 0.002,
             "target_dark_contact_area_fraction": 0.004,
             "systems": [
-                "deep_receiver_shadow_patches",
-                "hero_prop_contact_anchors",
-                "foreground_object_grounding",
+                "disabled_metric_proxy_receiver_patches",
+                "renderer_ssao_and_shadow_maps_own_contact",
             ],
         },
         "soft_occlusion": {
-            "enabled": True,
-            "penumbra_patch_count": 3 if not moonlight else 2,
-            "contact_gradient_layer_count": 1,
-            "hero_anchor_count": 7 if campsite else (6 if cabin else 4),
+            "enabled": False,
+            "penumbra_patch_count": 0,
+            "contact_gradient_layer_count": 0,
+            "hero_anchor_count": 0,
             "target_soft_contact_fraction": 0.010,
             "systems": [
-                "broad_contact_penumbra_disks",
-                "multi_layer_contact_gradients",
-                "hero_foundation_shadow_anchors",
-                "ssao_shadow_blend_support",
+                "disabled_soft_shadow_overlay_disks",
+                "renderer_ssao_and_cascaded_shadows",
             ],
         },
         "water_shore_integration": {
             "enabled": bool(water_on),
-            "foam_lace_segment_count": 5 if water_on else 0,
-            "shoreline_ripple_count": 6 if water_on else 0,
-            "wetline_band_count": 2 if water_on else 0,
-            "reflection_glint_count": 3 if water_on else 0,
+            "foam_lace_segment_count": 0,
+            "shoreline_ripple_count": 0,
+            "wetline_band_count": 0,
+            "reflection_glint_count": 0,
             "submerged_edge_rock_count": 3 if water_on else 0,
             "systems": [
-                "broken_foam_lace",
-                "shore_parallel_ripples",
-                "wetline_gradient_bands",
-                "screen_space_reflection_glints",
-                "submerged_rock_edge_grounding",
+                "real_water_subsystem_surface",
+                "shore_material_transition",
+                "submerged_edge_rock_grounding",
             ],
         },
         "surface_detail": {
@@ -958,11 +952,11 @@ def compile_v3_to_v2(v3: dict[str, Any]) -> dict[str, Any]:
         "lighting_shadow_material_field": {
             "enabled": True,
             "shadowed_spot_light_count": 3 if not moonlight else 2,
-            "material_response_surface_count": 8 if not desert else 7,
-            "contact_shadow_band_count": 2,
+            "material_response_surface_count": 18 if not desert else 16,
+            "contact_shadow_band_count": 0,
             "local_probe_volume_count": 2 if water_on else 1,
             "key_fill_ratio": 3.35 if campsite else (3.55 if desert else 2.65),
-            "ambient_intensity_ceiling": 0.50 if campsite else (0.54 if desert else 0.46),
+            "ambient_intensity_ceiling": 0.42 if campsite else (0.48 if desert else 0.38),
             "ssao_intensity_target": 3.35 if not moonlight else 3.05,
             "shadow_bias_target": 0.0011 if not moonlight else 0.0013,
             "shadow_pcf_radius_target": 3.85 if not moonlight else 3.55,
@@ -975,7 +969,7 @@ def compile_v3_to_v2(v3: dict[str, Any]) -> dict[str, Any]:
                 "renderer_ssao_shadow_bias_pcf_targets",
                 "existing_surface_pbr_response_tuning",
                 "local_probe_volume_material_grade",
-                "contact_shadow_band_field",
+                "no_translucent_shadow_band_overlays",
             ],
         },
         "source_readability_balance": {
@@ -1015,7 +1009,7 @@ def compile_v3_to_v2(v3: dict[str, Any]) -> dict[str, Any]:
             "systems": [
                 "readback_verified_ssao_controls",
                 "readback_verified_shadow_map_controls",
-                "bounded_receiver_contact_support",
+                "renderer_owned_contact_support",
                 "generated_dxr_opt_in_only",
             ],
         },
@@ -1036,7 +1030,7 @@ def compile_v3_to_v2(v3: dict[str, Any]) -> dict[str, Any]:
                 "triplanar_source_texture_material_relief",
                 "terrain_relief_patch_meshes",
                 "localized_shadow_caster_geometry",
-                "terrain_toned_contact_receiver_materials",
+                "terrain_material_receives_renderer_shadows",
                 "module_specific_practical_light_pools",
                 "volumetric_light_and_fog_slices",
                 "wet_dry_shore_roughness_variation",

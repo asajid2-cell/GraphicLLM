@@ -357,3 +357,19 @@ Status: pending.
   `gen_a_stormy_alpine_lake_with_a_smal_0.png`, and desert
   `gen_a_sunny_desert_canyon_campsite_w_0.png`. Visual truth remains negative; the next
   Loop 4 work should target lighting/water/material coherence and actual shadowing.
+- 2026-07-06: Loop 4 iteration 6 dirty probe shifted lighting/water/material work away from
+  proxy overlays. The compiler now requests zero contact patches, soft penumbra disks, image
+  contact occluders, shadow bands, water ripple/glint strips, and authored water shape cards;
+  it increases existing-surface material response and lowers ambient ceilings so real SSAO,
+  cascaded shadows, local shadowed lights, probes, and the water subsystem carry the image.
+  Runtime skips shadow-band mesh upload when the budget is zero, raises cascade quality for
+  generated exteriors, prevents transparent water from casting sun shadows, and increases water
+  slosh/meniscus/flow. Heartbeat proof
+  `genscene-loop4-renderer-shadows-proof` fired by timeout after 1s. Dirty probe
+  `tools/run_genscene_acceptance.ps1 -Tag phase4_renderer_shadow_water_dirty_probe_20260706`
+  built Release and passed ratchet freeze, Python compile, curation, graphics reset, and
+  structural scene gates; it failed only expected dirty-tree policy gates. Selected candidates:
+  campsite `gen_a_foggy_mountain_campsite_beside_0.png`, alpine
+  `gen_a_stormy_alpine_lake_with_a_smal_0.png`, desert
+  `gen_a_sunny_desert_canyon_campsite_w_0.png`. Visual truth remains negative: this is a
+  cleanup away from Goodhart overlays, not an AAA-quality solve.

@@ -131,3 +131,13 @@
   and phase0 policy. Loop 4 remains open; next active item is lighting/water/material
   coherence and real shadowing, because the current accepted stills are still visibly below
   AA/AAA quality.
+- 2026-07-06: Loop 4 renderer-owned shadow/water cleanup dirty probe
+  `tools/run_genscene_acceptance.ps1 -Tag phase4_renderer_shadow_water_dirty_probe_20260706`
+  wrote red `CURRENT_FAILED.md` as expected. It passed ratchet freeze, Python compile,
+  curation, graphics reset, Release build, and structural scene gates, and failed only
+  `clean_tree` plus `phase0_policy` because the implementation was intentionally uncommitted.
+  The change removes several Goodhart-style proxy overlay requests: contact patches, soft
+  penumbra disks, image contact occluders, translucent shadow bands, water glint/ripple strips,
+  and authored water cards. Visual inspection remains negative: scenes are cleaner but still
+  flat, low-poly, and not AA/AAA. Accept only as a structural cleanup checkpoint, then continue
+  to asset/composition/real material fronts.

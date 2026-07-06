@@ -630,3 +630,12 @@ Status: pending.
   `gen_a_sunny_desert_canyon_campsite_w_1.png`. Visual truth remains negative; Loop 4 stays
   open. Next work should target coherent backdrop/terrain/lighting form, not more water-footprint
   cleanup unless it blocks a real prompt.
+- 2026-07-06: Loop 4 iteration 17 rejected the foothill/backdrop dirty probe
+  `phase4_foothill_backdrop_dirty_probe_20260706`. It passed the automated dirty-probe gates
+  except expected dirty-tree policy, but the selected stills did not improve the image: desert
+  gained broad pale shelf bands behind the water, campsite/alpine stayed cardboard-flat, and the
+  patch added another ridge-like slab system instead of removing the visual ceiling. Reverted the
+  production diff and dirty `CURRENT_FAILED.md` change. Strategy review: this is exactly the
+  local-minimum failure Claude called out, so the next slice must replace backdrop/terrain form
+  through continuous terrain/material/lighting systems or remove weak geometry, not add another
+  metric-friendly layer.

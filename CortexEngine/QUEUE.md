@@ -308,3 +308,11 @@
   `gen_a_stormy_alpine_lake_with_a_smal_0.png`, and desert
   `gen_a_sunny_desert_canyon_campsite_w_1.png`. Next active item is backdrop/terrain/lighting
   cohesion: water footprints are cleaner, but the frames still read staged and low-fidelity.
+- 2026-07-06: rejected Loop 4 foothill/backdrop dirty probe
+  `phase4_foothill_backdrop_dirty_probe_20260706`. The runner passed ratchet freeze,
+  Python compile, curation, graphics reset, Release build, and structural scene gates, but
+  visual inspection showed the new foothill aprons as broad pale shelf/slab bands in the
+  desert path and no meaningful quality lift in campsite/alpine. This was a Goodhart-risk
+  geometry accretion, so the production diff and dirty `CURRENT_FAILED.md` state were reverted.
+  Next active item remains real terrain/backdrop/lighting cohesion, preferably by replacing
+  slab/backdrop cheats with continuous terrain and material/lighting response.

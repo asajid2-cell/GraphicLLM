@@ -111,7 +111,9 @@ Verifier:
   manifest metadata.
 - No files under `docs/media/final_art/` or `build/bin/logs/` are staged.
 
-Status: pending.
+Status: done. Evidence: `tools/run_genscene_acceptance.ps1 -Tag phase1_curation_20260706`
+wrote green `CURRENT.md`; `curation_gate` proved bad loop-style ids fail, good `genscene_*`
+dry-runs pass, the manifest is valid, debris paths are ignored, and no generated debris is tracked.
 
 ### Loop 2: Gate Reset
 
@@ -211,3 +213,5 @@ Status: pending.
   `docs/media/genscene/manifest.json`, staging promotion mode, and a runner `curation_gate`.
   Dirty probe `phase1_curation_dirty_probe_20260706 -SkipBuild` passed `curation_gate`,
   `python_compile`, and `gate_ratchet_freeze`; it failed only the expected dirty-tree gates.
+- 2026-07-06: Loop 1 accepted. Full runner `phase1_curation_20260706` passed clean tree,
+  ratchet freeze, Python compile, curation gate, Release build, and phase0 policy.

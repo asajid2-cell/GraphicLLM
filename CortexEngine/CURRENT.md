@@ -2,19 +2,20 @@
 
 Overall: **GREEN - acceptable checkpoint (commit it now)**
 
-- Tag: `phase0_clean_freeze_20260706`
-- Date: 2026-07-06 05:04
-- Accepted tag: `phase0_clean_freeze_20260706`
-- Previous tag: `seed_pre_genscene_pivot_20260706`
-- HEAD: ec269b9 Checkpoint GenScene campaign state pivot
+- Tag: `phase1_curation_20260706`
+- Date: 2026-07-06 05:10
+- Accepted tag: `phase1_curation_20260706`
+- Previous tag: `phase0_clean_freeze_20260706`
+- HEAD: eabe407 Add GenScene curation gate
 - Tracked tree: CLEAN
 
 ## Gates
 
-- **clean_tree**: PASS -- Z:\328\CMPUT328-A2\codexworks\301\graphics\CortexEngine\artifacts\genscene_acceptance\phase0_clean_freeze_20260706\git_status.txt
+- **clean_tree**: PASS -- Z:\328\CMPUT328-A2\codexworks\301\graphics\CortexEngine\artifacts\genscene_acceptance\phase1_curation_20260706\git_status.txt
 - **gate_ratchet_freeze**: PASS -- no added missing_* hard gates in scene_graphics_gate.py
-- **python_compile**: PASS -- Z:\328\CMPUT328-A2\codexworks\301\graphics\CortexEngine\artifacts\genscene_acceptance\phase0_clean_freeze_20260706\python_compile.log
-- **release_build**: PASS -- Z:\328\CMPUT328-A2\codexworks\301\graphics\CortexEngine\artifacts\genscene_acceptance\phase0_clean_freeze_20260706\release_build.log
+- **python_compile**: PASS -- Z:\328\CMPUT328-A2\codexworks\301\graphics\CortexEngine\artifacts\genscene_acceptance\phase1_curation_20260706\python_compile.log
+- **curation_gate**: PASS -- Z:\328\CMPUT328-A2\codexworks\301\graphics\CortexEngine\artifacts\genscene_acceptance\phase1_curation_20260706\curation_gate.log
+- **release_build**: PASS -- Z:\328\CMPUT328-A2\codexworks\301\graphics\CortexEngine\artifacts\genscene_acceptance\phase1_curation_20260706\release_build.log
 - **phase0_policy**: PASS -- dirty tree and old overlay-gate changes must not be accepted by assertion
 
 ## Residuals
@@ -23,6 +24,6 @@ Overall: **GREEN - acceptable checkpoint (commit it now)**
 
 ## Regression
 
-    Previous accepted tag: seed_pre_genscene_pivot_20260706
+    Previous accepted tag: phase0_clean_freeze_20260706
 
 Next steps live in `QUEUE.md` and `PLAN.md`. This file is state, nothing else.

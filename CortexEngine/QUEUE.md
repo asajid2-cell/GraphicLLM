@@ -219,3 +219,12 @@
   curation, graphics reset, Release build, structural scene gate, and phase0 policy. Loop 4
   remains open. Next active item is still real visual coherence: remove remaining strip/clutter
   artifacts and replace weak hero/background forms with higher-fidelity geometry/materials.
+- 2026-07-06: Loop 4 visible-card cleanup dirty probe
+  `tools/run_genscene_acceptance.ps1 -Tag phase4_visible_card_cleanup_dirty_probe2_20260706 -SkipBuild`
+  wrote red `CURRENT_FAILED.md` as expected. It passed ratchet freeze, Python compile, curation,
+  graphics reset, and structural scene gates, and failed only `clean_tree` plus `phase0_policy`
+  because the implementation was intentionally uncommitted. The change zeros visible hero
+  material/shadow/volumetric/wet-roughness card requests and fixes a real campsite
+  `purple_water_roi_fail` by strengthening purple/violet water material. Visual truth remains
+  negative; accept only as a bounded visible-card cleanup checkpoint, then continue into the
+  suspected bloom/emissive/practical-light ghosting and weak hero/background forms.

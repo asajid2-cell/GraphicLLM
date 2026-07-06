@@ -366,6 +366,12 @@ def compile_v3_to_v2(v3: dict[str, Any]) -> dict[str, Any]:
             "body_thickness": max(env["water"]["body_thickness"], 1.18),
             "color_strength": 0.46 if stylized_water else env["water"]["color_strength"],
         })
+        if water_intent in {"purple", "violet"}:
+            env["water"].update({
+                "shallow": [0.64, 0.025, 1.18],
+                "deep": [0.24, 0.0, 0.64],
+                "color_strength": 0.56,
+            })
     elif authored_module_id == "desert_canyon_river":
         env["sun"].update({
             "azimuth_deg": 112.0,
@@ -566,11 +572,11 @@ def compile_v3_to_v2(v3: dict[str, Any]) -> dict[str, Any]:
     renderer_shadow_bias = 0.0014
     contact_receiver_patch_budget = 0
     soft_penumbra_patch_budget = 0
-    cinematic_relief_patches = 34 if canyon else (30 if campsite else 26)
-    cinematic_shadow_casters = 12 if (campsite or canyon) else 9
+    cinematic_relief_patches = 18 if canyon else (16 if campsite else 14)
+    cinematic_shadow_casters = 8 if (campsite or canyon) else 6
     cinematic_contact_receivers = 0
     cinematic_local_lights = 3 if (campsite or cabin) else 2
-    cinematic_volumetric_slices = 6 if (fog or moonlight or campsite) else 4
+    cinematic_volumetric_slices = 0
     env["graphics_pass"] = {
         "version": 2,
         "authored_scene_module": {
@@ -887,8 +893,8 @@ def compile_v3_to_v2(v3: dict[str, Any]) -> dict[str, Any]:
         },
         "hero_material_shadow_readability": {
             "enabled": True,
-            "hero_material_panel_count": 8 if campsite else (9 if cabin else 7),
-            "hero_shadow_receiver_count": 3 if campsite else (3 if cabin else 2),
+            "hero_material_panel_count": 0,
+            "hero_shadow_receiver_count": 0,
             "local_fill_light_count": 2 if (campsite or cabin) else 1,
             "rim_light_count": 2 if (campsite or cabin) else 1,
             "material_contrast": 0.64 if not moonlight else 0.54,
@@ -898,10 +904,10 @@ def compile_v3_to_v2(v3: dict[str, Any]) -> dict[str, Any]:
                 "cabin_window_moon_bounce" if cabin else "canyon_wall_raking_light"
             ),
             "systems": [
-                "hero_surface_albedo_normal_panels",
+                "real_hero_surface_materials_no_visible_cards",
                 "local_fill_light_without_global_washout",
                 "rim_light_edge_separation",
-                "hero_contact_shadow_receivers",
+                "renderer_ssao_contact_not_shadow_cards",
                 "bounded_exposure_lift",
                 "no_visible_light_cards",
             ],
@@ -1020,7 +1026,7 @@ def compile_v3_to_v2(v3: dict[str, Any]) -> dict[str, Any]:
             "contact_receiver_count": cinematic_contact_receivers,
             "localized_light_count": cinematic_local_lights,
             "volumetric_light_slice_count": cinematic_volumetric_slices,
-            "wet_roughness_variation_count": 12 if water_on else 0,
+            "wet_roughness_variation_count": 0,
             "source_texture_weight": 0.82 if not desert else 0.76,
             "normal_detail_scale": 0.96 if not desert else 0.84,
             "roughness_variation": 0.62 if water_on else 0.48,
@@ -1031,8 +1037,8 @@ def compile_v3_to_v2(v3: dict[str, Any]) -> dict[str, Any]:
                 "localized_shadow_caster_geometry",
                 "terrain_material_receives_renderer_shadows",
                 "module_specific_practical_light_pools",
-                "volumetric_light_and_fog_slices",
-                "wet_dry_shore_roughness_variation",
+                "renderer_fog_without_visible_light_cards",
+                "water_and_shore_materials_without_patch_cards",
             ],
         },
         "atmosphere_fidelity": {

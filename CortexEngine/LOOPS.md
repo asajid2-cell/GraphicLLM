@@ -506,3 +506,21 @@ Status: pending.
   `gen_a_sunny_desert_canyon_campsite_w_0.png`. Visual truth remains negative; next active work
   should attack remaining strip/clutter artifacts and weak hero/background form, not declare this
   a quality solve.
+- 2026-07-06: Loop 4 iteration 12 dirty probe removed another visible-card path instead of
+  adding new proxy overlays. The compiler now requests zero hero material panels, zero hero
+  shadow receivers, zero volumetric light slices, and zero wet roughness variation patches,
+  while reducing cinematic relief/shadow caster counts and relabeling those systems as
+  renderer-owned material/contact/fog work. The first dirty probe found a real campsite
+  `purple_water_roi_fail`; the compiler then strengthened purple/violet lake material shallow
+  and deep colors plus `color_strength` so the prompt color remains readable through the real
+  water path. Dirty probe
+  `tools/run_genscene_acceptance.ps1 -Tag phase4_visible_card_cleanup_dirty_probe2_20260706 -SkipBuild`
+  passed ratchet freeze, Python compile, curation, graphics reset, and structural scene gates,
+  failing only expected `clean_tree` plus `phase0_policy`. Selected candidates were campsite
+  `gen_a_foggy_mountain_campsite_beside_1.png`, alpine
+  `gen_a_stormy_alpine_lake_with_a_smal_1.png`, and desert
+  `gen_a_sunny_desert_canyon_campsite_w_0.png`. Campsite purple ROI passed with average RGB
+  `[0.5183, 0.4412, 0.5091]`, average saturation `0.2183`, and purple fraction `0.6332`.
+  Visual truth remains negative: this is only a visible-card subtraction checkpoint. Remaining
+  orange rectangular ghosting likely comes from emissive/practical/bloom behavior, not the
+  now-zeroed compiler card budgets.

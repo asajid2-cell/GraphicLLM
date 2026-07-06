@@ -200,3 +200,8 @@
   The change replaces more authored campsite primitives with loaded source meshes and irregular
   terrain patch grounding. Visual truth remains negative; accept only as a bounded source-cluster
   checkpoint, then continue cleaning debris/shore artifacts and replacing hero forms.
+- 2026-07-06: `tools/run_genscene_acceptance.ps1 -Tag phase4_source_cluster_20260706`
+  wrote green `CURRENT.md`. Result: PASS for clean tree, ratchet freeze, Python compile,
+  curation, graphics reset, Release build, structural scene gate, and phase0 policy. Loop 4
+  remains open. Next active item is artifact cleanup and stronger coherent composition: the
+  campsite cluster is less primitive, but accepted stills still have strip artifacts and clutter.

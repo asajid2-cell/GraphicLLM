@@ -419,3 +419,13 @@ Status: pending.
   `gen_a_sunny_desert_canyon_campsite_w_0.png`. Visual truth remains negative: composition and
   tent/ground material read are better, but water is still broad, mountains remain flat bands, and
   desert still selects a dark brown frame because brighter candidates wash out the turquoise ROI.
+- 2026-07-06: Loop 4 iteration 8 accepted. Full runner
+  `tools/run_genscene_acceptance.ps1 -Tag phase4_grounded_composition_material_20260706`
+  passed clean tree, ratchet freeze, Python compile, curation, graphics reset, Release build,
+  structural scene gate, and phase0 policy, and rewrote `CURRENT.md` to accepted tag
+  `phase4_grounded_composition_material_20260706`. Selected accepted candidates were campsite
+  `gen_a_foggy_mountain_campsite_beside_2.png`, alpine
+  `gen_a_stormy_alpine_lake_with_a_smal_0.png`, and desert
+  `gen_a_sunny_desert_canyon_campsite_w_0.png`. Visual truth remains negative; next Loop 4 work
+  must leave the current camera/material cleanup lane and attack still-flat water surface response,
+  cardboard ridge/backdrop geometry, and real asset-library replacement.

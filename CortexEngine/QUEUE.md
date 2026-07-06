@@ -170,3 +170,9 @@
   material response, and brighter canyon ambient/exposure. Visual truth remains negative: accept
   only as a bounded geometry/material/composition checkpoint; next active work must attack the
   still-flat water surface, cardboard mountain/backdrop forms, and weak asset library ceiling.
+- 2026-07-06: `tools/run_genscene_acceptance.ps1 -Tag phase4_grounded_composition_material_20260706`
+  wrote green `CURRENT.md`. Result: PASS for clean tree, ratchet freeze, Python compile,
+  curation, graphics reset, Release build, structural scene gate, and phase0 policy. Loop 4
+  remains open. Next active item is not more camera/material cleanup; target the remaining
+  structural visual ceiling: water shader/surface depth, mountain/backdrop geometry, and real
+  non-Kenney asset replacement.

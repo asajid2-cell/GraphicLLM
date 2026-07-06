@@ -809,3 +809,17 @@ Status: pending.
   regresses, if runtime receipts do not prove the integrated base reached the renderer, or if
   manual still inspection shows new shelf/slab artifacts instead of cleaner terrain-water
   continuity.
+- 2026-07-06: Loop 4 iteration 24 accepted. Full runner
+  `tools/run_genscene_acceptance.ps1 -Tag phase4_integrated_terrain_water_20260706` passed clean
+  tree, ratchet freeze, Python compile, curation, graphics reset, Release build, structural scene
+  gate, and phase0 policy, and rewrote `CURRENT.md` to accepted tag
+  `phase4_integrated_terrain_water_20260706` at HEAD `4f57ca6`. Heartbeat
+  `genscene-loop24-clean-accept-2` fired on process exit after 70s. Selected accepted candidates
+  were campsite `gen_a_foggy_mountain_campsite_beside_1.png`, alpine
+  `gen_a_stormy_alpine_lake_with_a_smal_1.png`, and desert
+  `gen_a_sunny_desert_canyon_campsite_w_0.png`; structural scene gate reported
+  `structural_terrain_receipt=True` and `structural_water_receipt=True` for all three. Visual
+  truth remains negative: the terrain-water base is more structurally coherent, but the scenes
+  still lack convincing backdrop massing, hero asset fidelity, and high-end lighting/material
+  response. Loop 4 remains open; next active item should be a larger visual system front, not
+  another small water-color or camera tweak.

@@ -407,3 +407,9 @@
   strip/guyline budgets that fight the base. This is a structural base-scene slice: no new hard
   pixel gates, no water color-ratio tuning, no overlay/card proof layers, and no fallback/Kenney
   source asset regression.
+- 2026-07-06: `tools/run_genscene_acceptance.ps1 -Tag phase4_integrated_terrain_water_20260706`
+  wrote green `CURRENT.md`. Result: PASS for clean tree, ratchet freeze, Python compile,
+  curation, graphics reset, Release build, structural scene gate, and phase0 policy. Loop 4
+  remains open and visual truth remains negative. Next active item is a higher-leverage visual
+  system pass: backdrop/terrain massing, hero asset fidelity, or renderer/material lighting depth,
+  not more water color-ratio tuning or overlay/card proof geometry.

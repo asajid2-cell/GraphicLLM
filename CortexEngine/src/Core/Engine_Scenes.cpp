@@ -10576,28 +10576,26 @@ void Engine::BuildRecipeScene() {
 
     if (genExt.valid && genExt.sourceEnvironmentAssets.enabled) {
         if (auto* renderer = m_renderer.get()) {
-            auto fetchedBoulderMesh = LoadProjectRelativeMesh("assets/models/fetched/gen_weathered_grey_boulder/gen_weathered_grey_boulder.gltf");
-            auto fetchedMonolithMesh = LoadProjectRelativeMesh("assets/models/fetched/gen_jagged_volcanic_monolith/gen_jagged_volcanic_monolith.gltf");
-            auto fetchedCragMesh = LoadProjectRelativeMesh("assets/models/fetched/gen_battery_test_crag_stone/gen_battery_test_crag_stone.gltf");
             auto cliffLargeMesh = LoadProjectRelativeMesh("assets/models/kenney_nature_kit/cliff_large_rock/cliff_large_rock.gltf");
             auto cliffCornerMesh = LoadProjectRelativeMesh("assets/models/kenney_nature_kit/cliff_cornerLarge_rock/cliff_cornerLarge_rock.gltf");
             auto cliffSlopeMesh = LoadProjectRelativeMesh("assets/models/kenney_nature_kit/cliff_blockSlope_rock/cliff_blockSlope_rock.gltf");
-            auto pineAMesh = LoadProjectRelativeMesh("assets/models/kenney_nature_kit/tree_pineTallA_detailed/tree_pineTallA_detailed.gltf");
-            auto pineCMesh = LoadProjectRelativeMesh("assets/models/kenney_nature_kit/tree_pineTallC_detailed/tree_pineTallC_detailed.gltf");
             auto boulderMesh = LoadNaturalisticShowcaseMesh("boulder_01/boulder_01_1k.gltf");
             auto mossRockMesh = LoadNaturalisticShowcaseMesh("rock_moss_set_01/rock_moss_set_01_1k.gltf");
+            auto trunkMesh = LoadNaturalisticShowcaseMesh("dead_tree_trunk/dead_tree_trunk_1k.gltf");
+            auto branchMesh = LoadNaturalisticShowcaseMesh("dry_branches_medium_01/dry_branches_medium_01_1k.gltf");
+            auto stumpMesh = LoadNaturalisticShowcaseMesh("tree_stump_01/tree_stump_01_1k.gltf");
+            auto bushMesh = LoadNaturalisticShowcaseMesh("wild_rooibos_bush/wild_rooibos_bush_1k.gltf");
 
             const bool uploadsOk =
-                UploadAssetLedMesh(renderer, fetchedBoulderMesh, "source environment fetched weathered boulder") &&
-                UploadAssetLedMesh(renderer, fetchedMonolithMesh, "source environment fetched jagged monolith") &&
-                UploadAssetLedMesh(renderer, fetchedCragMesh, "source environment fetched crag stone") &&
                 UploadAssetLedMesh(renderer, cliffLargeMesh, "source environment cliff_large_rock") &&
                 UploadAssetLedMesh(renderer, cliffCornerMesh, "source environment cliff_cornerLarge_rock") &&
                 UploadAssetLedMesh(renderer, cliffSlopeMesh, "source environment cliff_blockSlope_rock") &&
-                UploadAssetLedMesh(renderer, pineAMesh, "source environment tree_pineTallA_detailed") &&
-                UploadAssetLedMesh(renderer, pineCMesh, "source environment tree_pineTallC_detailed") &&
                 UploadAssetLedMesh(renderer, boulderMesh, "source environment naturalistic boulder_01") &&
-                UploadAssetLedMesh(renderer, mossRockMesh, "source environment naturalistic rock_moss_set_01");
+                UploadAssetLedMesh(renderer, mossRockMesh, "source environment naturalistic rock_moss_set_01") &&
+                UploadAssetLedMesh(renderer, trunkMesh, "source environment naturalistic dead_tree_trunk") &&
+                UploadAssetLedMesh(renderer, branchMesh, "source environment naturalistic dry_branches_medium_01") &&
+                UploadAssetLedMesh(renderer, stumpMesh, "source environment naturalistic tree_stump_01") &&
+                UploadAssetLedMesh(renderer, bushMesh, "source environment naturalistic wild_rooibos_bush");
             if (!uploadsOk) {
                 spdlog::warn("generative_exterior: source environment asset mesh upload failed");
             } else {
@@ -10633,11 +10631,20 @@ void Engine::BuildRecipeScene() {
                     Scene::RenderableComponent::RenderLayer::Opaque,
                     "masonry"
                 };
-                const AssetLedMaterialSettings farPine{
-                    glm::vec4(alpineModule ? glm::vec3(0.075f, 0.12f, 0.19f) : glm::vec3(0.10f, 0.22f, 0.12f), 1.0f),
-                    0.0f, 0.74f, 0.0f, 1.5f, glm::vec3(0.0f), 1.0f,
-                    std::min(0.44f, genExt.groundWetness + 0.10f),
-                    0.48f, true,
+                const AssetLedMaterialSettings sourceWood{
+                    glm::vec4(desertSurface ? glm::vec3(0.34f, 0.22f, 0.13f) : glm::vec3(0.17f, 0.105f, 0.066f), 1.0f),
+                    0.0f, desertSurface ? 0.80f : 0.58f, 0.0f, 1.5f, glm::vec3(0.0f), 1.0f,
+                    desertSurface ? 0.06f : std::min(0.60f, genExt.groundWetness + 0.18f),
+                    desertSurface ? 0.34f : 0.48f, false,
+                    Scene::RenderableComponent::AlphaMode::Opaque,
+                    Scene::RenderableComponent::RenderLayer::Opaque,
+                    "wood"
+                };
+                const AssetLedMaterialSettings sourceVegetation{
+                    glm::vec4(desertSurface ? glm::vec3(0.42f, 0.32f, 0.15f) : glm::vec3(0.085f, 0.18f, 0.11f), 1.0f),
+                    0.0f, desertSurface ? 0.86f : 0.74f, 0.0f, 1.5f, glm::vec3(0.0f), 1.0f,
+                    desertSurface ? 0.025f : std::min(0.45f, genExt.groundWetness + 0.12f),
+                    desertSurface ? 0.22f : 0.44f, true,
                     Scene::RenderableComponent::AlphaMode::Opaque,
                     Scene::RenderableComponent::RenderLayer::Opaque,
                     "vegetation"
@@ -10658,16 +10665,15 @@ void Engine::BuildRecipeScene() {
                         sourceSets++;
                     }
                 };
-                countSourceSet(fetchedBoulderMesh);
-                countSourceSet(fetchedMonolithMesh);
-                countSourceSet(fetchedCragMesh);
                 countSourceSet(cliffLargeMesh);
                 countSourceSet(cliffCornerMesh);
                 countSourceSet(cliffSlopeMesh);
-                countSourceSet(pineAMesh);
-                countSourceSet(pineCMesh);
                 countSourceSet(boulderMesh);
                 countSourceSet(mossRockMesh);
+                countSourceSet(trunkMesh);
+                countSourceSet(branchMesh);
+                countSourceSet(stumpMesh);
+                countSourceSet(bushMesh);
 
                 auto addSourceRenderable = [&](const std::string& tag,
                                                const char* assetId,
@@ -10703,31 +10709,48 @@ void Engine::BuildRecipeScene() {
                 };
 
                 int fetchedRocks = 0;
+                int naturalisticBackdrops = 0;
                 for (int i = 0; i < genExt.sourceEnvironmentAssets.fetchedRockMassCount; ++i) {
                     const int lane = i / 2;
                     const float side = (i % 2 == 0) ? -1.0f : 1.0f;
-                    std::shared_ptr<Scene::MeshData> mesh = (i % 3 == 0) ? fetchedMonolithMesh : ((i % 3 == 1) ? fetchedCragMesh : fetchedBoulderMesh);
-                    const char* assetId = (i % 3 == 0) ? "gen_jagged_volcanic_monolith" : ((i % 3 == 1) ? "gen_battery_test_crag_stone" : "gen_weathered_grey_boulder");
-                    const float x = side * (8.6f + static_cast<float>(lane) * 1.55f + pseudo(i, 1.17f) * 1.15f);
-                    const float z = shoreZ - 1.9f - static_cast<float>(lane) * 2.10f - pseudo(i + 13, 1.91f) * 0.80f;
-                    const glm::vec3 scale = (i % 3 == 0)
-                        ? glm::vec3(0.72f + 0.05f * static_cast<float>(i % 4),
-                                    1.12f + 0.08f * static_cast<float>(i % 3),
-                                    0.70f)
-                        : glm::vec3(0.84f + 0.06f * static_cast<float>(i % 4),
-                                    0.62f + 0.06f * static_cast<float>(i % 3),
-                                    0.78f);
-                    addSourceRenderable("GenerativeExterior_SourceFetchedRockMass" + std::to_string(i),
+                    const int mode = desertSurface ? 0 : (i % 4);
+                    std::shared_ptr<Scene::MeshData> mesh = boulderMesh;
+                    const char* assetId = "boulder_01";
+                    const AssetLedMaterialSettings* material = &sourceRock;
+                    glm::vec3 scale = glm::vec3(desertSurface ? 0.46f : 0.42f);
+                    glm::vec3 euler = glm::vec3(glm::radians(-3.0f + pseudo(i, 2.13f) * 6.0f),
+                                                glm::radians(side * (18.0f + 17.0f * static_cast<float>(lane))),
+                                                glm::radians(-5.0f + pseudo(i, 2.77f) * 10.0f));
+                    if (mode == 1) {
+                        mesh = mossRockMesh;
+                        assetId = "rock_moss_set_01";
+                        material = &terrainAnchor;
+                        scale = glm::vec3(0.18f + 0.018f * static_cast<float>(i % 3));
+                    } else if (mode == 2) {
+                        mesh = trunkMesh;
+                        assetId = "dead_tree_trunk";
+                        material = &sourceWood;
+                        scale = glm::vec3(0.46f + 0.035f * static_cast<float>(i % 2));
+                        euler = glm::vec3(glm::radians(3.0f + pseudo(i, 2.13f) * 4.0f),
+                                          glm::radians(side * (32.0f + 21.0f * static_cast<float>(lane))),
+                                          glm::radians(-4.0f + pseudo(i, 2.77f) * 8.0f));
+                    } else if (mode == 3) {
+                        mesh = stumpMesh;
+                        assetId = "tree_stump_01";
+                        material = &sourceWood;
+                        scale = glm::vec3(0.36f + 0.025f * static_cast<float>(i % 2));
+                    }
+                    const float x = side * (7.4f + static_cast<float>(lane) * 1.28f + pseudo(i, 1.17f) * 1.05f);
+                    const float z = shoreZ - 1.15f - static_cast<float>(lane) * 1.60f - pseudo(i + 13, 1.91f) * 0.70f;
+                    addSourceRenderable("GenerativeExterior_SourceNaturalisticBackdropMass" + std::to_string(i),
                                         assetId,
                                         mesh,
-                                        glm::vec3(x, 0.12f + 0.025f * static_cast<float>(i % 3), z),
+                                        glm::vec3(x, 0.080f + 0.015f * static_cast<float>(i % 3), z),
                                         scale,
-                                        glm::vec3(glm::radians(-3.0f + pseudo(i, 2.13f) * 6.0f),
-                                                  glm::radians(side * (18.0f + 17.0f * static_cast<float>(lane))),
-                                                  glm::radians(-5.0f + pseudo(i, 2.77f) * 10.0f)),
-                                        sourceRock,
-                                        false,
-                                        fetchedRocks);
+                                        euler,
+                                        *material,
+                                        true,
+                                        naturalisticBackdrops);
                 }
 
                 int kenneyCliffs = 0;
@@ -10757,20 +10780,25 @@ void Engine::BuildRecipeScene() {
                 for (int i = 0; i < genExt.sourceEnvironmentAssets.detailedTreeBackdropCount; ++i) {
                     const int lane = i / 2;
                     const float side = (i % 2 == 0) ? -1.0f : 1.0f;
-                    std::shared_ptr<Scene::MeshData> mesh = (i % 3 == 0) ? pineCMesh : pineAMesh;
-                    const char* assetId = (i % 3 == 0) ? "tree_pineTallC_detailed" : "tree_pineTallA_detailed";
-                    const float x = side * (13.6f + pseudo(i + 31, 1.29f) * 6.8f);
-                    const float z = shoreZ - 1.45f - static_cast<float>(lane) * 2.40f - pseudo(i + 37, 1.53f) * 1.10f;
-                    const float s = alpineModule ? 1.80f + 0.08f * static_cast<float>(i % 4)
-                                                  : 1.46f + 0.07f * static_cast<float>(i % 4);
-                    addSourceRenderable("GenerativeExterior_SourceDetailedTreeBackdrop" + std::to_string(i),
+                    const bool useTrunk = (i % 3 == 2);
+                    std::shared_ptr<Scene::MeshData> mesh = useTrunk ? trunkMesh : bushMesh;
+                    const char* assetId = useTrunk ? "dead_tree_trunk" : "wild_rooibos_bush";
+                    const float x = side * (10.8f + pseudo(i + 31, 1.29f) * 4.6f);
+                    const float z = shoreZ - 0.95f - static_cast<float>(lane) * 1.75f - pseudo(i + 37, 1.53f) * 0.90f;
+                    const float s = useTrunk
+                        ? (alpineModule ? 0.56f : 0.48f)
+                        : (alpineModule ? 1.10f + 0.08f * static_cast<float>(i % 3)
+                                        : 0.92f + 0.06f * static_cast<float>(i % 3));
+                    addSourceRenderable("GenerativeExterior_SourceNaturalisticVegetationBackdrop" + std::to_string(i),
                                         assetId,
                                         mesh,
-                                        glm::vec3(x, 0.04f, z),
+                                        glm::vec3(x, useTrunk ? 0.10f : 0.16f, z),
                                         glm::vec3(s),
-                                        glm::vec3(0.0f, glm::radians(-18.0f + 29.0f * static_cast<float>(i)), 0.0f),
-                                        farPine,
-                                        false,
+                                        glm::vec3(glm::radians(useTrunk ? 4.0f : 0.0f),
+                                                  glm::radians(-18.0f + 29.0f * static_cast<float>(i)),
+                                                  glm::radians(useTrunk ? (-4.0f + 2.0f * static_cast<float>(i % 3)) : 0.0f)),
+                                        useTrunk ? sourceWood : sourceVegetation,
+                                        true,
                                         detailedTrees);
                 }
 
@@ -10798,34 +10826,54 @@ void Engine::BuildRecipeScene() {
                 int terrainReplacements = 0;
                 for (int i = 0; i < genExt.sourceEnvironmentAssets.terrainReplacementLayerCount; ++i) {
                     const float side = (i % 2 == 0) ? -1.0f : 1.0f;
-                    std::shared_ptr<Scene::MeshData> mesh = (i % 2 == 0) ? fetchedCragMesh : fetchedBoulderMesh;
-                    const char* assetId = (i % 2 == 0) ? "gen_battery_test_crag_stone" : "gen_weathered_grey_boulder";
+                    const int mode = desertSurface ? 0 : (i % 3);
+                    std::shared_ptr<Scene::MeshData> mesh = boulderMesh;
+                    const char* assetId = "boulder_01";
+                    const AssetLedMaterialSettings* material = &terrainAnchor;
+                    glm::vec3 scale = glm::vec3(0.38f + 0.04f * static_cast<float>(i % 3),
+                                                0.30f + 0.03f * static_cast<float>(i % 2),
+                                                0.34f);
+                    if (mode == 1) {
+                        mesh = mossRockMesh;
+                        assetId = "rock_moss_set_01";
+                        scale = glm::vec3(0.14f + 0.018f * static_cast<float>(i % 3));
+                    } else if (mode == 2) {
+                        mesh = branchMesh;
+                        assetId = "dry_branches_medium_01";
+                        material = &sourceWood;
+                        scale = glm::vec3(0.58f + 0.04f * static_cast<float>(i % 2));
+                    }
                     const float x = side * (6.2f + pseudo(i + 53, 1.31f) * (groundW * 0.18f));
                     const float z = shoreZ + 0.20f + pseudo(i + 59, 1.73f) * std::max(5.0f, genExt.extent * 0.22f);
-                    addSourceRenderable("GenerativeExterior_SourceTerrainReplacementLayer" + std::to_string(i),
+                    addSourceRenderable("GenerativeExterior_SourceNaturalisticTerrainReplacementLayer" + std::to_string(i),
                                         assetId,
                                         mesh,
                                         glm::vec3(x, 0.035f, z),
-                                        glm::vec3(0.72f + 0.08f * static_cast<float>(i % 3),
-                                                  0.28f + 0.03f * static_cast<float>(i % 2),
-                                                  0.64f),
+                                        scale,
                                         glm::vec3(glm::radians(-4.0f + pseudo(i, 4.11f) * 8.0f),
                                                   glm::radians(side * (20.0f + 18.0f * static_cast<float>(i))),
                                                   glm::radians(-3.0f + pseudo(i, 4.37f) * 6.0f)),
-                                        terrainAnchor,
-                                        false,
+                                        *material,
+                                        true,
                                         terrainReplacements);
                 }
 
-                const int backdropAnchors = fetchedRocks + kenneyCliffs + detailedTrees + terrainReplacements;
+                const int fallbackSourceAssets = fetchedRocks + kenneyCliffs;
+                const int naturalisticSourceAssets =
+                    naturalisticBackdrops + detailedTrees + naturalisticAnchors + terrainReplacements;
+                const int backdropAnchors =
+                    naturalisticBackdrops + fetchedRocks + kenneyCliffs + detailedTrees + terrainReplacements;
                 if (backdropAnchors + naturalisticAnchors > 0) {
-                    spdlog::info("generative_exterior: source environment assets fetched_rocks={} kenney_cliffs={} detailed_trees={} naturalistic_anchors={} terrain_replacements={} backdrop_anchors={} source_sets={}",
+                    spdlog::info("generative_exterior: source environment assets fetched_rocks={} kenney_cliffs={} naturalistic_backdrops={} naturalistic_vegetation={} naturalistic_anchors={} terrain_replacements={} backdrop_anchors={} naturalistic_total={} fallback_total={} source_sets={}",
                                  fetchedRocks,
                                  kenneyCliffs,
+                                 naturalisticBackdrops,
                                  detailedTrees,
                                  naturalisticAnchors,
                                  terrainReplacements,
                                  backdropAnchors,
+                                 naturalisticSourceAssets,
+                                 fallbackSourceAssets,
                                  sourceSets);
                 } else {
                     spdlog::warn("generative_exterior: source environment assets requested but no source meshes were created");

@@ -754,3 +754,29 @@ Status: pending.
   renderer-contact/material-depth cleanup. Next active item must be a larger structural front:
   real continuous terrain/backdrop replacement, water/shore integration, or photoreal asset
   replacement; do not spend the next loop on another small exposure/ambient tweak.
+- 2026-07-06: Loop 4 iteration 23 started as a source-asset dominance slice. Recon found the
+  source-environment lane still routes backdrop/terrain replacement through fetched/generated
+  crag meshes and optional Kenney pine/cliff assets, while local CC0 naturalistic scans with
+  bound PBR textures are already available through `AddAssetLedNaturalisticRenderable`. Scope is
+  limited to source-environment asset selection/receipts and compiler metadata; no new pixel
+  hard gates, no water color-ratio tuning, no overlay/card proof layers. Hypothesis: replacing
+  fetched/Kenney source-environment backdrops with scanned boulder, moss-rock, trunk, stump,
+  branch, and bush assets will reduce the toy/proxy read and make material response more
+  coherent. Kill criteria: reject if semantic/structural gates fail, water ROI regresses, runtime
+  receipts do not show naturalistic dominance, or visual inspection says the images are still
+  dominated by proxy/fallback geometry.
+- 2026-07-06: Loop 4 iteration 23 dirty probe
+  `tools/run_genscene_acceptance.ps1 -Tag phase4_source_asset_dominance_dirty_probe_20260706 -SkipBuild`
+  passed ratchet freeze, Python compile, curation, graphics reset, and structural scene gate
+  after a manual Release build, and failed only expected dirty-tree policy. Heartbeat
+  `genscene-source-asset-dirty-probe` fired on process exit after 225s. Runtime receipts on the
+  selected campsite/alpine/desert renders show `fetched_rocks=0`, `kenney_cliffs=0`,
+  `fallback_total=0`, and `naturalistic_total=15-17` with naturalistic PBR texture uploads in
+  the frame reports. Selected candidates were campsite
+  `gen_a_foggy_mountain_campsite_beside_1.png`, alpine
+  `gen_a_stormy_alpine_lake_with_a_smal_0.png`, and desert
+  `gen_a_sunny_desert_canyon_campsite_w_0.png`. Visual truth remains negative: this is not AA/AAA
+  and the images still have flat water/terrain, toy tents, and cardboard backdrop massing, but the
+  source-environment lane now uses real scanned assets instead of fetched/Kenney fallback meshes.
+  Accept only as a bounded structural source-asset checkpoint, then continue to terrain/water/hero
+  composition rather than stopping.

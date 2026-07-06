@@ -387,3 +387,12 @@
   `gen_a_stormy_alpine_lake_with_a_smal_0.png`, and desert
   `gen_a_sunny_desert_canyon_campsite_w_0.png`. Loop 4 remains open and visual truth remains
   negative. Next active item is a bigger structural quality front, not more renderer knob tuning.
+- 2026-07-06: active item is Loop 4 iteration 23, source-asset dominance. Replace the
+  source-environment lane's fetched/Kenney/procedural-looking backdrops with already-available
+  naturalistic CC0 scan assets and runtime receipts proving naturalistic dominance. This is a
+  structural asset-material slice, not a new metric or lighting knob pass.
+- 2026-07-06: Loop 4 iteration 23 dirty probe passed all real gates and proved naturalistic
+  source-environment dominance (`fallback_total=0`, `naturalistic_total=15-17`). Visual truth
+  remains negative, so this can only be accepted as a bounded checkpoint. After clean acceptance,
+  the next active item must attack the remaining structural image failures: flat water/shore,
+  cardboard terrain/backdrops, and toy hero camp geometry.

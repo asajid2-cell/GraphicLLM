@@ -112,3 +112,8 @@
   `clean_tree` and `phase0_policy` because the implementation was intentionally uncommitted.
   Visual truth remains negative; this checkpoint is only a hero/material overpaint cleanup
   and runner freshness fix.
+- 2026-07-06: `tools/run_genscene_acceptance.ps1 -Tag phase4_hero_material_cleanup_20260706`
+  wrote green `CURRENT.md`. Result: PASS for clean tree, ratchet freeze, Python compile,
+  curation, graphics reset, fresh structural scene generation/gating, Release build, and
+  phase0 policy. Loop 4 remains open; next active item is a real lighting/material/asset
+  system pass, not more overlay-count trimming.

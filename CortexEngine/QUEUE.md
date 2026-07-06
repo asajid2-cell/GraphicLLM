@@ -363,3 +363,12 @@
   `turquoise_water_roi_fail`; accepting it would continue the metric-ratio rut. Reverted the
   production diff and dirty `CURRENT_FAILED.md`. Next active item is hero asset/material fidelity
   or real shore/terrain/composition structure, not more water-color tuning.
+- 2026-07-06: rejected Loop 4 hero-cluster grounding dirty probe
+  `phase4_hero_cluster_grounding_dirty_probe2_20260706`. The runner passed ratchet freeze,
+  Python compile, curation, graphics reset, Release build, and structural scene gate, failing only
+  expected dirty-tree policy gates, but selected campsite/desert stills stayed visibly
+  disconnected and low-fidelity: toy tent/prop clusters in front of flat water and backdrop forms.
+  This hit the slice kill criteria and is rejected to avoid continuing the incremental
+  local-minimum pattern. Next active item is a higher-leverage system pass: continuous terrain,
+  real water/shore integration, lighting/shadow/material response, or asset replacement. Do not
+  spend the next slice on more clutter/camera/card tuning.

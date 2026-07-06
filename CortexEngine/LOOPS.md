@@ -699,3 +699,23 @@ Status: pending.
   continue water-color ratio tuning; move to a higher-leverage front such as hero asset/material
   replacement, real shore/terrain geometry, or composition/lighting systems that can change the
   actual image structure.
+- 2026-07-06: Loop 4 iteration 21 started as a hero-cluster grounding slice. Baseline stills
+  inspected from accepted tag `phase4_backdrop_material_depth_20260706`: campsite still reads as
+  an isolated toy A-frame on broad empty ground; alpine cabin has a stronger focal object but
+  low-detail surrounding scatter; desert canyon campsite crops the tent and leaves the fire/props
+  disconnected from the river. Scope is limited to existing compiler/runtime hero, authored
+  source-asset, material, light, and camera composition paths. Kill criteria: reject if the slice
+  adds new pixel hard gates, resumes water color-ratio tuning, creates more visible strips/slabs,
+  or keeps the campsite/desert hero set visibly disconnected after the dirty probe.
+- 2026-07-06: Loop 4 iteration 21 rejected after dirty probe
+  `tools/run_genscene_acceptance.ps1 -Tag phase4_hero_cluster_grounding_dirty_probe2_20260706`.
+  Heartbeat `genscene-hero-cluster-dirty-probe2` fired on timeout while the runner continued.
+  The runner passed ratchet freeze, Python compile, curation, graphics reset, Release build, and
+  structural scene gate, and failed only expected dirty-tree policy gates. Selected candidates
+  were campsite `gen_a_foggy_mountain_campsite_beside_1.png`, alpine
+  `gen_a_stormy_alpine_lake_with_a_smal_0.png`, and desert
+  `gen_a_sunny_desert_canyon_campsite_w_0.png`. Manual visual inspection rejected the slice
+  against its own kill criteria: campsite/desert still read as disconnected low-fidelity tent and
+  prop clusters in front of flat water/backdrop forms, so accepting it would continue the
+  incremental local-minimum pattern. Revert the production diff and dirty `CURRENT_FAILED.md`;
+  next work must be a higher-leverage system front, not another hero-clutter tweak.

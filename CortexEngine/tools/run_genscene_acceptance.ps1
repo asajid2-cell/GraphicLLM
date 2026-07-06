@@ -131,6 +131,58 @@ try {
 $curationDetails | Out-File -FilePath $curationLog -Encoding utf8
 Report 'curation_gate' $curationOk $curationLog
 
+$graphicsResetLog = Join-Path $dir 'graphics_gate_reset.log'
+$graphicsResetOk = $true
+$graphicsResetDetails = @()
+try {
+    $gateTextHits = @(Select-String -Path 'tools\scene_graphics_gate.py' -Pattern 'missing_' -SimpleMatch)
+    $graphicsResetDetails += "legacy_missing_prefix_hits=$($gateTextHits.Count)"
+    if ($gateTextHits.Count -gt 0) {
+        $graphicsResetOk = $false
+        $graphicsResetDetails += 'scene_graphics_gate.py still contains legacy missing-prefix hard codes'
+    }
+
+    $badIr = 'build\bin\logs\v3_campsite_ridge_test_0_ir.json'
+    $badPng = 'build\bin\logs\v3_campsite_ridge_test_0.png'
+    $goodBase = 'build\bin\logs\aaa_pipeline_campsite_loop32_0'
+    $goodIr = "${goodBase}_ir.json"
+    $goodPng = "${goodBase}.png"
+    $goodLog = "${goodBase}.out"
+    $goodFrame = "${goodBase}_frame_report.json"
+    if (-not (Test-Path $badIr) -or -not (Test-Path $badPng)) {
+        $graphicsResetOk = $false
+        $graphicsResetDetails += 'known-bad graphics fixture is absent'
+    } else {
+        $badOut = & python tools\scene_graphics_gate.py --prompt 'a foggy mountain campsite beside a purple lake at dawn' --ir $badIr --png $badPng --expect-fail 2>&1
+        $badCode = $LASTEXITCODE
+        $graphicsResetDetails += "known_bad_expect_fail_exit=$badCode"
+        $graphicsResetDetails += 'known_bad_tail=' + (($badOut | Select-Object -Last 4) -join ' ')
+        if ($badCode -ne 0) {
+            $graphicsResetOk = $false
+            $graphicsResetDetails += 'known-bad fixture did not fail under expect-fail'
+        }
+    }
+
+    if (-not (Test-Path $goodIr) -or -not (Test-Path $goodPng) -or -not (Test-Path $goodFrame)) {
+        $graphicsResetOk = $false
+        $graphicsResetDetails += 'sidecar-backed good graphics fixture is absent'
+    } else {
+        $goodOut = & python tools\scene_graphics_gate.py --prompt 'a foggy mountain campsite beside a purple lake at dawn' --ir $goodIr --png $goodPng --log $goodLog --frame-report $goodFrame 2>&1
+        $goodCode = $LASTEXITCODE
+        $graphicsResetDetails += "good_fixture_exit=$goodCode"
+        $graphicsResetDetails += 'good_tail=' + (($goodOut | Select-Object -Last 4) -join ' ')
+        if ($goodCode -ne 0) {
+            $graphicsResetOk = $false
+            $graphicsResetDetails += 'sidecar-backed good fixture did not pass'
+        }
+    }
+} catch {
+    $graphicsResetOk = $false
+    $graphicsResetDetails += $_.Exception.Message
+}
+$graphicsResetDetails | Out-File -FilePath $graphicsResetLog -Encoding utf8
+Report 'graphics_gate_reset' $graphicsResetOk $graphicsResetLog
+
 if ($SkipBuild) {
     Report 'release_build' $true 'skipped by -SkipBuild'
 } else {

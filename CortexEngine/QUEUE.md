@@ -38,3 +38,8 @@
   wrote green `CURRENT.md`. Result: PASS for `clean_tree`, `gate_ratchet_freeze`,
   `python_compile` including `tools/curate_gallery.py`, `curation_gate`, `release_build`,
   and `phase0_policy`. Loop 1 curation is accepted; next active item is Phase 2 gate reset.
+- 2026-07-06: Loop 2 dirty verifier probe
+  `tools/run_genscene_acceptance.ps1 -Tag phase2_gate_reset_dirty_probe_20260706 -SkipBuild`
+  wrote red `CURRENT_FAILED.md` as expected. `graphics_gate_reset`, `curation_gate`,
+  `python_compile`, and `gate_ratchet_freeze` passed; `clean_tree` and `phase0_policy`
+  failed because the gate reset implementation was intentionally uncommitted.

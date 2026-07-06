@@ -215,3 +215,8 @@ Status: pending.
   `python_compile`, and `gate_ratchet_freeze`; it failed only the expected dirty-tree gates.
 - 2026-07-06: Loop 1 accepted. Full runner `phase1_curation_20260706` passed clean tree,
   ratchet freeze, Python compile, curation gate, Release build, and phase0 policy.
+- 2026-07-06: Loop 2 implementation replaced the old hard graphics-fidelity tower with a
+  401-line render-health gate. `tools/scene_graphics_gate.py` now contains zero `missing_`
+  codes; image and old graphics-pass signals are telemetry. Dirty probe
+  `phase2_gate_reset_dirty_probe_20260706 -SkipBuild` passed `graphics_gate_reset`,
+  curation, Python compile, and ratchet freeze, failing only expected dirty-tree gates.

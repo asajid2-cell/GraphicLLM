@@ -743,3 +743,14 @@ Status: pending.
   human gate, but contact/material depth is less washed and prompt water colors remain readable;
   no new geometry, no new gates, no water-ratio tuning. Accept only as a bounded renderer/material
   coherence checkpoint, then continue with larger structural fronts.
+- 2026-07-06: Loop 4 iteration 22 accepted. Full runner
+  `tools/run_genscene_acceptance.ps1 -Tag phase4_renderer_material_coherence_20260706` passed
+  clean tree, ratchet freeze, Python compile, curation, graphics reset, Release build,
+  structural scene gate, and phase0 policy, and rewrote `CURRENT.md` to accepted tag
+  `phase4_renderer_material_coherence_20260706`. Selected accepted candidates were campsite
+  `gen_a_foggy_mountain_campsite_beside_2.png`, alpine
+  `gen_a_stormy_alpine_lake_with_a_smal_0.png`, and desert
+  `gen_a_sunny_desert_canyon_campsite_w_0.png`. Visual truth remains negative: this is only a
+  renderer-contact/material-depth cleanup. Next active item must be a larger structural front:
+  real continuous terrain/backdrop replacement, water/shore integration, or photoreal asset
+  replacement; do not spend the next loop on another small exposure/ambient tweak.

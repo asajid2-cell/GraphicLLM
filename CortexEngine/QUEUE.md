@@ -380,3 +380,10 @@
   a bounded renderer/material checkpoint. Next active item must be a larger structural front:
   continuous terrain/backdrop replacement, water/shore integration, or real photoreal asset
   replacement, not another tiny lighting tweak.
+- 2026-07-06: `tools/run_genscene_acceptance.ps1 -Tag phase4_renderer_material_coherence_20260706`
+  wrote green `CURRENT.md`. Result: PASS for clean tree, ratchet freeze, Python compile,
+  curation, graphics reset, Release build, structural scene gate, and phase0 policy. Selected
+  candidates were campsite `gen_a_foggy_mountain_campsite_beside_2.png`, alpine
+  `gen_a_stormy_alpine_lake_with_a_smal_0.png`, and desert
+  `gen_a_sunny_desert_canyon_campsite_w_0.png`. Loop 4 remains open and visual truth remains
+  negative. Next active item is a bigger structural quality front, not more renderer knob tuning.

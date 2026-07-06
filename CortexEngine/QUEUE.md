@@ -269,3 +269,16 @@
   `gen_a_sunny_desert_canyon_campsite_w_1.png`. Next active item is a real hero-form and
   water-surface pass, because the accepted images are cleaner but still not visually coherent
   AA/AAA scenes.
+- 2026-07-06: Loop 4 hero/water form dirty probe
+  `tools/run_genscene_acceptance.ps1 -Tag phase4_hero_water_form_dirty_probe_20260706`
+  wrote red `CURRENT_FAILED.md` as expected. It passed ratchet freeze, Python compile,
+  curation, graphics reset, Release build, and structural scene gates, and failed only
+  `clean_tree` plus `phase0_policy`. The change removes the catalog `tent_smallClosed` wedge
+  from generated campsites so the procedural canvas tent owns the silhouette, increases only
+  procedural canvas seam/pole/rope detail, and gives the generated water mesh a non-straight
+  shore edge plus subtle surface/material variation. Selected candidates were campsite
+  `gen_a_foggy_mountain_campsite_beside_0.png`, alpine
+  `gen_a_stormy_alpine_lake_with_a_smal_2.png`, and desert
+  `gen_a_sunny_desert_canyon_campsite_w_1.png`. Visual truth remains negative: hero form and
+  water are incrementally cleaner, but material fidelity, water shading depth, and backdrop/asset
+  quality are still below the target.

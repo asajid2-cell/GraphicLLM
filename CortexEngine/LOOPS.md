@@ -583,3 +583,17 @@ Status: pending.
   `gen_a_sunny_desert_canyon_campsite_w_1.png`. Visual truth remains negative; Loop 4 stays
   open. Next active work should replace weak tent/cabin/shore hero forms and deepen water-surface
   material response instead of more strip/noise cleanup.
+- 2026-07-06: Loop 4 iteration 15 dirty probe shifted hero/water form toward real geometry.
+  The compiler no longer emits the catalog `tent_smallClosed` wedge for generated campsites;
+  procedural canvas shell/seam/pole/rope detail now owns the tent silhouette. The generated
+  water mesh now curves the near shore per vertex, adds subtle surface displacement, and exposes
+  stronger water normal/procedural/transmission material response before the shader waves. A
+  focused campsite render stayed semantic-valid before the full probe. Dirty probe
+  `tools/run_genscene_acceptance.ps1 -Tag phase4_hero_water_form_dirty_probe_20260706` passed
+  ratchet freeze, Python compile, curation, graphics reset, Release build, and structural scene
+  gates, failing only expected `clean_tree` plus `phase0_policy`. Selected candidates were
+  campsite `gen_a_foggy_mountain_campsite_beside_0.png`, alpine
+  `gen_a_stormy_alpine_lake_with_a_smal_2.png`, and desert
+  `gen_a_sunny_desert_canyon_campsite_w_1.png`. Visual truth remains negative: the tent is less
+  blocked by a catalog slab and the river/lake edge is less rigid, but the scenes still lack
+  convincing material depth, water shading, and high-quality backdrop/assets.

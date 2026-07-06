@@ -557,7 +557,8 @@ namespace {
 
         for (uint32_t iz = 0; iz <= zSegments; ++iz) {
             const float v = static_cast<float>(iz) / static_cast<float>(zSegments);
-            const float localZ = halfLength - v * length;
+            const float baseLocalZ = halfLength - v * length;
+            const float shoreBlend = 1.0f - smooth(v);
             const auto sample = profile(v);
 
             for (uint32_t ix = 0; ix <= xSegments; ++ix) {
@@ -567,7 +568,18 @@ namespace {
                 const float scallop = (std::sin(v * 17.0f + side * 3.4f) * 0.035f +
                                        std::sin(v * 31.0f - side * 6.1f) * 0.018f) * edgeWeight;
                 const float localX = sample.centerX + side * sample.halfWidth * (1.0f + scallop);
-                mesh->positions.emplace_back(localX, 0.0f, localZ);
+                const float shoreCurve = riverLike
+                    ? std::sin(side * glm::pi<float>() * 0.75f) * 0.16f
+                    : (1.0f - std::abs(side)) * 0.42f + std::sin(side * 5.3f + 0.4f) * 0.08f;
+                const float longitudinalRipple =
+                    std::sin(v * 24.0f + side * 4.1f) * (riverLike ? 0.035f : 0.055f) *
+                    (0.35f + 0.65f * shoreBlend);
+                const float localZ = baseLocalZ + shoreBlend * shoreCurve + longitudinalRipple;
+                const float waveY =
+                    (std::sin(v * 32.0f + side * 5.0f) * 0.012f +
+                     std::sin(v * 11.0f - side * 7.0f) * 0.010f) *
+                    (riverLike ? 0.55f : 1.0f) * (1.0f - edgeWeight * 0.25f);
+                mesh->positions.emplace_back(localX, waveY, localZ);
                 mesh->normals.emplace_back(0.0f, 1.0f, 0.0f);
                 mesh->texCoords.emplace_back(u, v);
             }
@@ -7578,6 +7590,10 @@ void Engine::BuildRecipeScene() {
                 r.clearcoatRoughnessFactor = std::clamp(genExt.waterRough + 0.18f, 0.12f, 0.72f);
                 r.specularFactor = riverLike ? 1.08f : 0.96f;
                 r.anisotropyStrength = riverLike ? 0.22f : 0.16f;
+                r.normalScale = riverLike ? 0.34f : 0.28f;
+                r.proceduralMaskStrength = riverLike ? 0.42f : 0.34f;
+                r.transmissionFactor = riverLike ? 0.20f : 0.24f;
+                r.ior = 1.333f;
                 r.presetName = "water";
                 r.castsSunShadow = false;
                 Scene::WaterSurfaceComponent sea{};

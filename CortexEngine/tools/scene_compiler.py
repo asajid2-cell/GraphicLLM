@@ -414,8 +414,8 @@ def compile_v3_to_v2(v3: dict[str, Any]) -> dict[str, Any]:
 
     # Hero grammar: the focal set stays tight enough for the quality gate and camera.
     if campsite:
-        tent_tint = [0.72, 0.48, 0.27] if desert else ([0.32, 0.38, 0.50] if moonlight else [0.68, 0.42, 0.22])
-        _add(objects, "tent_smallClosed", 3.15, 1.18, -18.0, 0.92, tint=tent_tint, placed=placed)
+        # The renderer-owned procedural canvas tent owns the hero silhouette.
+        # Keeping the catalog wedge here hides the better shell behind a low-poly slab.
         _add(objects, "campfire_bricks", -0.35, 0.35, 0.0, 1.05, placed=placed)
         _add(objects, "campfire_logs", -1.05, 0.86, 31.0, 0.56, placed=placed)
         _add(objects, "campfire_stones", 0.48, -0.18, -12.0, 0.62, placed=placed)
@@ -813,10 +813,10 @@ def compile_v3_to_v2(v3: dict[str, Any]) -> dict[str, Any]:
                     "canyon_hero_massing" if canyon else "landscape_hero_overbuild"
                 )
             ),
-            "canvas_shell_panel_count": 3 if campsite else 0,
-            "fabric_layer_count": 3 if campsite else 0,
-            "structural_pole_count": 4 if campsite else 0,
-            "rope_stake_count": 4 if campsite else 0,
+            "canvas_shell_panel_count": 5 if campsite else 0,
+            "fabric_layer_count": 6 if campsite else 0,
+            "structural_pole_count": 6 if campsite else 0,
+            "rope_stake_count": 6 if campsite else 0,
             "low_poly_mask_count": 0,
             "cabin_facade_module_count": 6 if cabin else 0,
             "cabin_roof_module_count": 4 if cabin else 0,

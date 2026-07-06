@@ -68,3 +68,8 @@
   `gen_a_stormy_alpine_lake_with_a_smal_0.png`, and
   `gen_a_sunny_desert_canyon_campsite_w_2.png`. Visual truth remains negative; this is
   accepted only as debris subtraction, not as AAA quality.
+- 2026-07-06: `tools/run_genscene_acceptance.ps1 -Tag phase4_overlay_subtraction_20260706`
+  wrote green `CURRENT.md`. Result: PASS for clean tree, ratchet freeze, Python compile,
+  curation, graphics reset, structural scene gate, Release build, and phase0 policy.
+  Loop 4 remains open; next work must replace flat lighting/material/composition systems,
+  not add proxy overlays.

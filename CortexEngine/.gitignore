@@ -44,6 +44,11 @@ cmake_install.cmake
 *.log
 .hb/
 
+# Generated campaign artifacts and uncurated media
+artifacts/genscene_acceptance/
+docs/media/final_art/
+docs/media/genscene/tmp/
+
 # OS files
 .DS_Store
 Thumbs.db

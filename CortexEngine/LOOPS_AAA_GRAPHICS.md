@@ -1,3 +1,5 @@
+> [!ARCHIVED 2026-07-06] STALE - do not read for state. State = `CURRENT.md`; strategy = `PLAN.md`; queue = `QUEUE.md`; active loop contract = `LOOPS.md`.
+
 # Loops: AAA Graphics Pass
 
 ## Grand Goal Contract

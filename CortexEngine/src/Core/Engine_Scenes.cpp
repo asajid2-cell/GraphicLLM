@@ -441,6 +441,45 @@ namespace {
         return {centerX, halfWidth};
     }
 
+    float ApplyGenerativeWaterbedToTerrain(float baseHeight,
+                                           float worldX,
+                                           float worldZ,
+                                           float waterFromZ,
+                                           float groundFar,
+                                           float waterBodyWidth,
+                                           bool riverLike,
+                                           float relief) {
+        const float waterLen = std::max(waterFromZ - groundFar, 1.0f);
+        if (worldZ > waterFromZ + 0.58f || worldZ < groundFar - 0.35f) {
+            return baseHeight;
+        }
+
+        const float v = std::clamp((waterFromZ - worldZ) / waterLen, 0.0f, 1.0f);
+        const auto sample = SampleGenerativeWaterProfile(v, waterBodyWidth * 0.5f, riverLike);
+        const float edgeDist = std::abs(worldX - sample.centerX) - sample.halfWidth;
+        const float lateralDepth =
+            Smooth01(std::clamp((-edgeDist) / std::max(sample.halfWidth * 0.34f, 0.55f), 0.0f, 1.0f));
+        const float insideWater =
+            1.0f - Smooth01(std::clamp((edgeDist + 0.18f) / 1.18f, 0.0f, 1.0f));
+        const float bankBlend =
+            1.0f - Smooth01(std::clamp(std::max(edgeDist, 0.0f) / 2.15f, 0.0f, 1.0f));
+
+        const float channel = riverLike
+            ? (0.46f + 0.54f * lateralDepth)
+            : (0.58f + 0.42f * lateralDepth);
+        const float depthRamp = Smooth01(v);
+        const float bedNoise =
+            std::sin(worldX * 0.31f + worldZ * 0.19f + 3.7f) * 0.035f +
+            std::sin(worldX * 0.73f - worldZ * 0.41f + 8.1f) * 0.018f;
+        const float bedY = -(0.08f + 2.35f * depthRamp * channel) + bedNoise * (0.25f + depthRamp * 0.75f);
+        const float raisedBank =
+            (edgeDist >= -0.22f && edgeDist <= 2.15f)
+                ? (0.045f + std::min(relief * 0.16f, 0.16f)) * bankBlend
+                : 0.0f;
+
+        return glm::mix(baseHeight + raisedBank, bedY, insideWater);
+    }
+
     Scene::TerrainNoiseParams GenerativeTerrainParams(float relief,
                                                        float microRelief,
                                                        uint32_t seed) {
@@ -543,6 +582,88 @@ namespace {
         return mesh;
     }
 
+    std::shared_ptr<Scene::MeshData> CreateGenerativeIntegratedTerrainWaterMesh(float width,
+                                                                               float length,
+                                                                               float centerZ,
+                                                                               float relief,
+                                                                               float microRelief,
+                                                                               float waterFromZ,
+                                                                               float groundFar,
+                                                                               float waterBodyWidth,
+                                                                               bool riverLike,
+                                                                               uint32_t gridDim,
+                                                                               uint32_t terrainSeed) {
+        auto mesh = std::make_shared<Scene::MeshData>();
+        mesh->kind = Scene::MeshKind::Procedural;
+        gridDim = std::clamp(gridDim, 48u, 144u);
+        const Scene::TerrainNoiseParams terrainParams =
+            GenerativeTerrainParams(relief, microRelief, terrainSeed);
+
+        const uint32_t verts = gridDim + 1u;
+        const float halfW = width * 0.5f;
+        const float halfL = length * 0.5f;
+        const float shoreZ = waterFromZ + 0.50f;
+        mesh->positions.reserve(verts * verts);
+        mesh->normals.resize(verts * verts, glm::vec3(0.0f, 1.0f, 0.0f));
+        mesh->texCoords.reserve(verts * verts);
+
+        auto idx = [verts](uint32_t x, uint32_t z) { return z * verts + x; };
+        for (uint32_t iz = 0; iz <= gridDim; ++iz) {
+            const float vz = static_cast<float>(iz) / static_cast<float>(gridDim);
+            const float localZ = halfL - vz * length;
+            const float worldZ = centerZ + localZ;
+            for (uint32_t ix = 0; ix <= gridDim; ++ix) {
+                const float vx = static_cast<float>(ix) / static_cast<float>(gridDim);
+                const float localX = -halfW + vx * width;
+                float y = GenerativeTerrainHeight(localX, worldZ, relief, microRelief, shoreZ, true, terrainParams);
+                y = ApplyGenerativeWaterbedToTerrain(y,
+                                                     localX,
+                                                     worldZ,
+                                                     waterFromZ,
+                                                     groundFar,
+                                                     waterBodyWidth,
+                                                     riverLike,
+                                                     relief);
+                mesh->positions.emplace_back(localX, y, localZ);
+                mesh->texCoords.emplace_back(vx, vz);
+            }
+        }
+
+        for (uint32_t iz = 0; iz <= gridDim; ++iz) {
+            for (uint32_t ix = 0; ix <= gridDim; ++ix) {
+                const uint32_t xl = ix > 0 ? ix - 1u : ix;
+                const uint32_t xr = ix < gridDim ? ix + 1u : ix;
+                const uint32_t zd = iz > 0 ? iz - 1u : iz;
+                const uint32_t zu = iz < gridDim ? iz + 1u : iz;
+                const glm::vec3 dx = mesh->positions[idx(xr, iz)] - mesh->positions[idx(xl, iz)];
+                const glm::vec3 dz = mesh->positions[idx(ix, zd)] - mesh->positions[idx(ix, zu)];
+                glm::vec3 n = glm::cross(dx, dz);
+                if (glm::length(n) < 1e-5f) {
+                    n = glm::vec3(0.0f, 1.0f, 0.0f);
+                } else {
+                    n = glm::normalize(n);
+                    if (n.y < 0.0f) {
+                        n = -n;
+                    }
+                }
+                mesh->normals[idx(ix, iz)] = n;
+            }
+        }
+
+        for (uint32_t iz = 0; iz < gridDim; ++iz) {
+            for (uint32_t ix = 0; ix < gridDim; ++ix) {
+                const uint32_t a = idx(ix, iz);
+                const uint32_t b = idx(ix + 1u, iz);
+                const uint32_t c = idx(ix, iz + 1u);
+                const uint32_t d = idx(ix + 1u, iz + 1u);
+                mesh->indices.insert(mesh->indices.end(), {a, b, d, a, d, c});
+            }
+        }
+
+        mesh->UpdateBounds();
+        return mesh;
+    }
+
     std::shared_ptr<Scene::MeshData> CreateGenerativeWaterBodyMesh(float maxWidth,
                                                                    float length,
                                                                    bool riverLike,
@@ -590,7 +711,29 @@ namespace {
             }
         }
 
+        mesh->normals.resize(mesh->positions.size(), glm::vec3(0.0f, 1.0f, 0.0f));
         auto idx = [rowVerts](uint32_t x, uint32_t z) { return z * rowVerts + x; };
+        for (uint32_t iz = 0; iz <= zSegments; ++iz) {
+            for (uint32_t ix = 0; ix <= xSegments; ++ix) {
+                const uint32_t xl = ix > 0 ? ix - 1u : ix;
+                const uint32_t xr = ix < xSegments ? ix + 1u : ix;
+                const uint32_t zd = iz > 0 ? iz - 1u : iz;
+                const uint32_t zu = iz < zSegments ? iz + 1u : iz;
+                const glm::vec3 dx = mesh->positions[idx(xr, iz)] - mesh->positions[idx(xl, iz)];
+                const glm::vec3 dz = mesh->positions[idx(ix, zd)] - mesh->positions[idx(ix, zu)];
+                glm::vec3 n = glm::cross(dx, dz);
+                if (glm::length(n) < 1e-5f) {
+                    n = glm::vec3(0.0f, 1.0f, 0.0f);
+                } else {
+                    n = glm::normalize(n);
+                    if (n.y < 0.0f) {
+                        n = -n;
+                    }
+                }
+                mesh->normals[idx(ix, iz)] = n;
+            }
+        }
+
         for (uint32_t iz = 0; iz < zSegments; ++iz) {
             for (uint32_t ix = 0; ix < xSegments; ++ix) {
                 const uint32_t a = idx(ix, iz);
@@ -5088,25 +5231,41 @@ void Engine::BuildRecipeScene() {
             const float groundFar = -(genExt.extent * 1.9f + 10.0f); // seabed past the water, into the fog
             const float groundW = genExt.extent * 2.0f;
             const float shoreZ = genExt.waterOn ? (genExt.waterFromZ + 0.5f) : groundFar;
-            // Land = flat plane with its surface at y=0. When there is water, a second
-            // gently TILTED plane continues from the shoreline down to -2.5 m at the far
-            // edge, so the water gains real depth with distance -- shallow green at the
-            // shore, deep tint further out -- instead of a uniform 5 cm film over sand.
+            const bool riverLikeWater = genExt.waterOn &&
+                genExt.authoredSceneModule.moduleId == "desert_canyon_river";
+            const float waterBodyWidthForBase = genExt.extent * (riverLikeWater ? 1.08f : 1.38f);
+            const bool integratedTerrainWater = genExt.terrainHeightfield && genExt.waterOn;
             const float landLen = groundNear - shoreZ;
-            auto groundPlane = genExt.terrainHeightfield
-                ? CreateGenerativeTerrainMesh(groundW,
-                                              landLen,
-                                              (groundNear + shoreZ) * 0.5f,
-                                              genExt.terrainRelief,
-                                              genExt.terrainMicroRelief,
-                                              shoreZ,
-                                              genExt.waterOn,
-                                              genExt.terrainGrid,
-                                              genExt.terrainSeed)
-                : Utils::MeshGenerator::CreatePlane(groundW, landLen);
+            const float terrainLen = integratedTerrainWater ? (groundNear - groundFar) : landLen;
+            const float terrainCenterZ = integratedTerrainWater
+                ? (groundNear + groundFar) * 0.5f
+                : (groundNear + shoreZ) * 0.5f;
+            auto groundPlane = integratedTerrainWater
+                ? CreateGenerativeIntegratedTerrainWaterMesh(groundW,
+                                                             terrainLen,
+                                                             terrainCenterZ,
+                                                             genExt.terrainRelief,
+                                                             genExt.terrainMicroRelief,
+                                                             genExt.waterFromZ,
+                                                             groundFar,
+                                                             waterBodyWidthForBase,
+                                                             riverLikeWater,
+                                                             std::max(genExt.terrainGrid, 112u),
+                                                             genExt.terrainSeed)
+                : (genExt.terrainHeightfield
+                    ? CreateGenerativeTerrainMesh(groundW,
+                                                  landLen,
+                                                  terrainCenterZ,
+                                                  genExt.terrainRelief,
+                                                  genExt.terrainMicroRelief,
+                                                  shoreZ,
+                                                  genExt.waterOn,
+                                                  genExt.terrainGrid,
+                                                  genExt.terrainSeed)
+                    : Utils::MeshGenerator::CreatePlane(groundW, landLen));
             const float uvTile = genExt.extent / 2.5f;
             for (auto& uv : groundPlane->texCoords) {
-                uv *= glm::vec2(uvTile, uvTile * (landLen / groundW));
+                uv *= glm::vec2(uvTile, uvTile * (terrainLen / groundW));
             }
             glm::vec3 gcol = genExt.groundColor;
             if (!genExt.groundColorSet) {
@@ -5179,7 +5338,7 @@ void Engine::BuildRecipeScene() {
                 entt::entity groundE = m_registry->CreateEntity();
                 m_registry->AddComponent<Scene::TagComponent>(groundE, "GenerativeExterior_Ground");
                 auto& t = m_registry->AddComponent<TransformComponent>(groundE);
-                t.position = glm::vec3(0.0f, 0.0f, (groundNear + shoreZ) * 0.5f);
+                t.position = glm::vec3(0.0f, 0.0f, terrainCenterZ);
                 auto& r = m_registry->AddComponent<Scene::RenderableComponent>(groundE);
                 r.mesh = groundPlane;
                 dressGround(r);
@@ -5188,15 +5347,17 @@ void Engine::BuildRecipeScene() {
                                  genExt.terrainGrid,
                                  genExt.terrainRelief,
                                  genExt.terrainMicroRelief);
-                    spdlog::info("generative_exterior: structural terrain-water base terrain=shared_fbm_heightfield seed={} grid={} vertices={} water_enabled={} shore_z={:.2f}",
+                    spdlog::info("generative_exterior: structural terrain-water base terrain=shared_fbm_heightfield integrated_waterbed={} seed={} grid={} vertices={} water_enabled={} shore_z={:.2f} water_width={:.2f}",
+                                 integratedTerrainWater ? 1 : 0,
                                  genExt.terrainSeed,
                                  genExt.terrainGrid,
                                  groundPlane->positions.size(),
                                  genExt.waterOn ? 1 : 0,
-                                 shoreZ);
+                                 shoreZ,
+                                 waterBodyWidthForBase);
                 }
             }
-            if (genExt.waterOn) {
+            if (genExt.waterOn && !integratedTerrainWater) {
                 const bool riverLike = genExt.authoredSceneModule.moduleId == "desert_canyon_river";
                 const float seaLen = genExt.waterFromZ - groundFar;
                 const float seaMidZ = (genExt.waterFromZ + groundFar) * 0.5f;
@@ -5277,6 +5438,10 @@ void Engine::BuildRecipeScene() {
                                  seaLen,
                                  seabedPlane->positions.size());
                 }
+            } else if (genExt.waterOn) {
+                spdlog::info("generative_exterior: continuous terrain-water base replaces split far-floor/seabed meshes water_profile={} width={:.2f}",
+                             riverLikeWater ? "s_curve_river" : "curved_lake_cove",
+                             waterBodyWidthForBase);
             }
             if (genExt.graphicsMaterials && genExt.waterOn && genExt.shoreLayerCount > 0) {
                 int shoreLayers = 0;

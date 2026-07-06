@@ -792,3 +792,20 @@ Status: pending.
   only proves source-environment fallback demotion and PBR scan dominance. Next loop must attack
   the larger visible failures: flat water/shore, cardboard terrain/backdrop massing, and toy camp
   hero geometry.
+- 2026-07-06: Loop 4 iteration 24 started as an integrated terrain-water continuity slice.
+  Baseline visual inspection of the accepted source-asset checkpoint shows the same structural
+  failure across campsite, alpine, and desert: a broad flat terrain stage, cutout lake/river
+  water, ribbon/silhouette mountain backdrops, and hero props sitting disconnected from the
+  landscape. Recon found the engine already emits terrain/water receipts, but the generated
+  base uses a land mesh ending on a straight shore, separate far-floor/seabed meshes, fixed-up
+  water normals, and old patch-layer systems that can still read as strips. Heartbeat
+  `genscene-loop24-proof` was proven by a 2s timeout before long waits. Scope is limited to the
+  runtime terrain/water base and compiler pass budgets that request visible strip detail; no new
+  pixel hard gates, no water color-ratio tuning, no fetched/Kenney fallback reintroduction, and no
+  visible card/proof overlays. Hypothesis: replacing the split flat stage with one continuous
+  heightfield/shore/waterbed base and deriving water normals from the actual displaced mesh will
+  reduce the cutout-sheet read while preserving prompt color and structural receipts. Kill
+  criteria: reject if any acceptance gate fails beyond expected dirty-tree policy, if water ROI
+  regresses, if runtime receipts do not prove the integrated base reached the renderer, or if
+  manual still inspection shows new shelf/slab artifacts instead of cleaner terrain-water
+  continuity.

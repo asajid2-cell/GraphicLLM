@@ -401,3 +401,9 @@
   curation, graphics reset, Release build, structural scene gate, and phase0 policy. Loop 4
   remains open and visual truth remains negative. Next active item is continuous terrain/water/
   hero-geometry structure, not more source-asset count work.
+- 2026-07-06: active item is Loop 4 iteration 24, integrated terrain-water continuity. Replace
+  the split flat generated exterior base with a continuous heightfield/shore/waterbed mesh and
+  derive water normals from displaced water geometry, while demoting compiler-requested visible
+  strip/guyline budgets that fight the base. This is a structural base-scene slice: no new hard
+  pixel gates, no water color-ratio tuning, no overlay/card proof layers, and no fallback/Kenney
+  source asset regression.

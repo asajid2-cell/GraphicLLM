@@ -692,12 +692,12 @@ def compile_v3_to_v2(v3: dict[str, Any]) -> dict[str, Any]:
             "rock_lichen_patch_count": 2 if not desert else 0,
             "desert_strata_patch_count": 2 if canyon else 0,
             "vegetation_cluster_count": 2 if not desert else 1,
-            "hero_material_line_count": 4 if (campsite or cabin) else 2,
+            "hero_material_line_count": 0,
             "systems": [
                 "ground_albedo_breakup",
                 "rock_lichen_or_desert_stain",
                 "vegetation_scrub_clusters",
-                "fabric_wood_material_lines",
+                "source_texture_material_response_no_visible_strips",
             ],
         },
         "mesh_silhouette_realism": {
@@ -816,7 +816,7 @@ def compile_v3_to_v2(v3: dict[str, Any]) -> dict[str, Any]:
             "canvas_shell_panel_count": 5 if campsite else 0,
             "fabric_layer_count": 6 if campsite else 0,
             "structural_pole_count": 6 if campsite else 0,
-            "rope_stake_count": 6 if campsite else 0,
+            "rope_stake_count": 2 if campsite else 0,
             "low_poly_mask_count": 0,
             "cabin_facade_module_count": 6 if cabin else 0,
             "cabin_roof_module_count": 4 if cabin else 0,
@@ -825,7 +825,7 @@ def compile_v3_to_v2(v3: dict[str, Any]) -> dict[str, Any]:
             "systems": [
                 "dominant_canvas_shell_replaces_orange_tent_read",
                 "layered_fabric_wrinkles_and_edge_hems",
-                "structural_pole_and_guyline_frame",
+                "structural_pole_frame_with_minimal_guyline_geometry",
                 "low_poly_catalog_masking_panels",
                 "cabin_facade_roof_deck_overbuild",
                 "prompt_family_hero_rock_massing",

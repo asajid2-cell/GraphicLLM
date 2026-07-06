@@ -9,6 +9,7 @@ quality gates can inspect. Native C++ support for richer v3 layers comes later.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import math
 import random
@@ -22,6 +23,11 @@ def _clamp(v: float, lo: float, hi: float) -> float:
 
 def _round3(v: float) -> float:
     return round(float(v), 3)
+
+
+def _stable_seed(text: str) -> int:
+    digest = hashlib.sha1(text.encode("utf-8")).hexdigest()
+    return int(digest[:8], 16) % 16_000_000 + 1000
 
 
 def _asset_exists(asset_id: str) -> bool:
@@ -250,8 +256,8 @@ def compile_v3_to_v2(v3: dict[str, Any]) -> dict[str, Any]:
     water_intent = str(waterbody.get("color_intent") or "").lower()
     stylized_water = water_intent in {"purple", "violet", "turquoise", "blue"}
     if canyon and water_intent == "turquoise":
-        water_shallow = [0.0, 1.80, 2.05]
-        water_deep = [0.0, 0.75, 1.05]
+        water_shallow = [0.0, 2.25, 3.05]
+        water_deep = [0.0, 1.05, 1.58]
     if water_intent in {"purple", "violet"}:
         water_shallow = [1.10, 0.02, 1.85]
         water_deep = [0.36, 0.00, 0.92]
@@ -278,6 +284,8 @@ def compile_v3_to_v2(v3: dict[str, Any]) -> dict[str, Any]:
                 "color": [0.22, 0.10, 0.085] if desert else [0.10, 0.12, 0.18],
             },
         ]
+
+    terrain_seed = _stable_seed(f"{scene_type}:{prompt_lower}:terrain")
 
     env = {
         "sun": {
@@ -308,6 +316,8 @@ def compile_v3_to_v2(v3: dict[str, Any]) -> dict[str, Any]:
                 "relief_m": 0.56 if moonlight else (0.64 if not desert else 0.48),
                 "micro_relief_m": 0.105 if not desert else 0.078,
                 "shore_flatten_m": 5.5,
+                "seed": terrain_seed,
+                "noise": "shared_fbm_heightfield",
             },
         },
         "water": {
@@ -585,6 +595,17 @@ def compile_v3_to_v2(v3: dict[str, Any]) -> dict[str, Any]:
             "heightfield": True,
             "relief_m": env["ground"]["terrain"]["relief_m"],
             "shore_integrated": bool(water_on),
+            "seed": terrain_seed,
+            "noise": "shared_fbm_heightfield",
+        },
+        "structural_terrain_water": {
+            "enabled": True,
+            "terrain_system": "Scene::SampleTerrainHeight",
+            "terrain_noise": "shared_fbm_heightfield",
+            "terrain_seed": terrain_seed,
+            "water_system": "WaterSurfaceComponent" if water_on else "none",
+            "subsystem_water": bool(water_on),
+            "overlay_contract": "telemetry_only",
         },
         "world_geometry": {
             "enabled": True,

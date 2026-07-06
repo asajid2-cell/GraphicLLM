@@ -411,21 +411,36 @@ namespace {
         return a + b + c;
     }
 
+    Scene::TerrainNoiseParams GenerativeTerrainParams(float relief,
+                                                       float microRelief,
+                                                       uint32_t seed) {
+        Scene::TerrainNoiseParams params{};
+        params.seed = seed;
+        params.amplitude = std::max(0.08f, relief * 2.15f + microRelief * 1.25f);
+        params.frequency = 0.082f;
+        params.octaves = 5;
+        params.lacunarity = 2.08f;
+        params.gain = 0.52f;
+        params.warp = 0.42f;
+        return params;
+    }
+
     float GenerativeTerrainHeight(float worldX,
                                   float worldZ,
                                   float relief,
                                   float microRelief,
                                   float shoreZ,
-                                  bool waterOn) {
+                                  bool waterOn,
+                                  const Scene::TerrainNoiseParams& terrainParams) {
         const float heroDist = glm::length(glm::vec2(worldX, worldZ - 1.15f));
         const float heroFlatten = std::clamp((heroDist - 2.8f) / 8.0f, 0.0f, 1.0f);
         const float shoreDist = waterOn ? std::abs(worldZ - shoreZ) : 99.0f;
         const float shoreFlatten = waterOn ? std::clamp((shoreDist - 0.8f) / 5.5f, 0.0f, 1.0f) : 1.0f;
         const float depthBias = std::clamp((worldZ + 1.5f) / 16.0f, -0.35f, 0.65f);
-        const float macro = GenerativeTerrainNoise(worldX, worldZ, 2.37f) * relief;
-        const float micro = GenerativeTerrainNoise(worldX * 2.7f, worldZ * 2.7f, 8.13f) * microRelief;
+        const float shared = Scene::SampleTerrainHeight(worldX, worldZ, terrainParams) - terrainParams.amplitude * 0.5f;
+        const float micro = GenerativeTerrainNoise(worldX * 3.1f, worldZ * 3.1f, 8.13f) * microRelief * 0.35f;
         const float mask = std::max(0.16f, heroFlatten) * std::max(0.20f, shoreFlatten);
-        return std::clamp((macro + micro) * mask + depthBias * 0.055f, -0.10f, relief * 1.25f);
+        return std::clamp((shared + micro) * mask + depthBias * 0.055f, -0.14f, relief * 1.35f);
     }
 
     std::shared_ptr<Scene::MeshData> CreateGenerativeTerrainMesh(float width,
@@ -435,10 +450,13 @@ namespace {
                                                                  float microRelief,
                                                                  float shoreZ,
                                                                  bool waterOn,
-                                                                 uint32_t gridDim) {
+                                                                 uint32_t gridDim,
+                                                                 uint32_t terrainSeed) {
         auto mesh = std::make_shared<Scene::MeshData>();
         mesh->kind = Scene::MeshKind::Procedural;
         gridDim = std::clamp(gridDim, 16u, 128u);
+        const Scene::TerrainNoiseParams terrainParams =
+            GenerativeTerrainParams(relief, microRelief, terrainSeed);
 
         const uint32_t verts = gridDim + 1u;
         const float halfW = width * 0.5f;
@@ -455,7 +473,7 @@ namespace {
             for (uint32_t ix = 0; ix <= gridDim; ++ix) {
                 const float vx = static_cast<float>(ix) / static_cast<float>(gridDim);
                 const float localX = -halfW + vx * width;
-                const float y = GenerativeTerrainHeight(localX, worldZ, relief, microRelief, shoreZ, waterOn);
+                const float y = GenerativeTerrainHeight(localX, worldZ, relief, microRelief, shoreZ, waterOn, terrainParams);
                 mesh->positions.emplace_back(localX, y, localZ);
                 mesh->texCoords.emplace_back(vx, vz);
             }
@@ -3572,6 +3590,7 @@ void Engine::BuildRecipeScene() {
         float terrainRelief = 0.0f;
         float terrainMicroRelief = 0.0f;
         uint32_t terrainGrid = 48;
+        uint32_t terrainSeed = 3281337u;
         bool graphicsMaterials = false;
         float groundNormalScale = 0.75f;
         float groundWetness = 0.0f;
@@ -3619,7 +3638,18 @@ void Engine::BuildRecipeScene() {
         int advancedShaderTermCount = 0;
     } genExt;
     if (recipe == "generative_exterior") {
-        if (const char* raw = std::getenv("CORTEX_SCENE_IR_JSON"); raw && *raw) {
+        std::string rawFromFile;
+        const char* raw = std::getenv("CORTEX_SCENE_IR_JSON");
+        if ((!raw || !*raw)) {
+            if (const char* rawFile = std::getenv("CORTEX_SCENE_IR_JSON_FILE"); rawFile && *rawFile) {
+                std::ifstream in(rawFile, std::ios::binary);
+                if (in) {
+                    rawFromFile.assign(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>());
+                    raw = rawFromFile.c_str();
+                }
+            }
+        }
+        if (raw && *raw) {
             try {
                 const nlohmann::json ir = nlohmann::json::parse(raw);
                 const nlohmann::json env = ir.value("environment", nlohmann::json::object());
@@ -3656,6 +3686,9 @@ void Engine::BuildRecipeScene() {
                 genExt.terrainMicroRelief = std::clamp(num(terrain, "micro_relief_m", genExt.terrainMicroRelief), 0.0f, 0.25f);
                 genExt.terrainGrid = static_cast<uint32_t>(std::clamp(num(terrain, "grid", static_cast<float>(genExt.terrainGrid)),
                                                                        16.0f, 128.0f));
+                genExt.terrainSeed = static_cast<uint32_t>(std::clamp(num(terrain, "seed", static_cast<float>(genExt.terrainSeed)),
+                                                                      1.0f,
+                                                                      16777215.0f));
                 const nlohmann::json water = env.value("water", nlohmann::json::object());
                 genExt.waterOn = water.value("enabled", false);
                 genExt.waterLevel = std::clamp(num(water, "level", genExt.waterLevel), 0.02f, 0.4f);
@@ -4636,7 +4669,8 @@ void Engine::BuildRecipeScene() {
                                               genExt.terrainMicroRelief,
                                               shoreZ,
                                               genExt.waterOn,
-                                              genExt.terrainGrid)
+                                              genExt.terrainGrid,
+                                              genExt.terrainSeed)
                 : Utils::MeshGenerator::CreatePlane(groundW, landLen);
             const float uvTile = genExt.extent / 2.5f;
             for (auto& uv : groundPlane->texCoords) {
@@ -4712,6 +4746,12 @@ void Engine::BuildRecipeScene() {
                                  genExt.terrainGrid,
                                  genExt.terrainRelief,
                                  genExt.terrainMicroRelief);
+                    spdlog::info("generative_exterior: structural terrain-water base terrain=shared_fbm_heightfield seed={} grid={} vertices={} water_enabled={} shore_z={:.2f}",
+                                 genExt.terrainSeed,
+                                 genExt.terrainGrid,
+                                 groundPlane->positions.size(),
+                                 genExt.waterOn ? 1 : 0,
+                                 shoreZ);
                 }
             }
             if (genExt.waterOn) {
@@ -7050,6 +7090,13 @@ void Engine::BuildRecipeScene() {
                 sea.shallowTint = genExt.waterShallow;
                 sea.deepTint = genExt.waterDeep;
                 m_registry->AddComponent<Scene::WaterSurfaceComponent>(water, sea);
+                spdlog::info("generative_exterior: structural water surface component=WaterSurfaceComponent width={:.2f} length={:.2f} level={:.2f} gerstner_shader=on shallow=({:.2f},{:.2f},{:.2f})",
+                             genExt.extent * 2.0f,
+                             waterLen,
+                             genExt.waterLevel,
+                             genExt.waterShallow.r,
+                             genExt.waterShallow.g,
+                             genExt.waterShallow.b);
             }
         }
     }
@@ -10492,6 +10539,8 @@ void Engine::BuildRecipeScene() {
                     const float n = std::sin(static_cast<float>(i) * 12.9898f + salt * 78.233f) * 43758.5453f;
                     return n - std::floor(n);
                 };
+                const Scene::TerrainNoiseParams splitTerrainParams =
+                    GenerativeTerrainParams(genExt.terrainRelief, genExt.terrainMicroRelief, genExt.terrainSeed);
                 for (int i = 0; i < genExt.sourceReadabilityBalance.blackMassSplitCount; ++i) {
                     const float side = (i % 2 == 0) ? -1.0f : 1.0f;
                     const float lane = static_cast<float>((i / 2) % 5);
@@ -10502,7 +10551,8 @@ void Engine::BuildRecipeScene() {
                                                             genExt.terrainRelief,
                                                             genExt.terrainMicroRelief,
                                                             shoreZ,
-                                                            genExt.waterOn) +
+                                                            genExt.waterOn,
+                                                            splitTerrainParams) +
                                     0.066f + static_cast<float>(i % 3) * 0.0015f;
                     entt::entity e = m_registry->CreateEntity();
                     m_registry->AddComponent<Scene::TagComponent>(

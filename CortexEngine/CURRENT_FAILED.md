@@ -2,20 +2,21 @@
 
 Overall: **RED - DO NOT ACCEPT. Fix or revert before anything else.**
 
-- Tag: `phase2_gate_reset_dirty_probe_20260706`
-- Date: 2026-07-06 05:14
-- Accepted tag: `phase1_curation_20260706`
-- Previous tag: `phase1_curation_20260706`
-- HEAD: 08636a3 Accept GenScene curation checkpoint
-- Tracked tree: DIRTY:  M CortexEngine/tools/run_genscene_acceptance.ps1;  M CortexEngine/tools/scene_graphics_gate.py
+- Tag: `phase3_structural_terrain_water_dirty_probe_20260706`
+- Date: 2026-07-06 05:32
+- Accepted tag: `phase2_gate_reset_20260706`
+- Previous tag: `phase2_gate_reset_20260706`
+- HEAD: 3262b11 Accept GenScene gate reset checkpoint
+- Tracked tree: DIRTY:  M CortexEngine/src/Core/Engine.cpp;  M CortexEngine/src/Core/Engine_Scenes.cpp;  M CortexEngine/tools/render_ir.ps1;  M CortexEngine/tools/run_genscene_acceptance.ps1;  M CortexEngine/tools/scene_compiler.py
 
 ## Gates
 
-- **clean_tree**: FAIL -- Z:\328\CMPUT328-A2\codexworks\301\graphics\CortexEngine\artifacts\genscene_acceptance\phase2_gate_reset_dirty_probe_20260706\git_status.txt
+- **clean_tree**: FAIL -- Z:\328\CMPUT328-A2\codexworks\301\graphics\CortexEngine\artifacts\genscene_acceptance\phase3_structural_terrain_water_dirty_probe_20260706\git_status.txt
 - **gate_ratchet_freeze**: PASS -- no added missing_* hard gates in scene_graphics_gate.py
-- **python_compile**: PASS -- Z:\328\CMPUT328-A2\codexworks\301\graphics\CortexEngine\artifacts\genscene_acceptance\phase2_gate_reset_dirty_probe_20260706\python_compile.log
-- **curation_gate**: PASS -- Z:\328\CMPUT328-A2\codexworks\301\graphics\CortexEngine\artifacts\genscene_acceptance\phase2_gate_reset_dirty_probe_20260706\curation_gate.log
-- **graphics_gate_reset**: PASS -- Z:\328\CMPUT328-A2\codexworks\301\graphics\CortexEngine\artifacts\genscene_acceptance\phase2_gate_reset_dirty_probe_20260706\graphics_gate_reset.log
+- **python_compile**: PASS -- Z:\328\CMPUT328-A2\codexworks\301\graphics\CortexEngine\artifacts\genscene_acceptance\phase3_structural_terrain_water_dirty_probe_20260706\python_compile.log
+- **curation_gate**: PASS -- Z:\328\CMPUT328-A2\codexworks\301\graphics\CortexEngine\artifacts\genscene_acceptance\phase3_structural_terrain_water_dirty_probe_20260706\curation_gate.log
+- **graphics_gate_reset**: PASS -- Z:\328\CMPUT328-A2\codexworks\301\graphics\CortexEngine\artifacts\genscene_acceptance\phase3_structural_terrain_water_dirty_probe_20260706\graphics_gate_reset.log
+- **structural_scene_gate**: PASS -- Z:\328\CMPUT328-A2\codexworks\301\graphics\CortexEngine\artifacts\genscene_acceptance\phase3_structural_terrain_water_dirty_probe_20260706\structural_scene_gate.log
 - **release_build**: PASS -- skipped by -SkipBuild
 - **phase0_policy**: FAIL -- dirty tree and old overlay-gate changes must not be accepted by assertion
 
@@ -25,6 +26,6 @@ Overall: **RED - DO NOT ACCEPT. Fix or revert before anything else.**
 
 ## Regression
 
-    Previous accepted tag: phase1_curation_20260706
+    Previous accepted tag: phase2_gate_reset_20260706
 
 Next steps live in `QUEUE.md` and `PLAN.md`. This file is state, nothing else.

@@ -225,3 +225,12 @@ Status: pending.
 - 2026-07-06: Loop 2 accepted. Full runner `phase2_gate_reset_20260706` passed clean tree,
   ratchet freeze, Python compile, curation gate, graphics gate reset, Release build, and
   phase0 policy.
+- 2026-07-06: Loop 3 implementation wired generated terrain to shared
+  `Scene::SampleTerrainHeight` FBM params, added file-backed IR handoff to avoid Windows env-var
+  limits on dense scenes, strengthened canyon turquoise material dominance, and added runtime
+  receipts for shared-FBM terrain plus `WaterSurfaceComponent` water. Three canonical prompts
+  rendered sequentially; direct quality and graphics gates passed for campsite, alpine, and
+  desert, and all three logs contain terrain/water structural receipts. Visual truth remains
+  negative: the scenes still show broad water sheets, patch debris, and kit silhouettes.
+  Dirty probe `phase3_structural_terrain_water_dirty_probe_20260706 -SkipBuild` passed the new
+  `structural_scene_gate` and failed only expected dirty-tree gates.

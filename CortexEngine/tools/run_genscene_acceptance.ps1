@@ -183,6 +183,72 @@ try {
 $graphicsResetDetails | Out-File -FilePath $graphicsResetLog -Encoding utf8
 Report 'graphics_gate_reset' $graphicsResetOk $graphicsResetLog
 
+$structuralLog = Join-Path $dir 'structural_scene_gate.log'
+$structuralOk = $true
+$structuralDetails = @()
+try {
+    $structuralItems = @(
+        @{
+            name = 'campsite'
+            prompt = 'a foggy mountain campsite beside a purple lake at dawn'
+            base = 'gen_a_foggy_mountain_campsite_beside_2'
+        },
+        @{
+            name = 'alpine'
+            prompt = 'a stormy alpine lake with a small cabin and blue moonlight'
+            base = 'gen_a_stormy_alpine_lake_with_a_smal_2'
+        },
+        @{
+            name = 'desert'
+            prompt = 'a sunny desert canyon campsite with red rocks and a turquoise river'
+            base = 'gen_a_sunny_desert_canyon_campsite_w_2'
+        }
+    )
+    foreach ($item in $structuralItems) {
+        $base = Join-Path 'build\bin\logs' $item.base
+        $ir = "${base}_ir.json"
+        $png = "${base}.png"
+        $out = "${base}.out"
+        $frame = "${base}_frame_report.json"
+        foreach ($requiredPath in @($ir, $png, $out, $frame)) {
+            if (-not (Test-Path $requiredPath)) {
+                $structuralOk = $false
+                $structuralDetails += "$($item.name): absent $requiredPath"
+            }
+        }
+        if ((Test-Path $ir) -and (Test-Path $png)) {
+            $qualityOut = & python tools\scene_quality_gate.py --prompt $item.prompt --ir $ir --png $png 2>&1
+            $qualityCode = $LASTEXITCODE
+            $structuralDetails += "$($item.name): quality_exit=$qualityCode"
+            if ($qualityCode -ne 0) {
+                $structuralOk = $false
+                $structuralDetails += "$($item.name): quality_tail=" + (($qualityOut | Select-Object -Last 4) -join ' ')
+            }
+        }
+        if ((Test-Path $ir) -and (Test-Path $png) -and (Test-Path $out) -and (Test-Path $frame)) {
+            $graphicsOut = & python tools\scene_graphics_gate.py --prompt $item.prompt --ir $ir --png $png --log $out --frame-report $frame 2>&1
+            $graphicsCode = $LASTEXITCODE
+            $structuralDetails += "$($item.name): graphics_exit=$graphicsCode"
+            if ($graphicsCode -ne 0) {
+                $structuralOk = $false
+                $structuralDetails += "$($item.name): graphics_tail=" + (($graphicsOut | Select-Object -Last 4) -join ' ')
+            }
+            $outText = Get-Content -LiteralPath $out -Raw
+            $hasTerrain = $outText.Contains('structural terrain-water base terrain=shared_fbm_heightfield')
+            $hasWater = $outText.Contains('structural water surface component=WaterSurfaceComponent')
+            $structuralDetails += "$($item.name): structural_terrain_receipt=$hasTerrain structural_water_receipt=$hasWater"
+            if (-not $hasTerrain -or -not $hasWater) {
+                $structuralOk = $false
+            }
+        }
+    }
+} catch {
+    $structuralOk = $false
+    $structuralDetails += $_.Exception.Message
+}
+$structuralDetails | Out-File -FilePath $structuralLog -Encoding utf8
+Report 'structural_scene_gate' $structuralOk $structuralLog
+
 if ($SkipBuild) {
     Report 'release_build' $true 'skipped by -SkipBuild'
 } else {

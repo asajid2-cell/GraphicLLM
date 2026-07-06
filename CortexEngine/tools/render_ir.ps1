@@ -26,7 +26,7 @@ if (-not (Test-Path $exe)) { Write-Error "engine not built: $exe"; exit 2 }
 if (-not (Test-Path $JsonFile)) { Write-Error "no json: $JsonFile"; exit 2 }
 if (Test-Path $bmp) { Remove-Item $bmp -Force }
 
-$json = (Get-Content -Raw -Path $JsonFile)
+$jsonPath = (Resolve-Path -Path $JsonFile).Path
 $env:PATH = "$vcpkgBin;$env:PATH"
 $env:CORTEX_SUPPRESS_CAMERA_HELP = "1"
 $env:CORTEX_SUPPRESS_FATAL_DIALOG = "1"
@@ -51,7 +51,8 @@ if ($env:CORTEX_ENABLE_GENERATIVE_DXR -and $env:CORTEX_ENABLE_GENERATIVE_DXR -ne
 # frame pacing keep the system responsive during full-SSAA captures.
 $env:CORTEX_LOW_GPU_PRIORITY = "1"
 $env:CORTEX_FRAME_PACE_MS = "35"
-$env:CORTEX_SCENE_IR_JSON = $json        # the generative scene
+$env:CORTEX_SCENE_IR_JSON_FILE = $jsonPath # file-backed generative scene; avoids Windows env-var size limits
+Remove-Item Env:CORTEX_SCENE_IR_JSON -ErrorAction SilentlyContinue
 Remove-Item Env:CORTEX_SCENE_PROMPT   -ErrorAction SilentlyContinue
 Remove-Item Env:CORTEX_SCENE_RECIPE   -ErrorAction SilentlyContinue
 Remove-Item Env:CORTEX_AUTOCAM_DOLLY,Env:CORTEX_AUTOCAM_LIFT,Env:CORTEX_AUTOCAM_YAW,Env:CORTEX_AUTOCAM_FOV_ADD,Env:CORTEX_AUTOEXPOSURE_MULT -ErrorAction SilentlyContinue

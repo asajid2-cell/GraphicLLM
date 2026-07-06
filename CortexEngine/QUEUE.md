@@ -46,3 +46,8 @@
   wrote green `CURRENT.md`. Result: PASS for `clean_tree`, ratchet freeze, Python compile,
   curation, `graphics_gate_reset`, Release build, and phase0 policy. Loop 2 gate reset is
   accepted; next active item is continuous terrain/water.
+- 2026-07-06: Loop 3 dirty verifier probe
+  `tools/run_genscene_acceptance.ps1 -Tag phase3_structural_terrain_water_dirty_probe_20260706 -SkipBuild`
+  wrote red `CURRENT_FAILED.md` as expected. `structural_scene_gate`, graphics reset,
+  curation, Python compile, and ratchet freeze passed; `clean_tree` and `phase0_policy`
+  failed because the structural terrain/water implementation was intentionally uncommitted.

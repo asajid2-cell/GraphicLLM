@@ -2,22 +2,22 @@
 
 Overall: **RED - DO NOT ACCEPT. Fix or revert before anything else.**
 
-- Tag: `phase4_hero_water_form_dirty_probe_20260706`
-- Date: 2026-07-06 12:45
-- Accepted tag: `phase4_visual_noise_cleanup_20260706`
-- Previous tag: `phase4_visual_noise_cleanup_20260706`
-- HEAD: 00f3bb8 Accept GenScene visible noise cleanup checkpoint
-- Tracked tree: DIRTY:  M CortexEngine/src/Core/Engine_Scenes.cpp;  M CortexEngine/tools/scene_compiler.py
+- Tag: `phase4_shaped_waterbed_dirty_probe2_20260706`
+- Date: 2026-07-06 13:11
+- Accepted tag: `phase4_hero_water_form_20260706`
+- Previous tag: `phase4_hero_water_form_20260706`
+- HEAD: f4b51eb Accept GenScene hero water form checkpoint
+- Tracked tree: DIRTY:  M CortexEngine/src/Core/Engine_Scenes.cpp
 
 ## Gates
 
-- **clean_tree**: FAIL -- Z:\328\CMPUT328-A2\codexworks\301\graphics\CortexEngine\artifacts\genscene_acceptance\phase4_hero_water_form_dirty_probe_20260706\git_status.txt
+- **clean_tree**: FAIL -- Z:\328\CMPUT328-A2\codexworks\301\graphics\CortexEngine\artifacts\genscene_acceptance\phase4_shaped_waterbed_dirty_probe2_20260706\git_status.txt
 - **gate_ratchet_freeze**: PASS -- no added missing_* hard gates in scene_graphics_gate.py
-- **python_compile**: PASS -- Z:\328\CMPUT328-A2\codexworks\301\graphics\CortexEngine\artifacts\genscene_acceptance\phase4_hero_water_form_dirty_probe_20260706\python_compile.log
-- **curation_gate**: PASS -- Z:\328\CMPUT328-A2\codexworks\301\graphics\CortexEngine\artifacts\genscene_acceptance\phase4_hero_water_form_dirty_probe_20260706\curation_gate.log
-- **graphics_gate_reset**: PASS -- Z:\328\CMPUT328-A2\codexworks\301\graphics\CortexEngine\artifacts\genscene_acceptance\phase4_hero_water_form_dirty_probe_20260706\graphics_gate_reset.log
-- **release_build**: PASS -- Z:\328\CMPUT328-A2\codexworks\301\graphics\CortexEngine\artifacts\genscene_acceptance\phase4_hero_water_form_dirty_probe_20260706\release_build.log
-- **structural_scene_gate**: PASS -- Z:\328\CMPUT328-A2\codexworks\301\graphics\CortexEngine\artifacts\genscene_acceptance\phase4_hero_water_form_dirty_probe_20260706\structural_scene_gate.log
+- **python_compile**: PASS -- Z:\328\CMPUT328-A2\codexworks\301\graphics\CortexEngine\artifacts\genscene_acceptance\phase4_shaped_waterbed_dirty_probe2_20260706\python_compile.log
+- **curation_gate**: PASS -- Z:\328\CMPUT328-A2\codexworks\301\graphics\CortexEngine\artifacts\genscene_acceptance\phase4_shaped_waterbed_dirty_probe2_20260706\curation_gate.log
+- **graphics_gate_reset**: PASS -- Z:\328\CMPUT328-A2\codexworks\301\graphics\CortexEngine\artifacts\genscene_acceptance\phase4_shaped_waterbed_dirty_probe2_20260706\graphics_gate_reset.log
+- **release_build**: PASS -- Z:\328\CMPUT328-A2\codexworks\301\graphics\CortexEngine\artifacts\genscene_acceptance\phase4_shaped_waterbed_dirty_probe2_20260706\release_build.log
+- **structural_scene_gate**: PASS -- Z:\328\CMPUT328-A2\codexworks\301\graphics\CortexEngine\artifacts\genscene_acceptance\phase4_shaped_waterbed_dirty_probe2_20260706\structural_scene_gate.log
 - **phase0_policy**: FAIL -- dirty tree and old overlay-gate changes must not be accepted by assertion
 
 ## Residuals
@@ -26,6 +26,6 @@ Overall: **RED - DO NOT ACCEPT. Fix or revert before anything else.**
 
 ## Regression
 
-    Previous accepted tag: phase4_visual_noise_cleanup_20260706
+    Previous accepted tag: phase4_hero_water_form_20260706
 
 Next steps live in `QUEUE.md` and `PLAN.md`. This file is state, nothing else.

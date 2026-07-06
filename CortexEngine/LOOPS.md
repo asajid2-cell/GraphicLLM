@@ -604,3 +604,19 @@ Status: pending.
   `phase4_hero_water_form_20260706`. Visual truth remains negative; Loop 4 stays open. Next
   active work should attack lighting/material/backdrop cohesion and water-surface depth rather
   than adding proxy cards or more pixel gates.
+- 2026-07-06: Loop 4 iteration 16 dirty probe attacked the remaining flat water-sheet read
+  through real geometry rather than overlays. The first probe exposed white gaps after removing
+  the full-width tinted seabed, so it was stopped as stale evidence. The second probe adds a
+  neutral far-shore terrain floor, gives the underwater bed the same curved lake/river footprint
+  as the water mesh, and tightens water-body width/resolution. Heartbeats
+  `genscene-shaped-waterbed-probe2-build`, `genscene-shaped-waterbed-probe2-render`,
+  `genscene-shaped-waterbed-probe2-alpine-desert`, and
+  `genscene-shaped-waterbed-probe2-final` fired during build/render waits. Dirty probe
+  `tools/run_genscene_acceptance.ps1 -Tag phase4_shaped_waterbed_dirty_probe2_20260706` passed
+  ratchet freeze, Python compile, curation, graphics reset, Release build, and structural scene
+  gates, failing only expected `clean_tree` plus `phase0_policy`. Selected candidates were
+  campsite `gen_a_foggy_mountain_campsite_beside_1.png`, alpine
+  `gen_a_stormy_alpine_lake_with_a_smal_2.png`, and desert
+  `gen_a_sunny_desert_canyon_campsite_w_0.png`. Visual truth remains negative: bounded water
+  reads better, but front shore edges, low-fidelity backdrop masses, lighting, and hero assets
+  still block a coherent AA/AAA result.

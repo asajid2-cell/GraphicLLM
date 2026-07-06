@@ -411,6 +411,35 @@ namespace {
         return a + b + c;
     }
 
+    float Smooth01(float t) {
+        t = std::clamp(t, 0.0f, 1.0f);
+        return t * t * (3.0f - 2.0f * t);
+    }
+
+    struct GenerativeWaterProfileSample {
+        float centerX = 0.0f;
+        float halfWidth = 1.0f;
+    };
+
+    GenerativeWaterProfileSample SampleGenerativeWaterProfile(float v,
+                                                              float halfMaxWidth,
+                                                              bool riverLike) {
+        const float bend = std::sin(v * glm::pi<float>() * 2.0f - 0.45f);
+        const float secondary = std::sin(v * glm::pi<float>() * 5.0f + 0.8f);
+        const float cove = std::sin(Smooth01(v) * glm::pi<float>());
+        const float farTaper = riverLike ? 1.0f : (1.0f - 0.38f * Smooth01(std::max(0.0f, (v - 0.70f) / 0.30f)));
+        const float centerX = riverLike
+            ? bend * halfMaxWidth * 0.20f
+            : (bend * 0.055f + secondary * 0.012f) * halfMaxWidth;
+        const float widthFactor = riverLike
+            ? (0.20f + 0.055f * Smooth01(v) + 0.022f * secondary)
+            : ((0.22f + 0.36f * cove + 0.055f * Smooth01(v) + 0.026f * secondary) * farTaper);
+        const float halfWidth = std::clamp(halfMaxWidth * widthFactor,
+                                           halfMaxWidth * (riverLike ? 0.16f : 0.18f),
+                                           halfMaxWidth * (riverLike ? 0.34f : 0.62f));
+        return {centerX, halfWidth};
+    }
+
     Scene::TerrainNoiseParams GenerativeTerrainParams(float relief,
                                                        float microRelief,
                                                        uint32_t seed) {
@@ -530,36 +559,11 @@ namespace {
         mesh->normals.reserve((zSegments + 1u) * rowVerts);
         mesh->texCoords.reserve((zSegments + 1u) * rowVerts);
 
-        auto smooth = [](float t) {
-            t = std::clamp(t, 0.0f, 1.0f);
-            return t * t * (3.0f - 2.0f * t);
-        };
-        auto profile = [&](float v) {
-            struct Sample {
-                float centerX;
-                float halfWidth;
-            };
-            const float bend = std::sin(v * glm::pi<float>() * 2.0f - 0.45f);
-            const float secondary = std::sin(v * glm::pi<float>() * 5.0f + 0.8f);
-            const float cove = std::sin(smooth(v) * glm::pi<float>());
-            const float farTaper = riverLike ? 1.0f : (1.0f - 0.38f * smooth(std::max(0.0f, (v - 0.70f) / 0.30f)));
-            const float centerX = riverLike
-                ? bend * halfMaxWidth * 0.20f
-                : (bend * 0.055f + secondary * 0.012f) * halfMaxWidth;
-            const float widthFactor = riverLike
-                ? (0.20f + 0.055f * smooth(v) + 0.022f * secondary)
-                : ((0.22f + 0.36f * cove + 0.055f * smooth(v) + 0.026f * secondary) * farTaper);
-            const float halfWidth = std::clamp(halfMaxWidth * widthFactor,
-                                               halfMaxWidth * (riverLike ? 0.16f : 0.18f),
-                                               halfMaxWidth * (riverLike ? 0.34f : 0.62f));
-            return Sample{centerX, halfWidth};
-        };
-
         for (uint32_t iz = 0; iz <= zSegments; ++iz) {
             const float v = static_cast<float>(iz) / static_cast<float>(zSegments);
             const float baseLocalZ = halfLength - v * length;
-            const float shoreBlend = 1.0f - smooth(v);
-            const auto sample = profile(v);
+            const float shoreBlend = 1.0f - Smooth01(v);
+            const auto sample = SampleGenerativeWaterProfile(v, halfMaxWidth, riverLike);
 
             for (uint32_t ix = 0; ix <= xSegments; ++ix) {
                 const float u = static_cast<float>(ix) / static_cast<float>(xSegments);
@@ -586,6 +590,89 @@ namespace {
         }
 
         auto idx = [rowVerts](uint32_t x, uint32_t z) { return z * rowVerts + x; };
+        for (uint32_t iz = 0; iz < zSegments; ++iz) {
+            for (uint32_t ix = 0; ix < xSegments; ++ix) {
+                const uint32_t a = idx(ix, iz);
+                const uint32_t b = idx(ix + 1u, iz);
+                const uint32_t c = idx(ix, iz + 1u);
+                const uint32_t d = idx(ix + 1u, iz + 1u);
+                mesh->indices.insert(mesh->indices.end(), {a, b, d, a, d, c});
+            }
+        }
+
+        mesh->UpdateBounds();
+        return mesh;
+    }
+
+    std::shared_ptr<Scene::MeshData> CreateGenerativeWaterBedMesh(float maxWidth,
+                                                                  float length,
+                                                                  bool riverLike,
+                                                                  float depth,
+                                                                  uint32_t zSegments = 48u,
+                                                                  uint32_t xSegments = 10u) {
+        auto mesh = std::make_shared<Scene::MeshData>();
+        mesh->kind = Scene::MeshKind::Procedural;
+        zSegments = std::clamp(zSegments, 8u, 96u);
+        xSegments = std::clamp(xSegments, 4u, 24u);
+        depth = std::max(depth, 0.25f);
+
+        const float halfLength = length * 0.5f;
+        const float halfMaxWidth = maxWidth * 0.5f;
+        const uint32_t rowVerts = xSegments + 1u;
+        mesh->positions.reserve((zSegments + 1u) * rowVerts);
+        mesh->normals.resize((zSegments + 1u) * rowVerts, glm::vec3(0.0f, 1.0f, 0.0f));
+        mesh->texCoords.reserve((zSegments + 1u) * rowVerts);
+
+        auto idx = [rowVerts](uint32_t x, uint32_t z) { return z * rowVerts + x; };
+        for (uint32_t iz = 0; iz <= zSegments; ++iz) {
+            const float v = static_cast<float>(iz) / static_cast<float>(zSegments);
+            const float baseLocalZ = halfLength - v * length;
+            const float shoreBlend = 1.0f - Smooth01(v);
+            const auto sample = SampleGenerativeWaterProfile(v, halfMaxWidth, riverLike);
+
+            for (uint32_t ix = 0; ix <= xSegments; ++ix) {
+                const float u = static_cast<float>(ix) / static_cast<float>(xSegments);
+                const float side = u * 2.0f - 1.0f;
+                const float edgeWeight = std::pow(std::abs(side), 1.65f);
+                const float scallop = (std::sin(v * 15.0f + side * 2.8f) * 0.020f +
+                                       std::sin(v * 27.0f - side * 5.4f) * 0.014f) * edgeWeight;
+                const float localX = sample.centerX + side * sample.halfWidth * (1.0f + scallop);
+                const float shoreCurve = riverLike
+                    ? std::sin(side * glm::pi<float>() * 0.72f) * 0.13f
+                    : (1.0f - std::abs(side)) * 0.34f + std::sin(side * 5.0f + 0.4f) * 0.055f;
+                const float localZ = baseLocalZ + shoreBlend * shoreCurve;
+                const float depthRamp = Smooth01(v);
+                const float channel = riverLike ? (0.55f + 0.45f * (1.0f - edgeWeight)) : (0.72f + 0.28f * (1.0f - edgeWeight));
+                const float bedNoise =
+                    std::sin(localX * 0.37f + v * 11.7f) * 0.030f +
+                    std::sin(localX * 0.91f - v * 23.1f) * 0.018f;
+                const float y = -(0.055f + depth * depthRamp * channel) + bedNoise * (0.35f + 0.65f * depthRamp);
+                mesh->positions.emplace_back(localX, y, localZ);
+                mesh->texCoords.emplace_back(u, v);
+            }
+        }
+
+        for (uint32_t iz = 0; iz <= zSegments; ++iz) {
+            for (uint32_t ix = 0; ix <= xSegments; ++ix) {
+                const uint32_t xl = ix > 0 ? ix - 1u : ix;
+                const uint32_t xr = ix < xSegments ? ix + 1u : ix;
+                const uint32_t zd = iz > 0 ? iz - 1u : iz;
+                const uint32_t zu = iz < zSegments ? iz + 1u : iz;
+                const glm::vec3 dx = mesh->positions[idx(xr, iz)] - mesh->positions[idx(xl, iz)];
+                const glm::vec3 dz = mesh->positions[idx(ix, zd)] - mesh->positions[idx(ix, zu)];
+                glm::vec3 n = glm::cross(dx, dz);
+                if (glm::length(n) < 1e-5f) {
+                    n = glm::vec3(0.0f, 1.0f, 0.0f);
+                } else {
+                    n = glm::normalize(n);
+                    if (n.y < 0.0f) {
+                        n = -n;
+                    }
+                }
+                mesh->normals[idx(ix, iz)] = n;
+            }
+        }
+
         for (uint32_t iz = 0; iz < zSegments; ++iz) {
             for (uint32_t ix = 0; ix < xSegments; ++ix) {
                 const uint32_t a = idx(ix, iz);
@@ -5109,29 +5196,73 @@ void Engine::BuildRecipeScene() {
                 }
             }
             if (genExt.waterOn) {
-                // The seabed: a gently tilted plane running from the shoreline (y=0)
-                // down to -2.5 m at the far edge.
-                const float seaLen = shoreZ - groundFar;
-                const float depth = 2.5f;
-                auto seabedPlane = Utils::MeshGenerator::CreatePlane(groundW, seaLen);
-                for (auto& uv : seabedPlane->texCoords) {
+                const bool riverLike = genExt.authoredSceneModule.moduleId == "desert_canyon_river";
+                const float seaLen = genExt.waterFromZ - groundFar;
+                const float seaMidZ = (genExt.waterFromZ + groundFar) * 0.5f;
+                const float waterBodyWidth = genExt.extent * (riverLike ? 1.55f : 1.65f);
+                auto farGroundPlane = CreateGenerativeTerrainMesh(groundW,
+                                                                   seaLen,
+                                                                   seaMidZ,
+                                                                   genExt.terrainRelief * 0.38f,
+                                                                   genExt.terrainMicroRelief * 0.55f,
+                                                                   shoreZ,
+                                                                   false,
+                                                                   std::min(genExt.terrainGrid, 72u),
+                                                                   genExt.terrainSeed + 17u);
+                for (auto& uv : farGroundPlane->texCoords) {
                     uv *= glm::vec2(uvTile, uvTile * (seaLen / groundW));
+                }
+                auto upFar = renderer->UploadMesh(farGroundPlane);
+                if (upFar.IsErr()) {
+                    spdlog::warn("generative_exterior: far shore floor mesh upload failed: {}", upFar.Error());
+                } else {
+                    entt::entity farGroundE = m_registry->CreateEntity();
+                    m_registry->AddComponent<Scene::TagComponent>(farGroundE, "GenerativeExterior_FarShoreFloor");
+                    auto& t = m_registry->AddComponent<TransformComponent>(farGroundE);
+                    t.position = glm::vec3(0.0f, -0.12f, seaMidZ);
+                    auto& r = m_registry->AddComponent<Scene::RenderableComponent>(farGroundE);
+                    r.mesh = farGroundPlane;
+                    dressGround(r);
+                    const glm::vec3 farTint = riverLike
+                        ? glm::mix(gcol * 0.74f, glm::vec3(0.20f, 0.14f, 0.10f), 0.26f)
+                        : glm::mix(gcol * 0.70f, glm::vec3(0.18f, 0.20f, 0.20f), 0.18f);
+                    r.albedoColor = glm::vec4(glm::max(farTint, glm::vec3(0.025f)), 1.0f);
+                    r.roughness = std::max(r.roughness, 0.90f);
+                    r.specularFactor = std::min(r.specularFactor, 0.10f);
+                    r.clearcoatFactor = 0.0f;
+                    r.wetnessFactor = std::min(r.wetnessFactor, 0.04f);
+                    r.occlusionStrength = std::max(r.occlusionStrength, 0.82f);
+                    spdlog::info("generative_exterior: created neutral far shore floor width={:.2f} length={:.2f} vertices={}",
+                                 groundW,
+                                 seaLen,
+                                 farGroundPlane->positions.size());
+                }
+
+                // The seabed follows the generated water footprint. A full-width
+                // tinted rectangle behind a curved water mesh still reads as a flat
+                // lake card, so the underwater ground must share the same silhouette.
+                const float depth = 2.5f;
+                auto seabedPlane = CreateGenerativeWaterBedMesh(waterBodyWidth,
+                                                                seaLen,
+                                                                riverLike,
+                                                                depth,
+                                                                riverLike ? 64u : 72u,
+                                                                riverLike ? 12u : 18u);
+                for (auto& uv : seabedPlane->texCoords) {
+                    uv *= glm::vec2(uvTile * (waterBodyWidth / groundW), uvTile * (seaLen / groundW));
                 }
                 auto upS = renderer->UploadMesh(seabedPlane);
                 if (upS.IsErr()) {
                     spdlog::warn("generative_exterior: seabed mesh upload failed: {}", upS.Error());
                 } else {
-                    const float alpha = std::asin(std::clamp(depth / seaLen, 0.0f, 0.5f));
                     entt::entity seabedE = m_registry->CreateEntity();
                     m_registry->AddComponent<Scene::TagComponent>(seabedE, "GenerativeExterior_Seabed");
                     auto& t = m_registry->AddComponent<TransformComponent>(seabedE);
-                    t.position = glm::vec3(0.0f, -depth * 0.5f, (shoreZ + groundFar) * 0.5f);
-                    t.rotation = glm::quat(glm::vec3(-alpha, 0.0f, 0.0f)); // shore edge up to y=0, far edge down to -depth
+                    t.position = glm::vec3(0.0f, 0.0f, seaMidZ);
                     auto& r = m_registry->AddComponent<Scene::RenderableComponent>(seabedE);
                     r.mesh = seabedPlane;
                     dressGround(r);
                     applyGeneratedTextureMaterial(r, "terrain_shore", false, true);
-                    const bool riverLike = genExt.authoredSceneModule.moduleId == "desert_canyon_river";
                     const glm::vec3 seabedTint = riverLike
                         ? glm::mix(gcol * 0.22f, genExt.waterDeep, 0.16f)
                         : glm::mix(gcol * 0.24f, genExt.waterDeep, 0.24f);
@@ -5140,6 +5271,10 @@ void Engine::BuildRecipeScene() {
                     r.specularFactor = 0.08f;
                     r.clearcoatFactor = 0.0f;
                     r.wetnessFactor = 0.12f;
+                    spdlog::info("generative_exterior: created shaped waterbed width={:.2f} length={:.2f} vertices={}",
+                                 waterBodyWidth,
+                                 seaLen,
+                                 seabedPlane->positions.size());
                 }
             }
             if (genExt.graphicsMaterials && genExt.waterOn && genExt.shoreLayerCount > 0) {
@@ -5150,10 +5285,11 @@ void Engine::BuildRecipeScene() {
                     glm::vec4(glm::max(glm::mix(gcol * 0.42f, genExt.waterDeep, 0.06f), glm::vec3(0.016f)), 1.0f),
                 };
                 const bool riverLike = genExt.authoredSceneModule.moduleId == "desert_canyon_river";
-                const float bankLen = std::max(shoreZ - groundFar, 1.0f);
-                const float bankMidZ = (shoreZ + groundFar) * 0.5f;
+                const float waterBodyWidth = genExt.extent * (riverLike ? 1.55f : 1.65f);
+                const float bankLen = std::max(genExt.waterFromZ - groundFar, 1.0f);
+                const float bankMidZ = (genExt.waterFromZ + groundFar) * 0.5f;
                 for (int i = 0; i < std::min(genExt.shoreLayerCount, 2); ++i) {
-                    auto shoreMesh = CreateGenerativeShoreBankMesh(groundW,
+                    auto shoreMesh = CreateGenerativeShoreBankMesh(waterBodyWidth,
                                                                    bankLen,
                                                                    riverLike,
                                                                    bandWidths[i],
@@ -7565,7 +7701,12 @@ void Engine::BuildRecipeScene() {
             const float waterLen = genExt.waterFromZ - farEdge;
             const float waterMidZ = (genExt.waterFromZ + farEdge) * 0.5f;
             const bool riverLike = genExt.authoredSceneModule.moduleId == "desert_canyon_river";
-            auto waterMesh = CreateGenerativeWaterBodyMesh(genExt.extent * 2.0f, waterLen, riverLike);
+            const float waterBodyWidth = genExt.extent * (riverLike ? 1.55f : 1.65f);
+            auto waterMesh = CreateGenerativeWaterBodyMesh(waterBodyWidth,
+                                                           waterLen,
+                                                           riverLike,
+                                                           riverLike ? 64u : 72u,
+                                                           riverLike ? 12u : 18u);
             auto up = renderer->UploadMesh(waterMesh);
             if (up.IsErr()) {
                 spdlog::warn("generative_exterior: water mesh upload failed: {}", up.Error());
@@ -7616,7 +7757,7 @@ void Engine::BuildRecipeScene() {
                 m_registry->AddComponent<Scene::WaterSurfaceComponent>(water, sea);
                 spdlog::info("generative_exterior: structural water surface component=WaterSurfaceComponent shape={} width={:.2f} length={:.2f} vertices={} triangles={} level={:.2f} gerstner_shader=on absorption={:.2f} body={:.2f} tint_strength={:.2f} shallow=({:.2f},{:.2f},{:.2f})",
                              riverLike ? "s_curve_river" : "curved_lake_cove",
-                             genExt.extent * 2.0f,
+                             waterBodyWidth,
                              waterLen,
                              waterMesh->positions.size(),
                              waterMesh->indices.size() / 3u,

@@ -187,3 +187,8 @@
   river-only material correction before the probe. Visual truth remains negative: cleaner, but
   still staged/disconnected and below AA/AAA. Accept only as a bounded water/backdrop systems
   checkpoint, then continue to asset replacement, terrain composition, and stronger lighting.
+- 2026-07-06: `tools/run_genscene_acceptance.ps1 -Tag phase4_water_ridge_depth_20260706`
+  wrote green `CURRENT.md`. Result: PASS for clean tree, ratchet freeze, Python compile,
+  curation, graphics reset, Release build, structural scene gate, and phase0 policy. Loop 4
+  remains open. Next active item is real asset/composition/lighting coherence: the water and
+  ridge systems are less proxy-like, but the accepted stills still look staged and disconnected.

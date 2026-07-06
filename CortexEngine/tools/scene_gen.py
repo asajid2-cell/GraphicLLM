@@ -1573,9 +1573,22 @@ def run_pipeline(prompt, name, backends, iters=3, refresh_catalog=False, verbose
     def _candidate_rank(candidate):
         crit = candidate.get("crit") or {}
         score = crit.get("score") if isinstance(crit.get("score"), (int, float)) else 0
+        hard = candidate.get("hard_quality")
+        hard_rank = 1 if hard is None or hard.get("passed") else 0
         color_rank = 0 if crit.get("color_ok") is False else 1
         verdict_rank = {"bad": 0, "reframe": 1, "good": 2}.get(str(crit.get("verdict") or "").lower(), 1)
-        return (color_rank, float(score or 0), verdict_rank, -int(candidate.get("iter", 0)))
+        return (hard_rank, color_rank, float(score or 0), verdict_rank, -int(candidate.get("iter", 0)))
+
+    def _hard_quality_report(png_path):
+        try:
+            from scene_quality_gate import evaluate as evaluate_quality
+            report = evaluate_quality(prompt, ir, Path(png_path), None, False)
+            return {
+                "passed": bool(report.get("passed")),
+                "failures": [str(f.get("code", "")) for f in report.get("failures", []) if isinstance(f, dict)],
+            }
+        except Exception as exc:
+            return {"passed": False, "failures": [f"hard_quality_exception:{exc}"]}
 
     for it in range(iters):
         png = render_ir(ir, f"{name}_{it}", camera=camera, night=night)
@@ -1591,14 +1604,17 @@ def run_pipeline(prompt, name, backends, iters=3, refresh_catalog=False, verbose
             if verbose:
                 print(f"[render] iter {it}: FAILED after retries -- keeping best so far")
             break
+        hard_quality = _hard_quality_report(png)
         crit = None if skip_critic else (critique(png, prompt) if backends != ["offline"] else None)
         score = crit.get("score") if crit else None
         if verbose:
-            extra = ""
+            extra = f" hard_ok={hard_quality.get('passed')}"
+            if hard_quality.get("failures"):
+                extra += f" hard_fail={','.join(hard_quality.get('failures', [])[:2])}"
             if crit:
-                extra = f" score={score} color_ok={crit.get('color_ok')} dom={crit.get('dominant_color')} verdict={crit.get('verdict')}"
+                extra += f" score={score} color_ok={crit.get('color_ok')} dom={crit.get('dominant_color')} verdict={crit.get('verdict')}"
             print(f"[iter {it}] {Path(png).name}{extra}")
-        cur = {"iter": it, "png": png, "crit": crit, "camera": camera}
+        cur = {"iter": it, "png": png, "crit": crit, "camera": camera, "hard_quality": hard_quality}
         if best is None or _candidate_rank(cur) > _candidate_rank(best):
             best = cur
         if not crit or crit.get("verdict") == "good" or (score or 0) >= 5:

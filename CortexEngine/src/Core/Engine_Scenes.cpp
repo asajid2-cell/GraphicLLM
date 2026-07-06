@@ -6588,13 +6588,13 @@ void Engine::BuildRecipeScene() {
         if (auto* renderer = m_renderer.get()) {
             auto lanternMesh = LoadNaturalisticShowcaseMesh("Lantern_01/Lantern_01_1k.gltf");
             auto tableMesh = LoadNaturalisticShowcaseMesh("WoodenTable_01/WoodenTable_01_1k.gltf");
-            auto barrelMesh = LoadNaturalisticShowcaseMesh("Barrel_01/Barrel_01_1k.gltf");
+            auto chairMesh = LoadNaturalisticShowcaseMesh("WoodenChair_01/WoodenChair_01_1k.gltf");
             auto boulderMesh = LoadNaturalisticShowcaseMesh("boulder_01/boulder_01_1k.gltf");
 
             const bool uploadsOk =
                 UploadAssetLedMesh(renderer, lanternMesh, "source-bound Lantern_01") &&
                 UploadAssetLedMesh(renderer, tableMesh, "source-bound WoodenTable_01") &&
-                UploadAssetLedMesh(renderer, barrelMesh, "source-bound Barrel_01") &&
+                UploadAssetLedMesh(renderer, chairMesh, "source-bound WoodenChair_01") &&
                 UploadAssetLedMesh(renderer, boulderMesh, "source-bound boulder_01");
             if (!uploadsOk) {
                 spdlog::warn("generative_exterior: source-bound hero geometry mesh upload failed");
@@ -6635,21 +6635,6 @@ void Engine::BuildRecipeScene() {
                     Scene::RenderableComponent::RenderLayer::Opaque,
                     "wood"
                 };
-                const AssetLedMaterialSettings darkUtility{
-                    glm::vec4(0.24f, 0.20f, 0.16f, 1.0f),
-                    0.16f,
-                    0.42f,
-                    0.0f,
-                    1.5f,
-                    glm::vec3(0.0f),
-                    1.0f,
-                    wetness * 0.18f,
-                    0.36f,
-                    false,
-                    Scene::RenderableComponent::AlphaMode::Opaque,
-                    Scene::RenderableComponent::RenderLayer::Opaque,
-                    "masonry"
-                };
                 const AssetLedMaterialSettings anchorStone{
                     glm::vec4(desertSurface ? glm::vec3(0.50f, 0.31f, 0.20f) : glm::vec3(0.16f, 0.19f, 0.15f), 1.0f),
                     0.0f,
@@ -6669,7 +6654,7 @@ void Engine::BuildRecipeScene() {
                 auto sourceSets = 0;
                 sourceSets += (lanternMesh && lanternMesh->gpuBuffers) ? 1 : 0;
                 sourceSets += (tableMesh && tableMesh->gpuBuffers) ? 1 : 0;
-                sourceSets += (barrelMesh && barrelMesh->gpuBuffers) ? 1 : 0;
+                sourceSets += (chairMesh && chairMesh->gpuBuffers) ? 1 : 0;
                 sourceSets += (boulderMesh && boulderMesh->gpuBuffers) ? 1 : 0;
 
                 auto addSource = [&](const std::string& tag,
@@ -6713,13 +6698,13 @@ void Engine::BuildRecipeScene() {
 
                 for (int i = 0; i < genExt.sourceGeometryFidelity.scannedLanternCount; ++i) {
                     const glm::vec3 pos = hasCabin
-                        ? cabinPlace(-1.15f + 2.30f * static_cast<float>(i % 2), 0.42f, 2.28f + 0.18f * static_cast<float>(i / 2))
-                        : glm::vec3(0.94f + 0.46f * static_cast<float>(i), 0.38f, 1.18f + 0.16f * static_cast<float>(i % 2));
+                        ? cabinPlace(-1.25f + 1.25f * static_cast<float>(i), 0.50f, 2.28f + 0.20f * static_cast<float>(i % 2))
+                        : glm::vec3(0.72f + 0.42f * static_cast<float>(i), 0.48f, 1.00f + 0.18f * static_cast<float>(i % 2));
                     addSource("GenerativeExterior_SourceLantern" + std::to_string(i),
                               "Lantern_01",
                               lanternMesh,
                               pos,
-                              glm::vec3(hasCabin ? 0.32f : 0.28f),
+                              glm::vec3(hasCabin ? 0.46f : 0.42f),
                               glm::vec3(0.0f, glm::radians(-18.0f + 24.0f * static_cast<float>(i)), 0.0f),
                               warmBrass,
                               lanterns);
@@ -6727,21 +6712,21 @@ void Engine::BuildRecipeScene() {
 
                 for (int i = 0; i < genExt.sourceGeometryFidelity.scannedUtilityPropCount; ++i) {
                     const bool useTable = (i == 0);
-                    const auto& mesh = useTable ? tableMesh : barrelMesh;
-                    const char* assetId = useTable ? "WoodenTable_01" : "Barrel_01";
+                    const auto& mesh = useTable ? tableMesh : chairMesh;
+                    const char* assetId = useTable ? "WoodenTable_01" : "WoodenChair_01";
                     const glm::vec3 scale = useTable
-                        ? glm::vec3(hasCabin ? 0.48f : 0.42f)
-                        : glm::vec3(hasCabin ? 0.34f : 0.30f);
+                        ? glm::vec3(hasCabin ? 0.66f : 0.58f)
+                        : glm::vec3(hasCabin ? 0.42f : 0.36f);
                     const glm::vec3 pos = hasCabin
-                        ? cabinPlace(-0.48f + 0.72f * static_cast<float>(i), useTable ? 0.30f : 0.34f, 2.50f + 0.22f * static_cast<float>(i % 2))
-                        : glm::vec3(-0.85f + 0.72f * static_cast<float>(i), useTable ? 0.28f : 0.33f, 1.52f - 0.24f * static_cast<float>(i % 2));
+                        ? cabinPlace(-0.70f + 0.58f * static_cast<float>(i), useTable ? 0.38f : 0.42f, 2.46f + 0.24f * static_cast<float>(i % 2))
+                        : glm::vec3(-1.10f + 0.58f * static_cast<float>(i), useTable ? 0.36f : 0.42f, 1.42f - 0.18f * static_cast<float>(i % 2));
                     addSource("GenerativeExterior_SourceUtilityProp" + std::to_string(i),
                               assetId,
                               mesh,
                               pos,
                               scale,
                               glm::vec3(0.0f, glm::radians(-20.0f + 22.0f * static_cast<float>(i)), 0.0f),
-                              useTable ? wetWood : darkUtility,
+                              wetWood,
                               utilityProps);
                 }
 
@@ -6752,8 +6737,8 @@ void Engine::BuildRecipeScene() {
                     addSource("GenerativeExterior_SourceAnchorRock" + std::to_string(i),
                               "boulder_01",
                               boulderMesh,
-                              glm::vec3(x, 0.055f, z),
-                              glm::vec3(0.20f + 0.035f * static_cast<float>(i % 3)),
+                              glm::vec3(x, 0.075f, z),
+                              glm::vec3(0.30f + 0.050f * static_cast<float>(i % 3)),
                               glm::vec3(glm::radians(-2.0f + 3.0f * static_cast<float>(i % 2)),
                                         glm::radians(31.0f * static_cast<float>(i)),
                                         glm::radians(-4.0f + 5.0f * static_cast<float>(i % 3))),

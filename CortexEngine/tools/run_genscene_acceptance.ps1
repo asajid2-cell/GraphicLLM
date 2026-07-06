@@ -183,9 +183,30 @@ try {
 $graphicsResetDetails | Out-File -FilePath $graphicsResetLog -Encoding utf8
 Report 'graphics_gate_reset' $graphicsResetOk $graphicsResetLog
 
+$releaseBuildOk = $true
+if ($SkipBuild) {
+    Report 'release_build' $true 'skipped by -SkipBuild'
+} else {
+    $buildLog = Join-Path $dir 'release_build.log'
+    $vs = Find-VsDevCmd
+    if (-not $vs) {
+        $releaseBuildOk = $false
+        Report 'release_build' $false 'VsDevCmd.bat not found'
+    } else {
+        $cmdLine = '"' + $vs + '" -arch=x64 >nul && cmake --build build --config Release'
+        & cmd.exe /d /s /c $cmdLine *> $buildLog
+        $releaseBuildOk = $LASTEXITCODE -eq 0
+        Report 'release_build' $releaseBuildOk $buildLog
+    }
+}
+
 $structuralLog = Join-Path $dir 'structural_scene_gate.log'
 $structuralOk = $true
 $structuralDetails = @()
+if (-not $releaseBuildOk) {
+    $structuralOk = $false
+    $structuralDetails += 'skipped because release_build failed; refusing to render with a stale binary'
+} else {
 try {
     $structuralItems = @(
         @{
@@ -264,22 +285,9 @@ try {
     $structuralOk = $false
     $structuralDetails += $_.Exception.Message
 }
+}
 $structuralDetails | Out-File -FilePath $structuralLog -Encoding utf8
 Report 'structural_scene_gate' $structuralOk $structuralLog
-
-if ($SkipBuild) {
-    Report 'release_build' $true 'skipped by -SkipBuild'
-} else {
-    $buildLog = Join-Path $dir 'release_build.log'
-    $vs = Find-VsDevCmd
-    if (-not $vs) {
-        Report 'release_build' $false 'VsDevCmd.bat not found'
-    } else {
-        $cmdLine = '"' + $vs + '" -arch=x64 >nul && cmake --build build --config Release'
-        & cmd.exe /d /s /c $cmdLine *> $buildLog
-        Report 'release_build' ($LASTEXITCODE -eq 0) $buildLog
-    }
-}
 
 $phase0Policy = 'dirty tree and old overlay-gate changes must not be accepted by assertion'
 Report 'phase0_policy' $cleanTree $phase0Policy

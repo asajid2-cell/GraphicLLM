@@ -373,6 +373,16 @@ def compile_v3_to_v2(v3: dict[str, Any]) -> dict[str, Any]:
         env["look"] = {"time": "golden_hour", "grade": "desert_canyon_contrast"}
         env["fog"] = {"density": max(env["fog"]["density"], 0.012), "start": 8.0}
         env["exposure"] = min(env["exposure"], 0.84)
+        env["water"].update({
+            "shallow": [0.0, 2.75, 4.10],
+            "deep": [0.0, 1.18, 2.24],
+            "roughness": min(env["water"]["roughness"], 0.052),
+            "fresnel": 0.18,
+            "absorption": max(env["water"]["absorption"], 1.22),
+            "foam": max(env["water"]["foam"], 0.24),
+            "body_thickness": max(env["water"]["body_thickness"], 1.34),
+            "color_strength": 1.0,
+        })
     elif authored_module_id == "alpine_cabin_lake":
         env["sun"].update({
             "azimuth_deg": 214.0,
@@ -706,13 +716,13 @@ def compile_v3_to_v2(v3: dict[str, Any]) -> dict[str, Any]:
         },
         "naturalistic_ecology": {
             "enabled": True,
-            "grass_cluster_count": 14 if not desert else 0,
-            "bush_cluster_count": 6 if not desert else 0,
-            "fern_cluster_count": 5 if not desert else 0,
-            "trunk_count": 3 if not desert else 2,
-            "branch_count": 3 if not desert else 6,
-            "stump_count": 2,
-            "moss_rock_count": 5 if not desert else 5,
+            "grass_cluster_count": 20 if not desert else 0,
+            "bush_cluster_count": 8 if not desert else 1,
+            "fern_cluster_count": 7 if not desert else 0,
+            "trunk_count": 4 if not desert else 2,
+            "branch_count": 6 if not desert else 8,
+            "stump_count": 3 if not desert else 2,
+            "moss_rock_count": 8 if not desert else 7,
             "systems": [
                 "scanned_grass_clumps",
                 "scanned_ferns_or_bushes",
@@ -723,9 +733,9 @@ def compile_v3_to_v2(v3: dict[str, Any]) -> dict[str, Any]:
         },
         "asset_fidelity": {
             "enabled": True,
-            "hero_detail_count": (8 if campsite else 4) + (12 if cabin else 0),
-            "camp_detail_count": 8 if campsite else 0,
-            "cabin_facade_detail_count": 12 if cabin else 0,
+            "hero_detail_count": (4 if campsite else 3) + (6 if cabin else 0),
+            "camp_detail_count": 4 if campsite else 0,
+            "cabin_facade_detail_count": 6 if cabin else 0,
             "backdrop_detail_layers": 5 if canyon else 4,
             "foreground_dressing_clusters": 0,
             "detail_systems": [
@@ -741,13 +751,13 @@ def compile_v3_to_v2(v3: dict[str, Any]) -> dict[str, Any]:
         },
         "hero_environment_geometry": {
             "enabled": True,
-            "high_detail_camp_piece_count": 14 if campsite else 0,
-            "high_detail_cabin_piece_count": 14 if cabin else 0,
+            "high_detail_camp_piece_count": 4 if campsite else 0,
+            "high_detail_cabin_piece_count": 5 if cabin else 0,
             "mountain_mass_layer_count": 5 if (water_on or canyon or cabin) else 3,
             "cliff_mass_piece_count": 14 if canyon else 0,
-            "shoreline_prop_count": 10 if water_on else 0,
+            "shoreline_prop_count": 7 if water_on else 0,
             "irregular_tree_silhouette_count": 12 if not desert else 0,
-            "support_prop_count": 5 if campsite else (4 if cabin else 3),
+            "support_prop_count": 3 if campsite else (3 if cabin else 2),
             "detail_systems": [
                 "high_detail_camp_kit",
                 "high_detail_cabin_kit",
@@ -786,10 +796,10 @@ def compile_v3_to_v2(v3: dict[str, Any]) -> dict[str, Any]:
         "source_geometry_fidelity": {
             "enabled": True,
             "source_asset_set_count": 4,
-            "scanned_lantern_count": 2 if (campsite or cabin) else 0,
-            "scanned_utility_prop_count": 3 if campsite else (2 if cabin else 1),
-            "scanned_anchor_rock_count": 4 if water_on else 3,
-            "hero_anchor_count": 7 if campsite else (6 if cabin else 4),
+            "scanned_lantern_count": 3 if (campsite or cabin) else 0,
+            "scanned_utility_prop_count": 1 if (campsite or cabin) else 0,
+            "scanned_anchor_rock_count": 8 if water_on else 5,
+            "hero_anchor_count": 11 if campsite else (10 if cabin else 6),
             "systems": [
                 "scanned_lantern_pbr_mesh",
                 "scanned_table_or_barrel_pbr_mesh",
@@ -804,15 +814,15 @@ def compile_v3_to_v2(v3: dict[str, Any]) -> dict[str, Any]:
                     "canyon_hero_massing" if canyon else "landscape_hero_overbuild"
                 )
             ),
-            "canvas_shell_panel_count": 16 if campsite else 0,
-            "fabric_layer_count": 18 if campsite else 0,
-            "structural_pole_count": 10 if campsite else 0,
-            "rope_stake_count": 14 if campsite else 0,
-            "low_poly_mask_count": 5 if campsite else 0,
-            "cabin_facade_module_count": 18 if cabin else 0,
-            "cabin_roof_module_count": 10 if cabin else 0,
-            "cabin_deck_foundation_count": 12 if cabin else 0,
-            "hero_rock_mass_count": 12 if canyon else (6 if not (campsite or cabin) else 0),
+            "canvas_shell_panel_count": 3 if campsite else 0,
+            "fabric_layer_count": 4 if campsite else 0,
+            "structural_pole_count": 4 if campsite else 0,
+            "rope_stake_count": 4 if campsite else 0,
+            "low_poly_mask_count": 0,
+            "cabin_facade_module_count": 6 if cabin else 0,
+            "cabin_roof_module_count": 4 if cabin else 0,
+            "cabin_deck_foundation_count": 4 if cabin else 0,
+            "hero_rock_mass_count": 5 if canyon else (3 if not (campsite or cabin) else 0),
             "systems": [
                 "dominant_canvas_shell_replaces_orange_tent_read",
                 "layered_fabric_wrinkles_and_edge_hems",

@@ -117,3 +117,11 @@
   curation, graphics reset, fresh structural scene generation/gating, Release build, and
   phase0 policy. Loop 4 remains open; next active item is a real lighting/material/asset
   system pass, not more overlay-count trimming.
+- 2026-07-06: Loop 4 dirty verifier probe
+  `tools/run_genscene_acceptance.ps1 -Tag phase4_source_asset_ladder_dirty_probe6_20260706 -SkipBuild`
+  wrote red `CURRENT_FAILED.md` as expected. The source-asset ladder diff passed ratchet
+  freeze, Python compile, curation, graphics reset, and structural scene gates, and failed
+  only dirty-tree policy gates. The runner now builds before structural renders on full
+  runs, and `scene_gen.py` ranks candidates by the hard semantic gate before critic score.
+  Visual truth remains negative: the scenes are cleaner and less primitive-heavy, but still
+  not a serious AAA result.

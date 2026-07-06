@@ -332,3 +332,19 @@ Status: pending.
   `gen_a_stormy_alpine_lake_with_a_smal_0.png`, and desert
   `gen_a_sunny_desert_canyon_campsite_w_0.png`. Visual truth remains negative; Loop 4 stays
   open for actual lighting/material/asset replacement.
+- 2026-07-06: Loop 4 iteration 5 replaced part of the primitive hero overbuild with source
+  assets and tightened verifier freshness. The full runner now performs Release build before
+  fresh structural renders so engine changes cannot be judged by a stale binary. The compiler
+  increased naturalistic ecology/source anchors, reduced hero asset replacement from large
+  primitive stacks to small support budgets, and removed low-poly masks. Runtime source props
+  were scaled into the hero cluster, then utility clutter was reduced to one wooden table
+  after chair/barrel variants proved visually sloppy. `scene_gen.py` now ranks candidates by
+  `scene_quality_gate.py` hard semantic result before critic color/score, while the runner
+  still re-gates the selected PNG independently. Dirty probe
+  `phase4_source_asset_ladder_dirty_probe6_20260706 -SkipBuild` selected campsite
+  `gen_a_foggy_mountain_campsite_beside_1.png`, alpine
+  `gen_a_stormy_alpine_lake_with_a_smal_0.png`, and desert
+  `gen_a_sunny_desert_canyon_campsite_w_0.png`; all passed quality, graphics, and
+  terrain/water receipt checks. Receipts show campsite source anchors at 12 and primitive
+  campsite overbuild at 15 pieces with zero low-poly masks. Visual truth remains negative:
+  this is a structural cleanup/source-asset checkpoint, not a solved AAA scene.

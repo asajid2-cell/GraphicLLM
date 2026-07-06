@@ -556,3 +556,20 @@ Status: pending.
   `gen_a_sunny_desert_canyon_campsite_w_0.png`. Visual truth remains negative; Loop 4 stays
   open. Next active work should target water/shore band geometry, backdrop massing, and
   primitive hero/background forms rather than more bloom tuning.
+- 2026-07-06: Loop 4 iteration 14 dirty probe attacked visible noise and strip artifacts without
+  adding gates or proxy overlays. The compiler now requests zero visible haze depth bands,
+  horizon blend bands, terrain macro breakup cards, and directional shadow lanes; shoreline props
+  are fewer and placed on flanks; primitive tree silhouettes are disabled; Kenney/source pine
+  backdrop trees are reduced and pushed farther back; generated exteriors now use much lower
+  renderer particle density and scale down the recipe dust emitter. Renderer-side backstops keep
+  stale IR environment/haze/water/reflection/shadow-lane counts non-visible. Heartbeats
+  `genscene-visible-band-dirty-probe` and `genscene-visual-noise-dirty-probe` fired during the
+  probe runs. Dirty probe
+  `tools/run_genscene_acceptance.ps1 -Tag phase4_visual_noise_cleanup_dirty_probe_20260706`
+  passed ratchet freeze, Python compile, curation, graphics reset, Release build, and structural
+  scene gates, failing only expected `clean_tree` plus `phase0_policy`. Selected candidates were
+  campsite `gen_a_foggy_mountain_campsite_beside_0.png`, alpine
+  `gen_a_stormy_alpine_lake_with_a_smal_2.png`, and desert
+  `gen_a_sunny_desert_canyon_campsite_w_0.png`. Visual truth remains negative: visible speckle
+  and some strip clutter are reduced, but flat sheet water, primitive tent/cabin forms, and
+  backdrop/asset quality still block a serious AA/AAA result.

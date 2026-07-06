@@ -466,7 +466,7 @@ def compile_v3_to_v2(v3: dict[str, Any]) -> dict[str, Any]:
             for asset, x, z, yaw, foot in cliff_specs:
                 _add(objects, asset, x, z, yaw, foot, tint=rock_tint, placed=placed)
     else:
-        _scatter_ring(objects, "tree_pineTallA_detailed", 5, radius_x=19.0, z_base=-1.8, z_jitter=3.4,
+        _scatter_ring(objects, "tree_pineTallA_detailed", 2, radius_x=21.0, z_base=-5.6, z_jitter=2.4,
                       foot=3.0, seed=scene_type + ":trees", tint=foliage_tint,
                       placed=placed)
 
@@ -636,7 +636,7 @@ def compile_v3_to_v2(v3: dict[str, Any]) -> dict[str, Any]:
         "shot": env["shot"],
         "contact": {
             "decal_count": len(contact_patches),
-            "shore_layer_count": 1 if water_on else 0,
+            "shore_layer_count": 0,
             "patches": contact_patches,
         },
         "occlusion": {
@@ -754,8 +754,8 @@ def compile_v3_to_v2(v3: dict[str, Any]) -> dict[str, Any]:
             "high_detail_cabin_piece_count": 5 if cabin else 0,
             "mountain_mass_layer_count": 5 if (water_on or canyon or cabin) else 3,
             "cliff_mass_piece_count": 14 if canyon else 0,
-            "shoreline_prop_count": 7 if water_on else 0,
-            "irregular_tree_silhouette_count": 12 if not desert else 0,
+            "shoreline_prop_count": 4 if water_on else 0,
+            "irregular_tree_silhouette_count": 0,
             "support_prop_count": 3 if campsite else (3 if cabin else 2),
             "detail_systems": [
                 "high_detail_camp_kit",
@@ -851,11 +851,11 @@ def compile_v3_to_v2(v3: dict[str, Any]) -> dict[str, Any]:
             "enabled": True,
             "sky_layer_count": 6 if (moonlight or stormy or fog) else 5,
             "atmosphere_depth_cue_count": 7 if (canyon or moonlight or fog) else 5,
-            "horizon_blend_band_count": 4 if water_on else 3,
-            "terrain_macro_breakup_count": 5 if not desert else 4,
+            "horizon_blend_band_count": 0,
+            "terrain_macro_breakup_count": 0,
             "water_depth_band_count": 0,
             "reflection_band_count": 0,
-            "directional_shadow_lane_count": 3 if not moonlight else 2,
+            "directional_shadow_lane_count": 0,
             "backdrop_integration_layer_count": 7 if (canyon or cabin) else 6,
             "shadow_directionality": 0.82 if not moonlight else 0.72,
             "sky_gradient_strength": 0.72 if not moonlight else 0.42,
@@ -875,7 +875,7 @@ def compile_v3_to_v2(v3: dict[str, Any]) -> dict[str, Any]:
             "source_asset_set_count": 9 if canyon else 8,
             "fetched_rock_mass_count": 14 if canyon else 8,
             "kenney_cliff_backdrop_count": 3 if canyon else 1,
-            "detailed_tree_backdrop_count": 0 if desert else 4,
+            "detailed_tree_backdrop_count": 0 if desert else 2,
             "naturalistic_anchor_count": 9 if water_on else 6,
             "terrain_replacement_layer_count": 6 if canyon else 5,
             "backdrop_anchor_count": 15 if canyon else 12,
@@ -922,7 +922,7 @@ def compile_v3_to_v2(v3: dict[str, Any]) -> dict[str, Any]:
             "shadow_caster_count": 5 if not moonlight else 4,
             "material_blend_patch_count": 1 if canyon else 2,
             "light_volume_count": 3 if not moonlight else 2,
-            "nonplanar_shore_segment_count": (3 if canyon else 5) if water_on else 0,
+            "nonplanar_shore_segment_count": (2 if canyon else 3) if water_on else 0,
             "foundation_family": "embedded_tent_pad_and_fire_ring" if campsite else (
                 "stone_cabin_foundation_and_deck_contact" if cabin else "canyon_bank_embedded_camp"
             ),
@@ -1046,7 +1046,7 @@ def compile_v3_to_v2(v3: dict[str, Any]) -> dict[str, Any]:
             "night_sky_control": bool(moonlight),
             "storm_layer_count": 4 if stormy else (2 if fog else 1),
             "rain_streak_count": 28 if stormy else 0,
-            "haze_depth_layers": 4 if (stormy or moonlight or fog) else 2,
+            "haze_depth_layers": 0,
             "moonlight_exposure": 0.72 if moonlight else 0.0,
             "sky_background_lift": 0.38 if moonlight else 1.0,
         },

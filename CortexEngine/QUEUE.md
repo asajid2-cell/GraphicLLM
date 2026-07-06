@@ -248,3 +248,15 @@
   curation, graphics reset, Release build, structural scene gate, and phase0 policy. Loop 4
   remains open. Next active item is water/shore band geometry plus stronger backdrop and hero
   forms; the accepted stills are cleaner around emissives but are still not coherent AA/AAA shots.
+- 2026-07-06: Loop 4 water/visible-noise dirty probe
+  `tools/run_genscene_acceptance.ps1 -Tag phase4_visual_noise_cleanup_dirty_probe_20260706`
+  wrote red `CURRENT_FAILED.md` as expected. It passed ratchet freeze, Python compile,
+  curation, graphics reset, Release build, and structural scene gates, and failed only
+  `clean_tree` plus `phase0_policy` because the implementation was intentionally uncommitted.
+  The change disables remaining visible haze/environment strip emitters, moves shore props to
+  flank grounding, reduces recipe/global particle speckle, and demotes primitive/Kenney tree
+  clutter. Selected candidates were campsite `gen_a_foggy_mountain_campsite_beside_0.png`,
+  alpine `gen_a_stormy_alpine_lake_with_a_smal_2.png`, and desert
+  `gen_a_sunny_desert_canyon_campsite_w_0.png`. Visual truth remains negative: frames are
+  cleaner, but water sheets, primitive tent/cabin forms, and weak backdrop/asset quality still
+  block a real AA/AAA result.

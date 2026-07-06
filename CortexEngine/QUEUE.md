@@ -99,3 +99,16 @@
   wrote green `CURRENT.md`. Result: PASS for clean tree, ratchet freeze, Python compile,
   curation, graphics reset, structural scene gate, Release build, and phase0 policy.
   Loop 4 remains open; next item is hero mesh/material replacement and material response.
+- 2026-07-06: Loop 4 dirty verifier probe
+  `tools/run_genscene_acceptance.ps1 -Tag phase4_hero_material_cleanup_dirty_probe2_20260706 -SkipBuild`
+  wrote red `CURRENT_FAILED.md`. Result: `structural_scene_gate` failed because the runner
+  was still hardcoded to stale desert candidate `_2` while the generator selected a valid
+  best candidate. This was treated as a verifier wiring defect, not as visual acceptance.
+- 2026-07-06: Loop 4 dirty verifier probe
+  `tools/run_genscene_acceptance.ps1 -Tag phase4_hero_material_cleanup_dirty_probe3_20260706 -SkipBuild`
+  wrote red `CURRENT_FAILED.md` as expected. The runner now renders each canonical prompt
+  fresh, parses `best render:`, and gates the selected candidate. It passed ratchet freeze,
+  Python compile, curation, graphics reset, and structural scene gates; it failed only
+  `clean_tree` and `phase0_policy` because the implementation was intentionally uncommitted.
+  Visual truth remains negative; this checkpoint is only a hero/material overpaint cleanup
+  and runner freshness fix.

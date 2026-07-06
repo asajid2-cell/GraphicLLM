@@ -308,3 +308,18 @@ Status: pending.
   ratchet freeze, Python compile, curation, graphics reset, structural scene gate, Release build,
   and phase0 policy, and rewrote `CURRENT.md` to accepted tag
   `phase4_composition_cleanup_20260706`.
+- 2026-07-06: Loop 4 iteration 4 reduced hero/material overpaint counts instead of adding
+  more proof geometry, and fixed candidate selection so color-failing critic results cannot
+  win equal-score ties. The first dirty probe
+  `phase4_hero_material_cleanup_dirty_probe2_20260706 -SkipBuild` failed
+  `structural_scene_gate` because the runner was hardcoded to stale desert candidate `_2`;
+  direct gating showed the selected `_0` candidate passed semantic and graphics checks.
+  The runner verifier was then corrected to render each canonical prompt fresh, parse
+  `best render:`, and gate that selected candidate without weakening semantic/render-health
+  checks. Dirty probe
+  `phase4_hero_material_cleanup_dirty_probe3_20260706 -SkipBuild` selected campsite
+  `gen_a_foggy_mountain_campsite_beside_1.png`, alpine
+  `gen_a_stormy_alpine_lake_with_a_smal_1.png`, and desert
+  `gen_a_sunny_desert_canyon_campsite_w_2.png`; all passed quality, graphics, and
+  terrain/water receipt checks. The probe failed only expected dirty-tree policy gates.
+  Visual truth remains negative; next work must move to real lighting/material/asset systems.

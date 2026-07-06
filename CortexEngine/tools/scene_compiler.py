@@ -695,8 +695,8 @@ def compile_v3_to_v2(v3: dict[str, Any]) -> dict[str, Any]:
             "enabled": True,
             "cliff_mesh_vertical_bands": 6 if canyon else 0,
             "cliff_overhang_count": 12 if canyon else 0,
-            "hero_bevel_detail_count": 18 if (campsite or cabin) else 10,
-            "prop_depth_layer_count": 9 if (campsite or cabin) else 6,
+            "hero_bevel_detail_count": 7 if (campsite or cabin) else 5,
+            "prop_depth_layer_count": 4 if (campsite or cabin) else 3,
             "systems": [
                 "faceted_cliff_wall_mesh",
                 "hero_beveled_edges",
@@ -723,9 +723,9 @@ def compile_v3_to_v2(v3: dict[str, Any]) -> dict[str, Any]:
         },
         "asset_fidelity": {
             "enabled": True,
-            "hero_detail_count": (18 if campsite else 6) + (24 if cabin else 0),
-            "camp_detail_count": 18 if campsite else 0,
-            "cabin_facade_detail_count": 24 if cabin else 0,
+            "hero_detail_count": (8 if campsite else 4) + (12 if cabin else 0),
+            "camp_detail_count": 8 if campsite else 0,
+            "cabin_facade_detail_count": 12 if cabin else 0,
             "backdrop_detail_layers": 5 if canyon else 4,
             "foreground_dressing_clusters": 0,
             "detail_systems": [
@@ -741,13 +741,13 @@ def compile_v3_to_v2(v3: dict[str, Any]) -> dict[str, Any]:
         },
         "hero_environment_geometry": {
             "enabled": True,
-            "high_detail_camp_piece_count": 34 if campsite else 0,
-            "high_detail_cabin_piece_count": 30 if cabin else 0,
+            "high_detail_camp_piece_count": 14 if campsite else 0,
+            "high_detail_cabin_piece_count": 14 if cabin else 0,
             "mountain_mass_layer_count": 5 if (water_on or canyon or cabin) else 3,
             "cliff_mass_piece_count": 14 if canyon else 0,
             "shoreline_prop_count": 10 if water_on else 0,
             "irregular_tree_silhouette_count": 12 if not desert else 0,
-            "support_prop_count": 12 if campsite else (8 if cabin else 4),
+            "support_prop_count": 5 if campsite else (4 if cabin else 3),
             "detail_systems": [
                 "high_detail_camp_kit",
                 "high_detail_cabin_kit",
@@ -884,10 +884,10 @@ def compile_v3_to_v2(v3: dict[str, Any]) -> dict[str, Any]:
         },
         "hero_material_shadow_readability": {
             "enabled": True,
-            "hero_material_panel_count": 24 if campsite else (22 if cabin else 16),
-            "hero_shadow_receiver_count": 18 if campsite else (16 if cabin else 12),
-            "local_fill_light_count": 3 if (campsite or cabin) else 2,
-            "rim_light_count": 3 if (campsite or cabin) else 2,
+            "hero_material_panel_count": 8 if campsite else (9 if cabin else 7),
+            "hero_shadow_receiver_count": 3 if campsite else (3 if cabin else 2),
+            "local_fill_light_count": 2 if (campsite or cabin) else 1,
+            "rim_light_count": 2 if (campsite or cabin) else 1,
             "material_contrast": 0.64 if not moonlight else 0.54,
             "exposure_lift": 0.16 if campsite else (0.10 if moonlight else 0.12),
             "shadow_softness": 0.58 if not moonlight else 0.46,
@@ -929,11 +929,11 @@ def compile_v3_to_v2(v3: dict[str, Any]) -> dict[str, Any]:
         "hero_mesh_material_overhaul": {
             "enabled": True,
             "tent_shell_count": 1 if campsite else 0,
-            "cabin_cladding_count": 20 if cabin else 0,
-            "roof_layer_count": 10 if cabin else 0,
-            "canyon_hero_mesh_count": 12 if canyon else 0,
-            "pbr_material_layer_count": 8 if (campsite or cabin or canyon) else 6,
-            "lowpoly_silhouette_mask_count": 6 if campsite else (6 if cabin else 4),
+            "cabin_cladding_count": 10 if cabin else 0,
+            "roof_layer_count": 5 if cabin else 0,
+            "canyon_hero_mesh_count": 8 if canyon else 0,
+            "pbr_material_layer_count": 6 if (campsite or cabin or canyon) else 4,
+            "lowpoly_silhouette_mask_count": 1 if campsite else (2 if cabin else 1),
             "overhaul_family": "aframe_canvas_pbr_shell" if campsite else (
                 "cabin_cladding_roof_pbr" if cabin else "canyon_rock_mesh_pbr"
             ),

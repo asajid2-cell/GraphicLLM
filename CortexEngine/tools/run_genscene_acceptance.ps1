@@ -191,25 +191,43 @@ try {
         @{
             name = 'campsite'
             prompt = 'a foggy mountain campsite beside a purple lake at dawn'
-            base = 'gen_a_foggy_mountain_campsite_beside_2'
         },
         @{
             name = 'alpine'
             prompt = 'a stormy alpine lake with a small cabin and blue moonlight'
-            base = 'gen_a_stormy_alpine_lake_with_a_smal_2'
         },
         @{
             name = 'desert'
             prompt = 'a sunny desert canyon campsite with red rocks and a turquoise river'
-            base = 'gen_a_sunny_desert_canyon_campsite_w_2'
         }
     )
     foreach ($item in $structuralItems) {
-        $base = Join-Path 'build\bin\logs' $item.base
+        $sceneGenLog = Join-Path $dir ("scene_gen_$($item.name).log")
+        $sceneGenOut = & python tools\scene_gen.py $item.prompt 2>&1
+        $sceneGenCode = $LASTEXITCODE
+        $sceneGenOut | Out-File -FilePath $sceneGenLog -Encoding utf8
+        $structuralDetails += "$($item.name): scene_gen_exit=$sceneGenCode log=$sceneGenLog"
+        if ($sceneGenCode -ne 0) {
+            $structuralOk = $false
+            $structuralDetails += "$($item.name): scene_gen_tail=" + (($sceneGenOut | Select-Object -Last 6) -join ' ')
+            continue
+        }
+
+        $bestLine = $sceneGenOut | Where-Object { $_ -match '^best render:\s*(.+)$' } | Select-Object -Last 1
+        if (-not $bestLine -or -not ($bestLine -match '^best render:\s*(.+)$')) {
+            $structuralOk = $false
+            $structuralDetails += "$($item.name): absent best render line in $sceneGenLog"
+            continue
+        }
+        $png = $Matches[1].Trim().Trim('"')
+        if (-not [System.IO.Path]::IsPathRooted($png)) {
+            $png = Join-Path (Get-Location) $png
+        }
+        $base = Join-Path ([System.IO.Path]::GetDirectoryName($png)) ([System.IO.Path]::GetFileNameWithoutExtension($png))
         $ir = "${base}_ir.json"
-        $png = "${base}.png"
         $out = "${base}.out"
         $frame = "${base}_frame_report.json"
+        $structuralDetails += "$($item.name): selected=$png"
         foreach ($requiredPath in @($ir, $png, $out, $frame)) {
             if (-not (Test-Path $requiredPath)) {
                 $structuralOk = $false

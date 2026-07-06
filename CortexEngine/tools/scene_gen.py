@@ -1570,6 +1570,13 @@ def run_pipeline(prompt, name, backends, iters=3, refresh_catalog=False, verbose
     night = bool(ir.get("night", False))
     exposure = float(ir.get("exposure", 1.0)) if ir.get("setting") != "exterior" else 1.0
     camera = f"0,0,0,0,{exposure}" if abs(exposure - 1.0) > 1e-3 else ""
+    def _candidate_rank(candidate):
+        crit = candidate.get("crit") or {}
+        score = crit.get("score") if isinstance(crit.get("score"), (int, float)) else 0
+        color_rank = 0 if crit.get("color_ok") is False else 1
+        verdict_rank = {"bad": 0, "reframe": 1, "good": 2}.get(str(crit.get("verdict") or "").lower(), 1)
+        return (color_rank, float(score or 0), verdict_rank, -int(candidate.get("iter", 0)))
+
     for it in range(iters):
         png = render_ir(ir, f"{name}_{it}", camera=camera, night=night)
         for retry in range(2):
@@ -1592,7 +1599,7 @@ def run_pipeline(prompt, name, backends, iters=3, refresh_catalog=False, verbose
                 extra = f" score={score} color_ok={crit.get('color_ok')} dom={crit.get('dominant_color')} verdict={crit.get('verdict')}"
             print(f"[iter {it}] {Path(png).name}{extra}")
         cur = {"iter": it, "png": png, "crit": crit, "camera": camera}
-        if best is None or (score or 0) >= (best.get("crit", {}).get("score", 0) if best.get("crit") else 0):
+        if best is None or _candidate_rank(cur) > _candidate_rank(best):
             best = cur
         if not crit or crit.get("verdict") == "good" or (score or 0) >= 5:
             break

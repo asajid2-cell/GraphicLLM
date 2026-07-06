@@ -198,6 +198,10 @@ budgets for contact cards, foam strips, ground decals, material-response cards, 
 shadow bands without adding hard pixel gates. Direct canonical prompts rendered sequentially
 and passed semantic plus render-health gates, but visual truth remains negative: water is still
 sheet-like, asset silhouettes remain kit-like, and foreground debris is still visible.
+Iteration 2 evidence: generated water now uses a procedural shaped mesh (`curved_lake_cove` or
+`s_curve_river`) under `WaterSurfaceComponent` instead of a single rectangle, and environment
+water/reflection overlay bands are disabled. Direct canonical gates passed after widening the
+river enough to preserve the turquoise semantic read.
 
 ### Loop 5: Synthesis
 
@@ -262,3 +266,19 @@ Status: pending.
   ratchet freeze, Python compile, curation, graphics reset, structural scene gate, Release build,
   and phase0 policy, and rewrote `CURRENT.md` to accepted tag
   `phase4_overlay_subtraction_20260706`.
+- 2026-07-06: Loop 4 iteration 2 replaced rectangular generated water with
+  `CreateGenerativeWaterBodyMesh`, a procedural XZ mesh with cove width modulation for lakes and
+  an S-curve canyon channel for rivers. Compiler environment water/reflection overlay bands were
+  set to zero, with terrain/shadow overlay counts reduced, so water shape comes from geometry
+  instead of translucent proof strips. Release build passed after editing. Canonical renders:
+  campsite `build/bin/logs/gen_a_foggy_mountain_campsite_beside_2.png`, alpine
+  `build/bin/logs/gen_a_stormy_alpine_lake_with_a_smal_2.png`, desert
+  `build/bin/logs/gen_a_sunny_desert_canyon_campsite_w_2.png`. Quality and graphics gates passed
+  for campsite/alpine; desert first failed `turquoise_water_roi_fail` at `turquoise_fraction=0.3515`
+  after narrowing, then passed after widening the shaped river to `turquoise_fraction=0.4073`.
+  Receipts include `shape=curved_lake_cove` and `shape=s_curve_river`, 539 vertices, 960
+  triangles, and `WaterSurfaceComponent`. Dirty probe
+  `tools/run_genscene_acceptance.ps1 -Tag phase4_shaped_water_dirty_probe_20260706 -SkipBuild`
+  passed ratchet freeze, Python compile, curation, graphics reset, and structural scene gates,
+  and failed only expected dirty-tree gates. Visual truth remains negative; this removes one
+  structural flat-sheet failure but does not solve asset/material/composition quality.

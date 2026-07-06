@@ -73,3 +73,13 @@
   curation, graphics reset, structural scene gate, Release build, and phase0 policy.
   Loop 4 remains open; next work must replace flat lighting/material/composition systems,
   not add proxy overlays.
+- 2026-07-06: Loop 4 dirty verifier probe
+  `tools/run_genscene_acceptance.ps1 -Tag phase4_shaped_water_dirty_probe_20260706 -SkipBuild`
+  wrote red `CURRENT_FAILED.md` as expected. The shaped-water diff passed ratchet freeze,
+  Python compile, curation, graphics reset, and structural scene gates; it failed only
+  `clean_tree` and `phase0_policy` because the implementation was intentionally uncommitted.
+  Runtime receipts now report `shape=curved_lake_cove` for lake prompts and
+  `shape=s_curve_river` for the desert river. Canonical semantic/graphics gates passed after
+  adjustment; desert turquoise ROI recovered to `turquoise_fraction=0.4073`. Visual residuals
+  remain: lakes are still broad/flat, foreground dressing is still noisy, and assets remain
+  stylized.

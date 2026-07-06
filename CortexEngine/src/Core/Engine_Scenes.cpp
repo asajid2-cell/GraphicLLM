@@ -513,6 +513,69 @@ namespace {
         return mesh;
     }
 
+    std::shared_ptr<Scene::MeshData> CreateGenerativeWaterBodyMesh(float maxWidth,
+                                                                   float length,
+                                                                   bool riverLike,
+                                                                   uint32_t zSegments = 48u,
+                                                                   uint32_t xSegments = 10u) {
+        auto mesh = std::make_shared<Scene::MeshData>();
+        mesh->kind = Scene::MeshKind::Procedural;
+        zSegments = std::clamp(zSegments, 8u, 96u);
+        xSegments = std::clamp(xSegments, 4u, 24u);
+
+        const float halfLength = length * 0.5f;
+        const float halfMaxWidth = maxWidth * 0.5f;
+        const uint32_t rowVerts = xSegments + 1u;
+        mesh->positions.reserve((zSegments + 1u) * rowVerts);
+        mesh->normals.reserve((zSegments + 1u) * rowVerts);
+        mesh->texCoords.reserve((zSegments + 1u) * rowVerts);
+
+        auto smooth = [](float t) {
+            t = std::clamp(t, 0.0f, 1.0f);
+            return t * t * (3.0f - 2.0f * t);
+        };
+
+        for (uint32_t iz = 0; iz <= zSegments; ++iz) {
+            const float v = static_cast<float>(iz) / static_cast<float>(zSegments);
+            const float localZ = halfLength - v * length;
+            const float bend = std::sin(v * glm::pi<float>() * 2.0f - 0.45f);
+            const float secondary = std::sin(v * glm::pi<float>() * 5.0f + 0.8f);
+            const float centerX = riverLike ? bend * halfMaxWidth * 0.18f : bend * halfMaxWidth * 0.045f;
+            const float widthFactor = riverLike
+                ? (0.30f + 0.09f * smooth(v) + 0.030f * secondary)
+                : (0.46f + 0.42f * smooth(v) + 0.035f * secondary);
+            const float halfWidth = std::clamp(halfMaxWidth * widthFactor,
+                                               halfMaxWidth * (riverLike ? 0.24f : 0.34f),
+                                               halfMaxWidth * (riverLike ? 0.48f : 0.94f));
+
+            for (uint32_t ix = 0; ix <= xSegments; ++ix) {
+                const float u = static_cast<float>(ix) / static_cast<float>(xSegments);
+                const float side = u * 2.0f - 1.0f;
+                const float edgeWeight = std::pow(std::abs(side), 1.8f);
+                const float scallop = (std::sin(v * 17.0f + side * 3.4f) * 0.035f +
+                                       std::sin(v * 31.0f - side * 6.1f) * 0.018f) * edgeWeight;
+                const float localX = centerX + side * halfWidth * (1.0f + scallop);
+                mesh->positions.emplace_back(localX, 0.0f, localZ);
+                mesh->normals.emplace_back(0.0f, 1.0f, 0.0f);
+                mesh->texCoords.emplace_back(u, v);
+            }
+        }
+
+        auto idx = [rowVerts](uint32_t x, uint32_t z) { return z * rowVerts + x; };
+        for (uint32_t iz = 0; iz < zSegments; ++iz) {
+            for (uint32_t ix = 0; ix < xSegments; ++ix) {
+                const uint32_t a = idx(ix, iz);
+                const uint32_t b = idx(ix + 1u, iz);
+                const uint32_t c = idx(ix, iz + 1u);
+                const uint32_t d = idx(ix + 1u, iz + 1u);
+                mesh->indices.insert(mesh->indices.end(), {a, b, d, a, d, c});
+            }
+        }
+
+        mesh->UpdateBounds();
+        return mesh;
+    }
+
     std::shared_ptr<Scene::MeshData> CreateGenerativeTerrainPatchMesh(float radius,
                                                                       float relief,
                                                                       float microRelief,
@@ -7057,8 +7120,9 @@ void Engine::BuildRecipeScene() {
             const float farEdge = -(genExt.extent * 1.9f + 10.0f); // to the ground's far edge: no bare seabed strip at the horizon
             const float waterLen = genExt.waterFromZ - farEdge;
             const float waterMidZ = (genExt.waterFromZ + farEdge) * 0.5f;
-            auto waterPlane = Utils::MeshGenerator::CreatePlane(genExt.extent * 2.0f, waterLen);
-            auto up = renderer->UploadMesh(waterPlane);
+            const bool riverLike = genExt.authoredSceneModule.moduleId == "desert_canyon_river";
+            auto waterMesh = CreateGenerativeWaterBodyMesh(genExt.extent * 2.0f, waterLen, riverLike);
+            auto up = renderer->UploadMesh(waterMesh);
             if (up.IsErr()) {
                 spdlog::warn("generative_exterior: water mesh upload failed: {}", up.Error());
             } else {
@@ -7068,7 +7132,7 @@ void Engine::BuildRecipeScene() {
                 t.position = glm::vec3(0.0f, genExt.waterLevel, waterMidZ);
                 t.scale = glm::vec3(1.0f);
                 auto& r = m_registry->AddComponent<Scene::RenderableComponent>(water);
-                r.mesh = waterPlane;
+                r.mesh = waterMesh;
                 r.albedoColor = glm::vec4(genExt.waterShallow, 0.94f);
                 r.metallic = 0.0f;
                 r.roughness = genExt.waterRough;
@@ -7090,9 +7154,12 @@ void Engine::BuildRecipeScene() {
                 sea.shallowTint = genExt.waterShallow;
                 sea.deepTint = genExt.waterDeep;
                 m_registry->AddComponent<Scene::WaterSurfaceComponent>(water, sea);
-                spdlog::info("generative_exterior: structural water surface component=WaterSurfaceComponent width={:.2f} length={:.2f} level={:.2f} gerstner_shader=on shallow=({:.2f},{:.2f},{:.2f})",
+                spdlog::info("generative_exterior: structural water surface component=WaterSurfaceComponent shape={} width={:.2f} length={:.2f} vertices={} triangles={} level={:.2f} gerstner_shader=on shallow=({:.2f},{:.2f},{:.2f})",
+                             riverLike ? "s_curve_river" : "curved_lake_cove",
                              genExt.extent * 2.0f,
                              waterLen,
+                             waterMesh->positions.size(),
+                             waterMesh->indices.size() / 3u,
                              genExt.waterLevel,
                              genExt.waterShallow.r,
                              genExt.waterShallow.g,

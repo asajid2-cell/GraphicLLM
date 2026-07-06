@@ -597,3 +597,10 @@ Status: pending.
   `gen_a_sunny_desert_canyon_campsite_w_1.png`. Visual truth remains negative: the tent is less
   blocked by a catalog slab and the river/lake edge is less rigid, but the scenes still lack
   convincing material depth, water shading, and high-quality backdrop/assets.
+- 2026-07-06: Loop 4 iteration 15 accepted. Full runner
+  `tools/run_genscene_acceptance.ps1 -Tag phase4_hero_water_form_20260706` passed clean tree,
+  ratchet freeze, Python compile, curation, graphics reset, Release build, structural scene gate,
+  and phase0 policy, and rewrote `CURRENT.md` to accepted tag
+  `phase4_hero_water_form_20260706`. Visual truth remains negative; Loop 4 stays open. Next
+  active work should attack lighting/material/backdrop cohesion and water-surface depth rather
+  than adding proxy cards or more pixel gates.

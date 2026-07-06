@@ -282,3 +282,9 @@
   `gen_a_sunny_desert_canyon_campsite_w_1.png`. Visual truth remains negative: hero form and
   water are incrementally cleaner, but material fidelity, water shading depth, and backdrop/asset
   quality are still below the target.
+- 2026-07-06: `tools/run_genscene_acceptance.ps1 -Tag phase4_hero_water_form_20260706`
+  wrote green `CURRENT.md`. Result: PASS for clean tree, ratchet freeze, Python compile,
+  curation, graphics reset, Release build, structural scene gate, and phase0 policy. Loop 4
+  remains open; this is accepted only as a bounded hero-form/water-geometry checkpoint. Next
+  active item is a real lighting/material/backdrop pass, because the accepted stills still lack
+  convincing material depth, water shading, and high-quality scene cohesion.

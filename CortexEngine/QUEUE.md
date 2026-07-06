@@ -205,3 +205,12 @@
   curation, graphics reset, Release build, structural scene gate, and phase0 policy. Loop 4
   remains open. Next active item is artifact cleanup and stronger coherent composition: the
   campsite cluster is less primitive, but accepted stills still have strip artifacts and clutter.
+- 2026-07-06: Loop 4 shore-strip/readability dirty probe
+  `tools/run_genscene_acceptance.ps1 -Tag phase4_shore_strip_cleanup_dirty_probe3_20260706 -SkipBuild`
+  wrote red `CURRENT_FAILED.md` as expected after manual Release builds. It passed ratchet
+  freeze, Python compile, curation, graphics reset, and structural scene gates, and failed only
+  `clean_tree` plus `phase0_policy`. The change removes old authored shore slabs when curved
+  shore layers exist, moves canyon rivers closer as actual water, strengthens canyon river water
+  material read, and darkens/shortens canyon wet-shore patches. Visual truth remains negative:
+  accept only as a bounded artifact/readability checkpoint, then continue with debris removal,
+  coherent hero/background replacement, and stronger lighting/material form.

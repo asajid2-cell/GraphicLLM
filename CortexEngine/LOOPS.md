@@ -478,3 +478,21 @@ Status: pending.
   `gen_a_stormy_alpine_lake_with_a_smal_0.png`, and desert
   `gen_a_sunny_desert_canyon_campsite_w_0.png`. Visual truth remains negative; next work should
   clean the remaining strip/debris artifacts and continue replacing weak hero/background forms.
+- 2026-07-06: Loop 4 iteration 11 dirty probe cleaned one shore-strip/readability failure without
+  adding gates or proxy overlays. The diff disables the old authored shore cube slabs whenever
+  real curved shore layers exist, pulls canyon rivers slightly into the midground water band as
+  actual water, boosts only canyon-river `WaterSurfaceComponent` authored color/opacity so the
+  river remains turquoise after terrain/reflection blending, and makes canyon wet-shore transition
+  patches darker/shorter instead of bright `terrain_shore` bands. Heartbeats
+  `genscene-shore-strip-build3`, `genscene-shore-strip-build4`, and
+  `genscene-shore-strip-dirty-probe3` fired during build/probe waits. Rejected probes 1-2 found a
+  real desert `turquoise_water_roi_fail`; dirty probe
+  `tools/run_genscene_acceptance.ps1 -Tag phase4_shore_strip_cleanup_dirty_probe3_20260706 -SkipBuild`
+  then passed ratchet freeze, Python compile, curation, graphics reset, and structural scene gates,
+  failing only expected `clean_tree` plus `phase0_policy`. Selected candidates were campsite
+  `gen_a_foggy_mountain_campsite_beside_0.png`, alpine
+  `gen_a_stormy_alpine_lake_with_a_smal_0.png`, and desert
+  `gen_a_sunny_desert_canyon_campsite_w_0.png`; desert water ROI improved to avg RGB
+  `[0.5259, 0.5893, 0.6013]` and turquoise fraction `0.432`. Visual truth remains negative:
+  pale strip artifacts and primitive staging are reduced but still visible, so this is only a
+  bounded shoreline/river-readability checkpoint.

@@ -252,6 +252,10 @@ def compile_v3_to_v2(v3: dict[str, Any]) -> dict[str, Any]:
     else:
         authored_module_id = "exterior_landscape_setpiece"
     water_from_z = -0.16 * extent
+    if canyon and water_on:
+        # Canyon rivers need to occupy the midground water band as actual water,
+        # not rely on pale shore proxy strips to keep the prompt colour readable.
+        water_from_z = -0.115 * extent
     water_shallow, water_deep = _water_palette(waterbody)
     water_intent = str(waterbody.get("color_intent") or "").lower()
     stylized_water = water_intent in {"purple", "violet", "turquoise", "blue"}
@@ -910,9 +914,9 @@ def compile_v3_to_v2(v3: dict[str, Any]) -> dict[str, Any]:
             "terrain_displacement_layer_count": 1,
             "hero_foundation_count": 5 if campsite else (5 if cabin else 3),
             "shadow_caster_count": 5 if not moonlight else 4,
-            "material_blend_patch_count": 2,
+            "material_blend_patch_count": 1 if canyon else 2,
             "light_volume_count": 3 if not moonlight else 2,
-            "nonplanar_shore_segment_count": 5 if water_on else 0,
+            "nonplanar_shore_segment_count": (3 if canyon else 5) if water_on else 0,
             "foundation_family": "embedded_tent_pad_and_fire_ring" if campsite else (
                 "stone_cabin_foundation_and_deck_contact" if cabin else "canyon_bank_embedded_camp"
             ),

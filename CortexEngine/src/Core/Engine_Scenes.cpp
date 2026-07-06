@@ -7261,20 +7261,22 @@ void Engine::BuildRecipeScene() {
                                       waterAccent);
                         waterSegments++;
                     }
-                    addModulePart("GenerativeExterior_AuthoredCurvedShoreLeft",
-                                  cubeMesh,
-                                  glm::vec3(-groundW * 0.28f, 0.060f, shoreZ + 0.22f),
-                                  glm::vec3(groundW * 0.26f, 0.055f, 0.72f),
-                                  glm::vec3(0.0f, glm::radians(-7.0f), 0.0f),
-                                  wetShore);
-                    addModulePart("GenerativeExterior_AuthoredCurvedShoreRight",
-                                  cubeMesh,
-                                  glm::vec3(groundW * 0.24f, 0.062f, shoreZ + 0.34f),
-                                  glm::vec3(groundW * 0.22f, 0.055f, 0.64f),
-                                  glm::vec3(0.0f, glm::radians(8.0f), 0.0f),
-                                  wetShore);
-                    terrainSetpieces += 2;
-                    compositionAnchors += 2;
+                    if (genExt.shoreLayerCount <= 0) {
+                        addModulePart("GenerativeExterior_AuthoredCurvedShoreLeft",
+                                      cubeMesh,
+                                      glm::vec3(-groundW * 0.28f, 0.060f, shoreZ + 0.22f),
+                                      glm::vec3(groundW * 0.26f, 0.055f, 0.72f),
+                                      glm::vec3(0.0f, glm::radians(-7.0f), 0.0f),
+                                      wetShore);
+                        addModulePart("GenerativeExterior_AuthoredCurvedShoreRight",
+                                      cubeMesh,
+                                      glm::vec3(groundW * 0.24f, 0.062f, shoreZ + 0.34f),
+                                      glm::vec3(groundW * 0.22f, 0.055f, 0.64f),
+                                      glm::vec3(0.0f, glm::radians(8.0f), 0.0f),
+                                      wetShore);
+                        terrainSetpieces += 2;
+                        compositionAnchors += 2;
+                    }
                 }
 
                 if (campsiteModule) {
@@ -7523,7 +7525,11 @@ void Engine::BuildRecipeScene() {
                 t.scale = glm::vec3(1.0f);
                 auto& r = m_registry->AddComponent<Scene::RenderableComponent>(water);
                 r.mesh = waterMesh;
-                r.albedoColor = glm::vec4(genExt.waterShallow, riverLike ? 0.78f : 0.74f);
+                const glm::vec3 waterSurfaceTint = riverLike
+                    ? glm::max(genExt.waterShallow * glm::vec3(0.58f, 1.05f, 1.06f),
+                               glm::vec3(0.010f, 1.02f, 1.34f))
+                    : genExt.waterShallow;
+                r.albedoColor = glm::vec4(waterSurfaceTint, riverLike ? 0.92f : 0.74f);
                 r.metallic = 0.0f;
                 r.roughness = genExt.waterRough;
                 r.ao = 1.0f;
@@ -7535,16 +7541,22 @@ void Engine::BuildRecipeScene() {
                 r.presetName = "water";
                 r.castsSunShadow = false;
                 Scene::WaterSurfaceComponent sea{};
-                sea.absorption = std::min(genExt.waterAbsorption + (riverLike ? 0.10f : 0.18f), 1.5f);
+                sea.absorption = riverLike
+                    ? std::min(genExt.waterAbsorption * 0.84f, 0.86f)
+                    : std::min(genExt.waterAbsorption + 0.18f, 1.5f);
                 sea.foamStrength = genExt.waterFoam;
                 sea.viscosity = std::min(genExt.waterViscosity, riverLike ? 0.46f : 0.58f);
-                sea.emissiveHeat = genExt.waterColorStrength * (riverLike ? 0.40f : 0.30f);
+                sea.emissiveHeat = genExt.waterColorStrength * (riverLike ? 0.62f : 0.30f);
                 sea.bodyThickness = std::min(genExt.waterBodyThickness + (riverLike ? 0.16f : 0.24f), 2.0f);
                 sea.sloshStrength = riverLike ? 0.48f : 0.42f;
                 sea.meniscusStrength = riverLike ? 0.48f : 0.40f;
                 sea.flowSpeed = riverLike ? 0.98f : 0.64f;
-                sea.shallowTint = genExt.waterShallow;
-                sea.deepTint = genExt.waterDeep;
+                sea.shallowTint = riverLike
+                    ? glm::max(genExt.waterShallow, glm::vec3(0.015f, 1.56f, 2.20f))
+                    : genExt.waterShallow;
+                sea.deepTint = riverLike
+                    ? glm::max(genExt.waterDeep, glm::vec3(0.0f, 0.58f, 1.18f))
+                    : genExt.waterDeep;
                 m_registry->AddComponent<Scene::WaterSurfaceComponent>(water, sea);
                 spdlog::info("generative_exterior: structural water surface component=WaterSurfaceComponent shape={} width={:.2f} length={:.2f} vertices={} triangles={} level={:.2f} gerstner_shader=on absorption={:.2f} body={:.2f} tint_strength={:.2f} shallow=({:.2f},{:.2f},{:.2f})",
                              riverLike ? "s_curve_river" : "curved_lake_cove",
@@ -9519,9 +9531,12 @@ void Engine::BuildRecipeScene() {
                     const float x = (pseudo(i, 11.13f) - 0.5f) * groundW * 0.70f;
                     const float z = 2.3f - pseudo(i + 17, 11.79f) * 5.9f;
                     const bool wet = genExt.waterOn && (i % 4 == 0);
-                    const glm::vec3 target = wet ? glm::mix(baseGround, genExt.waterShallow, 0.10f)
-                                                 : (desertSurface ? glm::vec3(0.63f, 0.31f, 0.16f)
-                                                                  : glm::vec3(0.12f, 0.17f, 0.11f));
+                    const bool canyonWet = wet && canyonModule;
+                    const glm::vec3 target = wet
+                        ? (canyonWet ? glm::mix(baseGround, glm::vec3(0.060f, 0.110f, 0.105f), 0.24f)
+                                     : glm::mix(baseGround, genExt.waterShallow, 0.10f))
+                        : (desertSurface ? glm::vec3(0.63f, 0.31f, 0.16f)
+                                         : glm::vec3(0.12f, 0.17f, 0.11f));
                     addStructural("GenerativeExterior_StructuralMaterialBlend" + std::to_string(i),
                                   (i % 5 == 0) ? shoreBankMesh : terrainTileMesh,
                                   glm::vec3(x,
@@ -9535,12 +9550,12 @@ void Engine::BuildRecipeScene() {
                                             0.0f),
                                   glm::vec4(glm::max(glm::mix(baseGround, target, wet ? 0.08f : 0.30f), glm::vec3(0.016f)), wet ? 0.20f : 0.24f),
                                   wet ? "wet_masonry" : (desertSurface ? "masonry" : "naturalistic"),
-                                  wet ? "terrain_shore" : (desertSurface ? "rock_cliff" : "terrain_grass"),
+                                  wet ? (canyonWet ? "rock_cliff" : "terrain_shore") : (desertSurface ? "rock_cliff" : "terrain_grass"),
                                   wet ? 0.42f : 0.84f,
                                   0.86f,
                                   0.82f,
-                                  wet ? std::max(0.48f, genExt.groundWetness) : genExt.groundWetness * 0.18f,
-                                  wet ? 0.20f : 0.22f,
+                                  wet ? (canyonWet ? 0.34f : std::max(0.48f, genExt.groundWetness)) : genExt.groundWetness * 0.18f,
+                                  wet ? (canyonWet ? 0.12f : 0.20f) : 0.22f,
                                   materialBlends);
                 }
 
@@ -9550,22 +9565,28 @@ void Engine::BuildRecipeScene() {
                         const float u = (static_cast<float>(i) + 0.5f) / static_cast<float>(std::max(1, shoreTarget));
                         const float x = (u - 0.5f) * groundW * 0.82f;
                         const float bend = std::sin(u * glm::pi<float>() * 2.0f + 0.7f) * 0.22f;
-                        const glm::vec3 color = glm::mix(baseGround, genExt.waterShallow, 0.05f + 0.03f * pseudo(i, 14.17f));
+                        const glm::vec3 color = canyonModule
+                            ? glm::mix(baseGround, glm::vec3(0.070f, 0.120f, 0.115f), 0.30f)
+                            : glm::mix(baseGround, genExt.waterShallow, 0.05f + 0.03f * pseudo(i, 14.17f));
                         addStructural("GenerativeExterior_StructuralShoreBank" + std::to_string(i),
                                       shoreBankMesh,
-                                      glm::vec3(x, 0.072f + 0.002f * static_cast<float>(i % 5), shoreZ + 0.12f + bend),
-                                      glm::vec3(0.92f + 0.18f * static_cast<float>(i % 4), 1.0f, 0.34f),
+                                      glm::vec3(x,
+                                                (canyonModule ? 0.058f : 0.072f) + 0.002f * static_cast<float>(i % 5),
+                                                shoreZ + (canyonModule ? 0.04f : 0.12f) + bend),
+                                      glm::vec3((canyonModule ? 0.58f : 0.92f) + 0.12f * static_cast<float>(i % 4),
+                                                1.0f,
+                                                canyonModule ? 0.20f : 0.34f),
                                       glm::vec3(glm::radians(-1.0f),
                                                 glm::radians(-8.0f + 16.0f * pseudo(i, 14.83f)),
                                                 0.0f),
-                                      glm::vec4(glm::max(color, glm::vec3(0.018f)), 0.20f),
+                                      glm::vec4(glm::max(color, glm::vec3(0.018f)), canyonModule ? 0.13f : 0.20f),
                                       "wet_masonry",
-                                      "terrain_shore",
-                                      0.46f,
-                                      0.90f,
-                                      0.84f,
-                                      std::max(0.52f, genExt.groundWetness),
-                                      0.18f,
+                                      canyonModule ? "rock_cliff" : "terrain_shore",
+                                      canyonModule ? 0.58f : 0.46f,
+                                      canyonModule ? 0.62f : 0.90f,
+                                      canyonModule ? 0.48f : 0.84f,
+                                      canyonModule ? 0.36f : std::max(0.52f, genExt.groundWetness),
+                                      canyonModule ? 0.12f : 0.18f,
                                       shoreSegments);
                     }
                 }

@@ -243,3 +243,8 @@
   warm-light spill slab, and shrinks the camp/cabin visible glow geometry. Visual truth remains
   negative; accept only as an artifact cleanup checkpoint, then continue with water/shore band
   removal, backdrop massing, and higher-fidelity hero/background forms.
+- 2026-07-06: `tools/run_genscene_acceptance.ps1 -Tag phase4_emissive_bloom_cleanup_20260706`
+  wrote green `CURRENT.md`. Result: PASS for clean tree, ratchet freeze, Python compile,
+  curation, graphics reset, Release build, structural scene gate, and phase0 policy. Loop 4
+  remains open. Next active item is water/shore band geometry plus stronger backdrop and hero
+  forms; the accepted stills are cleaner around emissives but are still not coherent AA/AAA shots.

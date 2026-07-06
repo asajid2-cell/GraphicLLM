@@ -546,3 +546,13 @@ Status: pending.
   `gen_a_sunny_desert_canyon_campsite_w_1.png`. Visual truth remains negative: alpine glow bars
   are much cleaner, but water/shore strip artifacts, billboard ridges, and primitive hero forms
   still dominate the quality failure.
+- 2026-07-06: Loop 4 iteration 13 accepted. Full runner
+  `tools/run_genscene_acceptance.ps1 -Tag phase4_emissive_bloom_cleanup_20260706` passed clean
+  tree, ratchet freeze, Python compile, curation, graphics reset, Release build, structural
+  scene gate, and phase0 policy, and rewrote `CURRENT.md` to accepted tag
+  `phase4_emissive_bloom_cleanup_20260706`. Selected accepted candidates were campsite
+  `gen_a_foggy_mountain_campsite_beside_1.png`, alpine
+  `gen_a_stormy_alpine_lake_with_a_smal_0.png`, and desert
+  `gen_a_sunny_desert_canyon_campsite_w_0.png`. Visual truth remains negative; Loop 4 stays
+  open. Next active work should target water/shore band geometry, backdrop massing, and
+  primitive hero/background forms rather than more bloom tuning.

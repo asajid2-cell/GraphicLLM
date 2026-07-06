@@ -4,11 +4,9 @@
 
 ## Active Queue
 
-1. Phase 0 freeze/checkpoint: reject or accept the current Loop 43 dirty tree through
-   `tools/run_genscene_acceptance.ps1`, then commit the clean campaign-state scaffold.
-2. Phase 1 curation: add `.gitignore` protections and `tools/curate_gallery.py`.
-3. Phase 2 gate reset: split semantic/render-health/judge checks and demote old pixel metrics.
-4. Phase 3 first structural front: continuous terrain in generated exteriors.
+1. Phase 1 curation: add `.gitignore` protections and `tools/curate_gallery.py`.
+2. Phase 2 gate reset: split semantic/render-health/judge checks and demote old pixel metrics.
+3. Phase 3 first structural front: continuous terrain in generated exteriors.
 
 ## Accept / Reject Log
 
@@ -28,3 +26,7 @@
   ignored `artifacts/genscene_acceptance/rejected_loop43_overlay_20260706/loop43_rejected.diff`.
   Restored shader, engine, compiler, render script, scene generator, and graphics gate files to
   `HEAD`; only campaign-state/docs hygiene remains dirty for checkpointing.
+- 2026-07-06: `tools/run_genscene_acceptance.ps1 -Tag phase0_clean_freeze_20260706`
+  wrote green `CURRENT.md`. Result: PASS for `clean_tree`, `gate_ratchet_freeze`,
+  `python_compile`, `release_build`, and `phase0_policy`. Loop 0 freeze/checkpoint is accepted;
+  next active item is Phase 1 curation.

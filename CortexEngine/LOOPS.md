@@ -82,7 +82,9 @@ Escape:
 
 - If Release build fails after reverting Loop 43, diagnose build break before any new feature work.
 
-Status: running.
+Status: done. Evidence: `tools/run_genscene_acceptance.ps1 -Tag phase0_clean_freeze_20260706`
+wrote green `CURRENT.md`; `clean_tree`, `gate_ratchet_freeze`, `python_compile`,
+`release_build`, and `phase0_policy` all passed.
 
 ### Loop 1: Curated Media Pipeline
 
@@ -202,3 +204,6 @@ Status: pending.
 ## Progress
 
 - 2026-07-06: Opened the post-Goodhart loop ledger after Claude review. Loop 0 is active.
+- 2026-07-06: Loop 0 accepted. Rejected Loop 43 production diff, committed the campaign-state
+  scaffold, then ran `tools/run_genscene_acceptance.ps1 -Tag phase0_clean_freeze_20260706`
+  from a clean tree. The runner wrote green `CURRENT.md`.

@@ -4,8 +4,7 @@
 
 ## Active Queue
 
-1. Phase 2 gate reset: split semantic/render-health/judge checks and demote old pixel metrics.
-2. Phase 3 first structural front: continuous terrain in generated exteriors.
+1. Phase 3 first structural front: continuous terrain in generated exteriors.
 
 ## Accept / Reject Log
 
@@ -43,3 +42,7 @@
   wrote red `CURRENT_FAILED.md` as expected. `graphics_gate_reset`, `curation_gate`,
   `python_compile`, and `gate_ratchet_freeze` passed; `clean_tree` and `phase0_policy`
   failed because the gate reset implementation was intentionally uncommitted.
+- 2026-07-06: `tools/run_genscene_acceptance.ps1 -Tag phase2_gate_reset_20260706`
+  wrote green `CURRENT.md`. Result: PASS for `clean_tree`, ratchet freeze, Python compile,
+  curation, `graphics_gate_reset`, Release build, and phase0 policy. Loop 2 gate reset is
+  accepted; next active item is continuous terrain/water.

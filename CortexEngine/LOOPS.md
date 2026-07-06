@@ -137,7 +137,9 @@ Verifier:
 - Render-health fixture catches black/missing-sidecar failures.
 - Old edge/flatness/card statistics are emitted as telemetry without hard failure.
 
-Status: pending.
+Status: done. Evidence: `tools/run_genscene_acceptance.ps1 -Tag phase2_gate_reset_20260706`
+wrote green `CURRENT.md`; the reset gate has zero `missing_` hard codes, known-bad fixtures
+fail render-health expect-fail, and sidecar-backed pipeline fixtures pass.
 
 ### Loop 3: Continuous Terrain And Real Water
 
@@ -220,3 +222,6 @@ Status: pending.
   codes; image and old graphics-pass signals are telemetry. Dirty probe
   `phase2_gate_reset_dirty_probe_20260706 -SkipBuild` passed `graphics_gate_reset`,
   curation, Python compile, and ratchet freeze, failing only expected dirty-tree gates.
+- 2026-07-06: Loop 2 accepted. Full runner `phase2_gate_reset_20260706` passed clean tree,
+  ratchet freeze, Python compile, curation gate, graphics gate reset, Release build, and
+  phase0 policy.

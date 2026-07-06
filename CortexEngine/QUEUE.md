@@ -348,3 +348,11 @@
   ridge_layers=2` and `backdrop_surfaces=8`. Visual truth remains negative: this is a small
   material-depth checkpoint, not the AAA solve. Next active item should move to real water/shore
   shading or hero asset material fidelity, not another ridge/card layer.
+- 2026-07-06: `tools/run_genscene_acceptance.ps1 -Tag phase4_backdrop_material_depth_20260706`
+  wrote green `CURRENT.md`. Result: PASS for clean tree, ratchet freeze, Python compile,
+  curation, graphics reset, Release build, structural scene gate, and phase0 policy.
+  Accepted candidates were campsite `gen_a_foggy_mountain_campsite_beside_1.png`, alpine
+  `gen_a_stormy_alpine_lake_with_a_smal_1.png`, and desert
+  `gen_a_sunny_desert_canyon_campsite_w_0.png`. Loop 4 remains open; next active item is real
+  water/shore shading or hero asset/material fidelity. Do not continue ridge/card tuning unless
+  a later front proves backdrop massing is the blocker again.

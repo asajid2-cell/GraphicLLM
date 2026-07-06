@@ -356,3 +356,10 @@
   `gen_a_sunny_desert_canyon_campsite_w_0.png`. Loop 4 remains open; next active item is real
   water/shore shading or hero asset/material fidelity. Do not continue ridge/card tuning unless
   a later front proves backdrop massing is the blocker again.
+- 2026-07-06: rejected Loop 4 water transmission/depth dirty probes
+  `phase4_water_transmission_depth_dirty_probe_20260706` through
+  `phase4_water_transmission_depth_dirty_probe6_20260706`. The slice stayed trapped in flat
+  colored-water-sheet visuals and then oscillated between `purple_water_roi_fail` and
+  `turquoise_water_roi_fail`; accepting it would continue the metric-ratio rut. Reverted the
+  production diff and dirty `CURRENT_FAILED.md`. Next active item is hero asset/material fidelity
+  or real shore/terrain/composition structure, not more water-color tuning.

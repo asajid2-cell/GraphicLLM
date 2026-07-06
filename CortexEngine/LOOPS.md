@@ -687,3 +687,15 @@ Status: pending.
   `gen_a_sunny_desert_canyon_campsite_w_0.png`. Visual truth remains negative; this checkpoint
   only lands real material response on existing ridge/backdrop surfaces. Loop 4 stays open for
   real water/shore shading and hero asset/material fidelity.
+- 2026-07-06: Loop 4 iteration 20 rejected the water transmission/depth slice after dirty probes
+  `phase4_water_transmission_depth_dirty_probe_20260706` through
+  `phase4_water_transmission_depth_dirty_probe6_20260706`. Probe 1 passed the automated dirty
+  gates except expected dirty-tree policy, but manual inspection still showed flat colored water
+  sheets. Probes 2-6 then oscillated between `purple_water_roi_fail` and
+  `turquoise_water_roi_fail` while trying to preserve prompt color through alpha/transmission,
+  optical tint compression, and shader chroma bias. This hit the loop escape rule: same visual
+  failure class, no structural improvement. Reverted `assets/shaders/Water.hlsl`,
+  `src/Core/Engine_Scenes.cpp`, and the dirty `CURRENT_FAILED.md` state. Next work should not
+  continue water-color ratio tuning; move to a higher-leverage front such as hero asset/material
+  replacement, real shore/terrain geometry, or composition/lighting systems that can change the
+  actual image structure.

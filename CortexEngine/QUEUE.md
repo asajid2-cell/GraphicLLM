@@ -337,3 +337,14 @@
   `gen_a_sunny_desert_canyon_campsite_w_0.png`. Loop 4 remains open; next active item should
   attack remaining flat water/shore bands, cardboard backdrop masses, and hero-asset material
   fidelity rather than declaring this a quality solve.
+- 2026-07-06: Loop 4 backdrop material-depth dirty probe
+  `tools/run_genscene_acceptance.ps1 -Tag phase4_backdrop_material_depth_dirty_probe2_20260706`
+  wrote red `CURRENT_FAILED.md` as expected. It passed ratchet freeze, Python compile,
+  curation, graphics reset, Release build, and structural scene gates, failing only
+  `clean_tree` plus `phase0_policy`. The first attempt in this lane was visually rejected
+  because object-scale cliff textures made the desert backdrop too dark. The adjusted change
+  keeps existing ridge geometry but routes it through terrain-scale material sources and caps
+  distant backdrop response; runtime logs show `backdrop material depth textured_surfaces=2
+  ridge_layers=2` and `backdrop_surfaces=8`. Visual truth remains negative: this is a small
+  material-depth checkpoint, not the AAA solve. Next active item should move to real water/shore
+  shading or hero asset material fidelity, not another ridge/card layer.

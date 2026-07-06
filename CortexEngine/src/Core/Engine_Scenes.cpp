@@ -368,6 +368,7 @@ namespace {
         int fabric = 0;
         int hero = 0;
         int shore = 0;
+        int backdrop = 0;
         std::unordered_set<std::string> sets;
     };
 
@@ -10835,6 +10836,10 @@ void Engine::BuildRecipeScene() {
 
     if (genExt.valid && !genExt.ridgeLayers.empty()) {
         if (auto* renderer = m_renderer.get()) {
+            const std::string module = genExt.authoredSceneModule.moduleId;
+            const bool canyonModule = module == "desert_canyon_river";
+            const bool alpineModule = module == "alpine_cabin_lake";
+            const char* ridgeMaterialClass = canyonModule ? "terrain_sand" : "terrain_rock";
             int ridgeCount = 0;
             for (std::size_t i = 0; i < genExt.ridgeLayers.size(); ++i) {
                 const auto& layer = genExt.ridgeLayers[i];
@@ -10862,7 +10867,12 @@ void Engine::BuildRecipeScene() {
                 const glm::vec3 facetTint = glm::mix(layer.color * depthFade,
                                                      layer.color * 1.22f + skyLift,
                                                      0.22f);
-                r.albedoColor = glm::vec4(glm::max(facetTint, glm::vec3(0.045f)), 1.0f);
+                const glm::vec3 aerialTint = canyonModule
+                    ? glm::vec3(0.58f, 0.34f, 0.20f)
+                    : (alpineModule ? glm::vec3(0.24f, 0.30f, 0.42f) : glm::vec3(0.24f, 0.25f, 0.22f));
+                r.albedoColor = glm::vec4(glm::max(glm::mix(facetTint, aerialTint, canyonModule ? 0.34f : 0.16f),
+                                                   glm::vec3(canyonModule ? 0.090f : 0.055f)),
+                                          1.0f);
                 r.metallic = 0.0f;
                 r.roughness = 0.92f;
                 r.ao = 0.95f;
@@ -10872,6 +10882,11 @@ void Engine::BuildRecipeScene() {
                 r.specularFactor = 0.08f;
                 r.doubleSided = false;
                 r.presetName = "naturalistic";
+                applyGeneratedTextureMaterial(r, ridgeMaterialClass, false, false);
+                r.normalScale = std::max(r.normalScale, canyonModule ? 0.64f : 0.74f);
+                r.proceduralMaskStrength = std::max(r.proceduralMaskStrength, canyonModule ? 0.42f : 0.48f);
+                r.occlusionStrength = std::min(r.occlusionStrength, canyonModule ? 0.66f : 0.58f);
+                textureMaterialCounts.backdrop++;
                 ridgeCount++;
             }
             if (ridgeCount > 0) {
@@ -10906,7 +10921,12 @@ void Engine::BuildRecipeScene() {
                     const glm::vec3 notchColor = glm::mix(source.color * 1.18f + glm::vec3(0.035f, 0.045f, 0.060f),
                                                           glm::vec3(0.025f, 0.030f, 0.040f),
                                                           0.16f + 0.06f * (i % 2));
-                    r.albedoColor = glm::vec4(glm::max(notchColor, glm::vec3(0.040f)), 1.0f);
+                    const glm::vec3 aerialTint = canyonModule
+                        ? glm::vec3(0.58f, 0.34f, 0.20f)
+                        : (alpineModule ? glm::vec3(0.24f, 0.30f, 0.42f) : glm::vec3(0.24f, 0.25f, 0.22f));
+                    r.albedoColor = glm::vec4(glm::max(glm::mix(notchColor, aerialTint, canyonModule ? 0.36f : 0.18f),
+                                                       glm::vec3(canyonModule ? 0.085f : 0.050f)),
+                                              1.0f);
                     r.metallic = 0.0f;
                     r.roughness = 0.93f;
                     r.ao = 0.94f;
@@ -10916,12 +10936,22 @@ void Engine::BuildRecipeScene() {
                     r.specularFactor = 0.07f;
                     r.doubleSided = false;
                     r.presetName = "naturalistic";
+                    applyGeneratedTextureMaterial(r, ridgeMaterialClass, false, false);
+                    r.normalScale = std::max(r.normalScale, canyonModule ? 0.62f : 0.70f);
+                    r.proceduralMaskStrength = std::max(r.proceduralMaskStrength, canyonModule ? 0.40f : 0.46f);
+                    r.occlusionStrength = std::min(r.occlusionStrength, canyonModule ? 0.68f : 0.60f);
+                    textureMaterialCounts.backdrop++;
                     backdropDetailCount++;
                 }
                 if (backdropDetailCount > 0) {
                     spdlog::info("generative_exterior: created backdrop silhouette detail layers={}",
                                  backdropDetailCount);
                 }
+            }
+            if (textureMaterialCounts.backdrop > 0) {
+                spdlog::info("generative_exterior: backdrop material depth textured_surfaces={} ridge_layers={}",
+                             textureMaterialCounts.backdrop,
+                             ridgeCount);
             }
         }
     }
@@ -10938,21 +10968,31 @@ void Engine::BuildRecipeScene() {
             const float appliedAmbient = std::min(ambientCeiling + (alpineModule ? 0.04f : 0.05f), 0.61f);
 
             int materialSurfaces = 0;
+            int backdropMaterialSurfaces = 0;
+            const int backdropMaterialLimit = std::max(
+                2,
+                std::min(8, genExt.sourceReadabilityBalance.backdropSurfaceLiftCount));
             auto surfaceView = m_registry->View<Scene::TagComponent, Scene::RenderableComponent>();
             for (auto entity : surfaceView) {
-                if (materialSurfaces >= genExt.lightingShadowMaterialField.materialResponseSurfaceCount) {
-                    break;
-                }
                 const auto& tag = surfaceView.get<Scene::TagComponent>(entity).tag;
                 auto& r = surfaceView.get<Scene::RenderableComponent>(entity);
+                const bool backdropLike = tag.find("Ridge") != std::string::npos ||
+                                          tag.find("Backdrop") != std::string::npos ||
+                                          tag.find("SourceKenneyCliffBackdrop") != std::string::npos ||
+                                          tag.find("SourceDetailedTreeBackdrop") != std::string::npos;
                 if (tag.rfind("GenerativeExterior_", 0) != 0 ||
                     tag.find("Water") != std::string::npos ||
                     tag.find("Glow") != std::string::npos ||
                     tag.find("Light") != std::string::npos ||
                     tag.find("ShadowReceiver") != std::string::npos ||
-                    tag.find("Soft") != std::string::npos ||
-                    tag.find("Ridge") != std::string::npos ||
-                    tag.find("Backdrop") != std::string::npos) {
+                    tag.find("Soft") != std::string::npos) {
+                    continue;
+                }
+                if (!backdropLike &&
+                    materialSurfaces >= genExt.lightingShadowMaterialField.materialResponseSurfaceCount) {
+                    continue;
+                }
+                if (backdropLike && backdropMaterialSurfaces >= backdropMaterialLimit) {
                     continue;
                 }
 
@@ -10968,18 +11008,22 @@ void Engine::BuildRecipeScene() {
                 const bool fabricLike = tag.find("Tent") != std::string::npos ||
                                         tag.find("Canvas") != std::string::npos ||
                                         tag.find("Fabric") != std::string::npos;
-                const bool rockLike = tag.find("Rock") != std::string::npos ||
-                                      tag.find("Cliff") != std::string::npos ||
-                                      tag.find("Canyon") != std::string::npos ||
-                                      tag.find("Ridge") != std::string::npos ||
-                                      tag.find("Boulder") != std::string::npos;
+                const bool treeLike = tag.find("Tree") != std::string::npos ||
+                                      tag.find("Pine") != std::string::npos;
+                const bool rockLike = !treeLike &&
+                                      (tag.find("Rock") != std::string::npos ||
+                                       tag.find("Cliff") != std::string::npos ||
+                                       tag.find("Canyon") != std::string::npos ||
+                                       tag.find("Ridge") != std::string::npos ||
+                                       tag.find("Backdrop") != std::string::npos ||
+                                       tag.find("Boulder") != std::string::npos);
 
-                r.occlusionStrength = std::min(r.occlusionStrength, terrainLike ? 0.52f : 0.58f);
-                r.normalScale = std::max(r.normalScale, rockLike ? 1.02f : (fabricLike ? 0.94f : 0.86f));
-                r.proceduralMaskStrength = std::max(r.proceduralMaskStrength, terrainLike ? 0.62f : 0.54f);
-                r.roughness = std::clamp(r.roughness * (rockLike ? 0.92f : 0.96f), 0.38f, 0.88f);
-                r.specularFactor = std::max(r.specularFactor, (terrainLike || rockLike) ? 0.24f : 0.20f);
-                r.clearcoatFactor = std::max(r.clearcoatFactor, terrainLike ? 0.045f : 0.030f);
+                r.occlusionStrength = std::min(r.occlusionStrength, backdropLike ? (canyonModule ? 0.60f : 0.56f) : (terrainLike ? 0.52f : 0.58f));
+                r.normalScale = std::max(r.normalScale, backdropLike ? (canyonModule ? 0.72f : 0.86f) : (rockLike ? 1.02f : (fabricLike ? 0.94f : 0.86f)));
+                r.proceduralMaskStrength = std::max(r.proceduralMaskStrength, backdropLike ? (canyonModule ? 0.48f : 0.54f) : (terrainLike ? 0.62f : 0.54f));
+                r.roughness = std::clamp(r.roughness * (backdropLike ? 0.94f : (rockLike ? 0.92f : 0.96f)), 0.38f, 0.88f);
+                r.specularFactor = std::max(r.specularFactor, backdropLike ? (canyonModule ? 0.18f : 0.22f) : ((terrainLike || rockLike) ? 0.24f : 0.20f));
+                r.clearcoatFactor = std::max(r.clearcoatFactor, backdropLike ? (canyonModule ? 0.018f : 0.026f) : (terrainLike ? 0.045f : 0.030f));
                 r.clearcoatRoughnessFactor = std::max(r.clearcoatRoughnessFactor, 0.58f);
                 r.sheenWeight = std::max(r.sheenWeight, fabricLike ? 0.36f : 0.05f);
                 r.anisotropyStrength = std::max(r.anisotropyStrength, woodLike ? 0.38f : 0.12f);
@@ -10991,13 +11035,19 @@ void Engine::BuildRecipeScene() {
                         applyGeneratedTextureMaterial(r, "fabric", true, false);
                     } else if (woodLike) {
                         applyGeneratedTextureMaterial(r, "wood", true, false);
+                    } else if (treeLike) {
+                        applyGeneratedTextureMaterial(r, "wood", false, false);
                     } else if (rockLike) {
                         applyGeneratedTextureMaterial(r, "rock_cliff", false, false);
                     } else if (terrainLike) {
                         applyGeneratedTextureMaterial(r, canyonModule ? "terrain_sand" : "terrain_grass", false, false);
                     }
                 }
-                materialSurfaces++;
+                if (backdropLike) {
+                    backdropMaterialSurfaces++;
+                } else {
+                    materialSurfaces++;
+                }
             }
 
             int shadowBands = 0;
@@ -11152,9 +11202,10 @@ void Engine::BuildRecipeScene() {
 
             const auto features = renderer->GetFeatureState();
             const auto quality = renderer->GetQualityState();
-            spdlog::info("generative_exterior: lighting shadow material field shadowed_lights={} material_surfaces={} shadow_bands={} probe_volumes={} key_fill={:.2f} ambient={:.2f} ssao={:.2f} shadow_bias={:.4f} shadow_pcf={:.2f} cascade_lambda={:.2f}",
+            spdlog::info("generative_exterior: lighting shadow material field shadowed_lights={} material_surfaces={} backdrop_surfaces={} shadow_bands={} probe_volumes={} key_fill={:.2f} ambient={:.2f} ssao={:.2f} shadow_bias={:.4f} shadow_pcf={:.2f} cascade_lambda={:.2f}",
                          shadowedLights,
                          materialSurfaces,
+                         backdropMaterialSurfaces,
                          shadowBands,
                          probeVolumes,
                          genExt.lightingShadowMaterialField.keyFillRatio,
@@ -11210,7 +11261,9 @@ void Engine::BuildRecipeScene() {
                     ? (alpineModule ? glm::vec3(0.095f, 0.16f, 0.18f) : glm::vec3(0.10f, 0.18f, 0.10f))
                     : (rockLike
                         ? (canyonModule ? glm::vec3(0.34f, 0.15f, 0.070f) : glm::vec3(0.16f, 0.15f, 0.13f))
-                        : (alpineModule ? glm::vec3(0.13f, 0.16f, 0.22f) : glm::vec3(0.16f, 0.15f, 0.12f)));
+                        : (backdropLike && canyonModule
+                            ? glm::vec3(0.46f, 0.28f, 0.18f)
+                            : (alpineModule ? glm::vec3(0.13f, 0.16f, 0.22f) : glm::vec3(0.16f, 0.15f, 0.12f))));
                 glm::vec3 c = glm::vec3(r.albedoColor);
                 c = glm::max(c, glm::vec3(albedoFloor));
                 c = glm::mix(c, tint, backdropLike ? 0.24f : 0.18f);

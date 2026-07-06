@@ -661,3 +661,19 @@ Status: pending.
   `gen_a_stormy_alpine_lake_with_a_smal_0.png`, and desert
   `gen_a_sunny_desert_canyon_campsite_w_0.png`. Visual truth remains negative; Loop 4 stays
   open for water/shore material depth, backdrop mass replacement, and hero asset fidelity.
+- 2026-07-06: Loop 4 iteration 19 dirty probe targeted existing backdrop material depth, not new
+  geometry or new gates. The first probe proved the material path reached the renderer but was
+  visually rejected because boulder-scale cliff textures crushed the desert backdrop into dark
+  charcoal massing. The adjusted probe routes procedural ridge layers through terrain-scale
+  `terrain_rock` / `terrain_sand` texture sources, gives ridge/backdrop surfaces a capped
+  material-response pass, and adds runtime receipts:
+  `backdrop material depth textured_surfaces=2 ridge_layers=2` plus
+  `lighting shadow material field ... backdrop_surfaces=8`. Probe
+  `tools/run_genscene_acceptance.ps1 -Tag phase4_backdrop_material_depth_dirty_probe2_20260706`
+  passed ratchet freeze, Python compile, curation, graphics reset, Release build, and structural
+  scene gates, failing only expected dirty-tree policy. Selected candidates were campsite
+  `gen_a_foggy_mountain_campsite_beside_1.png`, alpine
+  `gen_a_stormy_alpine_lake_with_a_smal_0.png`, and desert
+  `gen_a_sunny_desert_canyon_campsite_w_0.png`. Visual truth remains negative: campsite/desert
+  ridges read less like flat color cards, but water sheets, foreground/shore material, and hero
+  asset fidelity still block coherent AA/AAA quality.

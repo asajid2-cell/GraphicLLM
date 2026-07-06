@@ -7038,6 +7038,12 @@ void Engine::BuildRecipeScene() {
 
     if (genExt.valid && genExt.authoredSceneModule.enabled) {
         if (auto* renderer = m_renderer.get()) {
+            const std::string module = genExt.authoredSceneModule.moduleId.empty()
+                ? std::string("exterior_landscape_setpiece")
+                : genExt.authoredSceneModule.moduleId;
+            const bool campsiteModule = module == "campsite_lake_dawn";
+            const bool canyonModule = module == "desert_canyon_river";
+            const bool alpineModule = module == "alpine_cabin_lake";
             auto cubeMesh = Utils::MeshGenerator::CreateCube();
             auto planeMesh = Utils::MeshGenerator::CreatePlane(1.0f, 1.0f);
             auto cylinderMesh = Utils::MeshGenerator::CreateCylinder(0.5f, 1.0f, 24);
@@ -7047,11 +7053,47 @@ void Engine::BuildRecipeScene() {
                                                            1.72f,
                                                            23.41f,
                                                            6u);
+            std::shared_ptr<Scene::MeshData> campPadMesh;
+            std::shared_ptr<Scene::MeshData> campTrunkMesh;
+            std::shared_ptr<Scene::MeshData> campBranchMesh;
+            std::shared_ptr<Scene::MeshData> campBoulderMesh;
+            std::shared_ptr<Scene::MeshData> campLanternMesh;
+            std::shared_ptr<Scene::MeshData> campTableMesh;
+            if (campsiteModule) {
+                campPadMesh = CreateGenerativeTerrainPatchMesh(1.0f, 0.050f, 0.026f, 91.37f, 6u, 40u);
+                campTrunkMesh = LoadNaturalisticShowcaseMesh("dead_tree_trunk/dead_tree_trunk_1k.gltf");
+                campBranchMesh = LoadNaturalisticShowcaseMesh("dry_branches_medium_01/dry_branches_medium_01_1k.gltf");
+                campBoulderMesh = LoadNaturalisticShowcaseMesh("boulder_01/boulder_01_1k.gltf");
+                campLanternMesh = LoadNaturalisticShowcaseMesh("Lantern_01/Lantern_01_1k.gltf");
+                campTableMesh = LoadNaturalisticShowcaseMesh("WoodenTable_01/WoodenTable_01_1k.gltf");
+            }
             const auto upCube = renderer->UploadMesh(cubeMesh);
             const auto upPlane = renderer->UploadMesh(planeMesh);
             const auto upCylinder = renderer->UploadMesh(cylinderMesh);
             const auto upShard = renderer->UploadMesh(shardMesh);
             const auto upCliff = renderer->UploadMesh(cliffMesh);
+            if (campPadMesh) {
+                const auto upCampPad = renderer->UploadMesh(campPadMesh);
+                if (upCampPad.IsErr()) {
+                    spdlog::warn("generative_exterior: authored camp terrain pad upload failed: {}", upCampPad.Error());
+                    campPadMesh.reset();
+                }
+            }
+            if (campTrunkMesh && !UploadAssetLedMesh(renderer, campTrunkMesh, "authored camp dead_tree_trunk")) {
+                campTrunkMesh.reset();
+            }
+            if (campBranchMesh && !UploadAssetLedMesh(renderer, campBranchMesh, "authored camp dry_branches_medium_01")) {
+                campBranchMesh.reset();
+            }
+            if (campBoulderMesh && !UploadAssetLedMesh(renderer, campBoulderMesh, "authored camp boulder_01")) {
+                campBoulderMesh.reset();
+            }
+            if (campLanternMesh && !UploadAssetLedMesh(renderer, campLanternMesh, "authored camp Lantern_01")) {
+                campLanternMesh.reset();
+            }
+            if (campTableMesh && !UploadAssetLedMesh(renderer, campTableMesh, "authored camp WoodenTable_01")) {
+                campTableMesh.reset();
+            }
             if (upCube.IsErr() || upPlane.IsErr() || upCylinder.IsErr() || upShard.IsErr() || upCliff.IsErr()) {
                 spdlog::warn("generative_exterior: authored scene module mesh upload failed cube='{}' plane='{}' cylinder='{}' shard='{}' cliff='{}'",
                              upCube.IsErr() ? upCube.Error() : "ok",
@@ -7060,12 +7102,6 @@ void Engine::BuildRecipeScene() {
                              upShard.IsErr() ? upShard.Error() : "ok",
                              upCliff.IsErr() ? upCliff.Error() : "ok");
             } else {
-                const std::string module = genExt.authoredSceneModule.moduleId.empty()
-                    ? std::string("exterior_landscape_setpiece")
-                    : genExt.authoredSceneModule.moduleId;
-                const bool campsiteModule = module == "campsite_lake_dawn";
-                const bool canyonModule = module == "desert_canyon_river";
-                const bool alpineModule = module == "alpine_cabin_lake";
                 const float shoreZ = genExt.waterOn ? (genExt.waterFromZ + 0.5f) : -genExt.extent * 0.32f;
                 const float groundW = genExt.extent * 1.86f;
                 const glm::vec3 baseGround = genExt.groundColorSet
@@ -7136,6 +7172,26 @@ void Engine::BuildRecipeScene() {
                                          const glm::vec3& euler,
                                          const AssetLedMaterialSettings& material) {
                     AddAssetLedRenderable(*m_registry, tag.c_str(), mesh, position, scale, euler, material);
+                };
+                auto addNaturalModulePart = [&](const std::string& tag,
+                                                const char* assetId,
+                                                const std::shared_ptr<Scene::MeshData>& mesh,
+                                                const glm::vec3& position,
+                                                const glm::vec3& scale,
+                                                const glm::vec3& euler,
+                                                const AssetLedMaterialSettings& material) {
+                    if (!mesh || !mesh->gpuBuffers) {
+                        return false;
+                    }
+                    AddAssetLedNaturalisticRenderable(*m_registry,
+                                                      tag.c_str(),
+                                                      assetId,
+                                                      mesh,
+                                                      position,
+                                                      scale,
+                                                      euler,
+                                                      material);
+                    return true;
                 };
 
                 int compositionAnchors = 0;
@@ -7223,18 +7279,21 @@ void Engine::BuildRecipeScene() {
 
                 if (campsiteModule) {
                     const bool cohesiveCamp = genExt.cohesiveStagingCleanup.enabled;
+                    const auto& campGroundMesh = campPadMesh ? campPadMesh : cubeMesh;
                     addModulePart("GenerativeExterior_AuthoredCampPad",
-                                  cubeMesh,
-                                  cohesiveCamp ? glm::vec3(0.92f, 0.034f, 0.98f) : glm::vec3(1.38f, 0.036f, 1.10f),
-                                  cohesiveCamp ? glm::vec3(2.72f, 0.034f, 1.36f) : glm::vec3(4.8f, 0.060f, 2.72f),
-                                  glm::vec3(0.0f, glm::radians(-10.0f), 0.0f),
+                                  campGroundMesh,
+                                  cohesiveCamp ? glm::vec3(0.82f, 0.036f, 0.98f) : glm::vec3(1.38f, 0.036f, 1.10f),
+                                  campPadMesh
+                                      ? (cohesiveCamp ? glm::vec3(2.25f, 0.38f, 1.12f) : glm::vec3(3.40f, 0.46f, 1.95f))
+                                      : (cohesiveCamp ? glm::vec3(2.72f, 0.034f, 1.36f) : glm::vec3(4.8f, 0.060f, 2.72f)),
+                                  glm::vec3(0.0f, glm::radians(-10.0f), campPadMesh ? glm::radians(-1.2f) : 0.0f),
                                   darkBank);
                     if (cohesiveCamp) {
                         addModulePart("GenerativeExterior_AuthoredCampfireGroundPatch",
-                                      cubeMesh,
-                                      glm::vec3(-0.24f, 0.035f, 0.42f),
-                                      glm::vec3(1.18f, 0.032f, 0.82f),
-                                      glm::vec3(0.0f, glm::radians(8.0f), 0.0f),
+                                      campGroundMesh,
+                                      glm::vec3(-0.24f, 0.044f, 0.42f),
+                                      campPadMesh ? glm::vec3(0.86f, 0.24f, 0.58f) : glm::vec3(1.18f, 0.032f, 0.82f),
+                                      glm::vec3(0.0f, glm::radians(8.0f), campPadMesh ? glm::radians(1.0f) : 0.0f),
                                       darkBank);
                     }
                     addModulePart("GenerativeExterior_AuthoredTentShadowBacking",
@@ -7243,18 +7302,84 @@ void Engine::BuildRecipeScene() {
                                   glm::vec3(2.65f, 0.76f, 0.18f),
                                   glm::vec3(0.0f, glm::radians(-20.0f), glm::radians(-3.0f)),
                                   darkFabric);
-                    addModulePart("GenerativeExterior_AuthoredLogSeatArcA",
-                                  cylinderMesh,
-                                  glm::vec3(-1.34f, 0.22f, 1.58f),
-                                  glm::vec3(0.12f, 1.62f, 0.12f),
-                                  glm::vec3(glm::radians(88.0f), glm::radians(64.0f), glm::radians(2.0f)),
-                                  warmWood);
-                    addModulePart("GenerativeExterior_AuthoredLogSeatArcB",
-                                  cylinderMesh,
-                                  glm::vec3(1.34f, 0.22f, 2.10f),
-                                  glm::vec3(0.12f, 1.42f, 0.12f),
-                                  glm::vec3(glm::radians(88.0f), glm::radians(-42.0f), glm::radians(-2.0f)),
-                                  warmWood);
+                    const bool placedNaturalLogA = addNaturalModulePart("GenerativeExterior_AuthoredScannedLogSeatArcA",
+                                                                        "dead_tree_trunk",
+                                                                        campTrunkMesh,
+                                                                        glm::vec3(-1.28f, 0.13f, 1.42f),
+                                                                        glm::vec3(0.34f),
+                                                                        glm::vec3(glm::radians(3.0f), glm::radians(54.0f), glm::radians(-2.0f)),
+                                                                        warmWood);
+                    const bool placedNaturalLogB = addNaturalModulePart("GenerativeExterior_AuthoredScannedLogSeatArcB",
+                                                                        "dead_tree_trunk",
+                                                                        campTrunkMesh,
+                                                                        glm::vec3(1.26f, 0.13f, 1.92f),
+                                                                        glm::vec3(0.30f),
+                                                                        glm::vec3(glm::radians(-2.0f), glm::radians(-46.0f), glm::radians(2.0f)),
+                                                                        warmWood);
+                    if (!placedNaturalLogA) {
+                        addModulePart("GenerativeExterior_AuthoredLogSeatArcA",
+                                      cylinderMesh,
+                                      glm::vec3(-1.34f, 0.22f, 1.58f),
+                                      glm::vec3(0.12f, 1.62f, 0.12f),
+                                      glm::vec3(glm::radians(88.0f), glm::radians(64.0f), glm::radians(2.0f)),
+                                      warmWood);
+                    }
+                    if (!placedNaturalLogB) {
+                        addModulePart("GenerativeExterior_AuthoredLogSeatArcB",
+                                      cylinderMesh,
+                                      glm::vec3(1.34f, 0.22f, 2.10f),
+                                      glm::vec3(0.12f, 1.42f, 0.12f),
+                                      glm::vec3(glm::radians(88.0f), glm::radians(-42.0f), glm::radians(-2.0f)),
+                                      warmWood);
+                    }
+                    addNaturalModulePart("GenerativeExterior_AuthoredScannedBranchKindling",
+                                         "dry_branches_medium_01",
+                                         campBranchMesh,
+                                         glm::vec3(-0.10f, 0.085f, 0.74f),
+                                         glm::vec3(0.36f),
+                                         glm::vec3(glm::radians(2.0f), glm::radians(18.0f), glm::radians(-4.0f)),
+                                         warmWood);
+                    int scannedCampAnchors = 0;
+                    static const glm::vec3 fireRockPos[5] = {
+                        glm::vec3(-0.72f, 0.066f, 0.18f),
+                        glm::vec3(-0.15f, 0.064f, -0.02f),
+                        glm::vec3(0.28f, 0.064f, 0.28f),
+                        glm::vec3(0.18f, 0.066f, 0.76f),
+                        glm::vec3(-0.54f, 0.065f, 0.86f),
+                    };
+                    for (int i = 0; i < 5; ++i) {
+                        if (addNaturalModulePart("GenerativeExterior_AuthoredScannedFireRingStone" + std::to_string(i),
+                                                 "boulder_01",
+                                                 campBoulderMesh,
+                                                 fireRockPos[i],
+                                                 glm::vec3(0.070f + 0.010f * static_cast<float>(i % 3)),
+                                                 glm::vec3(glm::radians(-2.0f + static_cast<float>(i % 2) * 3.0f),
+                                                           glm::radians(41.0f * static_cast<float>(i)),
+                                                           glm::radians(-3.0f + static_cast<float>(i % 3) * 2.5f)),
+                                                 bankMat)) {
+                            scannedCampAnchors++;
+                        }
+                    }
+                    if (campTableMesh && campTableMesh->gpuBuffers) {
+                        addNaturalModulePart("GenerativeExterior_AuthoredScannedCampTable",
+                                             "WoodenTable_01",
+                                             campTableMesh,
+                                             glm::vec3(1.22f, 0.34f, 1.08f),
+                                             glm::vec3(0.34f),
+                                             glm::vec3(0.0f, glm::radians(-22.0f), 0.0f),
+                                             warmWood);
+                        scannedCampAnchors++;
+                    }
+                    if (campLanternMesh && campLanternMesh->gpuBuffers) {
+                        addNaturalModulePart("GenerativeExterior_AuthoredScannedCampLantern",
+                                             "Lantern_01",
+                                             campLanternMesh,
+                                             glm::vec3(1.10f, 0.50f, 1.24f),
+                                             glm::vec3(0.28f),
+                                             glm::vec3(0.0f, glm::radians(-14.0f), 0.0f),
+                                             warmGlow);
+                        scannedCampAnchors++;
+                    }
                     addModulePart("GenerativeExterior_AuthoredFireGlowCore",
                                   cubeMesh,
                                   glm::vec3(-0.34f, 0.18f, 0.42f),
@@ -7263,7 +7388,12 @@ void Engine::BuildRecipeScene() {
                                   warmGlow);
                     terrainSetpieces += cohesiveCamp ? 2 : 1;
                     heroClusters += 3;
-                    compositionAnchors += 5;
+                    compositionAnchors += 5 + scannedCampAnchors;
+                    if (placedNaturalLogA || placedNaturalLogB || scannedCampAnchors > 0) {
+                        spdlog::info("generative_exterior: authored campsite source cluster scanned_logs={} scanned_anchors={}",
+                                     (placedNaturalLogA ? 1 : 0) + (placedNaturalLogB ? 1 : 0),
+                                     scannedCampAnchors);
+                    }
                     AddAssetLedPointLight(*m_registry, "GenerativeExterior_AuthoredCampfireKey", glm::vec3(-0.32f, 0.72f, 0.42f), glm::vec3(1.0f, 0.38f, 0.12f), 4.9f, 6.0f);
                     AddAssetLedPointLight(*m_registry, "GenerativeExterior_AuthoredLanternFill", glm::vec3(1.15f, 0.86f, 1.42f), glm::vec3(1.0f, 0.58f, 0.22f), 2.8f, 4.2f);
                     AddAssetLedSpotLight(*m_registry, "GenerativeExterior_AuthoredDawnRim", glm::vec3(-5.2f, 4.4f, -2.8f), glm::vec3(0.5f, 0.42f, 0.6f), glm::vec3(1.0f, 0.44f, 0.18f), 5.4f, 18.0f, false);

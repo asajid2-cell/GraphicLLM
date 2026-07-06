@@ -192,3 +192,11 @@
   curation, graphics reset, Release build, structural scene gate, and phase0 policy. Loop 4
   remains open. Next active item is real asset/composition/lighting coherence: the water and
   ridge systems are less proxy-like, but the accepted stills still look staged and disconnected.
+- 2026-07-06: Loop 4 source cluster dirty probe
+  `tools/run_genscene_acceptance.ps1 -Tag phase4_source_cluster_dirty_probe_20260706 -SkipBuild`
+  wrote red `CURRENT_FAILED.md` as expected after a manual Release build. It passed ratchet
+  freeze, Python compile, curation, graphics reset, and structural scene gates, and failed only
+  `clean_tree` plus `phase0_policy` because the implementation was intentionally uncommitted.
+  The change replaces more authored campsite primitives with loaded source meshes and irregular
+  terrain patch grounding. Visual truth remains negative; accept only as a bounded source-cluster
+  checkpoint, then continue cleaning debris/shore artifacts and replacing hero forms.

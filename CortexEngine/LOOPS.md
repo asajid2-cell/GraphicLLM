@@ -455,3 +455,17 @@ Status: pending.
   `gen_a_sunny_desert_canyon_campsite_w_0.png`. Visual truth remains negative; Loop 4 stays open.
   Next work must move beyond water/backdrop material tuning into real asset replacement,
   coherent terrain/composition staging, and stronger lighting/shadow authoring.
+- 2026-07-06: Loop 4 iteration 10 dirty probe moved campsite staging toward source-backed
+  coherent clusters. The authored campsite module now loads optional scanned Poly Haven/local
+  meshes for dead trunks, branches, boulders, lanterns, and a wood table; uses an irregular
+  terrain patch for the camp pad/fire patch instead of rectangular slabs; and falls back to the
+  old primitives only when source meshes fail to load. Focused campsite render stayed hard-valid
+  and the critic selected a `good` candidate, but visual truth remains negative because scattered
+  debris and shore strip artifacts are still visible. Manual Release build passed under heartbeat
+  `genscene-source-cluster-build`. Dirty probe
+  `tools/run_genscene_acceptance.ps1 -Tag phase4_source_cluster_dirty_probe_20260706 -SkipBuild`
+  passed ratchet freeze, Python compile, curation, graphics reset, and structural scene gates,
+  failing only expected dirty-tree policy gates. Selected candidates were campsite
+  `gen_a_foggy_mountain_campsite_beside_1.png`, alpine
+  `gen_a_stormy_alpine_lake_with_a_smal_0.png`, and desert
+  `gen_a_sunny_desert_canyon_campsite_w_0.png`.

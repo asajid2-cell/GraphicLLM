@@ -2,22 +2,22 @@
 
 Overall: **GREEN - acceptable checkpoint (commit it now)**
 
-- Tag: `phase4_source_asset_ladder_20260706`
-- Date: 2026-07-06 07:30
-- Accepted tag: `phase4_source_asset_ladder_20260706`
-- Previous tag: `phase4_hero_material_cleanup_20260706`
-- HEAD: cfad241 Shift GenScene toward source asset anchors
+- Tag: `phase4_renderer_shadow_water_20260706`
+- Date: 2026-07-06 07:58
+- Accepted tag: `phase4_renderer_shadow_water_20260706`
+- Previous tag: `phase4_source_asset_ladder_20260706`
+- HEAD: 3aa9e07 Move GenScene shadows and water off overlay proxies
 - Tracked tree: CLEAN
 
 ## Gates
 
-- **clean_tree**: PASS -- Z:\328\CMPUT328-A2\codexworks\301\graphics\CortexEngine\artifacts\genscene_acceptance\phase4_source_asset_ladder_20260706\git_status.txt
+- **clean_tree**: PASS -- Z:\328\CMPUT328-A2\codexworks\301\graphics\CortexEngine\artifacts\genscene_acceptance\phase4_renderer_shadow_water_20260706\git_status.txt
 - **gate_ratchet_freeze**: PASS -- no added missing_* hard gates in scene_graphics_gate.py
-- **python_compile**: PASS -- Z:\328\CMPUT328-A2\codexworks\301\graphics\CortexEngine\artifacts\genscene_acceptance\phase4_source_asset_ladder_20260706\python_compile.log
-- **curation_gate**: PASS -- Z:\328\CMPUT328-A2\codexworks\301\graphics\CortexEngine\artifacts\genscene_acceptance\phase4_source_asset_ladder_20260706\curation_gate.log
-- **graphics_gate_reset**: PASS -- Z:\328\CMPUT328-A2\codexworks\301\graphics\CortexEngine\artifacts\genscene_acceptance\phase4_source_asset_ladder_20260706\graphics_gate_reset.log
-- **release_build**: PASS -- Z:\328\CMPUT328-A2\codexworks\301\graphics\CortexEngine\artifacts\genscene_acceptance\phase4_source_asset_ladder_20260706\release_build.log
-- **structural_scene_gate**: PASS -- Z:\328\CMPUT328-A2\codexworks\301\graphics\CortexEngine\artifacts\genscene_acceptance\phase4_source_asset_ladder_20260706\structural_scene_gate.log
+- **python_compile**: PASS -- Z:\328\CMPUT328-A2\codexworks\301\graphics\CortexEngine\artifacts\genscene_acceptance\phase4_renderer_shadow_water_20260706\python_compile.log
+- **curation_gate**: PASS -- Z:\328\CMPUT328-A2\codexworks\301\graphics\CortexEngine\artifacts\genscene_acceptance\phase4_renderer_shadow_water_20260706\curation_gate.log
+- **graphics_gate_reset**: PASS -- Z:\328\CMPUT328-A2\codexworks\301\graphics\CortexEngine\artifacts\genscene_acceptance\phase4_renderer_shadow_water_20260706\graphics_gate_reset.log
+- **release_build**: PASS -- Z:\328\CMPUT328-A2\codexworks\301\graphics\CortexEngine\artifacts\genscene_acceptance\phase4_renderer_shadow_water_20260706\release_build.log
+- **structural_scene_gate**: PASS -- Z:\328\CMPUT328-A2\codexworks\301\graphics\CortexEngine\artifacts\genscene_acceptance\phase4_renderer_shadow_water_20260706\structural_scene_gate.log
 - **phase0_policy**: PASS -- dirty tree and old overlay-gate changes must not be accepted by assertion
 
 ## Residuals
@@ -26,6 +26,6 @@ Overall: **GREEN - acceptable checkpoint (commit it now)**
 
 ## Regression
 
-    Previous accepted tag: phase4_hero_material_cleanup_20260706
+    Previous accepted tag: phase4_source_asset_ladder_20260706
 
 Next steps live in `QUEUE.md` and `PLAN.md`. This file is state, nothing else.

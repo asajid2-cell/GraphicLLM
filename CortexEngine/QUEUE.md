@@ -141,3 +141,9 @@
   and authored water cards. Visual inspection remains negative: scenes are cleaner but still
   flat, low-poly, and not AA/AAA. Accept only as a structural cleanup checkpoint, then continue
   to asset/composition/real material fronts.
+- 2026-07-06: `tools/run_genscene_acceptance.ps1 -Tag phase4_renderer_shadow_water_20260706`
+  wrote green `CURRENT.md`. Result: PASS for clean tree, ratchet freeze, Python compile,
+  curation, graphics reset, Release build, structural scene gate, and phase0 policy. Loop 4
+  remains open. Next active item is a real asset/composition/material-form pass: low-poly tent,
+  cabin, tree, rock, and canyon silhouettes still dominate, and lakes still read as broad sheets
+  despite the renderer-owned cleanup.

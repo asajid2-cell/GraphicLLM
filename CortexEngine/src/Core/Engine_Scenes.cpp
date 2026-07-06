@@ -11357,36 +11357,50 @@ void Engine::BuildRecipeScene() {
                 }
             }
 
+            const float preservedSsao = std::max(
+                genExt.graphicsSSAOIntensity,
+                genExt.lightingShadowMaterialField.enabled
+                    ? genExt.lightingShadowMaterialField.ssaoIntensityTarget
+                    : genExt.graphicsSSAOIntensity);
             if (canyonModule) {
-                renderer->SetAmbientLighting(glm::vec3(0.115f, 0.078f, 0.052f), 0.88f);
-                renderer->SetExposure(std::clamp(std::max(renderer->GetExposure(), 1.12f), 0.98f, 1.28f));
-                renderer->SetIBLIntensity(1.62f, 1.12f);
-                renderer->SetSSAOParams(std::max(genExt.graphicsSSAORadius, 1.30f),
-                                        std::min(genExt.graphicsSSAOBias, 0.014f),
-                                        std::max(2.34f, genExt.graphicsSSAOIntensity * 0.72f));
+                renderer->SetAmbientLighting(glm::vec3(0.066f, 0.048f, 0.034f), 0.56f);
+                renderer->SetExposure(std::clamp(renderer->GetExposure(), 0.74f, 1.02f));
+                renderer->SetIBLIntensity(1.12f, 0.92f);
+                renderer->SetSSAOParams(std::max(genExt.graphicsSSAORadius, 1.42f),
+                                        std::min(genExt.graphicsSSAOBias, 0.012f),
+                                        std::max(3.12f, preservedSsao));
             } else if (alpineModule) {
-                renderer->SetAmbientLighting(glm::vec3(0.026f, 0.042f, 0.082f), 0.62f);
-                renderer->SetExposure(std::clamp(std::max(renderer->GetExposure(), 0.90f), 0.66f, 1.02f));
-                renderer->SetIBLIntensity(0.66f, 0.94f);
-                renderer->SetSSAOParams(std::max(genExt.graphicsSSAORadius, 1.22f),
-                                        std::min(genExt.graphicsSSAOBias, 0.015f),
-                                        std::max(2.46f, genExt.graphicsSSAOIntensity * 0.80f));
+                renderer->SetAmbientLighting(glm::vec3(0.018f, 0.030f, 0.066f), 0.48f);
+                renderer->SetExposure(std::clamp(renderer->GetExposure(), 0.58f, 0.92f));
+                renderer->SetIBLIntensity(0.46f, 0.82f);
+                renderer->SetSSAOParams(std::max(genExt.graphicsSSAORadius, 1.28f),
+                                        std::min(genExt.graphicsSSAOBias, 0.013f),
+                                        std::max(2.88f, preservedSsao));
             } else {
-                renderer->SetAmbientLighting(glm::vec3(0.040f, 0.050f, 0.066f), 0.65f);
-                renderer->SetExposure(std::clamp(std::max(renderer->GetExposure(), 0.98f), 0.80f, 1.16f));
-                renderer->SetIBLIntensity(1.22f, 1.00f);
-                renderer->SetSSAOParams(std::max(genExt.graphicsSSAORadius, 1.30f),
-                                        std::min(genExt.graphicsSSAOBias, 0.014f),
-                                        std::max(2.68f, genExt.graphicsSSAOIntensity * 0.82f));
+                renderer->SetAmbientLighting(glm::vec3(0.028f, 0.036f, 0.056f), 0.52f);
+                renderer->SetExposure(std::clamp(renderer->GetExposure(), 0.74f, 1.02f));
+                renderer->SetIBLIntensity(0.94f, 0.86f);
+                renderer->SetSSAOParams(std::max(genExt.graphicsSSAORadius, 1.38f),
+                                        std::min(genExt.graphicsSSAOBias, 0.012f),
+                                        std::max(3.02f, preservedSsao));
             }
+            renderer->SetShadowBias(std::min(genExt.graphicsShadowBias,
+                                             genExt.lightingShadowMaterialField.shadowBiasTarget));
+            renderer->SetShadowPCFRadius(std::max(genExt.graphicsShadowPCF,
+                                                  genExt.lightingShadowMaterialField.shadowPCFRadiusTarget));
             renderer->SetToneGrade(alpineModule ? 1.12f : 1.18f, alpineModule ? 1.02f : 1.08f);
+            const auto features = renderer->GetFeatureState();
+            const auto quality = renderer->GetQualityState();
 
-            spdlog::info("generative_exterior: source readability balance source_surfaces={} backdrop_surfaces={} black_splits={} albedo_floor={:.2f} nonblack_floor={:.2f}",
+            spdlog::info("generative_exterior: source readability balance source_surfaces={} backdrop_surfaces={} black_splits={} albedo_floor={:.2f} nonblack_floor={:.2f} lighting_policy=contact_preserve ssao={:.2f} shadow_bias={:.4f} shadow_pcf={:.2f}",
                          sourceSurfaces,
                          backdropSurfaces,
                          blackSplits,
                          albedoFloor,
-                         genExt.sourceReadabilityBalance.frameNonblackFloor);
+                         genExt.sourceReadabilityBalance.frameNonblackFloor,
+                         features.ssaoIntensity,
+                         quality.shadowBias,
+                         quality.shadowPCFRadius);
         }
     }
 

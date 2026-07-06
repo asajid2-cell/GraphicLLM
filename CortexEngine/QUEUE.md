@@ -372,3 +372,11 @@
   local-minimum pattern. Next active item is a higher-leverage system pass: continuous terrain,
   real water/shore integration, lighting/shadow/material response, or asset replacement. Do not
   spend the next slice on more clutter/camera/card tuning.
+- 2026-07-06: Loop 4 renderer/material coherence dirty probe
+  `phase4_renderer_material_coherence_dirty_probe_20260706 -SkipBuild` passed all real gates after
+  a manual Release build and failed only expected dirty-tree policy. The slice removes the late
+  source-readability washout by preserving stronger SSAO/shadow settings and lowering ambient/IBL
+  lift; selected stills are darker with better contact but still far below AA/AAA. Accept only as
+  a bounded renderer/material checkpoint. Next active item must be a larger structural front:
+  continuous terrain/backdrop replacement, water/shore integration, or real photoreal asset
+  replacement, not another tiny lighting tweak.

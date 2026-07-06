@@ -719,3 +719,27 @@ Status: pending.
   prop clusters in front of flat water/backdrop forms, so accepting it would continue the
   incremental local-minimum pattern. Revert the production diff and dirty `CURRENT_FAILED.md`;
   next work must be a higher-leverage system front, not another hero-clutter tweak.
+- 2026-07-06: Loop 4 iteration 22 started as a renderer/material coherence slice. Recon found
+  `lighting_shadow_material_field` sets stronger renderer-owned SSAO/shadows/contact lighting,
+  then `source_readability_balance` runs later and lifts ambient/exposure/IBL while reducing
+  effective SSAO, which plausibly explains the flat washed generated stills after the stronger
+  lighting pass. Scope is limited to the final renderer settings and material-readability
+  behavior in `src/Core/Engine_Scenes.cpp`; no compiler prompt changes, no new gates, no new
+  meshes/cards/overlays. Hypothesis: preserving stronger SSAO/shadow settings and reducing the
+  late ambient/exposure washout improves depth/coherence without hurting prompt readability.
+  Kill criteria: reject if any semantic/structural gate fails, if water color ROI regresses, if
+  the images become crushed/dark, if a new pixel hard gate appears, or if the slice adds visible
+  proof geometry instead of renderer/material behavior.
+- 2026-07-06: Loop 4 iteration 22 dirty probe
+  `tools/run_genscene_acceptance.ps1 -Tag phase4_renderer_material_coherence_dirty_probe_20260706 -SkipBuild`
+  after manual Release build heartbeat `genscene-renderer-material-build2` passed. Probe heartbeat
+  `genscene-renderer-material-dirty-probe` fired on timeout while the runner continued. The runner
+  passed ratchet freeze, Python compile, curation, graphics reset, and structural scene gate,
+  with Release build recorded as skipped after the manual build; it failed only expected
+  dirty-tree policy gates. Selected candidates were campsite
+  `gen_a_foggy_mountain_campsite_beside_1.png`, alpine
+  `gen_a_stormy_alpine_lake_with_a_smal_1.png`, and desert
+  `gen_a_sunny_desert_canyon_campsite_w_0.png`. Visual read: not AA/AAA and still below the
+  human gate, but contact/material depth is less washed and prompt water colors remain readable;
+  no new geometry, no new gates, no water-ratio tuning. Accept only as a bounded renderer/material
+  coherence checkpoint, then continue with larger structural fronts.

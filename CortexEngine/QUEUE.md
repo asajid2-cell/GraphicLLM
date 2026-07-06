@@ -125,3 +125,9 @@
   runs, and `scene_gen.py` ranks candidates by the hard semantic gate before critic score.
   Visual truth remains negative: the scenes are cleaner and less primitive-heavy, but still
   not a serious AAA result.
+- 2026-07-06: `tools/run_genscene_acceptance.ps1 -Tag phase4_source_asset_ladder_20260706`
+  wrote green `CURRENT.md`. Result: PASS for clean tree, ratchet freeze, Python compile,
+  curation, graphics reset, build-before-render Release build, fresh structural scene gates,
+  and phase0 policy. Loop 4 remains open; next active item is lighting/water/material
+  coherence and real shadowing, because the current accepted stills are still visibly below
+  AA/AAA quality.

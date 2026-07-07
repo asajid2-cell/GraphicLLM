@@ -553,3 +553,24 @@
   negative; next active item is to reconnect this proven renderer/material path to a small
   generated-scene slice under budget, or build a curated exterior asset/material module if direct
   generated RT still violates stability.
+- 2026-07-06: active item is Loop 4 iteration 34, constrained generated RT/AO fixture. Reconnect
+  the now-proven renderer path to exactly one generated exterior prompt under explicit density and
+  budget controls, and require nonblack capture plus frame-contract proof for RT, TLAS, SSAO, and
+  RT shadow resources. This is not a broad generated DXR retry and not a visual-quality claim.
+  Kill immediately if the slice reproduces Loop 29's black frame, queue fence timeout, water ROI
+  regression, or requires touching `scene_graphics_gate.py`, water color ratios, or overlay/card
+  proof geometry. If direct generated RT remains unstable, reject and pivot to a curated exterior
+  material/asset module that can receive renderer-owned shadow/occlusion before re-entering scene
+  generation.
+- 2026-07-06: Loop 4 iteration 34 verifier proof passed standalone. Red control:
+  `tools/run_genscene_rt_fixture.ps1 -IsolatedLogs -Runs 1 -Frames 120 -VisualValidationMinFrame 30
+  -BudgetProfile 4gb_low -MinTLASInstances 9999 -MaxTLASInstances 12000` rendered successfully
+  and failed for the intended reason (`TLAS instances=130`, expected `9999..12000`). Green control:
+  `tools/run_genscene_rt_fixture.ps1 -IsolatedLogs -Runs 2 -Frames 220 -VisualValidationMinFrame 30
+  -BudgetProfile 4gb_low` passed with both runs `objects=26`, `nonblack=1.000`,
+  `avg_luma=92.52/92.52`, `center_luma=84.41/84.40`, `tlas=130/130`, and `rt_passes=7`.
+  Green artifact:
+  `build/bin/logs/runs/genscene_rt_fixture_20260706_214402_022_266424_b94405cb/genscene_rt_fixture_summary.json`.
+  This proves generated RT shadows + SSAO can be stable for one prompt under budget, with RT
+  reflections/GI intentionally disabled. Next step is a clean full acceptance run after committing
+  the fixture tooling.

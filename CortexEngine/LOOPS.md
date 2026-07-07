@@ -1110,3 +1110,34 @@ Status: pending.
   ground truth without repeating Loop 29's broad DXR failure: either a tightly budgeted generated
   RT/AO opt-in fixture on one canonical prompt, or a curated exterior asset/material module that
   can visibly receive renderer-owned shadow/occlusion before returning to best-of-N scene gen.
+- 2026-07-06: Loop 4 iteration 34 started as a constrained generated RT/AO fixture. Orientation
+  trusted `CURRENT.md` at accepted tag `phase4_rt_nonblack_fixture_20260706`; git status was
+  clean on `main` after acceptance commit `9d96a58`. Heartbeat `cortex-aaa-loop34-proof` fired
+  on a 2s timeout before render waits. Scope is limited to generated render harness/budget
+  controls, one-prompt fixture tooling, and ledgers; no changes to generated scene geometry,
+  semantic gates, or visual proxy thresholds are allowed in this loop. Hypothesis: after proving
+  `rt_showcase`, the next safe step is a one-prompt generated exterior RT/AO fixture with explicit
+  density/budget checks, not another broad opt-in across campsite/alpine/desert. Verifier is
+  PARTIAL-RISK until proven red/green: a generated campsite IR fixture must render nonblack with
+  `ray_tracing.enabled=true`, `tlas_instances>0`, `features.ssao_enabled=true`, `SSAO` and
+  `RTShadowsGI` executed, and no fence timeout/black capture. Kill criteria: reject if capture is
+  black, if DX12 fence or shutdown validation errors recur, if water-color semantics regress, if
+  the fixture requires `scene_graphics_gate.py` edits/new `missing_*` gates/water color tuning, or
+  if the only result is receipt text without a stable renderer-material path.
+- 2026-07-06: Loop 4 iteration 34 verifier red/green proof completed. The generated fixture builds
+  deterministic Director-v3 campsite IR without an LLM, runs the engine directly under isolated
+  logs, forces `CORTEX_RT_BUDGET_PROFILE=4gb_low` and `CORTEX_RENDER_BUDGET_PROFILE=4gb_low`,
+  disables generated RT reflections/GI for this first stability slice, waits until validation
+  frame 30, and rejects black/fence/RT-missing captures. Red control:
+  `tools/run_genscene_rt_fixture.ps1 -IsolatedLogs -Runs 1 -Frames 120 -VisualValidationMinFrame 30
+  -BudgetProfile 4gb_low -MinTLASInstances 9999 -MaxTLASInstances 12000` exited nonzero for the
+  intended reason, `run 1 TLAS instances=130, expected 9999..12000`; summary
+  `build/bin/logs/runs/genscene_rt_fixture_20260706_214348_612_272924_0774ac1e/genscene_rt_fixture_summary.json`.
+  Green control:
+  `tools/run_genscene_rt_fixture.ps1 -IsolatedLogs -Runs 2 -Frames 220 -VisualValidationMinFrame 30
+  -BudgetProfile 4gb_low -MinTLASInstances 16 -MaxTLASInstances 512 -MaxTLASCandidates 512`;
+  summary `build/bin/logs/runs/genscene_rt_fixture_20260706_214402_022_266424_b94405cb/genscene_rt_fixture_summary.json`.
+  Both green runs had `objects=26`, `RT=true`, `SSAO=true`, `tlas=130`, `rt_passes=7`,
+  `nonblack=1.000`, and stable luma around `92.5/84.4`. Manual inspection remains visually
+  negative: the campsite still reads flat/toy-like with a huge purple water sheet. This loop is
+  accepted only as a renderer-stability bridge from isolated RT to generated scenes.

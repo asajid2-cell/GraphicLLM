@@ -71,6 +71,9 @@ $pyFiles = @(
 if (Test-Path 'tools\curate_gallery.py') {
     $pyFiles += 'tools\curate_gallery.py'
 }
+if (Test-Path 'tools\build_genscene_fixture_ir.py') {
+    $pyFiles += 'tools\build_genscene_fixture_ir.py'
+}
 python -m py_compile @pyFiles *> $pyLog
 Report 'python_compile' ($LASTEXITCODE -eq 0) $pyLog
 
@@ -222,6 +225,31 @@ if (-not $releaseBuildOk) {
     $rtFixtureOut | Out-File -FilePath $rtFixtureLog -Encoding utf8
 }
 Report 'rt_nonblack_fixture' $rtFixtureOk $rtFixtureLog
+
+$genRtFixtureLog = Join-Path $dir 'genscene_rt_fixture.log'
+$genRtFixtureOk = $true
+if (-not $releaseBuildOk) {
+    $genRtFixtureOk = $false
+    "skipped because release_build failed; refusing to render with a stale binary" |
+        Out-File -FilePath $genRtFixtureLog -Encoding utf8
+} else {
+    $genRtFixtureOut = & powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_genscene_rt_fixture.ps1 `
+        -IsolatedLogs `
+        -Runs 2 `
+        -Frames 220 `
+        -VisualValidationMinFrame 30 `
+        -BudgetProfile 4gb_low `
+        -MinTLASInstances 16 `
+        -MaxTLASInstances 512 `
+        -MaxTLASCandidates 512 `
+        -MinRayTracingPasses 3 `
+        -MinVisualNonBlackRatio 0.90 `
+        -MinVisualAvgLuma 20 `
+        -MinVisualCenterLuma 20 2>&1
+    $genRtFixtureOk = $LASTEXITCODE -eq 0
+    $genRtFixtureOut | Out-File -FilePath $genRtFixtureLog -Encoding utf8
+}
+Report 'genscene_rt_fixture' $genRtFixtureOk $genRtFixtureLog
 
 $structuralLog = Join-Path $dir 'structural_scene_gate.log'
 $structuralOk = $true

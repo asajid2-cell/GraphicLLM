@@ -1096,3 +1096,17 @@ Status: pending.
   and luma/center-luma around `117/137`. This proves the isolated renderer path, not generated
   scene visual quality; visual truth for GenScene remains negative until the renderer/material
   evidence is reconnected through a separate accepted loop.
+- 2026-07-06: Loop 4 iteration 33 accepted as an isolated renderer RT/AO fixture checkpoint.
+  Full runner `tools/run_genscene_acceptance.ps1 -Tag phase4_rt_nonblack_fixture_20260706`
+  passed clean tree, gate-ratchet freeze, Python compile, curation gate, graphics-gate reset,
+  Release build, `rt_nonblack_fixture`, structural scene gate, and phase0 policy, and rewrote
+  `CURRENT.md` to accepted tag `phase4_rt_nonblack_fixture_20260706` at HEAD `3b3372d`. The
+  acceptance-run RT fixture summary is
+  `build/bin/logs/runs/rt_nonblack_fixture_20260706_213143_825_255740_f39b1abf/rt_nonblack_fixture_summary.json`;
+  both runs were nonblack (`1.000`), had stable luma (`117.23/117.16`), `center_luma`
+  (`137.01/136.93`), `tlas=63`, and `rt_passes=9`. Structural scene gate still passed the three
+  canonical prompts, but visual truth remains negative: this loop proves the renderer path is
+  viable in isolation, not that generated scenes are high fidelity. Next loop must use this
+  ground truth without repeating Loop 29's broad DXR failure: either a tightly budgeted generated
+  RT/AO opt-in fixture on one canonical prompt, or a curated exterior asset/material module that
+  can visibly receive renderer-owned shadow/occlusion before returning to best-of-N scene gen.

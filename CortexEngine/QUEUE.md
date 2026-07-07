@@ -540,3 +540,16 @@
   `build/bin/logs/runs/rt_nonblack_fixture_20260706_213018_814_164144_0f693965/rt_nonblack_fixture_summary.json`.
   Next step is a clean full acceptance run now that the fixture is wired into
   `tools/run_genscene_acceptance.ps1`.
+- 2026-07-06: `tools/run_genscene_acceptance.ps1 -Tag phase4_rt_nonblack_fixture_20260706`
+  wrote green `CURRENT.md`. Result: PASS for clean tree, ratchet freeze, Python compile,
+  curation, graphics reset, Release build, new `rt_nonblack_fixture`, structural scene gate, and
+  phase0 policy. RT fixture artifact:
+  `build/bin/logs/runs/rt_nonblack_fixture_20260706_213143_825_255740_f39b1abf/rt_nonblack_fixture_summary.json`
+  (`nonblack=1.000`, `avg_luma=117.23/117.16`, `center_luma=137.01/136.93`, `tlas=63`,
+  `rt_passes=9`). Structural scene gate selected campsite
+  `gen_a_foggy_mountain_campsite_beside_1.png`, alpine
+  `gen_a_stormy_alpine_lake_with_a_smal_0.png`, and desert
+  `gen_a_sunny_desert_canyon_campsite_w_0.png`. Loop 4 remains open and visual truth remains
+  negative; next active item is to reconnect this proven renderer/material path to a small
+  generated-scene slice under budget, or build a curated exterior asset/material module if direct
+  generated RT still violates stability.

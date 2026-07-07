@@ -460,3 +460,15 @@
   Next active item is a higher-leverage fidelity replacement loop: real hero asset/material form,
   continuous terrain/backdrop massing, and renderer lighting/shadow behavior that visibly changes
   the image rather than satisfying a receipt.
+- 2026-07-06: active item is Loop 4 iteration 28, hero asset/material form. Replace the
+  campsite focal tent's slab/panel overbuild with richer procedural canvas mesh/material detail
+  and remove panel clutter that keeps the selected frames toy-like. Do not touch
+  `scene_graphics_gate.py`, do not add hard pixel gates, do not tune water color ratios, and do
+  not add overlay/card proof geometry.
+- 2026-07-06: Loop 4 iteration 28 dirty probe
+  `phase4_hero_canvas_form_dirty_probe_20260706 -SkipBuild` passed all real gates and failed
+  only expected dirty-tree policy after manual Release build. Receipts prove the campsite hero
+  path now uses a subdivided canvas shell with `panel_overlays=0`, 8 structural poles, and 6
+  rope stakes. Visual truth remains negative; accept only as a bounded hero-form checkpoint, then
+  move to a larger scene-system failure such as terrain/backdrop massing, water/shore shading, or
+  renderer lighting/shadow integration.

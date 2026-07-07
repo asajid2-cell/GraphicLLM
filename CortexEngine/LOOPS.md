@@ -916,3 +916,28 @@ Status: pending.
   reverted. Do not retry Loop 27 as another framing/ROI pass; the next loop must replace visible
   fidelity sources directly: hero asset/material form, continuous terrain/backdrop massing, and
   renderer-owned lighting/shadow response that materially changes the selected frames.
+- 2026-07-06: Loop 4 iteration 28 started as a hero asset/material form slice. Orientation
+  trusted `CURRENT.md` at accepted tag `phase4_strip_source_demote_20260706`; git status was
+  clean after rejection commit `a33e3bd`. Heartbeat `cortex-aaa-loop28-proof` fired on a 2s
+  timeout before long waits. Scope is limited to generated hero mesh/material code,
+  `tools/scene_compiler.py`, and ledgers. Hypothesis: replacing the visible campsite focal tent
+  from primitive panel overbuild into one richer procedural canvas mesh with real material
+  variation, seam/pole/rope geometry, and fewer slab-like panels will improve the dominant
+  silhouette more than another composition/camera pass. Kill criteria: reject if semantic or
+  structural gates fail, if water ROI/color semantics regress, if new hard pixel gates or
+  overlay/proof geometry are added, if old panel clutter still dominates the tent, or if manual
+  inspection says the selected campsite still reads as the same toy wedge with scattered props.
+- 2026-07-06: Loop 4 iteration 28 dirty probe
+  `tools/run_genscene_acceptance.ps1 -Tag phase4_hero_canvas_form_dirty_probe_20260706 -SkipBuild`
+  passed ratchet freeze, Python compile, curation, graphics reset, and structural scene gates
+  after a manual Release build. It failed only expected dirty-tree policy. Runtime receipts show
+  `hero canvas mesh form shell=subdivided_canvas length_segments=22 slope_segments=8
+  panel_overlays=0 fabric_layers=5 structural_poles=8 rope_stakes=6` and
+  `hero asset replacement canvas_shell=1 canvas_panel_overlays=0`. Selected candidates were
+  campsite `gen_a_foggy_mountain_campsite_beside_1.png`, alpine
+  `gen_a_stormy_alpine_lake_with_a_smal_1.png`, and desert
+  `gen_a_sunny_desert_canyon_campsite_w_0.png`; all passed quality and graphics gates with
+  structural terrain/water receipts. Manual visual truth remains negative: the tent is less
+  slab-stacked, but the frames still have flat water/backdrop massing, weak terrain material, and
+  a visibly procedural hero silhouette. Accept only as a bounded hero canvas-form checkpoint;
+  next loop must target a larger scene-system failure, not another tent-panel tweak.

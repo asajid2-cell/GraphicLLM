@@ -1259,11 +1259,15 @@ namespace {
                                                                     uint32_t slopeSegments = 4u) {
         auto mesh = std::make_shared<Scene::MeshData>();
         mesh->kind = Scene::MeshKind::Procedural;
-        lengthSegments = std::clamp(lengthSegments, 3u, 18u);
-        slopeSegments = std::clamp(slopeSegments, 2u, 8u);
+        lengthSegments = std::clamp(lengthSegments, 6u, 28u);
+        slopeSegments = std::clamp(slopeSegments, 4u, 12u);
 
         const float hx = width * 0.5f;
         const float hz = depth * 0.5f;
+        auto smooth01 = [](float edge0, float edge1, float x) {
+            const float t = std::clamp((x - edge0) / std::max(edge1 - edge0, 1e-4f), 0.0f, 1.0f);
+            return t * t * (3.0f - 2.0f * t);
+        };
 
         auto addTri = [&](const glm::vec3& a,
                           const glm::vec3& b,
@@ -1297,12 +1301,20 @@ namespace {
         auto tentPoint = [&](float side, uint32_t slope, uint32_t lane) {
             const float u = static_cast<float>(slope) / static_cast<float>(slopeSegments);
             const float v = static_cast<float>(lane) / static_cast<float>(lengthSegments);
-            const float z = -hz + v * depth;
-            const float fabricWave = std::sin(v * glm::pi<float>() * 4.0f + side * 0.8f) * 0.026f +
-                                     std::sin(v * glm::pi<float>() * 9.0f + u * 2.1f) * 0.012f;
+            float z = -hz + v * depth;
+            z += side * std::sin(v * glm::pi<float>() * 2.0f + 0.35f) * 0.018f * smooth01(0.15f, 0.85f, u);
+            const float fabricWave = std::sin(v * glm::pi<float>() * 5.0f + side * 0.8f) * 0.038f +
+                                     std::sin(v * glm::pi<float>() * 11.0f + u * 2.1f) * 0.017f;
             const float belly = std::sin(u * glm::pi<float>());
-            const float x = side * (hx * (1.0f - u) + 0.030f * u) + side * fabricWave * belly;
-            const float y = std::max(0.0f, height * u - std::abs(fabricWave) * belly * 0.55f);
+            const float edgeLift = std::pow(1.0f - u, 1.7f) *
+                                   (0.018f + 0.012f * std::sin(v * glm::pi<float>() * 6.0f + side));
+            const float ridgePull = smooth01(0.78f, 1.0f, u) *
+                                    std::sin(v * glm::pi<float>() * 4.0f + side * 0.2f) * 0.012f;
+            const float x = side * (hx * (1.0f - u) + 0.020f * u) +
+                            side * (fabricWave * belly + edgeLift * 0.65f);
+            const float y = std::max(0.0f,
+                                     height * u - std::abs(fabricWave) * belly * 0.58f +
+                                     ridgePull - edgeLift * 0.25f);
             return glm::vec3(x, y, z);
         };
 
@@ -1328,6 +1340,41 @@ namespace {
             }
         }
 
+        for (float side : {-1.0f, 1.0f}) {
+            for (uint32_t lane = 0; lane < lengthSegments; ++lane) {
+                const glm::vec3 a = tentPoint(side, 0u, lane);
+                const glm::vec3 b = tentPoint(side, 0u, lane + 1u);
+                const float v0 = static_cast<float>(lane) / static_cast<float>(lengthSegments);
+                const float v1 = static_cast<float>(lane + 1u) / static_cast<float>(lengthSegments);
+                const float roll0 = 0.040f + 0.010f * std::sin(v0 * glm::pi<float>() * 5.0f + side);
+                const float roll1 = 0.040f + 0.010f * std::sin(v1 * glm::pi<float>() * 5.0f + side);
+                const glm::vec3 c = a + glm::vec3(side * 0.11f, roll0, 0.0f);
+                const glm::vec3 d = b + glm::vec3(side * 0.11f, roll1, 0.0f);
+                if (side < 0.0f) {
+                    addQuad(c, a, b, d,
+                            glm::vec2(0.0f, v0), glm::vec2(0.25f, v0), glm::vec2(0.25f, v1), glm::vec2(0.0f, v1));
+                } else {
+                    addQuad(a, c, d, b,
+                            glm::vec2(0.75f, v0), glm::vec2(1.0f, v0), glm::vec2(1.0f, v1), glm::vec2(0.75f, v1));
+                }
+            }
+        }
+
+        for (uint32_t lane = 0; lane < lengthSegments; ++lane) {
+            const glm::vec3 la = tentPoint(-1.0f, slopeSegments, lane);
+            const glm::vec3 lb = tentPoint(-1.0f, slopeSegments, lane + 1u);
+            const glm::vec3 ra = tentPoint(1.0f, slopeSegments, lane);
+            const glm::vec3 rb = tentPoint(1.0f, slopeSegments, lane + 1u);
+            const float v0 = static_cast<float>(lane) / static_cast<float>(lengthSegments);
+            const float v1 = static_cast<float>(lane + 1u) / static_cast<float>(lengthSegments);
+            const glm::vec3 a(-0.050f, (la.y + ra.y) * 0.5f + 0.020f, (la.z + ra.z) * 0.5f);
+            const glm::vec3 b(0.050f, (la.y + ra.y) * 0.5f + 0.020f, (la.z + ra.z) * 0.5f);
+            const glm::vec3 c(0.050f, (lb.y + rb.y) * 0.5f + 0.020f, (lb.z + rb.z) * 0.5f);
+            const glm::vec3 d(-0.050f, (lb.y + rb.y) * 0.5f + 0.020f, (lb.z + rb.z) * 0.5f);
+            addQuad(a, b, c, d,
+                    glm::vec2(0.46f, v0), glm::vec2(0.54f, v0), glm::vec2(0.54f, v1), glm::vec2(0.46f, v1));
+        }
+
         const glm::vec3 frontLeft(-hx, 0.0f, hz);
         const glm::vec3 frontRight(hx, 0.0f, hz);
         const glm::vec3 frontPeak(0.0f, height * 0.985f, hz + 0.020f);
@@ -1345,6 +1392,14 @@ namespace {
                glm::vec2(0.36f, 1.0f), glm::vec2(0.5f, 0.42f), glm::vec2(0.5f, 0.0f));
         addTri(frontDoorPeak, frontDoorRight, frontPeak,
                glm::vec2(0.5f, 0.42f), glm::vec2(0.64f, 1.0f), glm::vec2(0.5f, 0.0f));
+        addTri(glm::vec3(-hx * 0.31f, 0.02f, hz + 0.048f),
+               glm::vec3(-hx * 0.18f, height * 0.52f, hz + 0.080f),
+               glm::vec3(-hx * 0.56f, height * 0.16f, hz + 0.105f),
+               glm::vec2(0.34f, 1.0f), glm::vec2(0.48f, 0.44f), glm::vec2(0.20f, 0.84f));
+        addTri(glm::vec3(hx * 0.18f, height * 0.52f, hz + 0.080f),
+               glm::vec3(hx * 0.31f, 0.02f, hz + 0.048f),
+               glm::vec3(hx * 0.56f, height * 0.16f, hz + 0.105f),
+               glm::vec2(0.52f, 0.44f), glm::vec2(0.66f, 1.0f), glm::vec2(0.80f, 0.84f));
         addTri(backRight, backLeft, backPeak,
                glm::vec2(0.0f, 1.0f), glm::vec2(1.0f, 1.0f), glm::vec2(0.5f, 0.0f));
 
@@ -8889,7 +8944,7 @@ void Engine::BuildRecipeScene() {
             auto cubeMesh = Utils::MeshGenerator::CreateCube();
             auto cylinderMesh = Utils::MeshGenerator::CreateCylinder(0.5f, 1.0f, 24);
             auto shardMesh = CreateGenerativeRockShardMesh(44.17f);
-            auto tentShellMesh = CreateGenerativeCanvasTentMesh(3.25f, 3.05f, 1.42f, 10u, 4u);
+            auto tentShellMesh = CreateGenerativeCanvasTentMesh(3.45f, 3.20f, 1.52f, 22u, 8u);
             auto cabinRoofMesh = CreateGenerativeGableRoofMesh(4.55f, 3.82f, 1.34f);
 
             const auto upCube = renderer->UploadMesh(cubeMesh);
@@ -8958,6 +9013,7 @@ void Engine::BuildRecipeScene() {
                 };
 
                 int canvasShell = 0;
+                int canvasPanelOverlays = 0;
                 int fabricLayers = 0;
                 int structuralPoles = 0;
                 int ropeStakes = 0;
@@ -9022,7 +9078,9 @@ void Engine::BuildRecipeScene() {
                         lowPolyMasks++;
                     }
 
-                    const int panelTarget = std::max(0, genExt.heroAssetReplacement.canvasShellPanelCount - canvasShell);
+                    const int panelTarget = readableCanvas
+                        ? 0
+                        : std::max(0, genExt.heroAssetReplacement.canvasShellPanelCount - canvasShell);
                     for (int i = 0; i < panelTarget; ++i) {
                         const float side = (i % 2 == 0) ? -1.0f : 1.0f;
                         const int row = (i / 2) % 4;
@@ -9042,9 +9100,13 @@ void Engine::BuildRecipeScene() {
                                        readableCanvas ? 0.94f : 0.66f,
                                        readableCanvas ? 0.42f : 0.70f);
                         canvasShell++;
+                        canvasPanelOverlays++;
                     }
 
-                    for (int i = 0; i < genExt.heroAssetReplacement.fabricLayerCount; ++i) {
+                    const int fabricLayerTarget = readableCanvas
+                        ? std::min(genExt.heroAssetReplacement.fabricLayerCount, 4)
+                        : genExt.heroAssetReplacement.fabricLayerCount;
+                    for (int i = 0; i < fabricLayerTarget; ++i) {
                         const int mode = i % 4;
                         const float side = (i % 2 == 0) ? -1.0f : 1.0f;
                         if (mode == 0) {
@@ -9152,6 +9214,11 @@ void Engine::BuildRecipeScene() {
                                           glm::vec3(1.0f, 0.40f, 0.16f),
                                           1.4f,
                                           3.5f);
+                    spdlog::info("generative_exterior: hero canvas mesh form shell=subdivided_canvas length_segments=22 slope_segments=8 panel_overlays={} fabric_layers={} structural_poles={} rope_stakes={}",
+                                 canvasPanelOverlays,
+                                 fabricLayers,
+                                 structuralPoles,
+                                 ropeStakes);
                 }
 
                 if ((genExt.heroAssetReplacement.cabinFacadeModuleCount > 0 ||
@@ -9351,8 +9418,9 @@ void Engine::BuildRecipeScene() {
                     }
                 }
 
-                spdlog::info("generative_exterior: hero asset replacement canvas_shell={} fabric_layers={} structural_poles={} rope_stakes={} low_poly_masks={} cabin_facade={} cabin_roof={} cabin_deck_foundation={} hero_rock_masses={}",
+                spdlog::info("generative_exterior: hero asset replacement canvas_shell={} canvas_panel_overlays={} fabric_layers={} structural_poles={} rope_stakes={} low_poly_masks={} cabin_facade={} cabin_roof={} cabin_deck_foundation={} hero_rock_masses={}",
                              canvasShell,
+                             canvasPanelOverlays,
                              fabricLayers,
                              structuralPoles,
                              ropeStakes,
@@ -9998,7 +10066,7 @@ void Engine::BuildRecipeScene() {
             auto cubeMesh = Utils::MeshGenerator::CreateCube();
             auto cylinderMesh = Utils::MeshGenerator::CreateCylinder(0.5f, 1.0f, 24);
             auto shardMesh = CreateGenerativeRockShardMesh(63.11f);
-            auto tentShellMesh = CreateGenerativeCanvasTentMesh(3.75f, 2.85f, 1.52f, 12u, 4u);
+            auto tentShellMesh = CreateGenerativeCanvasTentMesh(3.75f, 3.05f, 1.58f, 24u, 8u);
                 auto canyonHeroMesh = CreateGenerativeCliffWallMesh(genExt.extent * 0.15f,
                                                                 std::max(2.6f, genExt.terrainRelief * 5.4f),
                                                                 1.10f,

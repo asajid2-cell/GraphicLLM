@@ -440,3 +440,10 @@
 - 2026-07-06: Loop 4 iteration 26 second revision: triplanar overlays were gone, but desert still
   showed a full-width authored river band. Demote `GenerativeExterior_AuthoredRiverCutShadow`
   and verify the selected desert still no longer has the straight foreground strip.
+- 2026-07-06: `tools/run_genscene_acceptance.ps1 -Tag
+  phase4_strip_source_demote_20260706` wrote green `CURRENT.md`. Result: PASS for clean tree,
+  ratchet freeze, Python compile, curation, graphics reset, Release build, structural scene gate,
+  and phase0 policy. Loop 4 remains open and visual truth remains negative. Next active item is a
+  larger visual-system loop: replace staged terrain/backdrop/hero/light structure with coherent
+  scene massing and material response. Avoid more tiny emitter demotions, water color tuning,
+  metric gates, or overlay/card proof geometry.

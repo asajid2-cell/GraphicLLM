@@ -880,3 +880,17 @@ Status: pending.
   band with a runtime receipt, leaving the integrated terrain-water mesh and foreground ledge to
   own the bank. Kill criteria remain visual: reject if the desert band persists, if the canyon
   water/shore edge becomes harsher, or if any structural/semantic gate fails.
+- 2026-07-06: Loop 4 iteration 26 accepted as a bounded strip-source cleanup, not a quality
+  solve. Full runner `tools/run_genscene_acceptance.ps1 -Tag
+  phase4_strip_source_demote_20260706` passed clean tree, ratchet freeze, Python compile,
+  curation, graphics reset, Release build, structural scene gate, and phase0 policy, and rewrote
+  `CURRENT.md` to accepted tag `phase4_strip_source_demote_20260706` at HEAD `4b141e0`.
+  Heartbeat `cortex-aaa-accept-strip` fired on timeout twice while the runner built/rendered, then
+  on process exit after the final structural gate. Accepted selected candidates were campsite
+  `gen_a_foggy_mountain_campsite_beside_2.png`, alpine
+  `gen_a_stormy_alpine_lake_with_a_smal_1.png`, and desert
+  `gen_a_sunny_desert_canyon_campsite_w_0.png`. Visual truth remains negative: the active strip
+  emitters are demoted, but the stills remain flat, staged, and below AA/AAA. Next loop must be a
+  larger visual-system pass: coherent terrain/backdrop massing, real hero asset/material fidelity,
+  or renderer lighting/shadow integration that visibly changes the frame. Do not continue with
+  small receipt-only strip cleanup unless an entity dump proves a specific visible artifact source.

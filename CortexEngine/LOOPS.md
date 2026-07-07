@@ -1141,3 +1141,16 @@ Status: pending.
   `nonblack=1.000`, and stable luma around `92.5/84.4`. Manual inspection remains visually
   negative: the campsite still reads flat/toy-like with a huge purple water sheet. This loop is
   accepted only as a renderer-stability bridge from isolated RT to generated scenes.
+- 2026-07-06: Loop 4 iteration 34 accepted as a constrained generated RT/AO fixture checkpoint.
+  Full runner `tools/run_genscene_acceptance.ps1 -Tag phase4_genscene_rt_fixture_20260706`
+  passed clean tree, gate-ratchet freeze, Python compile, curation gate, graphics-gate reset,
+  Release build, `rt_nonblack_fixture`, `genscene_rt_fixture`, structural scene gate, and phase0
+  policy, and rewrote `CURRENT.md` to accepted tag `phase4_genscene_rt_fixture_20260706` at HEAD
+  `f48a4d6`. The generated RT acceptance artifact is
+  `build/bin/logs/runs/genscene_rt_fixture_20260706_214523_308_251804_33a7101d/genscene_rt_fixture_summary.json`;
+  both runs were stable at `objects=26`, `budget=4gb_low`, `nonblack=1.000`, `avg_luma=92.52`,
+  `center_luma=84.40`, `tlas=130/130`, and `rt_passes=7`, with generated RT reflections/GI still
+  disabled. Visual truth remains negative: the bridge is stable, but the selected generated stills
+  are still flat and toy-like. Next loop must spend the bridge on visible material/asset quality:
+  curated exterior material receivers, source asset/terrain PBR response, or a hero/shore module
+  that makes renderer-owned shadows/SSAO visible in the actual image.

@@ -574,3 +574,13 @@
   This proves generated RT shadows + SSAO can be stable for one prompt under budget, with RT
   reflections/GI intentionally disabled. Next step is a clean full acceptance run after committing
   the fixture tooling.
+- 2026-07-06: `tools/run_genscene_acceptance.ps1 -Tag phase4_genscene_rt_fixture_20260706`
+  wrote green `CURRENT.md`. Result: PASS for clean tree, ratchet freeze, Python compile,
+  curation, graphics reset, Release build, `rt_nonblack_fixture`, new `genscene_rt_fixture`,
+  structural scene gate, and phase0 policy. GenScene RT fixture artifact:
+  `build/bin/logs/runs/genscene_rt_fixture_20260706_214523_308_251804_33a7101d/genscene_rt_fixture_summary.json`
+  (`objects=26`, `budget=4gb_low`, `nonblack=1.000`, `avg_luma=92.52/92.52`,
+  `center_luma=84.40/84.40`, `tlas=130/130`, `rt_passes=7`, `rt_refl=False`, `rt_gi=False`).
+  Loop 4 remains open and visual truth remains negative. Next active item should use this stable
+  renderer bridge for actual visible quality: curated exterior material/asset module or a small
+  hero/terrain material receiver slice, not another proof-only gate.

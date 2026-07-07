@@ -472,3 +472,13 @@
   rope stakes. Visual truth remains negative; accept only as a bounded hero-form checkpoint, then
   move to a larger scene-system failure such as terrain/backdrop massing, water/shore shading, or
   renderer lighting/shadow integration.
+- 2026-07-06: active item is Loop 4 iteration 29, generated DXR/renderer lighting integration.
+  Make generated high-fidelity still captures opt into existing DXR from IR intent instead of a
+  manual env var. Verify with render logs that dxr-required generated captures are not forced to
+  `RT=off`; keep all old guardrails: no `scene_graphics_gate.py` edits, no new `missing_*` hard
+  gates, no water color tuning, and no overlay/card/proof geometry.
+- 2026-07-06: rejected Loop 4 iteration 29. Broad generated DXR opt-in proved the env plumbing
+  but failed structural acceptance: campsite regressed `purple_water_roi_fail`, alpine produced
+  black frames with a DX12 queue fence timeout, and manual stills did not improve. Reverted the
+  production diff and dirty `CURRENT_FAILED.md`. Next active item is non-RT structural fidelity:
+  water/shore subsystem routing, terrain/backdrop massing cleanup, or photoreal asset replacement.

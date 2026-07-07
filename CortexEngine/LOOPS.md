@@ -941,3 +941,33 @@ Status: pending.
   slab-stacked, but the frames still have flat water/backdrop massing, weak terrain material, and
   a visibly procedural hero silhouette. Accept only as a bounded hero canvas-form checkpoint;
   next loop must target a larger scene-system failure, not another tent-panel tweak.
+- 2026-07-06: Loop 4 iteration 29 started as generated DXR/renderer lighting integration.
+  Orientation trusted `CURRENT.md` at accepted tag `phase4_hero_canvas_form_20260706`; git
+  status was clean on `main` after acceptance commit `1c53ac5`. Heartbeat
+  `cortex-aaa-loop29-proof` fired on a 2s timeout before long waits. Scope is limited to
+  generated render intent/plumbing (`tools/render_ir.ps1`, `tools/scene_compiler.py`,
+  possibly `tools/scene_gen.py`) and ledgers. Hypothesis: generated high-fidelity stills should
+  opt into the engine's existing DXR path from IR intent instead of requiring a manual
+  environment variable, so renderer-owned reflections/shadowing can start replacing flat
+  card-like lighting. Verifier is PARTIAL-RISK: acceptance runner plus logs must show the IR has
+  `dxr_required=true` and render harness no longer forces `RT=off` for generated DXR stills;
+  selected canonical images still require manual visual inspection and visual truth cannot be
+  claimed AAA. Kill criteria: reject if DXR crashes/timeouts on the 3070 Ti path, if acceptance
+  gates fail beyond expected dirty-tree policy, if the log still shows generated RT disabled for
+  dxr-required IR, if `scene_graphics_gate.py` or water color ratios are touched, or if manual
+  inspection shows no material lighting improvement and only receipt text changed.
+- 2026-07-06: Loop 4 iteration 29 rejected after dirty probe
+  `phase4_generated_dxr_dirty_probe_20260706 -SkipBuild`. The IR/harness proof succeeded:
+  generated campsite IR had `dxr_required=true`, `render_ir.ps1` logged
+  `generated_dxr_required=True`, runtime receipts logged `dxr_required=1`, and the previous
+  `Renderer: env disables active ... RT=off` line was absent. The slice still hit kill criteria:
+  structural scene gate failed, campsite failed `purple_water_roi_fail`, and alpine generated
+  black 5 KB PNGs with `render_health_image` failure plus a DX12 queue fence timeout
+  (`expected=19, completed=18`) and in-flight resource final-release validation error. Manual
+  inspection also showed no coherent visual improvement: campsite remained a toy tent in front
+  of a flat purple sheet and card-like mountains. Production changes in `tools/render_ir.ps1`,
+  `tools/scene_compiler.py`, `tools/scene_gen.py`, and dirty `CURRENT_FAILED.md` were reverted.
+  Do not retry broad generated DXR opt-in until the RT capture path is isolated with a small
+  fixture that proves nonblack repeated captures under RT; the next active loop should target
+  a non-RT structural quality source such as real water/shore subsystem routing, terrain/backdrop
+  massing cleanup, or photoreal asset replacement.

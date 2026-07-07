@@ -997,3 +997,15 @@ Status: pending.
   staged/toy-like. Accept only as a bounded structural water-mesh checkpoint; the next loop must
   attack a larger non-water fidelity source such as terrain/backdrop massing or photoreal asset
   replacement.
+- 2026-07-06: Loop 4 iteration 30 accepted as a bounded structural water/shore mesh checkpoint.
+  Full runner `tools/run_genscene_acceptance.ps1 -Tag phase4_banked_water_mesh_20260706` passed
+  clean tree, ratchet freeze, Python compile, curation, graphics reset, Release build,
+  structural scene gate, and phase0 policy, and rewrote `CURRENT.md` to accepted tag
+  `phase4_banked_water_mesh_20260706` at HEAD `c77a42b`. Selected candidates were campsite
+  `build/bin/logs/gen_a_foggy_mountain_campsite_beside_2.png`, alpine
+  `build/bin/logs/gen_a_stormy_alpine_lake_with_a_smal_1.png`, and desert
+  `build/bin/logs/gen_a_sunny_desert_canyon_campsite_w_0.png`. Visual truth remains negative:
+  the water/shore silhouettes are less rectangular, but the frame still reads as flat,
+  disconnected, and below AA/AAA. Next active loop must attack a larger fidelity source:
+  terrain/backdrop massing, photoreal asset replacement, or renderer/material integration with a
+  fixture first. Do not continue with water color tuning, metric gates, or overlay/proof geometry.

@@ -490,3 +490,10 @@
   policy after manual Release build. Shoreline silhouettes are less rectangular, but water still
   reads flat/luminous and visual truth remains negative. Accept only as a bounded structural
   checkpoint; next active item should be terrain/backdrop massing or photoreal asset replacement.
+- 2026-07-06: `tools/run_genscene_acceptance.ps1 -Tag
+  phase4_banked_water_mesh_20260706` wrote green `CURRENT.md`. Result: PASS for clean tree,
+  ratchet freeze, Python compile, curation, graphics reset, Release build, structural scene gate,
+  and phase0 policy. Loop 4 remains open and visual truth remains negative. Next active item is
+  Loop 4 iteration 31: a larger structural fidelity source, preferably terrain/backdrop massing
+  or photoreal asset replacement, not more water color tuning, metric gates, or overlay/proof
+  geometry.

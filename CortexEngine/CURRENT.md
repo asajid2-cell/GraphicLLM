@@ -2,22 +2,22 @@
 
 Overall: **GREEN - acceptable checkpoint (commit it now)**
 
-- Tag: `phase4_strip_source_demote_20260706`
-- Date: 2026-07-06 18:30
-- Accepted tag: `phase4_strip_source_demote_20260706`
-- Previous tag: `phase4_integrated_terrain_water_20260706`
-- HEAD: 4b141e0 Demote GenScene strip overlay sources
+- Tag: `phase4_hero_canvas_form_20260706`
+- Date: 2026-07-06 19:25
+- Accepted tag: `phase4_hero_canvas_form_20260706`
+- Previous tag: `phase4_strip_source_demote_20260706`
+- HEAD: 4a2fa94 Refine GenScene canvas hero form
 - Tracked tree: CLEAN
 
 ## Gates
 
-- **clean_tree**: PASS -- Z:\328\CMPUT328-A2\codexworks\301\graphics\CortexEngine\artifacts\genscene_acceptance\phase4_strip_source_demote_20260706\git_status.txt
+- **clean_tree**: PASS -- Z:\328\CMPUT328-A2\codexworks\301\graphics\CortexEngine\artifacts\genscene_acceptance\phase4_hero_canvas_form_20260706\git_status.txt
 - **gate_ratchet_freeze**: PASS -- no added missing_* hard gates in scene_graphics_gate.py
-- **python_compile**: PASS -- Z:\328\CMPUT328-A2\codexworks\301\graphics\CortexEngine\artifacts\genscene_acceptance\phase4_strip_source_demote_20260706\python_compile.log
-- **curation_gate**: PASS -- Z:\328\CMPUT328-A2\codexworks\301\graphics\CortexEngine\artifacts\genscene_acceptance\phase4_strip_source_demote_20260706\curation_gate.log
-- **graphics_gate_reset**: PASS -- Z:\328\CMPUT328-A2\codexworks\301\graphics\CortexEngine\artifacts\genscene_acceptance\phase4_strip_source_demote_20260706\graphics_gate_reset.log
-- **release_build**: PASS -- Z:\328\CMPUT328-A2\codexworks\301\graphics\CortexEngine\artifacts\genscene_acceptance\phase4_strip_source_demote_20260706\release_build.log
-- **structural_scene_gate**: PASS -- Z:\328\CMPUT328-A2\codexworks\301\graphics\CortexEngine\artifacts\genscene_acceptance\phase4_strip_source_demote_20260706\structural_scene_gate.log
+- **python_compile**: PASS -- Z:\328\CMPUT328-A2\codexworks\301\graphics\CortexEngine\artifacts\genscene_acceptance\phase4_hero_canvas_form_20260706\python_compile.log
+- **curation_gate**: PASS -- Z:\328\CMPUT328-A2\codexworks\301\graphics\CortexEngine\artifacts\genscene_acceptance\phase4_hero_canvas_form_20260706\curation_gate.log
+- **graphics_gate_reset**: PASS -- Z:\328\CMPUT328-A2\codexworks\301\graphics\CortexEngine\artifacts\genscene_acceptance\phase4_hero_canvas_form_20260706\graphics_gate_reset.log
+- **release_build**: PASS -- Z:\328\CMPUT328-A2\codexworks\301\graphics\CortexEngine\artifacts\genscene_acceptance\phase4_hero_canvas_form_20260706\release_build.log
+- **structural_scene_gate**: PASS -- Z:\328\CMPUT328-A2\codexworks\301\graphics\CortexEngine\artifacts\genscene_acceptance\phase4_hero_canvas_form_20260706\structural_scene_gate.log
 - **phase0_policy**: PASS -- dirty tree and old overlay-gate changes must not be accepted by assertion
 
 ## Residuals
@@ -26,6 +26,6 @@ Overall: **GREEN - acceptable checkpoint (commit it now)**
 
 ## Regression
 
-    Previous accepted tag: phase4_integrated_terrain_water_20260706
+    Previous accepted tag: phase4_strip_source_demote_20260706
 
 Next steps live in `QUEUE.md` and `PLAN.md`. This file is state, nothing else.

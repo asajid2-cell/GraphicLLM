@@ -1009,3 +1009,31 @@ Status: pending.
   disconnected, and below AA/AAA. Next active loop must attack a larger fidelity source:
   terrain/backdrop massing, photoreal asset replacement, or renderer/material integration with a
   fixture first. Do not continue with water color tuning, metric gates, or overlay/proof geometry.
+- 2026-07-06: Loop 4 iteration 31 started as far-shore terrain/backdrop massing. Orientation
+  trusted `CURRENT.md` at accepted tag `phase4_banked_water_mesh_20260706`; git status was clean
+  after checkpoint commit `4db79f6`. Heartbeat `cortex-aaa-loop31-proof` fired on a 2s timeout.
+  Scope is limited to structural generated terrain/backdrop geometry in `src/Core/Engine_Scenes.cpp`
+  plus ledgers. Hypothesis: adding a broad opaque far-shore/foothill apron that uses the same
+  shared terrain noise and material system will make lakes/rivers read as coherent outdoor spaces
+  instead of flat water sheets in front of detached ridge cards. Verifier is PARTIAL-RISK:
+  Release build, dirty acceptance probe, runtime receipts for the new far-shore mass mesh, and
+  manual inspection of the three canonical stills. Kill criteria: reject if any real acceptance
+  gate fails beyond expected dirty-tree policy, if prompt water-color semantics regress, if the
+  new mass occludes the hero/water ROI, if it reads as another card/strip/overlay, or if the
+  selected frames remain visually dominated by disconnected backdrop sheets.
+- 2026-07-06: Loop 4 iteration 31 rejected after two dirty probes. Probe 1
+  `phase4_far_shore_apron_dirty_probe_20260706 -SkipBuild` and probe 2
+  `phase4_far_shore_apron_dirty_probe2_20260706 -SkipBuild` both passed ratchet freeze, Python
+  compile, curation, graphics reset, and structural scene gates after a manual Release build,
+  and failed only expected dirty-tree policy. Receipts proved the attempted systems:
+  `far-shore terrain mass apron=opaque_shared_fbm water_cutout=profile_following` and
+  `profile=volumetric_foothill_facets rows=7`. Selected probe-2 images were campsite
+  `gen_a_foggy_mountain_campsite_beside_1.png`, alpine
+  `gen_a_stormy_alpine_lake_with_a_smal_2.png`, and desert
+  `gen_a_sunny_desert_canyon_campsite_w_0.png`. Manual visual truth failed the loop: the far
+  shore and ridges were somewhat less wafer-thin, but the stills remained dominated by flat
+  luminous water, hard detached mountain silhouettes, toy campsite/cabin staging, and weak
+  material/light response; all selected probe-2 scene-gen verdicts remained `reframe`. Production
+  changes in `src/Core/Engine_Scenes.cpp` and dirty `CURRENT_FAILED.md` were reverted. Do not retry
+  terrain massing as more procedural ridge/apron geometry until asset/material and renderer
+  fidelity fronts are stronger.

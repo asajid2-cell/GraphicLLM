@@ -497,3 +497,14 @@
   Loop 4 iteration 31: a larger structural fidelity source, preferably terrain/backdrop massing
   or photoreal asset replacement, not more water color tuning, metric gates, or overlay/proof
   geometry.
+- 2026-07-06: active item is Loop 4 iteration 31, far-shore terrain/backdrop massing. Add a real
+  opaque foothill/opposite-bank mesh tied to shared terrain noise and material response so water
+  has surrounding landform context before the procedural ridge layers. No `scene_graphics_gate.py`
+  edits, no new hard pixel gates, no water color tuning, no translucent bands/cards/proof geometry,
+  and no DXR retry.
+- 2026-07-06: rejected Loop 4 iteration 31. Far-shore apron plus volumetric ridge geometry passed
+  real dirty-probe gates, but manual inspection and scene-gen verdicts stayed negative: the
+  selected stills remained flat, staged, and dominated by disconnected toy assets/materials. Revert
+  the production diff and move to a different high-leverage front: source/photoreal hero assets,
+  real material/shader response, or a small isolated RT/occlusion fixture before any broad renderer
+  opt-in.

@@ -523,3 +523,20 @@
   local prop/camera tuning: build a small isolated RT/SSAO/occlusion fixture or a curated
   exterior asset module that proves real material/light response before reconnecting it to
   generated scenes.
+- 2026-07-06: active item is Loop 4 iteration 33, isolated renderer RT/AO ground-truth fixture.
+  Prove the existing curated `rt_showcase` path can repeatedly produce nonblack captures with
+  ray tracing enabled, TLAS instances present, SSAO/occlusion evidence present, and frame-contract
+  diagnostics recorded under isolated logs before any generated-scene RT retry. This is a
+  verifier-building loop, not a generated-scene quality claim. Keep old guardrails: do not edit
+  `tools/scene_graphics_gate.py`, do not add new `missing_*` gates, do not tune water color ratios,
+  do not add overlay/card/proof geometry, and do not enable broad generated DXR.
+- 2026-07-06: Loop 4 iteration 33 verifier proof passed standalone. Red control:
+  `tools/run_rt_nonblack_fixture.ps1 -NoBuild -IsolatedLogs -Runs 1 -SmokeFrames 80
+  -MaxExpectedFrames 120 -MinVisualNonBlackRatio 1.01` failed for the intended reason
+  (`nonblack_ratio=1.0`, expected `>=1.01`). Green control:
+  `tools/run_rt_nonblack_fixture.ps1 -NoBuild -IsolatedLogs -Runs 2 -SmokeFrames 120
+  -MaxExpectedFrames 160` passed with both runs `nonblack=1.000`, `avg_luma=117.08/117.15`,
+  `center_luma=136.83/136.91`, `tlas=63`, and `rt_passes=9`. Green artifact:
+  `build/bin/logs/runs/rt_nonblack_fixture_20260706_213018_814_164144_0f693965/rt_nonblack_fixture_summary.json`.
+  Next step is a clean full acceptance run now that the fixture is wired into
+  `tools/run_genscene_acceptance.ps1`.

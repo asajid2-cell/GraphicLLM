@@ -200,6 +200,29 @@ if ($SkipBuild) {
     }
 }
 
+$rtFixtureLog = Join-Path $dir 'rt_nonblack_fixture.log'
+$rtFixtureOk = $true
+if (-not $releaseBuildOk) {
+    $rtFixtureOk = $false
+    "skipped because release_build failed; refusing to render with a stale binary" |
+        Out-File -FilePath $rtFixtureLog -Encoding utf8
+} else {
+    $rtFixtureOut = & powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_rt_nonblack_fixture.ps1 `
+        -NoBuild `
+        -IsolatedLogs `
+        -Runs 2 `
+        -SmokeFrames 120 `
+        -MaxExpectedFrames 160 `
+        -MinTLASInstances 8 `
+        -MinRayTracingPasses 3 `
+        -MinVisualNonBlackRatio 0.95 `
+        -MinVisualAvgLuma 20 `
+        -MinVisualCenterLuma 20 2>&1
+    $rtFixtureOk = $LASTEXITCODE -eq 0
+    $rtFixtureOut | Out-File -FilePath $rtFixtureLog -Encoding utf8
+}
+Report 'rt_nonblack_fixture' $rtFixtureOk $rtFixtureLog
+
 $structuralLog = Join-Path $dir 'structural_scene_gate.log'
 $structuralOk = $true
 $structuralDetails = @()

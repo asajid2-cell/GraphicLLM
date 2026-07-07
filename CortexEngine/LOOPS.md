@@ -1067,3 +1067,32 @@ Status: pending.
   reverted. Do not retry this as larger local prop clutter or camera-only framing; the next loop
   must change a true renderer/material/asset source, such as an isolated RT/AO fixture or a real
   curated exterior asset module, before more composition tuning.
+- 2026-07-06: Loop 4 iteration 33 started as an isolated renderer RT/AO ground-truth fixture.
+  Orientation trusted `CURRENT.md` at accepted tag `phase4_banked_water_mesh_20260706`; git status
+  was clean on `main` after rejection commit `6c50693`. Heartbeat `cortex-aaa-loop33-proof` fired
+  on a 2s timeout before long waits. Scope is limited to a narrow fixture/verifier wrapper around
+  existing curated `rt_showcase` diagnostics and ledgers; no generated-scene production changes
+  are allowed in this loop. Hypothesis: broad generated DXR failed because the integration target
+  was too wide, so the next safe step is to prove the renderer path itself with repeated nonblack
+  captures, RT enabled, TLAS instances present, SSAO/occlusion evidence present, and isolated
+  artifacts. Verifier is a fixture-building loop: first prove the new fixture can fail on a bad
+  threshold/missing evidence, then prove it green on two `rt_showcase` runs. Kill criteria: reject
+  if RT captures are black/flaky, if frame-contract evidence is missing, if the fixture requires
+  weakening old generated-scene gates, if it edits `scene_graphics_gate.py`, or if it becomes a
+  backdoor broad generated DXR opt-in.
+- 2026-07-06: Loop 4 iteration 33 verifier red/green proof completed. The first red-control run
+  rendered `rt_showcase` cleanly but the fixture initially threw while serializing its summary;
+  that fixture bug was fixed and rerun. Proven red command:
+  `tools/run_rt_nonblack_fixture.ps1 -NoBuild -IsolatedLogs -Runs 1 -SmokeFrames 80
+  -MaxExpectedFrames 120 -MinVisualNonBlackRatio 1.01`; exit was nonzero for the intended gate
+  failure, `run 1 nonblack_ratio=1.0, expected >= 1.01`, with summary
+  `build/bin/logs/runs/rt_nonblack_fixture_20260706_212915_603_260472_043ddaad/rt_nonblack_fixture_summary.json`.
+  Proven green command:
+  `tools/run_rt_nonblack_fixture.ps1 -NoBuild -IsolatedLogs -Runs 2 -SmokeFrames 120
+  -MaxExpectedFrames 160 -MinTLASInstances 8 -MinRayTracingPasses 3 -MinVisualNonBlackRatio 0.95
+  -MinVisualAvgLuma 20 -MinVisualCenterLuma 20`; exit 0, summary
+  `build/bin/logs/runs/rt_nonblack_fixture_20260706_213018_814_164144_0f693965/rt_nonblack_fixture_summary.json`.
+  Both green runs reported `RT=true`, `SSAO=true`, `tlas=63`, `rt_passes=9`, `nonblack=1.000`,
+  and luma/center-luma around `117/137`. This proves the isolated renderer path, not generated
+  scene visual quality; visual truth for GenScene remains negative until the renderer/material
+  evidence is reconnected through a separate accepted loop.

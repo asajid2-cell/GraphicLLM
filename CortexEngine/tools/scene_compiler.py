@@ -1020,7 +1020,7 @@ def compile_v3_to_v2(v3: dict[str, Any]) -> dict[str, Any]:
         },
         "cinematic_material_lighting": {
             "enabled": True,
-            "triplanar_detail_layer_count": 8 if canyon else 7,
+            "triplanar_detail_layer_count": 0,
             "terrain_relief_patch_count": cinematic_relief_patches,
             "shadow_caster_count": cinematic_shadow_casters,
             "contact_receiver_count": cinematic_contact_receivers,

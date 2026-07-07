@@ -852,3 +852,31 @@ Status: pending.
   work must replace visible structure: continuous authored terrain/backdrop composition,
   real hero assets/materials, and renderer lighting integration that changes the image, not
   another receipt-only cleanup.
+- 2026-07-06: Loop 4 iteration 26 started as an open-ended shore bank geometry slice. Recon
+  found the persistent desert/campsite straight shoreline strip is likely the near cap inside
+  `CreateGenerativeShoreBankMesh`: it bridges left and right bank vertices across the entire
+  foreground water edge, so the curved side-bank mesh still produces a horizontal tan/peach
+  band. Heartbeat `genscene-loop26-proof` fired on a 2s timeout before long waits. Scope is
+  limited to the shore-bank mesh helper, its runtime receipt, and ledgers. Hypothesis: removing
+  the cross-shore cap while preserving the side-following bank strips will reduce the staged
+  stripe read without adding overlays, changing water color ratios, or touching hard gates. Kill
+  criteria: reject if structural scene gates fail, if water ROI regresses, if the lake/river edge
+  becomes harsher or more empty than the accepted baseline, or if the stills still show the same
+  full-width straight shore band.
+- 2026-07-06: Loop 4 iteration 26 revised after dirty probe
+  `phase4_open_shore_bank_dirty_probe_20260706`. The probe passed all real automated gates and
+  failed only expected dirty-tree policy, but manual inspection and entity dumps falsified the
+  near-cap hypothesis: selected logs had `shore_segments=0` and no current shore-bank receipt,
+  while the visible strips lined up with `GenerativeExterior_CinematicTriplanarLayer0..7`.
+  Reverted the inactive cap edit. Revised scope stays narrow: set compiler
+  `triplanar_detail_layer_count` to zero and add a stale-IR runtime clamp/receipt for cinematic
+  triplanar ground overlays only. This targets the active strip source without changing hard gates,
+  water color ratios, or adding replacement overlay geometry.
+- 2026-07-06: Loop 4 iteration 26 revised again after the triplanar dirty probe. The triplanar
+  overlays were successfully removed (`triplanar_layers=0` and no current
+  `GenerativeExterior_CinematicTriplanarLayer*` entities), but desert still had one full-width
+  straight band. Entity dumps identified `GenerativeExterior_AuthoredRiverCutShadow`, a wide
+  cube placed across the canyon river edge. Revised scope now also demotes that authored river-cut
+  band with a runtime receipt, leaving the integrated terrain-water mesh and foreground ledge to
+  own the bank. Kill criteria remain visual: reject if the desert band persists, if the canyon
+  water/shore edge becomes harsher, or if any structural/semantic gate fails.

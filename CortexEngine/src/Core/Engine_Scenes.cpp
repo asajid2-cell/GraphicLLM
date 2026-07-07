@@ -4776,6 +4776,12 @@ void Engine::BuildRecipeScene() {
                     genExt.structures.push_back(structure);
                 }
                 genExt.valid = true;
+                const int suppressedTriplanarLayers = genExt.cinematicMaterialLighting.triplanarDetailLayerCount;
+                if (suppressedTriplanarLayers > 0) {
+                    genExt.cinematicMaterialLighting.triplanarDetailLayerCount = 0;
+                    spdlog::info("generative_exterior: cinematic triplanar ground overlays demoted triplanar_layers={} policy=terrain_mesh_owns_ground_detail",
+                                 suppressedTriplanarLayers);
+                }
             } catch (const std::exception& e) {
                 spdlog::warn("generative_exterior: bad IR json for environment: {}", e.what());
             }
@@ -7768,19 +7774,14 @@ void Engine::BuildRecipeScene() {
                         terrainSetpieces++;
                         compositionAnchors++;
                     }
-                    addModulePart("GenerativeExterior_AuthoredRiverCutShadow",
-                                  cubeMesh,
-                                  glm::vec3(0.0f, 0.048f, shoreZ + 0.44f),
-                                  glm::vec3(groundW * 0.30f, 0.050f, 0.34f),
-                                  glm::vec3(0.0f, glm::radians(-2.0f), 0.0f),
-                                  darkBank);
+                    spdlog::info("generative_exterior: authored canyon river cut shadow demoted policy=integrated_terrain_water_owns_bank");
                     addModulePart("GenerativeExterior_AuthoredForegroundCanyonLedge",
                                   shardMesh,
                                   glm::vec3(-4.2f, 0.16f, 3.72f),
                                   glm::vec3(0.82f, 0.34f, 0.62f),
                                   glm::vec3(glm::radians(-4.0f), glm::radians(28.0f), glm::radians(-5.0f)),
                                   bankMat);
-                    terrainSetpieces += 2;
+                    terrainSetpieces += 1;
                     heroClusters += 2;
                     compositionAnchors += 2;
                     AddAssetLedSpotLight(*m_registry, "GenerativeExterior_AuthoredCanyonSideKey", glm::vec3(-6.0f, 5.2f, -4.0f), glm::vec3(0.0f, 0.65f, -5.0f), glm::vec3(1.0f, 0.58f, 0.30f), 5.6f, 20.0f, false);

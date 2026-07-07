@@ -427,3 +427,16 @@
   composition, hero asset/material replacement, or renderer lighting that materially changes the
   selected frames. Do not spend the next iteration on receipt-only cleanup, water color ratios, or
   another overlay/card/strip emitter.
+- 2026-07-06: active item is Loop 4 iteration 26, open-ended shore bank geometry. Remove the
+  shore-bank near cap that bridges left and right banks across the foreground water edge, because
+  it creates the visible long straight tan/peach shore strip. Preserve side-following bank
+  geometry and structural terrain/water receipts; no hard-gate edits, no water color tuning, no
+  new card/overlay emitters.
+- 2026-07-06: Loop 4 iteration 26 revised: the shore-bank cap was not active in selected probe
+  logs. Entity dumps show the foreground strips are `GenerativeExterior_CinematicTriplanarLayer*`.
+  Active item is now targeted triplanar-overlay demotion: zero `triplanar_detail_layer_count` and
+  clamp stale IR for that count only, then rerun the dirty probe and reject if the strips remain
+  or the scenes become emptier/flatter.
+- 2026-07-06: Loop 4 iteration 26 second revision: triplanar overlays were gone, but desert still
+  showed a full-width authored river band. Demote `GenerativeExterior_AuthoredRiverCutShadow`
+  and verify the selected desert still no longer has the straight foreground strip.

@@ -894,3 +894,25 @@ Status: pending.
   larger visual-system pass: coherent terrain/backdrop massing, real hero asset/material fidelity,
   or renderer lighting/shadow integration that visibly changes the frame. Do not continue with
   small receipt-only strip cleanup unless an entity dump proves a specific visible artifact source.
+- 2026-07-06: Loop 4 iteration 27 started as a structural composition and scene-depth slice.
+  Orientation trusted `CURRENT.md` at accepted tag `phase4_strip_source_demote_20260706`; git
+  status was clean on `main`. Heartbeat `cortex-aaa-loop27-proof` fired on a 2s timeout before
+  long waits. Scope is limited to `src/Core/Engine_Scenes.cpp`, `tools/scene_compiler.py`, and
+  ledgers. Hypothesis: adding an explicit composition spine to the generated exterior path
+  (foreground anchors, grounded hero/midground placement, background massing, and renderer-owned
+  depth/lighting receipts) will reduce the disconnected toy-stage read more than another
+  artifact-demotion loop. Kill criteria: reject if any acceptance gate fails beyond expected
+  dirty-tree policy, if prompt water-color semantics regress, if source/fallback receipts lose
+  naturalistic dominance, if the change adds overlay/card/proof geometry or new `missing_*`
+  gates, or if manual inspection says the selected stills remain dominated by flat staged
+  cards, toy hero silhouettes, or disconnected props.
+- 2026-07-06: Loop 4 iteration 27 rejected. Dirty probe 2 passed the non-visual checks except
+  the campsite selected frame failed `purple_water_roi_fail`; manual inspection of
+  `build/bin/logs/gen_a_foggy_mountain_campsite_beside_0.png` also hit the slice kill criteria.
+  The frame still read as a flat staged campsite with a toy tent, broad colored water sheet,
+  card-like mountain/backdrop massing, and disconnected scattered props. A camera/ROI repair
+  would only make a weak composition-spine slice green, so the production diff in
+  `src/Core/Engine_Scenes.cpp`, `tools/scene_compiler.py`, and dirty `CURRENT_FAILED.md` was
+  reverted. Do not retry Loop 27 as another framing/ROI pass; the next loop must replace visible
+  fidelity sources directly: hero asset/material form, continuous terrain/backdrop massing, and
+  renderer-owned lighting/shadow response that materially changes the selected frames.

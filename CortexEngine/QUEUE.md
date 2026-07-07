@@ -447,3 +447,16 @@
   larger visual-system loop: replace staged terrain/backdrop/hero/light structure with coherent
   scene massing and material response. Avoid more tiny emitter demotions, water color tuning,
   metric gates, or overlay/card proof geometry.
+- 2026-07-06: active item is Loop 4 iteration 27, structural composition and scene depth. Build
+  a real foreground/midground/background composition path for generated exteriors using existing
+  terrain, water, renderer, and naturalistic asset systems. Do not touch `scene_graphics_gate.py`,
+  do not add new `missing_*` gates, do not tune water color ratios, and do not add overlay/card
+  proof geometry.
+- 2026-07-06: rejected Loop 4 iteration 27 after dirty probe 2 and manual inspection. The
+  composition-spine diff still produced campsite imagery dominated by a toy tent, flat stage,
+  broad purple water sheet, card-like backdrop massing, and disconnected props; it also failed
+  the selected campsite `purple_water_roi_fail`. Reverted production source and dirty
+  `CURRENT_FAILED.md`. Do not spend the next iteration on framing/ROI repair for this slice.
+  Next active item is a higher-leverage fidelity replacement loop: real hero asset/material form,
+  continuous terrain/backdrop massing, and renderer lighting/shadow behavior that visibly changes
+  the image rather than satisfying a receipt.

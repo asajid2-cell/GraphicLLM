@@ -427,17 +427,19 @@ namespace {
                                                               bool riverLike) {
         const float bend = std::sin(v * glm::pi<float>() * 2.0f - 0.45f);
         const float secondary = std::sin(v * glm::pi<float>() * 5.0f + 0.8f);
+        const float tertiary = std::sin(v * glm::pi<float>() * 8.0f + 1.7f);
         const float cove = std::sin(Smooth01(v) * glm::pi<float>());
-        const float farTaper = riverLike ? 1.0f : (1.0f - 0.38f * Smooth01(std::max(0.0f, (v - 0.70f) / 0.30f)));
+        const float farTaper = riverLike ? (0.92f + 0.08f * Smooth01(v))
+                                         : (1.0f - 0.34f * Smooth01(std::max(0.0f, (v - 0.70f) / 0.30f)));
         const float centerX = riverLike
-            ? bend * halfMaxWidth * 0.20f
-            : (bend * 0.055f + secondary * 0.012f) * halfMaxWidth;
+            ? (bend * 0.29f + secondary * 0.055f + tertiary * 0.018f) * halfMaxWidth
+            : (bend * 0.105f + secondary * 0.035f + tertiary * 0.018f) * halfMaxWidth;
         const float widthFactor = riverLike
-            ? (0.20f + 0.055f * Smooth01(v) + 0.022f * secondary)
-            : ((0.22f + 0.36f * cove + 0.055f * Smooth01(v) + 0.026f * secondary) * farTaper);
+            ? ((0.18f + 0.078f * Smooth01(v) + 0.034f * secondary + 0.018f * tertiary) * farTaper)
+            : ((0.23f + 0.35f * cove + 0.070f * Smooth01(v) + 0.038f * secondary + 0.024f * tertiary) * farTaper);
         const float halfWidth = std::clamp(halfMaxWidth * widthFactor,
                                            halfMaxWidth * (riverLike ? 0.16f : 0.18f),
-                                           halfMaxWidth * (riverLike ? 0.34f : 0.62f));
+                                           halfMaxWidth * (riverLike ? 0.33f : 0.60f));
         return {centerX, halfWidth};
     }
 
@@ -690,20 +692,24 @@ namespace {
             for (uint32_t ix = 0; ix <= xSegments; ++ix) {
                 const float u = static_cast<float>(ix) / static_cast<float>(xSegments);
                 const float side = u * 2.0f - 1.0f;
-                const float edgeWeight = std::pow(std::abs(side), 1.8f);
-                const float scallop = (std::sin(v * 17.0f + side * 3.4f) * 0.035f +
-                                       std::sin(v * 31.0f - side * 6.1f) * 0.018f) * edgeWeight;
+                const float edgeWeight = std::pow(std::abs(side), 1.45f);
+                const float edgeCoast = 1.0f - std::abs(side);
+                const float scallop = (std::sin(v * 17.0f + side * 3.4f) * 0.082f +
+                                       std::sin(v * 31.0f - side * 6.1f) * 0.038f +
+                                       std::sin(v * 9.0f + side * 2.7f) * 0.026f) * edgeWeight;
                 const float localX = sample.centerX + side * sample.halfWidth * (1.0f + scallop);
                 const float shoreCurve = riverLike
-                    ? std::sin(side * glm::pi<float>() * 0.75f) * 0.16f
-                    : (1.0f - std::abs(side)) * 0.42f + std::sin(side * 5.3f + 0.4f) * 0.08f;
+                    ? std::sin(side * glm::pi<float>() * 0.75f) * 0.30f +
+                          edgeCoast * std::sin(v * 5.0f + side * 1.4f) * 0.16f
+                    : edgeCoast * 1.05f + std::sin(side * 5.3f + 0.4f) * 0.22f +
+                          std::sin(v * 10.5f + side * 2.4f) * (0.25f + 0.75f * edgeCoast) * 0.20f;
                 const float longitudinalRipple =
-                    std::sin(v * 24.0f + side * 4.1f) * (riverLike ? 0.035f : 0.055f) *
+                    std::sin(v * 24.0f + side * 4.1f) * (riverLike ? 0.075f : 0.115f) *
                     (0.35f + 0.65f * shoreBlend);
                 const float localZ = baseLocalZ + shoreBlend * shoreCurve + longitudinalRipple;
                 const float waveY =
-                    (std::sin(v * 32.0f + side * 5.0f) * 0.012f +
-                     std::sin(v * 11.0f - side * 7.0f) * 0.010f) *
+                    (std::sin(v * 32.0f + side * 5.0f) * 0.020f +
+                     std::sin(v * 11.0f - side * 7.0f) * 0.016f) *
                     (riverLike ? 0.55f : 1.0f) * (1.0f - edgeWeight * 0.25f);
                 mesh->positions.emplace_back(localX, waveY, localZ);
                 mesh->normals.emplace_back(0.0f, 1.0f, 0.0f);
@@ -777,13 +783,17 @@ namespace {
             for (uint32_t ix = 0; ix <= xSegments; ++ix) {
                 const float u = static_cast<float>(ix) / static_cast<float>(xSegments);
                 const float side = u * 2.0f - 1.0f;
-                const float edgeWeight = std::pow(std::abs(side), 1.65f);
-                const float scallop = (std::sin(v * 15.0f + side * 2.8f) * 0.020f +
-                                       std::sin(v * 27.0f - side * 5.4f) * 0.014f) * edgeWeight;
+                const float edgeWeight = std::pow(std::abs(side), 1.45f);
+                const float edgeCoast = 1.0f - std::abs(side);
+                const float scallop = (std::sin(v * 15.0f + side * 2.8f) * 0.052f +
+                                       std::sin(v * 27.0f - side * 5.4f) * 0.026f +
+                                       std::sin(v * 8.0f + side * 2.1f) * 0.018f) * edgeWeight;
                 const float localX = sample.centerX + side * sample.halfWidth * (1.0f + scallop);
                 const float shoreCurve = riverLike
-                    ? std::sin(side * glm::pi<float>() * 0.72f) * 0.13f
-                    : (1.0f - std::abs(side)) * 0.34f + std::sin(side * 5.0f + 0.4f) * 0.055f;
+                    ? std::sin(side * glm::pi<float>() * 0.72f) * 0.24f +
+                          edgeCoast * std::sin(v * 4.7f + side * 1.2f) * 0.12f
+                    : edgeCoast * 0.84f + std::sin(side * 5.0f + 0.4f) * 0.15f +
+                          std::sin(v * 9.0f + side * 2.2f) * (0.25f + 0.75f * edgeCoast) * 0.14f;
                 const float localZ = baseLocalZ + shoreBlend * shoreCurve;
                 const float depthRamp = Smooth01(v);
                 const float channel = riverLike ? (0.55f + 0.45f * (1.0f - edgeWeight)) : (0.72f + 0.28f * (1.0f - edgeWeight));
@@ -7927,8 +7937,8 @@ void Engine::BuildRecipeScene() {
             auto waterMesh = CreateGenerativeWaterBodyMesh(waterBodyWidth,
                                                            waterLen,
                                                            riverLike,
-                                                           riverLike ? 64u : 72u,
-                                                           riverLike ? 12u : 18u);
+                                                           riverLike ? 80u : 96u,
+                                                           riverLike ? 16u : 24u);
             auto up = renderer->UploadMesh(waterMesh);
             if (up.IsErr()) {
                 spdlog::warn("generative_exterior: water mesh upload failed: {}", up.Error());
@@ -7977,8 +7987,8 @@ void Engine::BuildRecipeScene() {
                     ? glm::max(genExt.waterDeep, glm::vec3(0.0f, 0.58f, 1.18f))
                     : genExt.waterDeep;
                 m_registry->AddComponent<Scene::WaterSurfaceComponent>(water, sea);
-                spdlog::info("generative_exterior: structural water surface component=WaterSurfaceComponent shape={} width={:.2f} length={:.2f} vertices={} triangles={} level={:.2f} gerstner_shader=on absorption={:.2f} body={:.2f} tint_strength={:.2f} shallow=({:.2f},{:.2f},{:.2f})",
-                             riverLike ? "s_curve_river" : "curved_lake_cove",
+                spdlog::info("generative_exterior: structural water surface component=WaterSurfaceComponent shape={} shore_profile=asymmetric_banked width={:.2f} length={:.2f} vertices={} triangles={} level={:.2f} gerstner_shader=on absorption={:.2f} body={:.2f} tint_strength={:.2f} shallow=({:.2f},{:.2f},{:.2f})",
+                             riverLike ? "banked_s_curve_river" : "banked_curved_lake_cove",
                              waterBodyWidth,
                              waterLen,
                              waterMesh->positions.size(),

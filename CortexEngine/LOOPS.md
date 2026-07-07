@@ -971,3 +971,29 @@ Status: pending.
   fixture that proves nonblack repeated captures under RT; the next active loop should target
   a non-RT structural quality source such as real water/shore subsystem routing, terrain/backdrop
   massing cleanup, or photoreal asset replacement.
+- 2026-07-06: Loop 4 iteration 30 started as non-RT water/shore mesh structure. Orientation
+  trusted `CURRENT.md` at accepted tag `phase4_hero_canvas_form_20260706`; git status was clean
+  after rejection commit `3ae4bd9`. Heartbeat `cortex-aaa-loop30-proof` fired on a 2s timeout.
+  Scope is limited to generated water/shore mesh geometry and compiler IR budgets, not gates.
+  Hypothesis: the visible flat lake/river sheet can be improved by making the generated water
+  boundary and integrated terrain-water transition curved, irregular, and locally banked in the
+  structural mesh itself, with `WaterSurfaceComponent` still owning rendering. This must avoid
+  overlay/card/proof geometry, water color-ratio tuning, `scene_graphics_gate.py`, and DXR.
+  Verifier is PARTIAL-RISK: python compile, Release build, dirty acceptance probe, runtime
+  receipts for the structural mesh, and manual inspection of the three canonical stills. Kill
+  criteria: reject if semantic/graphics/structural gates fail beyond expected dirty-tree policy,
+  if prompt water color ROI regresses, if straight/luminous water sheets still dominate, if the
+  change creates visible strips/cards, or if the scenes become emptier/flatter.
+- 2026-07-06: Loop 4 iteration 30 dirty probe
+  `phase4_banked_water_mesh_dirty_probe_20260706 -SkipBuild` passed ratchet freeze, Python
+  compile, curation, graphics reset, and structural scene gates after a manual Release build;
+  it failed only expected dirty-tree policy. Selected candidates were campsite
+  `gen_a_foggy_mountain_campsite_beside_1.png`, alpine
+  `gen_a_stormy_alpine_lake_with_a_smal_1.png`, and desert
+  `gen_a_sunny_desert_canyon_campsite_w_0.png`, all quality/graphics green. Runtime receipts
+  prove `shore_profile=asymmetric_banked` with `banked_curved_lake_cove` / `banked_s_curve_river`
+  and higher water mesh tessellation. Manual visual truth remains negative: shoreline silhouettes
+  are less rectangular, but the water still reads as a flat luminous sheet and the scenes remain
+  staged/toy-like. Accept only as a bounded structural water-mesh checkpoint; the next loop must
+  attack a larger non-water fidelity source such as terrain/backdrop massing or photoreal asset
+  replacement.

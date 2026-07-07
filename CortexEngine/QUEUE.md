@@ -482,3 +482,11 @@
   black frames with a DX12 queue fence timeout, and manual stills did not improve. Reverted the
   production diff and dirty `CURRENT_FAILED.md`. Next active item is non-RT structural fidelity:
   water/shore subsystem routing, terrain/backdrop massing cleanup, or photoreal asset replacement.
+- 2026-07-06: active item is Loop 4 iteration 30, non-RT water/shore mesh structure. Improve
+  the generated water boundary and shore transition in the mesh itself while preserving
+  `WaterSurfaceComponent`; no DXR, no `scene_graphics_gate.py`, no water color tuning, and no
+  overlay/card/proof geometry.
+- 2026-07-06: Loop 4 iteration 30 dirty probe passed all real gates and failed only dirty-tree
+  policy after manual Release build. Shoreline silhouettes are less rectangular, but water still
+  reads flat/luminous and visual truth remains negative. Accept only as a bounded structural
+  checkpoint; next active item should be terrain/backdrop massing or photoreal asset replacement.

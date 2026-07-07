@@ -508,3 +508,18 @@
   the production diff and move to a different high-leverage front: source/photoreal hero assets,
   real material/shader response, or a small isolated RT/occlusion fixture before any broad renderer
   opt-in.
+- 2026-07-06: active item is Loop 4 iteration 32, source/photoreal foreground ownership. Make
+  scanned naturalistic assets visibly own the generated campsite foreground and source-bound hero
+  cluster: bind missing source textures, increase source table/rock budgets for campsite,
+  enlarge/reposition real logs/branches/fire-ring rocks/table/lantern around the campfire, and
+  demote the primitive tent shadow backing, and tighten the campsite-only camera around that
+  foreground cluster. Keep old guardrails: no `scene_graphics_gate.py`
+  edits, no new hard pixel gates, no water color tuning, no overlay/proof geometry, and no DXR
+  retry.
+- 2026-07-06: rejected Loop 4 iteration 32. Source foreground clutter did not become coherence:
+  the chair variant was visibly wrong, the no-chair variant stayed in the same toy-stage class,
+  and the camera variant failed the purple-water semantic gate. Reverted production source and
+  dirty `CURRENT_FAILED.md`. Next active item is a renderer/material ground-truth loop, not more
+  local prop/camera tuning: build a small isolated RT/SSAO/occlusion fixture or a curated
+  exterior asset module that proves real material/light response before reconnecting it to
+  generated scenes.

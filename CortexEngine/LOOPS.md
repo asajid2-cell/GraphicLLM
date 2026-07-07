@@ -1037,3 +1037,33 @@ Status: pending.
   changes in `src/Core/Engine_Scenes.cpp` and dirty `CURRENT_FAILED.md` were reverted. Do not retry
   terrain massing as more procedural ridge/apron geometry until asset/material and renderer
   fidelity fronts are stronger.
+- 2026-07-06: Loop 4 iteration 32 started as a source/photoreal foreground ownership slice.
+  Orientation trusted `CURRENT.md` at accepted tag `phase4_banked_water_mesh_20260706`; git status
+  was clean after rejection commit `1cbf0db`. Heartbeat `cortex-aaa-loop32-proof` fired on a 2s
+  timeout before long waits. Scope is limited to source asset texture binding, compiler budgets,
+  authored campsite source-cluster placement/materials, and ledgers. Hypothesis: the scanned
+  naturalistic assets already in the repo must visibly own the campsite foreground before more
+  procedural terrain/ridge work can help; enlarge/reposition real logs, branches, boulders,
+  table, and lanterns while demoting the primitive tent shadow backing and tightening the
+  campsite-only camera around the source foreground cluster. Verifier is
+  PARTIAL-RISK: Release build, dirty acceptance probe, receipts for
+  `foreground_owned=1` and expanded source hero counts, plus manual inspection of the canonical
+  campsite/alpine/desert stills. Kill criteria: reject if acceptance gates fail beyond dirty-tree
+  policy, if water color semantics regress, if source assets become clutter instead of grounding
+  the scene, if new hard pixel gates/overlays/proof geometry are added, or if manual inspection
+  says the selected stills remain in the same disconnected toy-stage failure class.
+- 2026-07-06: Loop 4 iteration 32 rejected. The dirty probe
+  `phase4_source_hero_asset_cluster_dirty_probe_20260706 -SkipBuild` passed ratchet freeze,
+  Python compile, curation, graphics reset, and skipped Release build after a manual green build,
+  but failed structural scene gate because the first source-budget edit leaked into the desert
+  canyon campsite prompt and all three desert candidates failed `turquoise_water_roi_fail`.
+  A targeted desert rerun after tightening the compiler condition produced a hard-valid
+  iteration again, proving the leak. Manual campsite inspection still rejected the slice:
+  adding `WoodenChair_01` made the scene visibly worse with indoor/throne-like furniture, and
+  after removing chairs the frame remained an oversized flat purple lake with a toy tent and
+  disconnected tiny props. A campsite-only camera tightening then failed `purple_water_roi_fail`
+  in all three iterations and still did not escape the visual failure class. Production changes
+  in `src/Core/Engine_Scenes.cpp`, `tools/scene_compiler.py`, and dirty `CURRENT_FAILED.md` were
+  reverted. Do not retry this as larger local prop clutter or camera-only framing; the next loop
+  must change a true renderer/material/asset source, such as an isolated RT/AO fixture or a real
+  curated exterior asset module, before more composition tuning.

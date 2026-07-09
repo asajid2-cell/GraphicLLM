@@ -1154,3 +1154,17 @@ Status: pending.
   are still flat and toy-like. Next loop must spend the bridge on visible material/asset quality:
   curated exterior material receivers, source asset/terrain PBR response, or a hero/shore module
   that makes renderer-owned shadows/SSAO visible in the actual image.
+- 2026-07-06: Loop 4 iteration 35 started as a visible exterior material/receiver module.
+  Orientation trusted `CURRENT.md` at accepted tag `phase4_genscene_rt_fixture_20260706`; git
+  status was clean on `main` after acceptance commit `70adc4b`. Heartbeat
+  `cortex-aaa-loop35-proof` fired on a 2s timeout before render waits. Scope is limited to
+  generated exterior scene construction/material assignment, fixture compatibility, and ledgers;
+  no `scene_graphics_gate.py`, no new `missing_*` hard gates, no water color-ratio tuning, and no
+  overlay/card/proof geometry. Hypothesis: the campsite remains flat because the visible hero,
+  terrain, and shore surfaces do not have a coherent receiver/material field for renderer-owned
+  shadows and SSAO. A curated receiver module should add actual textured/PBR terrain/shore/hero
+  surfaces and physical contact geometry that read in the image. Verifier is PARTIAL-RISK:
+  Release build, accepted RT fixtures, dirty acceptance probe, frame reports, and manual inspection
+  of the canonical campsite/alpine/desert stills. Kill criteria: reject if visual truth stays in
+  the same flat toy-stage class, if the module reads as pasted slabs/cards, if prompt water
+  semantics regress, if RT fixtures fail, or if the change is only receipt text.

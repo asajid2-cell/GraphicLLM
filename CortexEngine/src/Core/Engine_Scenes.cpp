@@ -7462,6 +7462,9 @@ void Engine::BuildRecipeScene() {
             std::shared_ptr<Scene::MeshData> campTrunkMesh;
             std::shared_ptr<Scene::MeshData> campBranchMesh;
             std::shared_ptr<Scene::MeshData> campBoulderMesh;
+            std::shared_ptr<Scene::MeshData> campMossRockMesh;
+            std::shared_ptr<Scene::MeshData> campGrassMesh;
+            std::shared_ptr<Scene::MeshData> campFernMesh;
             std::shared_ptr<Scene::MeshData> campLanternMesh;
             std::shared_ptr<Scene::MeshData> campTableMesh;
             if (campsiteModule) {
@@ -7469,6 +7472,9 @@ void Engine::BuildRecipeScene() {
                 campTrunkMesh = LoadNaturalisticShowcaseMesh("dead_tree_trunk/dead_tree_trunk_1k.gltf");
                 campBranchMesh = LoadNaturalisticShowcaseMesh("dry_branches_medium_01/dry_branches_medium_01_1k.gltf");
                 campBoulderMesh = LoadNaturalisticShowcaseMesh("boulder_01/boulder_01_1k.gltf");
+                campMossRockMesh = LoadNaturalisticShowcaseMesh("rock_moss_set_01/rock_moss_set_01_1k.gltf");
+                campGrassMesh = LoadNaturalisticShowcaseMesh("grass_bermuda_01/grass_bermuda_01_1k.gltf");
+                campFernMesh = LoadNaturalisticShowcaseMesh("fern_02/fern_02_1k.gltf");
                 campLanternMesh = LoadNaturalisticShowcaseMesh("Lantern_01/Lantern_01_1k.gltf");
                 campTableMesh = LoadNaturalisticShowcaseMesh("WoodenTable_01/WoodenTable_01_1k.gltf");
             }
@@ -7492,6 +7498,15 @@ void Engine::BuildRecipeScene() {
             }
             if (campBoulderMesh && !UploadAssetLedMesh(renderer, campBoulderMesh, "authored camp boulder_01")) {
                 campBoulderMesh.reset();
+            }
+            if (campMossRockMesh && !UploadAssetLedMesh(renderer, campMossRockMesh, "authored camp rock_moss_set_01")) {
+                campMossRockMesh.reset();
+            }
+            if (campGrassMesh && !UploadAssetLedMesh(renderer, campGrassMesh, "authored camp grass_bermuda_01")) {
+                campGrassMesh.reset();
+            }
+            if (campFernMesh && !UploadAssetLedMesh(renderer, campFernMesh, "authored camp fern_02")) {
+                campFernMesh.reset();
             }
             if (campLanternMesh && !UploadAssetLedMesh(renderer, campLanternMesh, "authored camp Lantern_01")) {
                 campLanternMesh.reset();
@@ -7545,6 +7560,36 @@ void Engine::BuildRecipeScene() {
                     Scene::RenderableComponent::RenderLayer::Overlay,
                     "water"
                 };
+                AssetLedMaterialSettings receiverGround{
+                    glm::vec4(glm::max(glm::mix(baseGround, glm::vec3(0.10f, 0.13f, 0.085f), 0.52f), glm::vec3(0.018f)), 1.0f),
+                    0.0f, 0.86f, 0.0f, 1.5f, glm::vec3(0.0f), 1.0f,
+                    std::max(0.26f, genExt.groundWetness + 0.18f), 0.78f, false,
+                    Scene::RenderableComponent::AlphaMode::Opaque,
+                    Scene::RenderableComponent::RenderLayer::Opaque,
+                    "naturalistic"
+                };
+                receiverGround.albedoTexture = "assets/textures/polyhaven/aerial_grass_rock/aerial_grass_rock_diff_1k.jpg";
+                receiverGround.normalTexture = "assets/textures/polyhaven/aerial_grass_rock/aerial_grass_rock_nor_gl_1k.jpg";
+                receiverGround.roughnessTexture = "assets/textures/polyhaven/aerial_grass_rock/aerial_grass_rock_rough_1k.jpg";
+                AssetLedMaterialSettings receiverShore{
+                    glm::vec4(glm::max(glm::mix(baseGround * 0.62f, genExt.waterDeep, 0.14f), glm::vec3(0.016f)), 1.0f),
+                    0.0f, 0.70f, 0.0f, 1.5f, glm::vec3(0.0f), 1.0f,
+                    std::max(0.42f, genExt.groundWetness + 0.22f), 0.68f, false,
+                    Scene::RenderableComponent::AlphaMode::Opaque,
+                    Scene::RenderableComponent::RenderLayer::Opaque,
+                    "wet_masonry"
+                };
+                receiverShore.albedoTexture = "assets/textures/polyhaven/coast_sand_05/coast_sand_05_diff_1k.jpg";
+                receiverShore.normalTexture = "assets/textures/polyhaven/coast_sand_05/coast_sand_05_nor_gl_1k.jpg";
+                receiverShore.roughnessTexture = "assets/textures/polyhaven/coast_sand_05/coast_sand_05_rough_1k.jpg";
+                const AssetLedMaterialSettings receiverVegetation{
+                    glm::vec4(0.080f, 0.16f, 0.085f, 1.0f),
+                    0.0f, 0.76f, 0.0f, 1.5f, glm::vec3(0.0f), 1.0f,
+                    std::max(0.16f, genExt.groundWetness * 0.50f), 0.50f, true,
+                    Scene::RenderableComponent::AlphaMode::Opaque,
+                    Scene::RenderableComponent::RenderLayer::Opaque,
+                    "vegetation"
+                };
                 const AssetLedMaterialSettings warmWood{
                     glm::vec4(0.24f, 0.13f, 0.060f, 1.0f),
                     0.0f, 0.62f, 0.0f, 1.5f, glm::vec3(0.0f), 1.0f,
@@ -7595,7 +7640,26 @@ void Engine::BuildRecipeScene() {
                                          const glm::vec3& scale,
                                          const glm::vec3& euler,
                                          const AssetLedMaterialSettings& material) {
-                    AddAssetLedRenderable(*m_registry, tag.c_str(), mesh, position, scale, euler, material);
+                    return AddAssetLedRenderable(*m_registry, tag.c_str(), mesh, position, scale, euler, material);
+                };
+                auto tuneReceiverSurface = [&](entt::entity entity,
+                                               float normalScale,
+                                               float occlusionStrength,
+                                               float specular,
+                                               float clearcoat,
+                                               float anisotropy) {
+                    if (!m_registry->HasComponent<Scene::RenderableComponent>(entity)) {
+                        return;
+                    }
+                    auto& r = m_registry->GetComponent<Scene::RenderableComponent>(entity);
+                    r.normalScale = std::max(r.normalScale, normalScale);
+                    r.occlusionStrength = std::min(r.occlusionStrength, occlusionStrength);
+                    r.proceduralMaskStrength = std::max(r.proceduralMaskStrength, 0.72f);
+                    r.specularFactor = std::max(r.specularFactor, specular);
+                    r.clearcoatFactor = std::max(r.clearcoatFactor, clearcoat);
+                    r.clearcoatRoughnessFactor = std::max(r.clearcoatRoughnessFactor, 0.68f);
+                    r.anisotropyStrength = std::max(r.anisotropyStrength, anisotropy);
+                    r.castsSunShadow = true;
                 };
                 auto addNaturalModulePart = [&](const std::string& tag,
                                                 const char* assetId,

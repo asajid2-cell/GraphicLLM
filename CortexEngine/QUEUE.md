@@ -584,3 +584,12 @@
   Loop 4 remains open and visual truth remains negative. Next active item should use this stable
   renderer bridge for actual visible quality: curated exterior material/asset module or a small
   hero/terrain material receiver slice, not another proof-only gate.
+- 2026-07-06: active item is Loop 4 iteration 35, visible exterior material/receiver module.
+  Use the stable generated RT/AO bridge to make the generated campsite visibly receive real
+  shadow/SSAO/material response: a curated terrain/shore/hero receiver module with actual
+  textured/PBR surfaces and physical receiver geometry, not overlay cards, proof strips, or
+  receipt-only counters. Scope can touch generated exterior scene construction and material
+  assignment, plus ledgers; keep `scene_graphics_gate.py`, water color ratios, and new hard
+  pixel gates untouched. Kill criteria: reject if canonical stills remain the same flat toy-stage
+  class, if the module reads as pasted cards/slabs, if prompt water semantics regress, or if it
+  breaks the accepted RT fixtures.
